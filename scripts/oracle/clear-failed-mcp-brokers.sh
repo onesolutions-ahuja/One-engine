@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 [[ "${EUID}" == 0 && "${#}" == 0 ]] || exit 64
-[[ "${GITHUB_REPOSITORY:-}" == 'unedev00/uneengine' ]] || exit 64
+[[ "${GITHUB_REPOSITORY:-}" == 'onesolutions-ahuja/One-engine' ]] || exit 64
 [[ "$(uname -m)" == aarch64 ]] || exit 64
 [[ "$(cat /proc/1/comm)" == systemd ]] || exit 1
 

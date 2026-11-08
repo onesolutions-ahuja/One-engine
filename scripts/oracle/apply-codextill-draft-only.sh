@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 umask 077
 [[ "${EUID}" == 0 && "$#" == 1 ]] || exit 64
-[[ "${GITHUB_REPOSITORY:-}" == "unedev00/uneengine" ]] || exit 64
+[[ "${GITHUB_REPOSITORY:-}" == "onesolutions-ahuja/One-engine" ]] || exit 64
 [[ "$(uname -m)" == "aarch64" ]] || exit 64
 SOURCE="$1"
 [[ "$SOURCE" == /* ]] || exit 64

@@ -11,7 +11,7 @@
     "build": "npm run build --workspace apps/web && npm run build --workspace apps/server",
     "test": "npm run test:unit",
     "test:unit": "npm run test:system --workspace apps/server && npm run test:metadata && npm run test:components && npm run test --workspace apps/acetill && node scripts/run-archived-tests.mjs scripts/smarttill/apply-visual-drafts.test.mjs",
-    "check": "node scripts/audit-duplicate-code.mjs && node scripts/audit-sql-api-contract.mjs --strict && node scripts/verify-system-file-boundaries.mjs && node scripts/verify-test-suites.mjs && node scripts/verify-project-references.mjs && node scripts/verify-web-source-layout.mjs && npm run test:unit && npm run test:login && npm run build && node scripts/verify-web-lazy-bundle.mjs apps/web/dist",
+    "check": "node scripts/audit-duplicate-code.mjs && node scripts/audit-sql-api-contract.mjs --strict && node scripts/verify-system-file-boundaries.mjs && node scripts/verify-test-suites.mjs && node scripts/verify-project-references.mjs && node scripts/verify-web-source-layout.mjs",
     "start:web": "npm run preview --workspace apps/web",
     "start:server": "npm run start --workspace apps/server",
     "audit:architecture": "node scripts/verify-project-references.mjs && node scripts/verify-web-source-layout.mjs",
@@ -24,7 +24,8 @@
     "test:suite:integration": "node scripts/run-test-suite.mjs integration",
     "test:suite:tenant-isolation": "node scripts/run-test-suite.mjs tenant-isolation",
     "test:suite:app-lifecycle": "node scripts/run-test-suite.mjs app-lifecycle",
-    "test:suite:browser-e2e": "node scripts/run-test-suite.mjs browser-e2e"
+    "test:suite:browser-e2e": "node scripts/run-test-suite.mjs browser-e2e",
+    "check:full": "node scripts/audit-duplicate-code.mjs && node scripts/audit-sql-api-contract.mjs --strict && node scripts/verify-system-file-boundaries.mjs && node scripts/verify-test-suites.mjs && node scripts/verify-project-references.mjs && node scripts/verify-web-source-layout.mjs && npm run test:unit && npm run test:login && npm run build && node scripts/verify-web-lazy-bundle.mjs apps/web/dist"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

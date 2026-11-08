@@ -12,7 +12,7 @@ import {brokerOperation} from './mcp-tools.js';
  * validates/builds it, and reuses full-stack backup/deploy/rollback and locks.
  * GitHub provides ONLY a read-only source SHA comparison, never dispatch/status.
  */
-const repository='unedev00/uneengine';
+const repository='onesolutions-ahuja/One-engine';
 const shaPattern=/^[a-f0-9]{40}$/;
 type OciRelease={
  state:'idle'|'running'|'succeeded'|'failed';
@@ -115,7 +115,7 @@ async function latestMainCommit():Promise<string>{
  try{
   const {stdout}=await execFileAsync('git',[
    '-c','credential.helper=','ls-remote','--exit-code',
-   'https://github.com/unedev00/uneengine.git','refs/heads/main'
+   'https://github.com/onesolutions-ahuja/One-engine.git','refs/heads/main'
   ],{timeout:12000,maxBuffer:4096,env:{...process.env,GIT_TERMINAL_PROMPT:'0'}});
   const match=/^([a-f0-9]{40})\s+refs\/heads\/main\s*$/m.exec(stdout);
   if(match)return match[1];

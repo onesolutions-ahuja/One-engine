@@ -178,7 +178,7 @@ export function PageFormulaScope({components,catalog,children}:{
 }
 export function PublishedFormulaProperties({id,values,rendered}:{id?:string;values:Record<string,unknown>;rendered:Readonly<Record<string,string>>}){
  const scope=usePageFormulaScope();
- const sqlLookup=useSqlFormulaDisplay(values,{useEffect,useMemo,useState});
+ const sqlLookup=useSqlFormulaDisplay(values,{useEffect,useMemo,useRef,useState});
  const entry=scope?.entries.find(item=>item.id===id);
  const publish=scope?.publish;
  const output:Record<string,Scalar>=Object.create(null);

@@ -1,0 +1,24 @@
+# Docker Mailserver — single organisation, no mailbox count limit.
+# Public mail ports. Stop the old Stalwart container before starting this service.
+services:
+  mailserver:
+    image: ghcr.io/docker-mailserver/docker-mailserver:15.1.0
+    container_name: metadrive-docker-mailserver
+    hostname: mail.unesolutions.co.uk
+    env_file: mailserver.env
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - ./data/mail-data:/var/mail
+      - ./data/mail-state:/var/mail-state
+      - ./data/mail-logs:/var/log/mail
+      - ./data/config:/tmp/docker-mailserver
+      - ./certs:/tmp/dms/custom-certs:ro
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    stop_grace_period: 1m
+    security_opt:
+      - no-new-privileges:true

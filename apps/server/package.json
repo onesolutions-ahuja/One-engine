@@ -1,0 +1,44 @@
+{
+  "name": "@metadrive/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/system-support/entrypoint.ts",
+    "build": "npm run build:system",
+    "test": "npm run test:unit --prefix ../..",
+    "start": "node dist-system/system-support/entrypoint.js",
+    "build:system": "tsc -p tsconfig.system-files.json && node scripts/copy-system-migrations.mjs",
+    "test:system": "node --import tsx --test test/system/backend.test.mjs",
+    "provision:tenant": "node dist-system/system-support/provision-cli.js",
+    "preflight:sql": "tsx src/system-support/cutover-cli.ts",
+    "start:worker": "node dist-system/system-support/job-worker-entrypoint.js",
+    "dev:worker": "tsx src/system-support/job-worker-entrypoint.ts",
+    "test:governance:sql": "node scripts/security-governance-sql-smoke.mjs",
+    "test:identity:sql": "node scripts/identity-session-sql-smoke.mjs"
+  },
+  "dependencies": {
+    "@node-saml/node-saml": "^5.1.0",
+    "@simplewebauthn/server": "^14.0.3",
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "esbuild": "^0.28.2",
+    "express": "^4.21.1",
+    "jose": "^5.9.6",
+    "nodemailer": "^10.2.1",
+    "pg": "^8.13.0",
+    "postcss": "^8.5.29",
+    "postcss-selector-parser": "^7.1.6",
+    "sanitize-html": "^2.18.0",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.5",
+    "@types/express": "^4.17.25",
+    "@types/nodemailer": "^8.0.2",
+    "@types/sanitize-html": "^2.16.2",
+    "tsx": "^4.20.0"
+  }
+}

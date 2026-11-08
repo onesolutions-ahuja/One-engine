@@ -1,0 +1,313 @@
+/* Public Une Solutions marketing site: isolated from the authenticated workspace. */
+html{scroll-behavior:smooth}
+html,body,#root{min-width:320px;min-height:100%;margin:0}
+body{background:#fff}
+.une-marketing{--une-ink:var(--md-text,#192230);--une-muted:var(--md-muted,#596579);--une-blue:var(--md-primary,#1d4ed8);--une-border:var(--md-border,#e0e5eb);--une-gradient:linear-gradient(115deg,#086af9 0%,#7449ec 34%,#ef3a9e 68%,#ff9f40 100%);font-family:var(--md-font,Inter,ui-sans-serif,system-ui,sans-serif);color:var(--une-ink);background:#fff;font-size:16px;line-height:var(--md-leading-body,1.5);overflow-x:hidden;}
+.une-marketing *{box-sizing:border-box}
+.une-marketing a{color:inherit;text-decoration:none}
+.une-marketing button{font:inherit}
+.une-marketing button,.une-marketing a{touch-action:manipulation}
+.une-marketing button:focus-visible,.une-marketing a:focus-visible{outline:3px solid #316af6;outline-offset:4px}
+.une-container{width:min(1180px,calc(100% - 64px));margin:0 auto}
+.une-site-header{position:sticky;top:0;z-index:80;background:rgba(255,255,255,.94);border-bottom:1px solid rgba(222,226,240,.86);backdrop-filter:blur(18px)}
+.une-header-inner{height:72px;display:flex;align-items:center;justify-content:space-between;gap:var(--md-space-6,24px)}
+.une-brand{display:inline-flex;align-items:center;flex-shrink:0}
+.une-brand .une-marketing-logo{height:65px}
+.une-site-nav{display:flex;gap:var(--md-space-6,24px);align-items:center;margin:auto}
+.une-site-nav a{white-space:nowrap;font-weight:600;font-size:var(--md-fs-body,14px);color:#3b445a;transition:color .2s}
+.une-site-nav a:hover,.une-header-login:hover{color:#653de6}
+.une-header-actions{display:flex;align-items:center;gap:20px}
+.une-header-login{display:inline-flex;align-items:center;gap:var(--md-space-2,8px);font-size:var(--md-fs-body,14px);font-weight:700;white-space:nowrap}
+.une-marketing .une-button{display:inline-flex;justify-content:center;align-items:center;gap:var(--md-space-2,8px);font-size:var(--md-fs-body,14px);font-weight:700;letter-spacing:.005em;line-height:1.25;border:1px solid transparent;border-radius:var(--md-radius-pill,999px);padding:var(--md-space-3,12px) var(--md-space-6,24px);min-height:var(--md-control-touch,44px);white-space:normal;transition:transform .2s,box-shadow .2s,background .2s;cursor:pointer}
+.une-marketing .une-button:hover{transform:translateY(-2px)}
+.une-marketing .une-button-primary{background:var(--md-primary,#1d4ed8);color:#fff;box-shadow:0 8px 24px rgba(24,28,53,.13)}
+.une-marketing .une-button-primary:hover{box-shadow:0 12px 28px rgba(24,28,53,.25);background:var(--md-primary-hover,#1e40af)}
+.une-marketing .une-button-outline{border:1px solid #cdd4e4;background:rgba(255,255,255,.74);color:#252d41}
+.une-marketing .une-button-dark{background:#19233f;color:#fff}
+.une-marketing .une-button-light{background:#fff;color:#17213f}
+.une-marketing .une-button-transparent{color:#fff;border-color:rgba(255,255,255,.45);background:rgba(255,255,255,.08)}
+.une-nav-toggle,.une-mobile-login{display:none!important}
+.une-hero{position:relative;background:radial-gradient(ellipse at 85% 20%,rgba(159,198,255,.24),transparent 40%),radial-gradient(ellipse at 54% 53%,rgba(239,205,253,.21),transparent 43%),#fafbff}
+.une-hero-ambient{position:absolute;pointer-events:none;inset:0;background-image:radial-gradient(circle at 12% 90%,rgba(63,113,251,.07),transparent 30%)}
+.une-hero-layout{position:relative;display:grid;grid-template-columns:48% 52%;align-items:center;min-height:695px;padding-top:45px;padding-bottom:40px}
+.une-hero-content{position:relative;z-index:2;padding-bottom:28px}
+ .une-hero-chip{display:inline-flex;align-items:center;gap:var(--md-space-2,8px);border:1px solid #e2dafa;background:#f5f0ff;padding:9px 13px;color:#6947c6;border-radius:var(--md-radius-pill,999px);font-size:var(--md-fs-sm,12px);font-weight:700;letter-spacing:.06em}
+.une-hero h1{font-size:clamp(40px,5.25vw,64px);line-height:1.13;letter-spacing:-.03em;font-weight:700;margin:var(--md-space-6,24px) 0;max-width:610px}
+.une-hero h1 span{display:inline-block;background:var(--une-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+.une-hero-description{color:#667089;font-size:17px;max-width:505px;line-height:var(--md-leading-body,1.5);margin:0}
+.une-hero-actions{display:flex;gap:var(--md-space-3,12px);flex-wrap:wrap;margin-top:var(--md-space-8,32px)}
+.une-hero-promise{display:flex;flex-wrap:wrap;gap:var(--md-space-4,16px) var(--md-space-6,24px);margin-top:var(--md-space-8,32px);color:#667088;font-size:12px;font-weight:600}
+.une-hero-promise span{display:inline-flex;align-items:center;gap:8px}
+.une-hero-promise svg{color:#30a384}
+.une-hero-art{height:530px;position:relative;display:grid;align-items:center;perspective:1000px}
+.une-hero-glow{width:490px;height:455px;position:absolute;right:0;top:35px;border-radius:48%;filter:blur(7px);background:radial-gradient(circle at 45% 40%,rgba(162,191,255,.35),rgba(211,170,255,.31) 43%,rgba(253,182,192,.16) 65%,transparent 75%)}
+.une-hero-dashboard{position:relative;width:97%;transform:perspective(900px) rotateY(-8deg) rotateX(4deg) rotateZ(-1deg);filter:drop-shadow(0 30px 33px rgba(52,59,112,.18));z-index:2}
+.une-preview{width:100%;background:white;border:1px solid #e8eaf2;box-shadow:0 20px 48px rgba(35,44,90,.12);border-radius:15px;overflow:hidden;font-family:inherit;text-align:left;color:#1d2539}
+.une-preview-toolbar{height:43px;background:#fff;border-bottom:1px solid #eceef5;display:flex;justify-content:space-between;align-items:center;padding:0 16px;gap:12px;font-size:10px;font-weight:700}
+.une-mini-logo{display:flex;align-items:center;gap:9px}
+.une-mini-mark{height:22px}
+.une-toolbar-right{display:flex;align-items:center;gap:8px;color:#536176;font-size:9px;font-weight:600}
+.une-live-dot{width:7px;height:7px;background:#34ba88;display:inline-block;flex:none;border-radius:50%;box-shadow:0 0 0 3px #daf7eb}
+.une-avatar{background:#ecedff;border-radius:50%;color:#4f419f;font-size:8px;font-weight:700;padding:5px}
+.une-preview-body{display:flex;min-height:298px;background:#f8faff}
+.une-preview-sidebar{flex:0 0 45px;display:flex;flex-direction:column;align-items:center;gap:24px;padding:20px 0;background:#fff;border-right:1px solid #edf0f7;color:#536176}
+.une-preview-sidebar svg:first-child{color:#7355e4}
+.une-preview-main{flex:1;padding:19px 19px 17px;min-width:0}
+.une-preview-label{font-size:9px;color:#536176}
+.une-preview-heading{font-size:17px;font-weight:700;letter-spacing:-.03em;margin:1px 0 15px}
+.une-wave{color:#e969a4}
+.une-metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.une-metric-row>div{display:flex;flex-direction:column;background:white;border:1px solid #edf0f7;border-radius:9px;padding:12px 13px;min-width:0}
+.une-metric-row small,.une-metric-row em{font-size:9px;color:#536176;font-style:normal}
+.une-metric-row strong{font-size:18px;letter-spacing:-.045em;margin:1px 0}
+.une-metric-row em{color:#16764f;font-weight:700}
+.une-chart-card{background:white;margin-top:11px;border:1px solid #edf0f7;border-radius:10px;padding:12px 13px 8px}
+.une-chart-label{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:10px}
+.une-chart-label span{font-size:8px;color:#536176}
+.une-bars{height:77px;margin:18px 10px 5px;display:flex;gap:8px;align-items:end;border-bottom:1px solid #edf0f7}
+.une-bars>div{flex:1;background:linear-gradient(180deg,#7494ff,#b8c6ff);border-radius:3px 3px 0 0}
+.une-bars>div:nth-child(3n){background:linear-gradient(180deg,#8369eb,#d7c8ff)}
+.une-chart-footer{font-size:7px;display:flex;justify-content:space-between;color:#536176;letter-spacing:.04em}
+.une-hero-phone{position:absolute;z-index:4;right:-14px;bottom:3px;width:138px;height:264px;background:#fff;border:6px solid #1c2340;box-shadow:0 20px 35px rgba(33,38,68,.28);border-radius:27px;padding:16px 10px 10px;transform:rotate(8deg)}
+.une-phone-speaker{position:absolute;width:38px;height:5px;background:#1d2540;border-radius:0 0 8px 8px;top:0;left:calc(50% - 19px)}
+.une-phone-top{font-size:10px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.une-phone-top span{font-size:6px;color:#16764f}
+.une-phone-greeting{font-size:13px;font-weight:700;line-height:1.25;margin-top:17px}
+.une-phone-food{height:105px;border-radius:12px;background:linear-gradient(150deg,#fbe7c1,#ffcebd);display:grid;place-items:center;font-size:58px;margin-top:10px}
+.une-phone-order{background:#172044;border-radius:8px;color:#fff;text-align:center;margin-top:11px;font-size:8px;font-weight:700;padding:9px}
+.une-float-card{position:absolute;z-index:5;display:flex;align-items:center;gap:9px;padding:11px 13px;background:rgba(255,255,255,.97);border:1px solid #edf0f7;border-radius:13px;box-shadow:0 10px 30px rgba(37,45,100,.13)}
+.une-float-card small{display:block;font-size:8px;color:#536176}
+.une-float-card strong{display:block;font-size:10px}
+.une-float-sales{left:-11px;top:44px;transform:rotate(-5deg)}
+.une-float-message{left:15px;bottom:10px;transform:rotate(3deg)}
+.une-float-icon{display:grid;place-items:center;width:32px;height:32px;background:#e8f0ff;color:#3475e8;border-radius:10px}
+.une-float-icon.pink{background:#fff0f6;color:#e646a0}
+.une-hero-bottom{min-height:86px;display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:16px;align-items:center;border-top:1px solid #e6e9f1}
+.une-hero-bottom>div{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:700;color:#6c758c}
+.une-hero-bottom>div:first-child{display:block}
+.une-hero-bottom strong,.une-hero-bottom>div:first-child span{display:block}
+.une-hero-bottom strong{font-size:12px;color:#1d2540}
+.une-hero-bottom svg{color:#6965a1;flex:none}
+.une-section{padding:calc(var(--md-space-12,48px) * 2) 0;scroll-margin-top:80px}
+.une-section-eyebrow{display:inline-block;color:#6746d5;font-size:11px;font-weight:700;letter-spacing:.15em}
+.une-marketing h2{font-size:clamp(35px,3.7vw,51px);line-height:1.18;letter-spacing:-.03em;font-weight:700;margin:13px 0 18px}
+.une-marketing h3{letter-spacing:-.025em}
+.une-marketing .une-section p{color:var(--une-muted)}
+.une-heading-row{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:36px}
+.une-heading-row h2{max-width:580px}
+.une-heading-row p{margin:0;font-size:16px}
+.une-inline-link{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-size:13px;font-weight:700;color:#5f4ed1!important}
+.une-inline-link:hover{text-decoration:underline}
+.une-solutions-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:15px}
+.une-solution-card{border:1px solid #e7eaf3;border-radius:19px;padding:23px 20px 18px;background:#fff;min-height:238px;transition:transform .25s,box-shadow .25s,border-color .25s}
+.une-solution-card:hover{transform:translateY(-4px);border-color:#d6d8fa;box-shadow:0 15px 34px rgba(59,61,112,.09)}
+.une-solution-icon{width:46px;height:46px;display:grid;place-items:center;border-radius:13px;margin-bottom:15px}
+.une-solution-icon.blue{color:#3b66de;background:#e9efff}.une-solution-icon.orange{color:#e78d31;background:#fff4df}.une-solution-icon.pink{color:#ea5d9a;background:#ffeff7}.une-solution-icon.violet{color:#795ad4;background:#f1ebff}.une-solution-icon.cyan{color:#169db1;background:#e3f8fb}.une-solution-icon.green{color:#269e75;background:#dff9ee}
+.une-solution-tag{font-size:var(--md-fs-xs,11px);color:#536176;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.une-solution-card h3{font-size:16px;line-height:1.3;margin:6px 0 9px}
+.une-solution-card p{font-size:12px;line-height:1.65;margin:0 0 12px}
+.une-solution-card>a{font-size:11px;font-weight:700;color:#6255d4;display:inline-flex;gap:5px;align-items:center}
+.une-showcase-section{background:#f6f8ff}
+/* WCAG AA: muted showcase copy must contrast with the pale showcase background. */
+.une-marketing .une-showcase-top>p,.une-marketing .une-showcase-copy>p{color:#596579}
+.une-showcase-top{text-align:center}
+.une-showcase-top h2{max-width:760px;margin-left:auto;margin-right:auto}
+.une-showcase-top p{margin:0}
+.une-showcase-tabs{display:flex;align-items:center;justify-content:center;gap:8px;margin:38px 0}
+.une-showcase-tabs button{background:white;border:1px solid #e0e5f0;border-radius:999px;font-size:12px;padding:10px 20px;color:#65718b;cursor:pointer;font-weight:700}
+.une-showcase-tabs button.selected{background:#17213e;border-color:#17213e;color:#fff}
+.une-showcase-stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.7fr);align-items:center;gap:var(--md-space-12,48px)}
+.une-showcase-device{min-height:425px;border:1px solid #e3e8f5;border-radius:26px;background:linear-gradient(135deg,#e2eafd,#f8edff 53%,#ffeaf2);display:grid;place-items:center;padding:40px 34px;overflow:hidden}
+.une-showcase-device>.une-preview{max-width:610px}
+.une-showcase-device .une-preview-body{min-height:330px}
+.une-showcase-device .une-bars{height:110px}
+.une-showcase-copy h3{font-size:35px;line-height:1.22;margin:13px 0 18px}
+.une-showcase-copy>p{font-size:15px;line-height:var(--md-leading-body,1.5)}
+.une-showcase-copy ul{list-style:none;padding:0;margin:24px 0}
+.une-showcase-copy li{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-bottom:12px}
+.une-showcase-copy li svg{color:#36af84}
+.une-illustration-note{display:block;margin-top:26px;font-size:10px;color:#536176;line-height:1.5}
+.une-kiosk-device{position:relative;width:210px;height:345px;border:9px solid #242b40;border-radius:19px;box-shadow:0 25px 40px rgba(32,36,78,.25);background:white;align-self:center}
+.une-kiosk-screen{width:100%;height:100%;background:#fffaf5;border-radius:10px;padding:12px 10px;display:flex;flex-direction:column;color:#2e2d38;overflow:hidden}
+.une-kiosk-head{display:flex;justify-content:space-between;align-items:center;font-size:7px;font-weight:700}
+.une-small-sun{color:#ff9e48;font-size:13px}
+.une-kiosk-title{text-align:center;font-size:14px;font-weight:700;margin-top:19px;letter-spacing:-.045em;line-height:1.15}
+.une-kiosk-sub{font-size:6px;text-align:center;color:#62544e;margin-top:5px}
+.une-kiosk-pills{display:flex;gap:4px;margin:16px 0 11px}
+.une-kiosk-pills span{border-radius:100px;padding:5px 8px;background:#fff;font-size:6px;color:#595553}
+.une-kiosk-pills .active{background:#9a4318;color:white}
+.une-kiosk-items{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.une-kiosk-items>div{background:white;border:1px solid #f7eee4;border-radius:8px;padding:5px}
+.une-food{background:#fce9d8;border-radius:6px;height:53px;display:grid;place-items:center;font-size:28px}
+.une-food-coffee{background:#f4dfc8}.une-food-croissant{background:#ffecc5}.une-food-sandwich{background:#e4f5df}.une-food-cake{background:#ffe2e7}
+.une-kiosk-items strong,.une-kiosk-items small{display:block;font-size:7px;line-height:1.4;margin-top:3px}
+.une-kiosk-items small{color:#9a4318;font-weight:700}
+.une-kiosk-bottom{margin:auto -4px 0;padding:9px 7px;display:flex;justify-content:space-between;background:#202944;color:#fff;border-radius:8px;font-size:6px}
+.une-kiosk-stand{position:absolute;z-index:-1;width:12px;height:40px;left:calc(50% - 6px);bottom:-45px;background:#363e54}
+.une-kiosk-stand:after{content:"";position:absolute;bottom:-7px;left:-40px;width:92px;height:8px;background:#363e54;border-radius:6px}
+.une-pos-layout{display:grid;grid-template-columns:1.45fr .9fr;background:#f6f8fb;min-height:295px}
+.une-pos-products{padding:18px}
+.une-pos-search{border:1px solid #e8edf4;color:#596579;padding:10px 12px;border-radius:9px;font-size:9px;background:white}
+.une-pos-categories{display:flex;gap:9px;margin:12px 0}
+.une-pos-categories span{font-size:9px;padding:5px 9px;border-radius:50px;background:#fff}
+.une-pos-categories span:first-child{background:#313a6a;color:white}
+.une-pos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.une-pos-grid>div{background:white;border:1px solid #edf0f8;border-radius:9px;text-align:center;padding:9px 5px}
+.une-pos-grid span{display:block;font-size:26px}
+.une-pos-grid strong,.une-pos-grid small{display:block;font-size:8px}
+.une-pos-grid small{color:#5146b8}
+.une-pos-cart{background:#fff;border-left:1px solid #edf0f8;padding:18px;display:flex;flex-direction:column}
+.une-pos-cart>strong{font-size:13px}
+.une-pos-cart>small{font-size:9px;color:#536176;margin-bottom:20px}
+.une-pos-line{display:flex;justify-content:space-between;font-size:9px;border-bottom:1px solid #eef0f6;padding:10px 0}
+.une-pos-total{display:flex;justify-content:space-between;align-items:center;margin:auto 0 12px;font-size:10px}
+.une-pos-total strong{font-size:18px}
+.une-pos-pay{background:#333766;color:#fff;text-align:center;border-radius:8px;font-size:10px;font-weight:700;padding:11px}
+.une-kds-preview{background:#182237;color:#fff;padding:17px;min-height:310px}
+.une-kds-toolbar{display:flex;justify-content:space-between;font-size:11px;align-items:center}
+.une-kds-toolbar span{font-size:9px;display:flex;gap:8px;align-items:center;color:#b4bdce}
+.une-kds-orders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:18px}
+.une-kds-ticket{background:#29364b;border-radius:10px;padding:12px 9px;min-height:222px;display:flex;flex-direction:column}
+.une-kds-ticket>div{display:flex;justify-content:space-between;gap:4px;font-size:12px;align-items:center}
+.une-kds-ticket>div span{font-size:7px;font-weight:700;border-radius:5px;padding:4px;background:rgba(255,255,255,.15)}
+.une-kds-ticket.orange{border-top:4px solid #ffac5b}.une-kds-ticket.blue{border-top:4px solid #60b6f9}.une-kds-ticket.green{border-top:4px solid #47d19b}
+.une-kds-ticket>small{font-size:8px;color:#c0c8d8;margin:8px 0 15px}
+.une-kds-ticket p{font-size:10px;color:#f6f7ff!important;margin:0 0 10px}
+.une-kds-ticket footer{margin-top:auto;background:rgba(255,255,255,.11);border-radius:7px;text-align:center;padding:7px;font-size:8px}
+.une-benefits-grid{display:grid;grid-template-columns:1fr 1fr;gap:100px;align-items:center}
+.une-benefits-grid>div:first-child>p{font-size:16px;max-width:420px;line-height:var(--md-leading-body,1.5)}
+.une-benefits-grid h2 span{color:#7869e4}
+.une-benefits-grid .une-button{margin-top:21px}
+.une-benefits-list{display:grid;gap:8px}
+.une-benefits-list article{display:flex;gap:19px;padding:18px 10px;border-bottom:1px solid #edf0f6}
+.une-benefits-list article>span{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:13px;color:#6a59df;background:#f1edff}
+.une-benefits-list h3{font-size:16px;margin:0}
+.une-benefits-list p{font-size:12px;line-height:1.7;margin:5px 0 0}
+.une-integrations-section{background:#f9faff}
+.une-integrations-layout{display:grid;grid-template-columns:1.08fr .92fr;gap:var(--md-space-12,48px);align-items:center}
+.une-integrations-copy>p{max-width:560px;line-height:var(--md-leading-body,1.5)}
+.une-integration-pills{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0}
+.une-integration-pills span{display:flex;align-items:center;gap:11px;padding:13px 15px;border:1px solid #e5e9f3;background:white;border-radius:11px;font-size:12px;font-weight:700}
+.une-integration-pills svg{color:#7559e4;flex:none}
+.une-marketing .une-integrations-note{font-size:11px;color:#536176}
+.une-integration-visual{position:relative;aspect-ratio:1/1;max-height:430px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.6),rgba(220,225,255,.15) 50%,transparent 70%);display:grid;place-items:center}
+.une-integration-orbit{position:absolute;border:1px dashed #c9d2ea;border-radius:50%;inset:18px}
+.une-integration-orbit.orbit-two{inset:76px}
+.une-integration-centre{width:172px;height:172px;background:white;display:grid;place-items:center;border:1px solid #e6e7ff;border-radius:50%;box-shadow:0 12px 42px rgba(93,77,159,.13)}
+.une-integration-centre .une-integration-logo{height:76px}
+.une-orbit-item{position:absolute;display:flex;flex-direction:column;align-items:center;gap:5px;justify-content:center;width:87px;height:87px;border-radius:20px;background:#fff;box-shadow:0 10px 30px rgba(50,66,115,.09);color:#6355d8;border:1px solid #ecedfa}
+.une-orbit-item small{font-size:9px;font-weight:700;color:#627086}
+.orbit-a{top:1%;left:18%}.orbit-b{top:12%;right:2%}.orbit-c{right:0;bottom:21%}.orbit-d{bottom:0;left:19%}.orbit-e{left:0;top:43%}
+.une-engage-layout{display:grid;grid-template-columns:.9fr 1.1fr;gap:135px;align-items:center}
+.une-engage-phone{width:325px;max-width:100%;min-height:540px;justify-self:center;border-radius:34px;background:#eef7f3;border:9px solid #20283e;box-shadow:0 33px 60px rgba(33,45,78,.18);overflow:hidden;display:flex;flex-direction:column}
+.une-chat-top{display:flex;gap:9px;align-items:center;background:#fff;padding:17px 18px;font-size:12px}
+.une-chat-avatar{display:grid;place-items:center;background:var(--une-gradient);color:#fff;font-size:13px;font-weight:700;width:36px;height:36px;border-radius:50%}
+.une-chat-top div{flex:1}
+.une-chat-top strong,.une-chat-top small{display:block}
+.une-chat-top small{font-size:9px;color:#50645a}
+.une-chat-body{padding:14px;flex:1;display:flex;flex-direction:column;gap:12px}
+.une-chat-date{align-self:center;background:#deece5;padding:4px 10px;border-radius:20px;font-size:9px}
+.une-chat-bubble{max-width:82%;border-radius:13px;font-size:12px;padding:12px;box-shadow:0 2px 5px rgba(8,48,36,.04)}
+.une-chat-bubble.left{background:white;align-self:flex-start;border-top-left-radius:3px}
+.une-chat-bubble.right{background:#d6f9e5;align-self:flex-end;border-top-right-radius:3px}
+.une-chat-options{display:grid;gap:5px;width:76%;align-self:flex-start}
+.une-chat-options span{text-align:center;background:#fff;color:#28627f;padding:7px;font-size:10px;border-radius:7px;border:1px solid #dae8e5}
+.une-chat-input{background:#fff;margin:0 10px 12px;padding:11px 16px;border-radius:24px;display:flex;justify-content:space-between;color:#50645d;font-size:10px}
+.une-engage-copy>p{font-size:16px;line-height:1.9}
+.une-engage-copy ul{list-style:none;padding:0;margin:24px 0}
+.une-engage-copy li{display:flex;align-items:center;gap:10px;margin:14px 0;font-weight:700;font-size:13px}
+.une-engage-copy li svg{color:#36b78f}
+.une-engage-copy>small{display:block;color:#536176;font-size:var(--md-fs-xs,11px);margin-top:22px}
+.une-reporting-section{background:#f8faff}
+.une-reporting-layout{display:grid;grid-template-columns:1fr 1fr;gap:95px;align-items:center}
+.une-reporting-copy>p{line-height:1.9}
+.une-report-points{display:grid;gap:13px;margin:25px 0}
+.une-report-points span{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700}
+.une-report-points svg{color:#36b58d}
+.une-email-card{background:#fff;border:1px solid #e5eafb;box-shadow:0 20px 60px rgba(38,52,98,.1);border-radius:19px;overflow:hidden;transform:rotate(2deg)}
+.une-email-top{display:flex;align-items:center;gap:10px;padding:16px 22px;border-bottom:1px solid #e7eaf5;font-size:12px;font-weight:700}
+.une-email-top svg{color:#7770da}
+.une-email-new{margin-left:auto;color:#536176;font-size:8px}
+.une-email-inner{padding:var(--md-space-8,32px)}
+.une-email-inner>small{letter-spacing:.1em;color:#6857d8;font-weight:700;font-size:9px}
+.une-email-inner h3{font-size:24px;margin:8px 0 21px}
+.une-email-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.une-email-stats div{padding:15px 10px;background:#f7f8ff;border-radius:10px}
+.une-email-stats small,.une-email-stats b{display:block;font-size:9px}
+.une-email-stats b{font-size:18px}
+.une-email-chart{height:115px;margin:27px 0 18px;display:flex;align-items:end;gap:9px}
+.une-email-chart span{flex:1;background:linear-gradient(#8d77f6,#d0c4ff);border-radius:6px 6px 0 0}
+.une-email-chart span:nth-child(3n){background:linear-gradient(#62aaf5,#c9e9ff)}
+.une-email-footer{border-top:1px solid #ecedf5;padding-top:15px;color:#536176;font-size:11px;display:flex;justify-content:space-between;align-items:center}
+.une-email-footer svg{color:#2bb888}
+.une-section-centred{text-align:center;margin-bottom:44px}
+.une-section-centred p{margin:0}
+.une-industry-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:17px}
+.une-industry-card{padding:27px 23px;border-radius:18px;background:#fafbff;border:1px solid #e8ecf5;min-height:242px;position:relative;transition:background .2s,transform .2s}
+.une-industry-card:hover{background:#f2f4ff;transform:translateY(-4px)}
+.une-industry-card>span{width:49px;height:49px;display:grid;place-items:center;border-radius:13px;color:#7b63dd;background:#ede8ff}
+.une-industry-card h3{font-size:17px;line-height:1.3;margin:20px 0 7px}
+.une-industry-card p{font-size:12px;line-height:1.65}
+.une-industry-card>svg{position:absolute;right:22px;top:29px;color:#7f7ae6}
+.une-faq-section{background:#fafbff}
+.une-faq-layout{display:grid;grid-template-columns:.7fr 1.3fr;gap:110px}
+.une-faq-layout>div:first-child>p{line-height:var(--md-leading-body,1.5)}
+.une-faq-list{border-top:1px solid #e0e4f0}
+.une-faq-item{border-bottom:1px solid #e0e4f0}
+.une-faq-item button{display:flex;justify-content:space-between;text-align:left;align-items:center;gap:18px;width:100%;padding:19px 0;background:transparent;border:none;font-size:14px;font-weight:700;color:#252d46;cursor:pointer}
+.une-faq-item button svg{flex:none;color:#636acd;transition:transform .2s}
+.une-faq-item button[aria-expanded=true] svg{transform:rotate(180deg)}
+.une-faq-item p{margin:0 0 20px;font-size:13px;line-height:var(--md-leading-body,1.5)}
+.une-final-cta{padding:85px 0}
+.une-cta-inner{position:relative;isolation:isolate;overflow:hidden;text-align:center;border-radius:28px;background:#131b3c;padding:76px 28px;color:white}
+.une-cta-color{pointer-events:none;position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 4% 4%,rgba(40,91,252,.6),transparent 44%),radial-gradient(ellipse at 95% 80%,rgba(244,74,166,.44),transparent 40%),radial-gradient(ellipse at 86% 12%,rgba(254,150,52,.23),transparent 26%)}
+.une-cta-kicker{display:inline-flex;gap:10px;align-items:center;color:#d8c7ff;font-size:10px;font-weight:700;letter-spacing:.14em}
+.une-cta-inner h2{font-size:clamp(36px,4.8vw,62px);margin:18px 0}
+.une-cta-inner h2 em{font-style:normal;background:linear-gradient(100deg,#77aaff,#ef9cfa,#ffbc8f);-webkit-background-clip:text;background-clip:text;color:transparent}
+.une-cta-inner>p{color:#d5dced!important;font-size:17px}
+.une-cta-buttons{display:flex;justify-content:center;gap:var(--md-space-3,12px);margin:var(--md-space-8,32px) 0 var(--md-space-6,24px)}
+.une-cta-email{font-size:12px;color:#b8c2da}
+.une-cta-email a{text-decoration:underline}
+.une-footer{padding:70px 0 22px;background:#f8faff}
+.une-footer-main{display:grid;grid-template-columns:2fr 1fr 1fr 1.1fr;gap:60px;padding-bottom:50px}
+.une-footer-main>div{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.une-footer-main .une-brand .une-marketing-logo{height:72px}
+.une-footer-main p{color:#536176;font-size:12px;line-height:var(--md-leading-body,1.5);margin:0}
+.une-footer-main strong{font-size:12px;margin-bottom:7px}
+.une-footer-main a:not(.une-brand){font-size:12px;color:#5b6882}
+.une-footer-main a:hover{text-decoration:underline}
+.une-footer-main span{font-size:11px;line-height:1.7;color:#536176}
+.une-footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:21px;border-top:1px solid #e6eaf3;color:#536176;font-size:11px}
+.une-footer-bottom a{display:inline-flex;align-items:center;gap:4px}
+@media(max-width:1150px){.une-site-nav{gap:15px}.une-header-actions{gap:13px}.une-solutions-grid{grid-template-columns:repeat(3,1fr)}.une-hero h1{font-size:57px}.une-showcase-stage{gap:35px}.une-engage-layout{gap:65px}}
+@media(max-width:900px){.une-container{width:min(100% - 40px,720px)}.une-header-inner{height:72px}.une-brand .une-marketing-logo{height:55px}.une-nav-toggle{display:grid!important;place-items:center;border:0;background:transparent;padding:9px;color:#1c2540}.une-site-nav{display:none;position:absolute;left:0;right:0;top:100%;padding:20px 24px 25px;background:#fff;border-bottom:1px solid #e7eaf3;box-shadow:0 18px 25px rgba(20,30,70,.1);flex-direction:column;align-items:stretch;gap:0}.une-site-nav.is-open{display:flex}.une-site-nav a{font-size:15px;padding:12px 8px}.une-mobile-login{display:flex!important;align-items:center;gap:5px}.une-header-login{display:none}.une-header-demo{padding:13px 17px!important;min-height:42px!important}.une-hero-layout{grid-template-columns:1fr;gap:18px;padding-top:80px;padding-bottom:35px}.une-hero-content{text-align:center;padding:0}.une-hero h1{max-width:610px;margin-left:auto;margin-right:auto}.une-hero-description{margin:auto}.une-hero-actions,.une-hero-promise{justify-content:center}.une-hero-art{width:min(100%,690px);height:490px;margin:0 auto}.une-hero-bottom{grid-template-columns:repeat(2,1fr);padding:20px 0;gap:14px}.une-section{padding:calc(var(--md-space-12,48px) + var(--md-space-6,24px)) 0}.une-heading-row{align-items:start}.une-solutions-grid{grid-template-columns:repeat(2,1fr)}.une-showcase-stage{grid-template-columns:1fr;gap:25px}.une-showcase-copy{max-width:600px}.une-showcase-copy h3{font-size:30px}.une-benefits-grid,.une-integrations-layout,.une-engage-layout,.une-reporting-layout,.une-faq-layout{grid-template-columns:1fr;gap:45px}.une-integration-visual{width:450px;max-width:100%;margin:auto}.une-engage-phone{grid-row:2}.une-reporting-layout{gap:45px}.une-industry-grid{grid-template-columns:repeat(2,1fr)}.une-footer-main{grid-template-columns:repeat(2,1fr);gap:40px}}
+@media(max-width:520px){.une-container{width:calc(100% - 34px)}.une-header-inner{height:64px}.une-header-demo{font-size:var(--md-fs-xs,11px)!important;padding:12px!important;min-height:var(--md-control-touch,44px)!important}.une-header-demo svg{width:14px}.une-brand .une-marketing-logo{height:50px}.une-hero-layout{padding-top:64px}.une-hero h1{font-size:clamp(41px,12vw,59px);letter-spacing:-.03em}.une-hero-description{font-size:14px}.une-hero-chip{font-size:var(--md-fs-xs,11px);letter-spacing:.05em}.une-hero-actions{flex-direction:column;align-items:stretch}.une-marketing .une-button{width:100%}.une-hero-art{height:365px}.une-hero-dashboard{width:100%;transform:scale(.93) rotateZ(-2deg)}.une-hero-art .une-preview-toolbar{height:32px}.une-hero-art .une-preview-body{min-height:185px}.une-hero-art .une-preview-main{padding:10px}.une-hero-art .une-preview-heading{font-size:11px;margin-bottom:8px}.une-hero-art .une-metric-row>div{padding:5px}.une-hero-art .une-metric-row strong{font-size:12px}.une-hero-art .une-metric-row small,.une-hero-art .une-metric-row em{font-size:6px}.une-hero-art .une-bars{height:45px;margin-top:7px;gap:3px}.une-hero-art .une-preview-sidebar{flex-basis:27px;gap:10px}.une-hero-art .une-preview-sidebar svg{width:10px;height:10px}.une-hero-art .une-chart-card{padding:7px}.une-hero-phone{right:0;bottom:2px;width:105px;height:215px;border-width:5px;border-radius:18px;padding:14px 8px 7px}.une-phone-food{height:75px;font-size:43px}.une-phone-greeting{font-size:10px}.une-phone-top{font-size:8px}.une-float-card{padding:7px;gap:5px}.une-float-card small{font-size:7px}.une-float-card strong{font-size:8px}.une-float-icon{width:22px;height:22px}.une-float-sales{top:16px;left:0}.une-float-message{bottom:12px;left:0}.une-hero-bottom{grid-template-columns:1fr 1fr;gap:11px}.une-hero-bottom>div{font-size:var(--md-fs-xs,11px)}.une-hero-bottom>div:first-child span{font-size:var(--md-fs-xs,11px)}.une-heading-row{display:block}.une-heading-row .une-inline-link{margin-top:20px}.une-marketing h2{font-size:35px}.une-solutions-grid{gap:10px}.une-solution-card{padding:17px 14px;min-height:235px}.une-solution-card h3{font-size:14px}.une-solution-card p{font-size:11px}.une-showcase-tabs{overflow-x:auto;justify-content:flex-start;gap:var(--md-space-2,8px);padding:0 0 var(--md-space-2,8px);scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb,#abb8c8) transparent;overscroll-behavior:contain;mask-image:linear-gradient(to right,#000 0%,#000 calc(100% - 20px),transparent 100%)}.une-showcase-tabs:focus-within{mask-image:none}.une-showcase-tabs button{flex:none;font-size:11px;padding:9px 16px}.une-showcase-device{min-height:320px;padding:22px 12px}.une-showcase-device .une-preview-body{min-height:225px}.une-showcase-device .une-preview-main{padding:9px}.une-showcase-device .une-metric-row>div{padding:6px}.une-showcase-device .une-metric-row strong{font-size:12px}.une-showcase-device .une-metric-row small,.une-showcase-device .une-metric-row em{font-size:7px}.une-showcase-device .une-preview-sidebar{flex-basis:29px;gap:15px}.une-showcase-device .une-preview-sidebar svg{width:12px;height:12px}.une-showcase-device .une-bars{height:65px}.une-showcase-device .une-chart-card{padding:7px}.une-showcase-device .une-chart-label span{font-size:6px}.une-pos-products{padding:7px}.une-pos-grid{gap:4px}.une-pos-grid>div{padding:6px 2px}.une-pos-grid span{font-size:18px}.une-pos-grid strong,.une-pos-grid small{font-size:6px}.une-pos-cart{padding:9px}.une-pos-cart>strong{font-size:9px}.une-pos-line{font-size:7px}.une-kds-preview{padding:10px}.une-kds-ticket{padding:8px 5px;min-height:200px}.une-kds-ticket>div{font-size:9px;flex-wrap:wrap}.une-kds-ticket p{font-size:8px}.une-kiosk-device{transform:scale(.85)}.une-integration-pills{gap:8px}.une-integration-pills span{font-size:var(--md-fs-xs,11px);padding:12px 8px}.une-integration-pills svg{width:15px}.une-integration-visual{height:315px}.une-integration-orbit{inset:12px}.une-integration-orbit.orbit-two{inset:48px}.une-integration-centre{width:125px;height:125px}.une-integration-centre .une-integration-logo{height:58px}.une-orbit-item{width:62px;height:62px;border-radius:13px}.une-orbit-item svg{width:18px}.une-orbit-item small{font-size:7px}.une-engage-phone{min-height:510px}.une-industry-grid{gap:10px}.une-industry-card{padding:18px 14px;min-height:230px}.une-industry-card h3{font-size:15px}.une-industry-card p{font-size:11px}.une-industry-card>svg{right:12px;top:20px}.une-email-inner{padding:18px}.une-email-inner h3{font-size:19px}.une-email-stats{gap:5px}.une-email-stats div{padding:10px 6px}.une-email-stats b{font-size:14px}.une-cta-inner{padding:52px 18px}.une-cta-buttons{flex-direction:column;gap:10px}.une-footer-main{gap:32px 20px}.une-footer-bottom{flex-direction:column;align-items:flex-start;gap:9px}}
+@media(prefers-reduced-motion:reduce){.une-marketing *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Shared visual rhythm for interactive marketing content; embedded product previews are illustrations. */
+.une-marketing :is(.une-site-nav a,.une-header-login,.une-inline-link,.une-showcase-tabs button){min-height:var(--md-control-height,40px)}
+.une-marketing :is(.une-header-login,.une-site-nav a,.une-inline-link){display:inline-flex;align-items:center}
+@media(pointer:coarse){.une-marketing :is(.une-site-nav a,.une-header-login,.une-inline-link,.une-showcase-tabs button){min-height:var(--md-control-touch,44px)}}
+
+/* Standalone public privacy page, readable without authentication or client JS state. */
+.une-privacy-page {min-height:100dvh;display:flex;flex-direction:column}
+.une-privacy-header {border-bottom:1px solid #e2e8f0;background:#fff}
+.une-privacy-header-inner {display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:78px}
+.une-privacy-header .une-marketing-logo {height:58px}
+.une-privacy-header-inner>a:last-child {display:inline-flex;align-items:center;gap:8px;font-size:14px;color:#164aa5;font-weight:650}
+.une-privacy-main {max-width:820px;padding-block:56px 72px;flex:1 1 auto}
+.une-privacy-main h1 {font-size:clamp(30px,5vw,44px);letter-spacing:-.03em;line-height:1.2;margin:8px 0}
+.une-privacy-main h2 {font-size:20px;line-height:1.35;margin:30px 0 9px;color:#192230}
+.une-privacy-main p {font-size:15px;line-height:1.75;color:#475569;margin:10px 0;max-width:75ch}
+.une-privacy-main .une-privacy-updated {color:#64748b;font-size:13px;margin-bottom:25px}
+.une-privacy-main a {color:#124dad;text-decoration:underline;text-underline-offset:3px}
+.une-privacy-actions {display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding-top:22px;margin-top:36px}
+.une-privacy-actions a {display:inline-flex;align-items:center;min-height:44px;font-weight:650}
+.une-privacy-footer {padding:18px 0;border-top:1px solid #e2e8f0;font-size:13px;color:#475569}
+.une-privacy-footer a {text-decoration:underline}
+@media(max-width:520px){
+ .une-privacy-main {padding-block:28px 48px}
+ .une-privacy-header-inner {min-height:64px}
+ .une-privacy-header .une-marketing-logo {height:45px}
+ .une-privacy-main h2 {font-size:18px}
+}

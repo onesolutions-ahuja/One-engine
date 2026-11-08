@@ -1,0 +1,40 @@
+{
+  "apiName": "smart_cart",
+  "label": "Smart Cart",
+  "category": "Data",
+  "description": "Metadata-driven cart presentation for the Page Builder. Bindings, totals and actions are configured separately.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_cart/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_cart/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 680,
+    "defaultHeight": 520,
+    "minWidth": 280,
+    "minHeight": 220
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "click",
+      "label": "On Click"
+    },
+    {
+      "apiName": "qtyIcon",
+      "label": "Qty Icon"
+    },
+    {
+      "apiName": "customButton1",
+      "label": "Custom Button 1"
+    },
+    {
+      "apiName": "customButton2",
+      "label": "Custom Button 2"
+    }
+  ]
+}

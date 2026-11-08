@@ -1,0 +1,42 @@
+.oauth-scope-selector{margin:18px 0;padding:16px;border:1px solid var(--md-border,#d4dce4);border-radius:10px}
+.oauth-scope-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.oauth-scope-heading h3{margin:0}
+.oauth-scope-heading p{margin:5px 0 12px;color:var(--md-text-secondary,#5a6671)}
+.oauth-scope-count{white-space:nowrap;font-weight:600;font-size:12px}
+.oauth-scope-groups{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.oauth-scope-group{border:1px solid var(--md-border,#d4dce4);border-radius:8px;overflow:hidden;min-width:0}
+.oauth-scope-group summary{padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.oauth-scope-group summary span{font-size:12px;color:var(--md-text-secondary,#5a6671);white-space:nowrap}
+.oauth-scope-group[open] summary{border-bottom:1px solid var(--md-border,#d4dce4)}
+.oauth-scope-group-body{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:0 16px;padding:8px 12px 12px;max-height:360px;overflow-y:auto}
+.oauth-scope-group-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.oauth-scope-group-actions .btn{font-size:12px;padding:5px 8px}
+.oauth-scope-option{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--md-border,#e5e9ef);cursor:pointer}
+.oauth-scope-option:last-child{border-bottom:0}
+.oauth-scope-option input{margin-top:4px;flex:0 0 auto}
+.oauth-scope-option>span{min-width:0;flex:1;display:grid;gap:3px}
+.oauth-scope-option strong{font-size:13px}
+.oauth-scope-option code{font-size:11px;overflow-wrap:anywhere}
+.oauth-scope-option small{font-size:12px;color:var(--md-text-secondary,#5a6671);line-height:1.4}
+.oauth-scope-option em{font-size:11px;font-style:normal;white-space:nowrap;color:var(--md-text-secondary,#5a6671)}
+.oauth-scope-reserved{opacity:.62;cursor:not-allowed}
+.oauth-scope-help{font-size:12px;line-height:1.5;color:var(--md-text-secondary,#5a6671);margin:12px 0 0}
+@media(max-width:680px){.oauth-scope-heading{flex-wrap:wrap}.oauth-scope-groups{grid-template-columns:1fr}}
+
+.connected-apps-directory{min-width:0;margin:12px 0 20px;padding:14px;border:1px solid var(--md-border,#d4dce4);border-radius:10px}
+.connected-apps-directory>.md-admin-actions{margin:0 0 12px}
+.connected-apps-directory>.form-label{max-width:min(100%,450px)}
+.connected-apps-directory-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px}
+.connected-apps-directory-item{min-width:0;min-height:88px;display:grid;gap:5px;text-align:left;padding:12px;border:1px solid var(--md-border,#d4dce4);border-radius:9px;background:var(--md-surface,#fff);color:var(--md-text,#192230)}
+.connected-apps-directory-item:hover{border-color:var(--md-action-ink,#0054aa)}
+.connected-apps-directory-item:focus-visible{outline:3px solid var(--md-focus-ring,#0054aa);outline-offset:2px}
+.connected-apps-directory-item small{font-size:12px;color:var(--md-muted,#596579)}
+.connected-apps-directory-item code{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.connected-apps-group>.form-label{max-width:min(100%,450px)}
+.oauth-scope-option code,.oauth-scope-option em{font-size:12px}
+@media(max-width:700px){.connected-apps-directory{padding:10px}.connected-apps-directory-grid{grid-template-columns:minmax(0,1fr)}}
+
+
+/* Let installed-app tiles use the width of their parent directory. */
+.connected-apps-directory-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.connected-apps-directory-item{min-width:0}

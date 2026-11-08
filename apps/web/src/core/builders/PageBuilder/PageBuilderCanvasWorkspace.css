@@ -1,0 +1,135 @@
+/* Editor viewport only: never change published page dimensions or component geometry. */
+.builder-page:has(.office-builder-ribbon){
+  width:100%!important;max-width:none!important;padding-inline:0!important;
+}
+.builder-editor-mode .reference-builder-layout.page-builder-layout.canvas-unified-builder{
+  width:100%!important;max-width:none!important;
+}
+.builder-editor-mode .reference-builder-layout.page-builder-layout .page-preview-area{
+  display:flex!important;flex-direction:column!important;align-items:safe center!important;
+  width:100%!important;max-width:none!important;
+  padding:6px!important;margin:0!important;overflow:auto!important;
+}
+.builder-editor-mode .reference-builder-layout.page-builder-layout .page-stage{
+  width:max-content!important;max-width:none!important;min-width:0!important;
+  flex:0 0 auto!important;align-self:safe center!important;
+  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;
+}
+.builder-editor-mode .reference-builder-layout.page-builder-layout .record-preview.free-canvas-preview{
+  margin:0!important;max-width:none!important;
+}
+/* The canvas frame is geometry-only. Authored borders belong to the component's native surface. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.canvas-hidden-selection{
+  outline:2px dashed #ca6b0d!important;outline-offset:-2px;
+  background:repeating-linear-gradient(45deg,#fff7ed,#fff7ed 7px,#ffedd5 7px,#ffedd5 14px);
+  min-height:24px;
+}
+.canvas-hidden-marker{
+  display:inline-flex;align-items:center;padding:6px 10px;
+  color:#92400e;font-size:13px;font-weight:600;
+}
+.office-builder-ribbon .canvas-placement-group{min-width:245px}
+.office-builder-ribbon .canvas-placement-actions{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:5px!important;align-content:start;
+}
+.office-builder-ribbon .canvas-placement-actions button,
+.office-builder-ribbon .canvas-preview-tools button{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-height:27px;padding:3px 7px;border:1px solid #cbd5e1;
+  border-radius:4px;background:white;color:#263c59;white-space:nowrap;
+  font-size:11px;cursor:pointer;
+}
+.office-builder-ribbon .canvas-placement-actions button:disabled{
+  opacity:.45;cursor:not-allowed;
+}
+.office-builder-ribbon .canvas-preview-selector-group{min-width:282px}
+.office-builder-ribbon .canvas-preview-selector-group label{
+  display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:12px;
+}
+.office-builder-ribbon .canvas-preview-selector-group select{
+  width:205px;max-width:205px;height:31px;border:1px solid #b9c6d8;
+  border-radius:4px;background:#fff;padding:3px;
+}
+.office-builder-ribbon .canvas-preview-selector-group small{
+  display:block;max-width:270px;white-space:normal;font-size:10px;
+}
+.office-builder-ribbon .canvas-preview-tools{min-width:180px}
+.office-builder-ribbon .canvas-preview-tools .office-ribbon-stack{
+  display:grid;gap:4px;justify-items:start;
+}
+.office-builder-ribbon .canvas-preview-tools span{font-size:11px}
+.builder-editor-mode .modern-canvas-builder .canvas-group-outline{
+  position:absolute;z-index:900;box-sizing:border-box;
+  border:2px solid #2457d6;outline:1px solid #fff;outline-offset:1px;
+  background:rgba(37,99,235,.025);cursor:move;touch-action:none;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle{
+  position:absolute;z-index:2;display:block;width:12px;height:12px;
+  min-width:12px;min-height:12px;padding:0;margin:0;
+  border:2px solid #2457d6;border-radius:2px;background:white;
+  transform:translate(-50%,-50%);touch-action:none;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-n{left:50%;top:0;cursor:ns-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-ne{left:100%;top:0;cursor:nesw-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-e{left:100%;top:50%;cursor:ew-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-se{left:100%;top:100%;cursor:nwse-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-s{left:50%;top:100%;cursor:ns-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-sw{left:0;top:100%;cursor:nesw-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-w{left:0;top:50%;cursor:ew-resize}
+.builder-editor-mode .modern-canvas-builder .canvas-group-handle.resize-nw{left:0;top:0;cursor:nwse-resize}
+
+/* Preview ribbon: compact stacked controls with captions kept on their own baseline. */
+.office-builder-ribbon .canvas-preview-selector-group{min-width:250px!important}
+.office-builder-ribbon .canvas-preview-selector-group .office-ribbon-stack>label{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:7px!important}
+.office-builder-ribbon .canvas-preview-selector-group select{width:230px!important;max-width:230px!important}
+.office-builder-ribbon .canvas-preview-tools{min-width:210px!important}
+.office-builder-ribbon .canvas-preview-tools .office-ribbon-stack{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px!important}
+.office-builder-ribbon .canvas-preview-tools .office-ribbon-stack button{min-height:23px!important;padding:2px 5px!important}
+.office-builder-ribbon .canvas-preview-tools .canvas-zoom-control{grid-column:1 / -1;display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px}
+.office-builder-ribbon .canvas-preview-tools .canvas-zoom-control input{min-width:45px;flex:1}
+.office-builder-ribbon .canvas-preview-tools .canvas-zoom-control output{min-width:34px;text-align:right}
+.office-builder-ribbon .preview-visibility-group{padding-inline:10px!important}
+.office-builder-ribbon .preview-visibility-controls{gap:10px!important;align-items:center!important}
+.office-builder-ribbon .canvas-placement-group{min-width:245px}
+
+/* The group frame is not a click shield. Only its handles capture pointers;
+   underlying image, tab, container and card controls remain selectable. */
+.builder-editor-mode .modern-canvas-builder .canvas-group-outline{
+ pointer-events:none;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-outline .canvas-group-handle,
+.builder-editor-mode .modern-canvas-builder .canvas-group-outline .canvas-group-move-handle{
+ pointer-events:auto;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-move-handle{
+ box-sizing:border-box;position:absolute;z-index:3;
+ left:50%;top:-14px;transform:translateX(-50%);
+ display:flex;align-items:center;justify-content:center;
+ width:26px;height:26px;min-width:26px;min-height:26px;
+ padding:0;border:1px solid #2457d6;border-radius:4px;
+ background:white;color:#2457d6;cursor:move;touch-action:none;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-move-handle:focus-visible{
+ outline:2px solid #2457d6;outline-offset:2px;
+}
+
+/* Live preview hosts the published responsive runtime, not the editor's max-content stage. */
+.builder-page.builder-interactive-preview .reference-builder-layout.page-builder-layout .page-stage:has(> .page-builder-live-runtime){
+  width:100%!important;max-width:100%!important;align-self:stretch!important;
+}
+.builder-page.builder-interactive-preview .page-builder-live-runtime{
+  width:100%;min-width:0;max-width:100%;
+}
+
+/* Selection UI belongs to the builder only, never to the published page. */
+.builder-editor-mode .modern-canvas-builder .canvas-selection-marquee{
+  display:none;position:absolute;z-index:1200;box-sizing:border-box;pointer-events:none;
+  background:rgba(37,99,235,.12);border:1px dashed #2563eb;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-selection-count{
+  position:absolute;left:0;bottom:calc(100% + 7px);
+  pointer-events:none;padding:3px 6px;border-radius:4px;background:#1d4ed8;
+  color:white;font-size:10px;line-height:1.25;white-space:nowrap;
+}

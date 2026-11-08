@@ -1,0 +1,7 @@
+/* UX-0012: branded, accessible bootstrap indicator; does not delay workspace loading. */
+.md-boot-brand {height:44px!important;flex:0 0 auto}
+.md-boot-progress-label {display:flex;align-items:center;gap:10px}
+.md-boot-spinner {display:inline-block;width:18px;height:18px;flex:0 0 18px;border-radius:50%;border:2px solid #d1def6;border-top-color:#0b57d0;animation:md-boot-spin 900ms linear infinite}
+@keyframes md-boot-spin {to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.md-boot-spinner{animation:none;border-top-color:#0b57d0}}
+@media(max-width:359px){.md-boot-brand{height:35px!important}}

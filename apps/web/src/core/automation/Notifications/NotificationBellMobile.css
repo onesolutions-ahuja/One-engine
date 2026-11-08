@@ -1,0 +1,18 @@
+.md-mobile-notification{display:none}
+@media(max-width:599px),(max-height:500px) and (pointer:coarse){
+ .lightning .md-mobile-notification{display:flex;align-items:center;justify-content:center;margin-left:auto}
+ .md-mobile-notification .assist-bell{position:relative;width:44px;height:44px;display:grid;place-items:center;border:0;background:transparent;color:var(--md-ios-accent,#007aff);font-size:22px}
+ .md-mobile-notification .assist-bell b{position:absolute;right:0;top:0;padding:1px 5px;border-radius:12px;background:#d70015;color:#fff;font-size:11px;min-width:17px}
+ .md-mobile-notification .assist-notice-panel{position:fixed;z-index:999;left:0;right:0;top:calc(44px + env(safe-area-inset-top,0px));bottom:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding:0 12px calc(24px + env(safe-area-inset-bottom,0px));background:var(--md-ios-bg,#f2f2f7);color:var(--md-ios-text,#1c1c1e);border:0;border-radius:0;box-shadow:none}
+ .md-mobile-notification .assist-notice-header{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;min-height:50px;background:var(--md-ios-bg,#f2f2f7);padding:0 4px}
+ .md-mobile-notification .assist-notice-header h2{font-size:28px;margin:0}
+ .md-mobile-notification .assist-notice-header button{border:0;min-height:44px;color:var(--md-ios-accent,#007aff);background:transparent;font-size:17px}
+ .md-mobile-notification .assist-notice-group h3{margin:15px 0 8px;font-size:17px}
+ .md-mobile-notification .assist-note{padding:13px 14px;min-height:55px;background:var(--md-ios-surface,#fff);border-bottom:.5px solid var(--md-ios-separator,#c6c6c8)}
+ .md-mobile-notification .assist-note:first-of-type{border-radius:12px 12px 0 0}
+ .md-mobile-notification .assist-note strong{font-size:16px}
+ .md-mobile-notification .assist-note p{margin:5px 0;font-size:14px;line-height:1.4}
+ .md-mobile-notification .assist-note button{border:0;background:transparent;color:var(--md-ios-accent,#007aff);min-height:44px}
+ .md-mobile-notification .assist-note-unread{border-left:3px solid var(--md-ios-accent,#007aff)}
+ .md-mobile-notification .assist-notice-toast{display:none}
+}

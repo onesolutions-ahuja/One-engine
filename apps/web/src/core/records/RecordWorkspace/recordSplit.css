@@ -1,0 +1,130 @@
+/* Finder-style record list/detail surfaces. Loaded only with Record Workspace.
+ * Inline detail renders through the existing authorised RecordWorkspace runtime,
+ * never a parallel CRUD or record-fetch implementation.
+ */
+.md-records-split{min-width:0}
+.md-records-split>.records-list-card{min-width:0}
+.md-records-split-handle,.md-records-detail-pane{display:none}
+@media (min-width:1024px){
+ .md-records-split.md-records-split-open{
+  display:flex;align-items:stretch;position:relative;min-width:0;
+  width:100%;max-width:100%;min-height:min(680px,calc(100dvh - 160px));
+  border:1px solid var(--md-separator,var(--md-border));border-radius:var(--md-radius-lg,10px);
+  overflow:hidden;background:var(--md-surface,#fff);
+ }
+ .md-records-split-open>.records-list-card{
+  width:min(var(--md-list-pane-width,44%),calc(100% - 360px));flex:0 0 auto;
+  max-width:calc(100% - 360px);min-width:320px;
+  border:0;border-radius:0;overflow:auto;align-self:stretch;
+  background:var(--md-surface,#fff);
+ }
+ .md-records-split-open>.records-list-card .records-main-toolbar{
+  grid-template-columns:1fr;grid-template-areas:"title" "search" "views" "layout" "actions";
+  padding:12px;gap:8px;position:sticky;top:0;z-index:2;
+ }
+ .md-records-split-open>.records-list-card .records-list-actions{
+  grid-area:actions;justify-content:flex-start;justify-self:stretch;
+ }
+ .md-records-split-open .records-data-table{font-variant-numeric:tabular-nums}
+ .md-records-split-open .records-responsive-list{max-width:100%;overflow-x:auto}
+ .md-records-split-open>.md-records-split-handle{
+  display:block;flex:0 0 12px;min-width:12px;position:relative;
+  border:0;border-left:.5px solid var(--md-separator,var(--md-border));
+  border-right:.5px solid var(--md-separator,var(--md-border));
+  background:var(--md-surface-2,var(--md-canvas));cursor:col-resize;
+  touch-action:none;
+ }
+ .md-records-split-open>.md-records-split-handle::after{
+  content:"";position:absolute;top:50%;left:5px;width:2px;height:42px;
+  border-radius:4px;background:var(--md-separator,var(--md-border));transform:translateY(-50%);
+ }
+ .md-records-split-open>.md-records-split-handle:focus-visible{
+  outline:3px solid var(--md-focus-ring,var(--md-primary));outline-offset:-3px;z-index:5;
+ }
+ .md-records-split-open>.md-records-detail-pane{
+  display:block;flex:1 1 0;min-width:0;max-width:100%;
+  height:min(90dvh,900px);overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-gutter:stable;background:var(--md-bg,var(--md-canvas));
+ }
+ .md-records-split-open>.md-records-detail-pane>.md-records-detail-content{
+  background:transparent;border:0;box-shadow:none;border-radius:0;padding:12px;
+  min-width:0;min-height:100%;
+ }
+ .md-records-split-open .records-page{padding:0;max-width:none}
+ .md-records-split-open .records-page .record-detail-heading{position:sticky;top:0;z-index:3}
+ .md-records-split-open .record-detail-field span{white-space:normal;overflow-wrap:anywhere}
+ .md-records-split-open .record-fields-grid{container-type:inline-size}
+}
+@media (pointer:coarse){
+ .md-records-split-open>.md-records-split-handle{flex-basis:18px;min-width:18px}
+ .md-records-split-open>.md-records-split-handle::after{left:8px}
+}
+@media (max-width:1023px){
+ .md-records-split{display:block}
+ .md-records-split>.records-list-card{width:100%;max-width:100%}
+}
+/* Shared table vocabulary, independent of object metadata or app identity. */
+.lightning .records-data-table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
+.lightning .records-data-table thead th{
+ position:sticky;top:0;z-index:1;min-height:28px;
+ background:var(--md-surface,#fff);color:var(--md-text,#192230);
+ border-bottom:1px solid var(--md-border-strong,#aebacc);
+ font-size:12px;font-weight:600;letter-spacing:0.01em;
+}
+.lightning .records-data-table tbody td{
+ border-bottom:.5px solid var(--md-separator,var(--md-border));
+ border-left:0;border-right:0;min-height:32px;
+}
+.lightning .records-data-table tbody tr:focus-within{background:color-mix(in srgb,var(--md-primary) 7%,var(--md-surface))}
+.lightning .records-data-table :is(button,a):focus-visible{outline:3px solid var(--md-focus-ring)}
+@media(hover:hover){.lightning .records-data-table tbody tr:hover{background:color-mix(in srgb,var(--md-primary,#1d4ed8) 4%,var(--md-surface,#fff))}}
+@media(pointer:coarse){.lightning .records-data-table tbody td{min-height:44px;padding-block:12px}}
+@media(prefers-reduced-motion:reduce){.md-records-split-open>*{transition:none!important}}
+
+/* SQL-persisted per-user widths, without an additional frontend storage engine. */
+.records-data-table th[draggable="true"]{position:relative;padding-right:17px}
+.md-record-column-resize{
+ display:block;position:absolute;right:0;top:0;bottom:0;width:12px;z-index:3;
+ cursor:col-resize;touch-action:none;border-right:1px solid transparent;
+ transition:background .12s ease,border-color .12s ease;
+}
+.md-record-column-resize:hover,.md-record-column-resize:focus-visible{
+ border-right-color:var(--md-primary,#1d4ed8);
+ background:color-mix(in srgb,var(--md-primary) 16%,transparent);
+}
+.md-record-column-resize:focus-visible{
+ outline:3px solid var(--md-focus-ring,var(--md-primary));outline-offset:-2px;
+}
+@media(pointer:coarse){.md-record-column-resize{width:18px}}
+
+/* grok: empty detail pane + list empty states */
+.md-records-detail-pane .tenant-placeholder,
+.md-records-detail-pane .records-detail-empty,
+.md-records-split .records-detail-empty,
+.records-list-empty,
+.records-table-wrap .records-empty,
+.records-responsive-list .records-empty {
+  margin: 24px;
+  padding: 40px 24px;
+  text-align: center;
+  border-radius: var(--md-radius-lg, 12px);
+  border: 1px dashed var(--md-border, #e0e5eb);
+  background: var(--md-canvas, #f8fafc);
+  color: var(--md-muted, #596579);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* grok: toolbar control radius consistency */
+.records-main-toolbar .records-list-actions .btn,
+.records-layout-switcher {
+  border-radius: var(--md-radius-md, 8px);
+}
+.records-main-toolbar ~ .records-table-wrap .records-table thead th,
+.records-main-toolbar ~ .records-table-wrap .records-data-table thead th {
+  background: var(--md-surface, #fff);
+  color: var(--md-text, #192230);
+  font-weight: 600;
+  font-size: 12px;
+  border-bottom: 1px solid var(--md-border-strong, #aebacc);
+}

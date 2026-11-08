@@ -1,0 +1,16 @@
+.office-builder-ribbon #page-builder-tab-content>.arrange-ribbon{
+ display:flex;flex:0 0 auto;align-items:stretch;height:114px;min-width:0;
+ font-family:"Segoe UI",Arial,sans-serif;color:#29476a;
+}
+.arrange-ribbon-group{box-sizing:border-box;display:flex;flex-direction:column;
+ align-items:center;justify-content:space-between;padding:5px 12px 2px;
+ border-right:1px solid #cbd6e2;min-width:65px}
+.arrange-ribbon-rows{display:flex;flex-direction:column;gap:4px}
+.arrange-ribbon-row{display:flex;gap:4px;min-height:26px}
+.arrange-ribbon-row button{box-sizing:border-box;display:flex;align-items:center;
+ justify-content:center;width:26px;height:26px;min-width:26px;min-height:26px;
+ border:1px solid #c3cad4;border-radius:5px;background:#fff;color:#1f5fa8;cursor:pointer;padding:0}
+.arrange-ribbon-row button:hover:not(:disabled){background:#e7f1ff;border-color:#7eabe4}
+.arrange-ribbon-row button:disabled{opacity:.45;cursor:not-allowed}
+.arrange-ribbon-caption{display:block;text-align:center;font-size:10px;line-height:17px;
+ color:#526780;border-top:1px solid #e5ebf3;width:100%}

@@ -1,0 +1,32 @@
+{
+  "apiName": "smart_button",
+  "label": "Smart Button",
+  "category": "Inputs",
+  "description": "Reusable Smart Button for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_button/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_button/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 180,
+    "defaultHeight": 48,
+    "minWidth": 32,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "click",
+      "label": "Click"
+    },
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

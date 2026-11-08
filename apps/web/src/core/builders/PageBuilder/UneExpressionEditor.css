@@ -1,0 +1,12 @@
+.une-expression-editor{position:relative;isolation:isolate;flex:0 0 140px;width:140px;height:26px;min-width:140px;font:12px/24px "Segoe UI",Arial,sans-serif}
+.une-expression-highlight,.une-expression-editor>input{position:absolute;inset:0;box-sizing:border-box;width:100%;height:26px;margin:0;padding:2px 6px;white-space:pre;letter-spacing:normal;font:inherit;line-height:22px}
+.une-expression-highlight{pointer-events:none;overflow:hidden;background:#fff;color:#223c5b;border:1px solid #b9c6d8;border-radius:3px}
+.une-expression-reference{color:#0561c9!important;font-weight:600;text-decoration:underline;text-decoration-color:#a8cef9}
+.une-expression-editor>input{background:transparent!important;color:transparent!important;caret-color:#134fca!important;-webkit-text-fill-color:transparent!important;z-index:1;border:1px solid transparent!important;outline-offset:0;overflow-x:auto}
+.une-expression-editor:focus-within .une-expression-highlight{outline:2px solid #2563b8;outline-offset:-1px}
+.une-expression-editor:has(input:disabled){opacity:.38;filter:grayscale(1)}
+.une-expression-picker{overflow:auto;background:#fff;border:1px solid #93a8c8;border-radius:5px;box-shadow:0 8px 25px #19345730;padding:3px;overscroll-behavior:contain}
+.une-expression-picker button{width:100%;border:0;background:#fff;color:#234;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;font:12px "Segoe UI",Arial,sans-serif;cursor:pointer;text-align:left}
+.une-expression-picker button strong{color:#0561c9;font-size:12px}
+.une-expression-picker button span{color:#63728a;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.une-expression-picker button:is(:hover,[aria-selected=true]){background:#e9f2ff}

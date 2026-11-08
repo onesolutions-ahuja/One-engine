@@ -1,0 +1,63 @@
+/* One global numeric control standard for every Page Builder ribbon tab.
+   Three digits + native dropdown chevron/spinner; text/URL selectors retain room.
+   Imported last to supersede old per-component numeric dimensions. */
+.office-builder-ribbon{
+  --une-ribbon-numeric-width:80px;
+  --une-ribbon-numeric-height:27px;
+}
+.office-builder-ribbon #page-builder-tab-content :is(
+  .office-ribbon-direct-number select,
+  .office-ribbon-compact-size select,
+  input[type="number"],
+  .smart-universal-property[data-kind="NUMBER"] input,
+  .smart-universal-property[data-kind="CURRENCY"] input
+){
+  box-sizing:border-box!important;
+  width:var(--une-ribbon-numeric-width)!important;
+  min-width:var(--une-ribbon-numeric-width)!important;
+  max-width:var(--une-ribbon-numeric-width)!important;
+  height:var(--une-ribbon-numeric-height)!important;
+  min-height:var(--une-ribbon-numeric-height)!important;
+  max-height:var(--une-ribbon-numeric-height)!important;
+  flex:0 0 var(--une-ribbon-numeric-width)!important;
+  padding:2px 5px!important;
+  font-size:12px!important;
+  font-variant-numeric:tabular-nums!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+.smart-universal-property[data-kind="NUMBER"],
+.office-builder-ribbon #page-builder-tab-content
+.smart-universal-property[data-kind="CURRENCY"]{
+  min-width:165px!important;max-width:165px!important;
+}
+/* Equal-sized dropdowns for size and line limit on both typography groups. */
+.office-builder-ribbon #page-builder-tab-content
+:is(.office-ribbon-text-top .office-ribbon-compact-size,
+    .office-ribbon-text-middle .office-ribbon-direct-number){
+  width:94px!important;min-width:94px!important;max-width:94px!important;
+  box-sizing:border-box!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+.office-ribbon-text-middle .office-ribbon-direct-number .office-ribbon-command-glyph{
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+.office-ribbon-text-middle .office-ribbon-direct-number select{
+  grid-column:1!important;grid-row:1!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+.office-ribbon-text-middle .office-ribbon-direct-number .office-ribbon-command-label{
+  display:block!important;grid-column:1!important;grid-row:2!important;
+}
+/* Shared dropdown labels never overlap their numeric inputs. */
+.office-builder-ribbon #page-builder-tab-content
+:is(.office-ribbon-text-top .office-ribbon-compact-size,
+    .office-ribbon-text-middle .office-ribbon-direct-number)
+:is(span,.office-ribbon-command-label){
+  text-align:center!important;
+}
+/* Use a stable two-column geometry independent of the selected component. */
+.office-builder-ribbon #page-builder-tab-content
+:is(.office-ribbon-text-top,.office-ribbon-text-middle){
+  grid-template-columns:94px 80px!important;column-gap:5px!important;
+}

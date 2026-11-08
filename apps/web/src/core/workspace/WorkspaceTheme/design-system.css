@@ -1,0 +1,170 @@
+/* MetaDrive shared visual primitives. Keep app accents configurable via metadata. */
+:root {
+  --md-primary:#1d4ed8; --md-primary-hover:#1e40af;
+  --md-success:#168657; --md-danger:#b42318; --md-warning:#b45309;
+  --md-text:#192230; --md-muted:#596579; --md-text-muted:var(--md-muted); --md-border:#e0e5eb;
+  --md-surface:#fff; --md-canvas:#f8fafc; --md-surface-soft:#f0f5ff;
+  --md-font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --md-fs-xs:12px; --md-fs-sm:12px; --md-fs-md:13px;
+  --md-fs-body:14px; --md-fs-lg:16px; --md-fs-h3:20px;
+  --md-fs-h2:24px; --md-fs-h1:30px; --md-fs-display:40px;
+  --md-weight-normal:400; --md-weight-semibold:600; --md-weight-bold:700;
+  --md-leading-tight:1.3; --md-leading-body:1.5;
+  --md-space-1:4px; --md-space-2:8px; --md-space-3:12px;
+  --md-space-4:16px; --md-space-6:24px; --md-space-8:32px;
+  --md-space-12:48px; --md-radius-sm:6px; --md-radius-md:8px;
+  --md-radius-lg:12px; --md-radius-xl:16px; --md-radius-pill:999px;
+  --md-control-height:40px; --md-control-touch:44px;
+  --md-label-size:13px; --md-helper-size:12px; --md-table-size:13px;
+  --md-admin-row-height:38px; --md-form-short-width:220px; --md-form-medium-width:360px; --md-reading-width:76ch;
+  --md-scroll-thumb:#abb8c8; --md-scroll-track:transparent;
+}
+/* Native scrollbars remain accessible; scrollable panels opt in using the class. */
+.md-scroll-area{scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb) var(--md-scroll-track);overscroll-behavior:contain}
+.md-scroll-area::-webkit-scrollbar{width:8px;height:8px}
+.md-scroll-area::-webkit-scrollbar-thumb{background:var(--md-scroll-thumb);border:2px solid transparent;background-clip:padding-box;border-radius:999px}
+.md-scroll-area::-webkit-scrollbar-track{background:var(--md-scroll-track)}
+/* No forced clipping on keyboard navigation; hints can be applied to tab strips. */
+.md-scroll-hint{overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb) transparent;mask-image:linear-gradient(to right,#000 0%,#000 calc(100% - 22px),transparent 100%)}
+.md-scroll-hint:focus-within{mask-image:none}
+/* Workspace variables bridge legacy CSS to the shared system. */
+.lightning{
+  --brand:var(--md-primary);--brand-dark:var(--md-primary-hover);
+  --text:var(--md-text);--muted:var(--md-muted);
+  --border:var(--md-border);--surface:var(--md-surface);
+  --canvas:var(--md-canvas);--focus:var(--md-primary);
+  font-family:var(--md-font);line-height:var(--md-leading-body);
+}
+.lightning :is(.setup-tree,.notification-panel,.one-table-wrapper,.one-conversation-scroll,.one-conversation-messages,.one-conversation-new,.free-canvas-preview,.free-canvas-runtime-component,.md-chatter-scroll,.md-chatter-messages,.md-chatter-new-thread,.md-chatter-contact-choices){
+ scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb) transparent;overscroll-behavior:contain;
+}
+.one-ui{--one-accent:var(--md-primary);--one-border:var(--md-border);--one-radius:var(--md-radius-xl);--one-gap:var(--md-space-3);--one-pad:var(--md-space-4);--one-fg:var(--md-text);font-family:var(--md-font)}
+.one-ui .one-btn,.one-ui .one-control{min-height:var(--md-control-height)}
+.one-ui .one-heading{font-weight:var(--md-weight-semibold)}
+.one-ui .one-metric{font-weight:var(--md-weight-bold)}
+.one-ui .one-muted{font-size:max(var(--md-fs-xs),.88em)}
+.md-chatter{color:var(--md-text);font-family:var(--md-font);line-height:var(--md-leading-body);border-color:var(--md-border)}
+.md-chatter .md-chatter-heading h2{font-size:var(--md-fs-h2);font-weight:var(--md-weight-bold)}
+.md-chatter .md-chatter-list header{padding:var(--md-space-4)}
+.md-chatter .md-chatter-thread-head{padding:var(--md-space-4)}
+.md-chatter nav button{min-height:var(--md-control-height);font-size:var(--md-fs-sm)}
+.md-chatter .md-chatter-compose button{min-height:var(--md-control-touch)}
+.md-chatter :is(.md-chatter-list,.md-chatter-thread-head){border-color:var(--md-border)}
+.une-marketing{
+ --une-blue:var(--md-primary);--une-ink:var(--md-text);
+ --une-muted:var(--md-muted);--une-border:var(--md-border);
+ font-family:var(--md-font);line-height:var(--md-leading-body)
+}
+.une-marketing .une-header-inner{height:72px;gap:var(--md-space-6)}
+.une-marketing .une-site-nav{gap:var(--md-space-6)}
+.une-marketing .une-site-nav a{font-size:var(--md-fs-body)}
+@media(max-width:700px){
+ .md-chatter{min-height:0;height:min(780px,calc(100dvh - 96px));}
+ .md-chatter .md-chatter-list header,.md-chatter .md-chatter-thread-head{padding:var(--md-space-3)}
+ .one-ui .one-btn,.md-chatter nav button{min-height:var(--md-control-touch)}
+}
+@media(forced-colors:active){.md-scroll-hint{mask-image:none}}
+
+/* Phase 2: reusable semantic visual language. Tenant overrides may change
+   colours without changing the meaning of a control or feedback state. */
+:root {
+  --md-text-strong:var(--md-text);
+  --md-text-secondary:var(--md-muted);
+  --md-surface-raised:var(--md-surface);
+  --md-surface-subtle:var(--md-canvas);
+  --md-border-subtle:var(--md-border);
+  --md-border-strong:#aebacc;
+  --md-focus-ring:var(--md-primary);
+  --md-primary-contrast:#fff;
+  --md-success-surface:#ecfdf3;
+  --md-warning-surface:#fff7ed;
+  --md-danger-surface:#fef3f2;
+  --md-shadow-sm:0 1px 3px rgb(15 23 42 / 8%);
+  --md-shadow-md:0 8px 24px rgb(15 23 42 / 12%);
+  --md-duration-fast:140ms;
+  --md-duration-normal:200ms;
+}
+.lightning .md-surface-card,
+.one-ui .md-surface-card {
+  color:var(--md-text);
+  background:var(--md-surface-raised);
+  border:1px solid var(--md-border-subtle);
+  border-radius:var(--md-radius-lg);
+  box-shadow:var(--md-shadow-sm);
+}
+.lightning .md-section-heading,
+.one-ui .md-section-heading {
+  color:var(--md-text-strong);
+  font-weight:var(--md-weight-semibold);
+  line-height:var(--md-leading-tight);
+}
+.lightning .md-secondary-text,
+.one-ui .md-secondary-text { color:var(--md-text-secondary); }
+.lightning .md-action-primary,
+.one-ui .md-action-primary {
+  background:var(--md-primary);
+  color:var(--md-primary-contrast);
+  border:1px solid transparent;
+  border-radius:var(--md-radius-md);
+  min-height:var(--md-control-height);
+  transition:background var(--md-duration-fast) ease;
+}
+.lightning .md-action-primary:hover,
+.one-ui .md-action-primary:hover { background:var(--md-primary-hover); }
+.lightning .md-action-primary:focus-visible,
+.one-ui .md-action-primary:focus-visible,
+.lightning .md-surface-card :is(button,a,input,select,textarea):focus-visible,
+.one-ui .md-surface-card :is(button,a,input,select,textarea):focus-visible {
+  outline:2px solid var(--md-focus-ring);
+  outline-offset:2px;
+}
+.lightning .md-feedback-success,
+.one-ui .md-feedback-success { background:var(--md-success-surface);color:var(--md-success); }
+.lightning .md-feedback-warning,
+.one-ui .md-feedback-warning { background:var(--md-warning-surface);color:var(--md-warning); }
+.lightning .md-feedback-danger,
+.one-ui .md-feedback-danger { background:var(--md-danger-surface);color:var(--md-danger); }
+@media (prefers-reduced-motion:reduce) {
+  .lightning .md-action-primary,.one-ui .md-action-primary { transition:none; }
+}
+@media (forced-colors:active) {
+  .lightning .md-action-primary,.one-ui .md-action-primary { border:1px solid ButtonText; }
+}
+
+/* Phone-only native-feeling vocabulary: desktop and authored page tokens remain untouched. */
+@media (max-width: 599px), (max-height: 500px) and (pointer: coarse) {
+  .lightning {
+    --md-ios-accent: var(--md-primary, #007aff);
+    --md-ios-bg: #f2f2f7;
+    --md-ios-surface: #fff;
+    --md-ios-group: #f2f2f7;
+    --md-ios-text: #1c1c1e;
+    --md-ios-secondary: #686870;
+    --md-ios-separator: #c6c6c8;
+    --md-ios-pressed: #e5e5ea;
+    --md-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, ui-sans-serif, system-ui, sans-serif;
+    --md-control-height: 44px;
+    --md-fs-body: 17px;
+    --md-fs-sm: 15px;
+    --md-fs-xs: 13px;
+  }
+  .lightning :is(button, a, input, select, textarea, summary) {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .lightning :is(button, a, summary):active { transition-duration: 0ms; }
+  .lightning :is(.btn, .icon-button, .one-btn, .one-control, .header-page-tab) { min-height: 44px; }
+  .lightning :is(.btn, .icon-button, .one-btn):active { filter: brightness(.94); }
+}
+@media (prefers-color-scheme: dark) and (max-width: 599px),
+       (prefers-color-scheme: dark) and (max-height: 500px) and (pointer: coarse) {
+    .lightning {
+      --md-ios-bg: #000;
+      --md-ios-surface: #1c1c1e;
+      --md-ios-group: #2c2c2e;
+      --md-ios-text: #f5f5f7;
+      --md-ios-secondary: #aeaeb2;
+      --md-ios-separator: #38383a;
+      --md-ios-pressed: #38383a;
+    }
+}

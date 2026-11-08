@@ -1,0 +1,193 @@
+/* Office/PowerPoint-like selection: eight visible resize squares with larger
+   invisible pointer targets and a four-direction move cursor on the edges. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle{
+ position:absolute;display:flex;align-items:center;justify-content:center;
+ width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;
+ padding:0!important;margin:0;border:0!important;border-radius:0!important;
+ background:transparent!important;box-shadow:none!important;
+ z-index:165!important;opacity:1;pointer-events:auto;
+ touch-action:none;user-select:none;transition:opacity .1s ease;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle::before{
+ content:"";display:block;position:static;width:8px;height:8px;
+ box-sizing:border-box;background:#fff;border:1.5px solid #2563eb;border-radius:1px;
+ box-shadow:0 0 0 1px #fff;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle::after{display:none!important;content:none!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle:is(:hover,:focus-visible,:active){
+ opacity:1;outline:0!important;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-n{
+ top:-9px!important;bottom:auto!important;left:calc(50% - 9px)!important;right:auto!important;cursor:ns-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-s{
+ bottom:-9px!important;top:auto!important;left:calc(50% - 9px)!important;right:auto!important;cursor:ns-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-e{
+ right:-9px!important;left:auto!important;top:calc(50% - 9px)!important;bottom:auto!important;cursor:ew-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-w{
+ left:-9px!important;right:auto!important;top:calc(50% - 9px)!important;bottom:auto!important;cursor:ew-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-ne{
+ right:-9px!important;left:auto!important;top:-9px!important;bottom:auto!important;cursor:nesw-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-nw{
+ left:-9px!important;right:auto!important;top:-9px!important;bottom:auto!important;cursor:nwse-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-se{
+ right:-9px!important;left:auto!important;bottom:-9px!important;top:auto!important;cursor:nwse-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-sw{
+ left:-9px!important;right:auto!important;bottom:-9px!important;top:auto!important;cursor:nesw-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .canvas-move-grip{
+ cursor:move!important;touch-action:none;user-select:none;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .canvas-move-grip:active{
+ cursor:move!important;
+}
+/* A narrow border hit area gives the same four-direction drag affordance
+   as a selected spreadsheet shape. Corners remain reserved for resize handles. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-move-edge{
+ position:absolute;z-index:162!important;display:block;
+ box-sizing:border-box;background:transparent;border:0;
+ margin:0;padding:0;cursor:move!important;touch-action:none;
+ user-select:none;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .move-edge-n{
+ top:-5px;left:18px;right:18px;height:10px;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .move-edge-s{
+ bottom:-5px;left:18px;right:18px;height:10px;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .move-edge-e{
+ top:18px;bottom:18px;right:-5px;width:10px;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .move-edge-w{
+ top:18px;bottom:18px;left:-5px;width:10px;
+}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-move-edge:focus-visible{
+ outline:2px solid #2563eb;outline-offset:1px;
+}
+@media(pointer:coarse){
+ .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle{
+  opacity:1;
+ }
+}
+/* Live component geometry changes with the editor frame while pointer-dragging. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component .smart-runtime{
+ width:100%!important;height:100%!important;min-width:0;min-height:0;
+}
+/* Selection status is a read-only indicator, never an editable field. */
+.office-ribbon-selection-context{
+ flex:0 1 225px;min-width:0;max-width:225px;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis;user-select:none;
+}
+
+/* The editor uses an Office-style move cursor, not the browser's grab hand.
+   Resize handles retain directional cursors even when descendants are hovered. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected:not(.canvas-component-locked){cursor:move!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .free-canvas-resize-handle *{pointer-events:auto}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-n, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-n *{cursor:ns-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-s, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-s *{cursor:ns-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-e, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-e *{cursor:ew-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-w, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-w *{cursor:ew-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-ne, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-ne *{cursor:nesw-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-sw, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-sw *{cursor:nesw-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-nw, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-nw *{cursor:nwse-resize!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-se, .builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .resize-se *{cursor:nwse-resize!important}
+
+/* A selected component behaves like an Office shape: four-arrow move, with
+   eight independent directional resize hit targets above inner app content. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected:not(.canvas-component-locked),
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .record-component-head,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .record-component-head[data-canvas-move-handle],
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .canvas-move-grip,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .canvas-move-grip:active{cursor:move!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected{overflow:visible!important}
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected>.free-canvas-resize-handle{z-index:999!important;pointer-events:auto!important}
+/* Corner handles use the same 18px targets and 9px offsets as edge handles. */
+
+/* Hit testing must follow the SAME sibling order as the rendered canvas.
+   Selection never changes stacking order: Arrange commands own it. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-stage .free-canvas-component,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected{
+ z-index:var(--canvas-layer-order,0)!important;
+}
+/* The group frame cannot intercept clicks on members or overlapping images.
+   Its explicit move/resize handles remain interactive. */
+.builder-editor-mode .modern-canvas-builder .canvas-group-outline{
+ pointer-events:none;
+}
+.builder-editor-mode .modern-canvas-builder .canvas-group-outline :is(.canvas-group-handle,.canvas-group-move-handle){
+ pointer-events:auto;
+}
+/* Corners on the canvas boundary must remain accessible, not be clipped. */
+ .builder-editor-mode .modern-canvas-builder .free-canvas-stage.canvas-editing{
+ overflow:hidden;
+}
+/* Native images and runtime wrappers otherwise advertise grab/pointer cursors.
+   In the designer all non-toolbar component content is a four-way move surface.
+   Resize handles remain independent and retain their eight directional cursors. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component:not(.canvas-component-locked),
+.builder-editor-mode .modern-canvas-builder .free-canvas-component:not(.canvas-component-locked) > :not(.canvas-element-actions):not(.free-canvas-resize-handle):not(.free-canvas-move-edge):not(.canvas-data-bindings),
+.builder-editor-mode .modern-canvas-builder .free-canvas-component:not(.canvas-component-locked) > :not(.canvas-element-actions):not(.free-canvas-resize-handle):not(.free-canvas-move-edge):not(.canvas-data-bindings) *,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .canvas-move-grip,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected .canvas-move-grip *{
+ cursor:move!important;
+}
+
+/* Each container has its own local sibling stack. A child can be brought to
+   front INSIDE the container, never over an unrelated root-level tab. To
+   overlap that tab, arrange the container itself relative to the tab. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.layout-container-component{
+ isolation:isolate;
+}
+/* The selection frame remains transparent. Only the native image, card,
+   container, etc., paints its authored border and corner radius. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component[data-page-appearance]{
+ outline:0!important;
+ border:0!important;
+ box-shadow:none!important;
+}
+/* Editor-only selection frame always tracks the saved component box, including
+   very short heights where a child scroller can hide its own bottom edge.
+   This is not authored border metadata and never appears in Preview/runtime. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected::after{
+ content:"";position:absolute;inset:0;box-sizing:border-box;
+ border:1px solid var(--canvas-selection-outline,#2563eb);
+ border-radius:inherit;pointer-events:none;z-index:161;
+}
+/* Template components also show their bounds only while selected. */
+.builder-editor-mode .modern-canvas-builder .record-component.selected:not(.free-canvas-component){
+ outline:1px solid var(--canvas-selection-outline,#2563eb);
+ outline-offset:0;
+}
+/* Keyboard-only selection stays perceivable, rounded like the native shape. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component[data-page-appearance].selected:focus-visible{
+ border-radius:var(--md-page-radius,var(--one-radius,12px))!important;
+ outline:2px dashed var(--md-primary,#2563eb)!important;
+ outline-offset:3px!important;
+}
+
+
+/* Every free-canvas component has one bounded content viewport. The authoring
+   frame stays overflow-visible for eight resize handles, but visible content
+   never escapes the saved width/height. Native Card Grid, Cart, Tabs, Calendar
+   and Navigation retain their own inner scrollers when needed. */
+.modern-canvas-builder .free-canvas-component > .free-canvas-content-viewport{
+ position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box;
+ min-width:0;min-height:0;max-width:100%;max-height:100%;
+ overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;
+ touch-action:pan-y;
+}
+/* Designer gestures move the selected surface rather than selecting its text.
+   Preview and published runtime keep normal text selection and scrolling. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component > .free-canvas-content-viewport{
+ user-select:none;
+}
+.modern-canvas-builder .free-canvas-content-viewport > .smart-runtime,
+.modern-canvas-builder .free-canvas-content-viewport > .md-card-grid-bound{
+ width:100%;height:100%;min-width:0;min-height:0;
+}
+
+/* Data-source icons are click targets, not move surfaces: always a normal
+   pointer, even inside a selected, draggable component frame. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected>.canvas-data-bindings>.canvas-data-icon-button,
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.selected>.canvas-data-bindings>.canvas-data-icon-button *{
+ cursor:pointer!important;
+}

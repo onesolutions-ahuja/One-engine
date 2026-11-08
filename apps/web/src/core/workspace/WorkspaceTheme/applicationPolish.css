@@ -1,0 +1,113 @@
+/* Shared platform surfaces: Setup, Permissions, AppExchange, AppManager,
+ * Settings and generic forms. App-specific behaviours remain in their modules.
+ */
+.lightning :is(.page-heading,.section-toolbar,.builder-titlebar,.report-titlebar,.dashboard-builder-header) {
+ color:var(--md-text);
+ border-color:var(--md-separator);
+}
+.lightning :is(.page-heading h1,.builder-titlebar h1,.report-titlebar h1,.dashboard-builder-heading h1) {
+ color:var(--md-text);font-size:clamp(17px,1.5vw,22px);font-weight:600;
+}
+.lightning :is(.form-control,.form-display,.quick-find-input,.mini-search input,.records-search) {
+ border-color:var(--md-separator);background:var(--md-surface);color:var(--md-text);border-radius:var(--md-radius-md);
+}
+.lightning :is(.form-control,.records-search):focus-visible {
+ outline:3px solid var(--md-focus-ring);outline-offset:0;box-shadow:none;
+}
+.lightning :is(.btn,.btn-small,.text-action){font-weight:600;letter-spacing:normal}
+.lightning .btn-brand{background:var(--md-primary);color:var(--md-primary-contrast);border-color:var(--md-primary)}
+.lightning .btn-brand:hover{background:var(--md-primary-hover);border-color:var(--md-primary-hover)}
+.lightning :is(.shortcut-card,.app-manager-form-card,.app-manager-side-card,.exchange-app-card,.exchange-detail,.company-workspace-card) {
+ background:var(--md-surface);color:var(--md-text);border-color:var(--md-separator);
+ border-radius:var(--md-radius-lg);box-shadow:var(--md-shadow-sm);
+}
+.lightning .welcome-banner{min-height:0;display:block;border:0;box-shadow:none;border-radius:var(--md-radius-xl);padding:22px;background:var(--md-surface)}
+.lightning .welcome-banner .welcome-art{display:none}
+.lightning .welcome-banner .welcome-copy{padding:0}
+.lightning .welcome-banner .welcome-copy h2{font-size:26px;font-weight:600;color:var(--md-text)}
+.lightning .welcome-banner .welcome-copy p{font-size:13px;color:var(--md-text-2)}
+.lightning .welcome-banner .welcome-quick{
+ display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-start;
+ border:0;background:transparent;padding:14px 0 0;
+}
+.lightning .welcome-banner .welcome-quick .quick-label{flex:0 0 100%;color:var(--md-text-2);font-size:12px}
+.lightning .welcome-banner .welcome-quick button{flex:0 1 auto;max-width:100%;width:auto;padding:8px 12px;background:var(--md-surface-2);border:.5px solid var(--md-separator);border-radius:var(--md-radius-md)}
+.lightning .shortcut-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+/* Shortcut geometry is owned by shared styles.css; preserve theme-only styling here. */
+/* Icon geometry is owned by styles.css; theme colours live in settingsAppearance.css. */
+.lightning :is(.recent-surface,.help-surface) {
+ background:var(--md-surface);border-color:var(--md-separator);border-radius:var(--md-radius-lg);box-shadow:none;
+}
+.lightning :is(.recent-row,.resource-row){border-color:var(--md-separator)}
+.lightning :is(.permission-list,.permission-editor,.permission-table-wrap,.permission-workspace){
+ background:var(--md-surface);border-color:var(--md-separator);color:var(--md-text);
+}
+.lightning .permission-list-item.selected,.lightning .permission-list-item[aria-current="page"]{
+ color:var(--md-primary);background:color-mix(in srgb,var(--md-primary) 12%,var(--md-surface));
+ box-shadow:none;border-radius:var(--md-radius-md);
+}
+.lightning .permission-desktop-matrix{min-width:0;max-width:100%;overflow:auto;scrollbar-gutter:stable}
+.lightning .permission-desktop-matrix :is(th,td){
+ border-color:var(--md-separator);background:var(--md-surface);font-variant-numeric:tabular-nums;
+}
+.lightning .permission-desktop-matrix th{position:sticky;top:0;z-index:3;background:var(--md-surface-2)}
+.lightning .permission-desktop-matrix :is(th:first-child,td:first-child){position:sticky;left:0;z-index:2;background:var(--md-surface)}
+.lightning .permission-desktop-matrix th:first-child{z-index:4;background:var(--md-surface-2)}
+.lightning :is(.permission-tabs,.company-workspace-tabs,.exchange-tabs){
+ background:var(--md-surface-2);border-color:var(--md-separator);
+}
+.lightning :is(.permission-tabs button,.company-workspace-tabs button,.exchange-tabs button).active{
+ background:var(--md-surface);color:var(--md-primary);box-shadow:var(--md-shadow-sm);border-radius:var(--md-radius-md);
+}
+.lightning .exchange-hero{
+ background:var(--md-surface-2);border:.5px solid var(--md-separator);
+ border-radius:var(--md-radius-xl);color:var(--md-text);
+}
+.lightning .exchange-hero :is(h1,h2,strong,p){color:var(--md-text)}
+.lightning .exchange-app-card{overflow:hidden}
+.lightning .exchange-app-card :is(.btn,.exchange-card-footer button){border-radius:var(--md-radius-pill);font-weight:600}
+.lightning .exchange-detail{max-width:min(680px,calc(100vw - 24px))}
+.lightning .exchange-backdrop{background:rgb(0 0 0 / 32%);backdrop-filter:blur(4px)}
+.lightning .app-manager-layout{min-width:0;max-width:100%}
+.lightning :is(.app-manager-step,.app-manager-form-section,.app-manager-help-column,.app-manager-actions){
+ border-color:var(--md-separator);
+}
+.lightning :is(.company-workspace-body,.company-workspace-stack){min-width:0}
+.lightning .company-workspace-section{min-width:0;container-type:inline-size}
+.lightning :is(.record-form-dialog,.modal){border-radius:var(--md-radius-xl);box-shadow:var(--md-shadow-sheet);background:var(--md-surface);color:var(--md-text)}
+.lightning :is(.record-form-dialog,.modal) :is(header,footer){background:var(--md-surface);border-color:var(--md-separator)}
+.lightning :is(.record-form-dialog,.modal) footer{position:sticky;bottom:0;z-index:2}
+@media(min-resolution:2dppx){
+ .lightning :is(.records-table td,.records-table th,.permission-desktop-matrix td,.permission-desktop-matrix th){
+  border-bottom-width:.5px;
+ }
+}
+@media (min-width: 600px) and (max-width: 1023px){
+ .lightning :is(.home-content,.permissions-page,.app-exchange){min-width:0;max-width:100%;padding:16px}
+ .lightning .permission-workspace{display:block}
+ .lightning .permission-list{width:100%;max-height:170px;overflow:auto}
+ .lightning .permission-editor{min-width:0;overflow:auto}
+ .lightning .shortcut-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+}
+@media(max-width:599px){
+ .lightning .shortcut-grid{grid-template-columns:minmax(0,1fr)}
+ .lightning .welcome-banner{padding:16px}
+ .lightning .welcome-banner .welcome-copy h2{font-size:20px}
+ .lightning .welcome-banner .welcome-quick button{flex:1 1 100%;width:100%}
+}
+@media(pointer:coarse){
+ .lightning :is(.app-manager-step,.exchange-tabs button,.permission-tabs button,.shortcut-card,.company-workspace-tabs button){min-height:44px}
+}
+@media(prefers-reduced-transparency:reduce){.lightning .exchange-backdrop{backdrop-filter:none}}
+
+
+/* Permission labels need text contrast, not only coloured selection fills. */
+.lightning :is(.permission-tabs button.active,.permission-list-item.selected,
+ .permission-list-item[aria-current="page"]){
+ color:var(--md-action-ink,#0058bd);
+}
+
+/* WebKit dark native-button fallback must not paint light-grey inactive tabs. */
+.lightning .permission-tabs button:not(.active){
+ background:transparent;color:var(--md-text);border-color:transparent;
+}

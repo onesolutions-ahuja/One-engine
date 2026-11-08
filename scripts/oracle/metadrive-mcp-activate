@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+[[ $EUID == 0 && $# == 1 && $1 =~ ^[a-f0-9]{40}$ ]] || exit 64
+exec 9>/run/lock/metadrive-api-deploy.lock
+flock -n 9 || { echo 'Another deployment is active'; exit 75; }
+release="/opt/metadrive/releases/gh-$1"
+[[ $(realpath "$release") == "$release" ]] || exit 64
+test -f "$release/apps/server/dist-system/system-support/entrypoint.js"
+override=/etc/systemd/system/metadrive-api.service.d/90-oracle-actions.conf
+# Activation requires the existing deployment-managed service layout.
+test -f "$override"
+backup=$(mktemp)
+cp "$override" "$backup"
+rollback(){ cp "$backup" "$override"; systemctl daemon-reload; systemctl restart metadrive-api.service; }
+trap 'rollback; rm -f "$backup"' ERR
+node_bin=$(command -v node)
+cat > "$override" <<UNIT
+[Service]
+WorkingDirectory=$release
+ExecStart=
+ExecStart=$node_bin $release/apps/server/dist-system/system-support/entrypoint.js
+UNIT
+systemctl daemon-reload
+systemctl restart metadrive-api.service
+ok=0
+for attempt in $(seq 1 20); do
+ if curl --silent --fail --max-time 3 http://127.0.0.1:3001/api/health | grep -q '"status":"ok"'; then ok=1; break; fi
+ sleep 2
+done
+[[ $ok == 1 ]]
+systemctl is-active --quiet metadrive-api.service
+trap - ERR
+rm -f "$backup"
+echo "Activated release $1"

@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_container",
+  "label": "Smart Container",
+  "category": "Layout",
+  "description": "Reusable Smart Container for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_container/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_container/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 560,
+    "defaultHeight": 380,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

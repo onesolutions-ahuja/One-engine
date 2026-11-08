@@ -1,0 +1,129 @@
+.tenant-console{width:100%;padding:var(--md-space-6,24px);max-width:1560px;margin:auto;color:var(--md-text,#192230);font-size:var(--md-fs-body,14px)}.tenant-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}.tenant-heading h1{font-size:var(--md-fs-h2,24px);margin:var(--md-space-2,8px) 0 var(--md-space-1,4px)}.tenant-heading p{margin:0;color:var(--md-muted,#64748b)}.tenant-eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--md-muted,#64748b);font-weight:700;display:flex;gap:6px;align-items:center}.tenant-header-actions,.tenant-actions{display:flex;gap:8px;flex-wrap:wrap}.tenant-button{border:1px solid var(--md-border,#e0e5eb);border-radius:6px;background:#fff;padding:9px 12px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:600}.tenant-button:hover:not(:disabled){background:var(--md-canvas,#f8fafc)}.tenant-button:disabled{opacity:.58;cursor:default}.tenant-button-danger{border-color:#ad3842;color:#9b2533}.tenant-columns{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(290px,1fr);align-items:start;gap:16px}.tenant-panel{border:1px solid var(--md-border,#e0e5eb);background:#fff;border-radius:10px;min-width:0;overflow:hidden;box-shadow:0 3px 10px #11111108}.tenant-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:16px;flex-wrap:wrap}.tenant-search{border:1px solid var(--md-border,#e0e5eb);border-radius:6px;display:flex;align-items:center;gap:8px;padding:0 10px;min-height:44px;flex:1;min-width:200px}.tenant-search input{width:100%;border:0;outline:0;padding:8px 0;min-width:0}.tenant-filter{display:flex;align-items:center;gap:8px;color:#566064}.tenant-filter select{border:1px solid var(--md-border,#e0e5eb);background:#fff;border-radius:6px;min-height:var(--md-control-height,40px);padding:0 8px}.tenant-table-wrap{overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb,#abb8c8) transparent;overscroll-behavior:contain}.tenant-table{width:100%;border-collapse:collapse;text-align:left;min-width:500px}.tenant-table th{font-size:11px;letter-spacing:.02em;color:var(--md-muted,#64748b);background:var(--md-canvas,#f8fafc);font-weight:700}.tenant-table th,.tenant-table td{padding:12px 14px;border-bottom:1px solid var(--md-border,#e0e5eb)}.tenant-table tbody tr:hover{background:var(--md-canvas,#f8fafc)}.tenant-table tbody .tenant-row-selected{background:var(--md-canvas,#f8fafc)}.tenant-table td small{display:block;color:var(--md-muted,#64748b);margin-top:3px}.tenant-name-link{background:none;border:0;padding:0;min-height:44px;display:inline-flex;align-items:center;color:var(--md-primary,#1d4ed8);font-weight:700;text-align:left;text-decoration:underline;text-underline-offset:2px}.tenant-pill{display:inline-block;border-radius:50px;font-size:11px;font-weight:700;padding:5px 9px;white-space:nowrap}.tenant-pill-active{background:#e2f2e9;color:#216a43}.tenant-pill-suspended{background:#f9e5e7;color:#9b2533}.tenant-empty{text-align:center;color:var(--md-muted,#64748b);padding:32px!important}.tenant-pagination{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:9px;color:var(--md-muted,#64748b)}.tenant-pagination>div{display:flex;gap:5px}.tenant-pagination button{width:44px;height:44px;border:1px solid #ccd4d2;background:#fff;display:grid;place-items:center;border-radius:5px}.tenant-pagination button:disabled{opacity:.35}.tenant-detail{padding:20px}.tenant-detail-heading{display:flex;justify-content:space-between;align-items:start;gap:12px}.tenant-detail h2{margin:0 0 var(--md-space-3,12px);font-size:var(--md-fs-lg,16px)}.tenant-detail-heading code{color:var(--md-muted,#64748b);font-size:12px;word-break:break-word}.tenant-detail form{display:grid;gap:13px}.tenant-detail form>label{display:grid;gap:5px;font-weight:600}.tenant-detail input,.tenant-detail textarea{border:1px solid var(--md-border,#e0e5eb);border-radius:6px;padding:9px;width:100%;background:#fff;resize:vertical;font-weight:400}.tenant-facts{display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;border-block:1px solid var(--md-border,#e0e5eb);padding-block:13px}.tenant-facts span{color:var(--md-muted,#64748b)}.tenant-facts strong{font-weight:600}.tenant-help{font-size:12px;color:var(--md-muted,#64748b);line-height:1.5;margin:0}.tenant-placeholder{text-align:center;padding:50px 10px;color:var(--md-muted,#64748b)}.tenant-placeholder h2{color:var(--md-text,#192230);margin-top:12px}.tenant-placeholder p{line-height:1.5}.tenant-alert{display:flex;align-items:center;gap:8px;padding:12px;background:#edf8f1;border:1px solid #c2e5cb;border-radius:7px;margin-bottom:14px}.tenant-alert-error{background:#fff0ef;border-color:#f2c2c2;color:#9b2533}.tenant-restricted{text-align:center;display:grid;place-items:center;gap:7px;padding-top:60px}.tenant-restricted h2{margin:4px 0}.tenant-restricted p{color:var(--md-muted,#64748b)}@media(max-width:900px){.tenant-columns{grid-template-columns:1fr}.tenant-console{padding:16px}}
+/* Unified platform management layout: retains the existing Setup left sidebar. */
+.tenant-console{max-width:none;padding:clamp(16px,2.1vw,32px);font-size:var(--md-fs-body,14px)}
+.tenant-heading{align-items:center}
+.tenant-heading h1{font-size:clamp(24px,2.5vw,30px);letter-spacing:-.02em}
+.tenant-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 18px}
+.tenant-overview>div{display:flex;flex-direction:column;gap:var(--md-space-2,8px);background:var(--surface,#fff);border:1px solid var(--md-border,#e0e5eb);border-radius:var(--md-radius-lg,12px);padding:var(--md-space-4,16px);min-width:0;box-shadow:0 2px 6px #121e3408}
+.tenant-overview strong{font-size:var(--md-fs-h2,24px);line-height:1.2;font-weight:var(--md-weight-bold,700);color:var(--md-text,#192230)}
+.tenant-overview span{color:var(--md-muted,#64748b);font-size:12px}
+.tenant-columns{grid-template-columns:minmax(0,1fr)}
+.tenant-panel{border-radius:12px;border-color:var(--md-border,#e0e5eb);box-shadow:0 2px 8px #142b4e0b}
+.tenant-table th{background:#f6f8fb;color:#5b6980}
+.tenant-table tbody .tenant-row-selected{background:#edf3ff}
+.tenant-name-link{color:var(--md-primary,#1d4ed8);text-decoration:none}
+.tenant-name-link:hover{text-decoration:underline}
+.tenant-detail{padding:clamp(16px,2vw,24px)}
+.tenant-detail form{max-width:850px}
+.tenant-detail-heading h2{font-size:var(--md-fs-h3,20px)}
+.tenant-button-primary{background:var(--md-primary,#1d4ed8);color:white;border-color:var(--md-primary,#1d4ed8)}
+.tenant-button-primary:hover:not(:disabled){background:var(--md-primary-hover,#1e40af)}
+@media(max-width:700px){.tenant-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.tenant-toolbar{align-items:stretch}.tenant-filter{width:100%}}
+
+.tenant-detail-tabs{display:flex;align-items:center;gap:var(--md-space-1,4px);overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb,#abb8c8) transparent;overscroll-behavior:contain;border-bottom:1px solid var(--md-border,#e0e5eb);margin-bottom:22px}
+.tenant-detail-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;min-height:44px;padding:10px 16px;color:#63718a;white-space:nowrap;font-weight:600;cursor:pointer}
+.tenant-detail-tabs button.active{color:var(--md-primary,#1d4ed8);border-bottom-color:var(--md-primary,#1d4ed8)}
+.tenant-detail-tabs button:focus-visible{outline:2px solid var(--md-primary,#1d4ed8);outline-offset:-2px}
+.tenant-readonly-field{display:grid;grid-template-columns:minmax(130px,1fr) minmax(0,2fr);gap:12px;padding:14px 4px;border-bottom:1px solid var(--md-border,#e0e5eb)}
+.tenant-readonly-field span{color:var(--md-muted,#64748b)}.tenant-readonly-field strong{font-weight:600;overflow-wrap:anywhere}
+@media(max-width:600px){.tenant-readonly-field{grid-template-columns:1fr;gap:4px}}
+
+/* Overflow affordances and touch-friendly tenant controls. */
+@media(max-width:700px){.tenant-detail-tabs{mask-image:linear-gradient(to right,#000 0%,#000 calc(100% - 20px),transparent 100%)}.tenant-detail-tabs:focus-within{mask-image:none}}
+@media(pointer:coarse){.tenant-button,.tenant-filter select,.tenant-detail-tabs button{min-height:var(--md-control-touch,44px)}}
+.tenant-create-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;background:#10203399}
+.tenant-create-dialog{width:min(720px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;padding:clamp(18px,3vw,30px);border:1px solid var(--md-border,#d7e0e8);border-radius:14px;background:#fff;box-shadow:0 24px 80px #07111e55}
+.tenant-create-dialog form{display:grid;gap:14px}
+.tenant-create-dialog h2{margin:0;font-size:22px}
+.tenant-create-dialog .setup-draft-footer{position:sticky;bottom:-1px;display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:14px 0 0;background:#fff;border-top:1px solid var(--md-border,#e0e5eb)}
+.tenant-create-dialog .setup-draft-footer span{margin-right:auto;color:var(--md-muted,#64748b);font-size:13px}
+@media(max-width:600px){.tenant-create-dialog{padding:16px}.tenant-create-dialog .setup-draft-footer span{flex-basis:100%}}
+
+/* UI polish: modern table headers, consistent surfaces, better contrast */
+.tenant-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.tenant-table thead th {
+  background: var(--md-surface, #fff);
+  color: var(--md-text, #192230);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  border-bottom: 1px solid var(--md-border-strong, #aebacc);
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+.tenant-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--md-border, #e0e5eb);
+  vertical-align: middle;
+}
+.tenant-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-primary, #1d4ed8) 4%, var(--md-surface, #fff));
+}
+.tenant-table tbody .tenant-row-selected {
+  background: color-mix(in srgb, var(--md-primary, #1d4ed8) 9%, var(--md-surface, #fff));
+}
+.tenant-panel,
+.tenant-overview > div {
+  border-radius: var(--md-radius-lg, 12px);
+  box-shadow: 0 2px 8px rgba(20, 43, 78, 0.06);
+  border: 1px solid var(--md-border, #e0e5eb);
+}
+.tenant-button {
+  border-radius: var(--md-radius-md, 8px);
+}
+.tenant-search,
+.tenant-filter select {
+  border-radius: var(--md-radius-md, 8px);
+}
+.tenant-placeholder {
+  padding: 48px 24px;
+  border-radius: var(--md-radius-lg, 12px);
+  background: var(--md-canvas, #f8fafc);
+  border: 1px dashed var(--md-border, #e0e5eb);
+}
+.tenant-placeholder h2 {
+  font-size: var(--md-fs-h3, 20px);
+  margin: 8px 0 4px;
+}
+.tenant-placeholder p {
+  color: var(--md-muted, #596579);
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+
+/* Audited tenant directory: fill its card without 69px empty rows. */
+.tenant-table {table-layout:auto;width:100%;min-width:500px}
+.tenant-table th,.tenant-table td {padding:8px 12px;height:44px;vertical-align:middle}
+.tenant-table th {height:40px;font-size:12px}
+.tenant-table :is(th,td):nth-child(2){overflow-wrap:anywhere}
+.tenant-table :is(th,td):first-child{width:27%}
+.tenant-table :is(th,td):nth-child(2){width:29%}
+.tenant-table :is(th,td):last-child{white-space:nowrap}
+.tenant-placeholder p{max-width:44ch;margin-inline:auto}
+@media(max-width:600px){.tenant-table{min-width:580px}}
+
+/* Tenant details must show ALL tabs: wrap within their own panel instead of
+ * an inaccessible horizontal tab strip, including when the Setup nav is open. */
+.tenant-detail-tabs{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,110px),1fr));
+ gap:4px;
+ overflow:visible;
+ mask-image:none;
+}
+.tenant-detail-tabs button{
+ box-sizing:border-box;
+ min-width:0;
+ width:100%;
+ padding:9px 10px;
+ white-space:normal;
+ text-align:center;
+}
+.tenant-columns>.tenant-panel,.tenant-columns>[data-platform-slot]{min-width:0}
+@media(max-width:700px){.tenant-detail-tabs{mask-image:none}}

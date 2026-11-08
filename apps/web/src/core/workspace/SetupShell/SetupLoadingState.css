@@ -1,0 +1,26 @@
+.md-setup-loading-state{max-width:980px;min-height:260px;padding:24px}
+.md-setup-loading-state h2{font-size:18px;margin:0 0 6px}
+.md-setup-loading-state p{font-size:14px;margin:0 0 24px;color:var(--md-muted,#596579)}
+.md-setup-loading-skeleton{display:grid;gap:12px;max-width:740px}
+.md-setup-loading-skeleton>span{height:20px;width:95%;background:var(--md-surface-2,#e9edf2);border-radius:8px;animation:md-loading-pulse 1.5s ease-in-out infinite}
+.md-setup-loading-skeleton>span:nth-child(2){width:72%}
+.md-setup-loading-skeleton>span:nth-child(3){width:84%}
+.md-setup-loading-skeleton>span:nth-child(4){width:48%}
+@keyframes md-loading-pulse{50%{opacity:.5}}
+@media(prefers-reduced-motion:reduce){.md-setup-loading-skeleton>span{animation:none}}
+
+/* Page Builder list keeps a recognisable toolbar and six stable rows while SQL metadata resolves. */
+.md-page-list-loading { display:grid;gap:0;max-width:100%;border:1px solid var(--md-border,#dce3eb);border-radius:9px;overflow:hidden; }
+.md-page-list-loading-toolbar {display:flex;gap:12px;padding:14px;flex-wrap:wrap;border-bottom:1px solid var(--md-border,#dce3eb)}
+.md-page-list-loading-toolbar span {height:38px;min-width:112px;flex:1 1 120px}
+.md-page-list-loading-toolbar span:first-child{flex:2 1 220px}
+.md-page-list-loading-head,.md-page-list-loading-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:18px;align-items:center;padding:12px 14px}
+.md-page-list-loading-head {background:var(--md-surface-2,#f5f8fc)}
+.md-page-list-loading-row {min-height:48px;border-top:1px solid var(--md-border,#edf0f3)}
+.md-page-list-loading :is(.md-page-list-loading-toolbar,.md-page-list-loading-head,.md-page-list-loading-row)>span{
+  height:16px;width:100%;border-radius:7px;background:var(--md-surface-2,#e9edf2);
+  animation:md-loading-pulse 1.5s ease-in-out infinite;
+}
+.md-page-list-loading-toolbar>span{height:38px}
+@media(max-width:599px){.md-setup-loading-state{padding:16px}.md-page-list-loading-head,.md-page-list-loading-row{grid-template-columns:2fr 1fr;gap:10px}.md-page-list-loading-head span:last-child,.md-page-list-loading-row span:last-child{display:none}}
+@media(prefers-reduced-motion:reduce){.md-page-list-loading span{animation:none}}

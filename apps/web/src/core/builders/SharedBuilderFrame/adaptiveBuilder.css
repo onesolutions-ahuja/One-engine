@@ -1,0 +1,325 @@
+/* Shared builder presentation overrides; imported only by Page/Flow Builder modules.
+ * Preserve builder state, undo/redo, metadata publishing and existing panel toggles.
+ */
+.lightning :is(.page-builder-layout.canvas-unified-builder .component-panel,
+  .page-builder-layout.canvas-unified-builder .properties-panel,
+  .flow-workarea > .flow-toolbox,
+  .flow-workarea > .flow-settings) {
+  background: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-separator);
+}
+.lightning .canvas-unified-builder .builder-panel-collapse-row {
+  background: var(--md-surface);
+  border-color: var(--md-separator);
+}
+.lightning :is(.page-builder-layout.canvas-unified-builder .component-panel,
+  .page-builder-layout.canvas-unified-builder .properties-panel) {
+  border-radius: var(--md-radius-lg);
+}
+.lightning .flow-element-option { min-height: 32px; }
+.lightning .flow-element-option:focus-visible,
+.lightning .canvas-unified-builder .builder-icon-rail button:focus-visible {
+  outline: 3px solid var(--md-focus-ring);
+  outline-offset: -2px;
+}
+@media (pointer: coarse) {
+  /* All five shared builders must have usable touch targets, not only Page/Flow buttons.
+   * Leave checkboxes/radios at their native sizes and keep desktop controls compact. */
+  .lightning :is(.page-builder-layout, .flow-workarea, .dashboard-builder-layout,
+    .report-builder-layout, .md-object-editor-split)
+    :is(button, [role="button"], summary, .flow-element-option, .component-library-card) {
+    min-height: var(--md-control-touch, 44px);
+    touch-action: manipulation;
+  }
+  .lightning :is(.page-builder-layout, .flow-workarea, .dashboard-builder-layout,
+    .report-builder-layout, .md-object-editor-split)
+    :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    min-height: var(--md-control-touch, 44px);
+    font-size: max(16px, 1em); /* Prevent iPadOS zoom on editable fields. */
+  }
+  .lightning .canvas-unified-builder .builder-icon-rail button { min-height: 60px; }
+}
+/* iPad landscape and narrow desktop windows: icon rail + full canvas;
+ * optional panels float instead of consuming permanent grid columns.
+ */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .lightning .builder-page .page-builder-layout.canvas-unified-builder,
+  .lightning .builder-page .page-builder-layout.canvas-unified-builder.modern-canvas-builder {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) !important;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .lightning .canvas-unified-builder > .builder-icon-rail {
+    grid-column: 1;
+    grid-row: 1;
+    z-index: 2;
+    min-width: 0;
+    width: 56px;
+  }
+  .lightning .canvas-unified-builder > .page-preview-area {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+    overflow: auto;
+  }
+  .lightning .builder-page .canvas-unified-builder > :is(.component-panel, .properties-panel) {
+    position: absolute;
+    grid-column: auto;
+    grid-row: auto;
+    z-index: 20;
+    left: 56px;
+    right: auto;
+    top: 0;
+    bottom: 0;
+    width: min(320px, calc(100% - 56px));
+    max-height: 100% !important;
+    overflow: auto;
+    border: 1px solid var(--md-separator);
+    border-radius: var(--md-radius-lg);
+    box-shadow: var(--md-shadow-md);
+  }
+  .lightning .flow-builder .flow-workarea {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .lightning .flow-builder .flow-workarea > .flow-canvas {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 55dvh;
+  }
+  .lightning .flow-builder .flow-workarea > .flow-toolbox {
+    position: absolute;
+    z-index: 22;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(280px, 85%);
+    max-height: 100% !important;
+    overflow-y: auto;
+    border: 1px solid var(--md-separator);
+    border-radius: var(--md-radius-lg);
+    box-shadow: var(--md-shadow-md);
+    display: none !important;
+  }
+  .lightning .flow-builder .flow-workarea.flow-toolbox-expanded > .flow-toolbox { display: block !important; }
+  .lightning .flow-builder .flow-workarea > .flow-settings {
+    position: absolute;
+    z-index: 21;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: min(320px, 85%);
+    max-height: 100% !important;
+    overflow-y: auto;
+    border: 1px solid var(--md-separator);
+    border-radius: var(--md-radius-lg);
+    box-shadow: var(--md-shadow-md);
+  }
+  .lightning .flow-builder .flow-workarea > .flow-properties-resize-handle { display: none; }
+}
+/* Portrait: library/inspector use two-detent-ready bottom sheets, leaving
+ * most of the canvas visible. Existing action toggles still own visibility.
+ */
+@media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait) {
+  .lightning .builder-page .canvas-unified-builder > :is(.component-panel, .properties-panel) {
+    left: 56px;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: calc(100% - 56px);
+    height: min(40dvh, 450px);
+    max-height: 40dvh !important;
+    border-radius: var(--md-radius-xl) var(--md-radius-xl) 0 0;
+  }
+  .lightning .flow-builder .flow-workarea > :is(.flow-toolbox, .flow-settings) {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    height: min(40dvh, 450px);
+    max-height: 40dvh !important;
+    border-radius: var(--md-radius-xl) var(--md-radius-xl) 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lightning :is(.flow-toolbox, .flow-settings, .component-panel, .properties-panel) { animation: none; transition: none; }
+}
+
+/* Dashboard, Report and Object Manager reuse the same palette/surface,
+ * overlay/inspector, and focus conventions as Page/Flow Builder. */
+.lightning :is(.dashboard-builder-sidebar,.dashboard-properties,.report-outline,.report-fields-panel,.md-object-editor-split .object-subnav){
+ background:var(--md-surface);border-color:var(--md-separator);color:var(--md-text);
+}
+.lightning :is(.dashboard-builder-layout,.report-builder-layout,.md-object-editor-split) {
+ min-width:0;container-type:inline-size;
+}
+.lightning :is(.dashboard-builder-canvas,.report-preview,.md-object-editor-main){min-width:0;max-width:100%}
+.lightning .md-builder-panel-toggle{display:none}
+.lightning .dashboard-builder .dashboard-name-input{color:var(--md-text);background:var(--md-surface)}
+.lightning .report-builder-layout :is(.report-outline-tabs button,.report-fields-panel input,.report-outline input) {
+ background:var(--md-surface);color:var(--md-text);border-color:var(--md-separator);
+}
+.lightning .md-object-editor-split{
+ display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;
+ padding:0 12px 20px;
+}
+.lightning .md-object-editor-split .object-subnav{
+ display:flex;flex-direction:column;flex-wrap:nowrap;align-self:start;position:sticky;top:12px;
+ min-width:0;width:100%;box-sizing:border-box;
+ max-height:calc(100dvh - 140px);overflow-x:hidden;overflow-y:auto;gap:3px;padding:9px;
+ border:.5px solid var(--md-separator);border-radius:var(--md-radius-lg);
+}
+.lightning .md-object-editor-split .object-subnav button{
+ display:block;flex:none;min-height:32px;width:100%;white-space:normal;
+ border:0;border-radius:var(--md-radius-md);text-align:left;
+ padding:8px 10px;color:var(--md-text);background:transparent;
+}
+.lightning .md-object-editor-split .object-subnav button.active,
+.lightning .md-object-editor-split .object-subnav button[aria-current="page"]{
+ background:color-mix(in srgb,var(--md-primary) 12%,var(--md-surface));
+ color:var(--md-primary);font-weight:600;
+}
+.lightning .md-object-editor-split .object-subnav button.active::after{display:none}
+.lightning .md-object-settings-picker{display:none}
+@media(hover:hover){
+ .lightning .md-object-editor-split .object-subnav button:hover{background:var(--md-fill)}
+}
+@media(pointer:coarse){
+ .lightning .md-object-editor-split .object-subnav button{min-height:44px}
+}
+@media(min-width:600px) and (max-width:1199px){
+ .lightning .md-builder-panel-toggle{display:inline-flex;min-height:40px}
+ .lightning .dashboard-builder-layout.md-builder-frame:not(.dashboard-preview-layout),
+ .lightning .report-builder-layout.md-builder-frame:not(.report-run-page){
+  grid-template-columns:minmax(0,1fr)!important;
+  display:grid;position:relative;min-width:0;min-height:55dvh;overflow:hidden;
+ }
+ .lightning .dashboard-builder-layout.md-builder-frame .dashboard-builder-sidebar,
+ .lightning .dashboard-builder-layout.md-builder-frame .dashboard-properties,
+ .lightning .report-builder-layout.md-builder-frame .report-outline,
+ .lightning .report-builder-layout.md-builder-frame .report-fields-panel{
+  position:absolute;z-index:25;top:0;bottom:0;min-height:0;max-height:100%;
+  width:min(320px,85vw);overflow:auto;
+  border:.5px solid var(--md-separator);border-radius:var(--md-radius-lg);
+  box-shadow:var(--md-shadow-md);background:var(--md-surface);
+ }
+ .lightning .dashboard-builder-layout.md-builder-frame .dashboard-builder-sidebar,
+ .lightning .report-builder-layout.md-builder-frame .report-outline{
+  left:0;right:auto;display:none!important;
+ }
+ .lightning .dashboard-builder-layout.md-builder-frame .dashboard-properties,
+ .lightning .report-builder-layout.md-builder-frame .report-fields-panel{
+  left:auto;right:0;display:none!important;
+ }
+ .lightning .dashboard-builder-layout.md-builder-library-open>.dashboard-builder-sidebar,
+ .lightning .report-builder-layout.md-builder-library-open>.report-outline{
+  display:block!important;
+ }
+ .lightning .dashboard-builder-layout.md-builder-inspector-open>.dashboard-properties,
+ .lightning .report-builder-layout.report-fields-open>.report-fields-panel{display:block!important}
+ .lightning .dashboard-builder-layout.md-builder-frame .dashboard-builder-canvas,
+ .lightning .report-builder-layout.md-builder-frame .report-preview{
+  grid-column:1!important;min-width:0;width:100%;min-height:55dvh;
+  overflow:auto;
+ }
+}
+@media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait){
+ .lightning .dashboard-builder-layout.md-builder-frame>.dashboard-builder-sidebar,
+ .lightning .dashboard-builder-layout.md-builder-frame>.dashboard-properties,
+ .lightning .report-builder-layout.md-builder-frame>.report-outline,
+ .lightning .report-builder-layout.md-builder-frame>.report-fields-panel{
+  top:auto;left:0;right:0;bottom:0;width:100%;height:40dvh;
+  max-height:min(450px,40dvh);border-radius:var(--md-radius-xl) var(--md-radius-xl) 0 0;
+ }
+}
+/* Audit DEF-069: use the existing accessible settings picker on iPad landscape too. */
+@media(max-width:1199px){
+ .lightning .md-object-editor-split{display:block;padding:0 8px 18px}
+ .lightning .md-object-editor-split .object-subnav{display:none}
+ .lightning .md-object-settings-picker{display:grid;gap:6px;font-size:13px;font-weight:600;padding:8px 0 12px}
+ .lightning .md-object-settings-picker select{
+  width:100%;min-height:44px;padding:7px 12px;border:1px solid var(--md-separator);
+  border-radius:var(--md-radius-md);background:var(--md-surface);color:var(--md-text);
+ }
+}
+@media(prefers-reduced-transparency:reduce){
+ .lightning :is(.dashboard-builder-sidebar,.dashboard-properties,.report-outline,.report-fields-panel){backdrop-filter:none}
+}
+
+/* Keep the tablet Flow toolbox discoverable while its overlay is collapsed. */
+.flow-tablet-top-actions { display: none; }
+@media (min-width: 600px) and (max-width: 1023px) {
+  .lightning .flow-builder .flow-tablet-top-actions {
+    display: flex;
+    padding: 8px 12px;
+    justify-content: flex-start;
+  }
+}
+
+/* Phase 3 — Builder EDITOR chrome only. Do not touch rendered component
+ * instances in the Page canvas or published app runtimes. */
+.lightning :is(.builder-page,.flow-builder,.dashboard-builder,.report-builder-layout,.md-object-editor-split){min-width:0}
+.lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel,
+ .md-object-editor-split .object-subnav){min-width:0;overflow-wrap:anywhere;scrollbar-width:thin}
+.lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel)
+ :is(label,legend){font-size:var(--md-label-size,13px);line-height:1.45;color:var(--md-text);font-weight:600}
+.lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel)
+ :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){max-width:100%;min-width:0;box-sizing:border-box;color:var(--md-text);background:var(--md-surface);border-color:var(--md-separator);font-size:var(--md-fs-body,14px)}
+.lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel)
+ :is([class*="helper"],[class*="hint"],.form-help,.field-help){font-size:var(--md-helper-size,12px);line-height:1.45;color:var(--md-text-2,#596579)}
+.lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel)
+ summary{color:var(--md-text)}
+.lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel)
+ :is(button,summary,input,select,textarea):focus-visible{outline:3px solid var(--md-focus-ring,var(--md-primary,#1d4ed8));outline-offset:2px}
+.lightning :is(.dashboard-builder-layout,.report-builder-layout) :is(.table-scroll,.records-table-wrap){max-width:100%;overflow-x:auto;scrollbar-width:thin}
+.lightning .dashboard-builder-layout :is(.dashboard-builder-toolbar,.dashboard-builder-sidebar-header),
+.lightning .report-builder-layout :is(.report-toolbar,.report-outline-tabs){gap:8px;min-width:0}
+.lightning .md-object-editor-split .object-subnav button{line-height:1.4;overflow-wrap:anywhere}
+@media(max-width:720px){
+ .lightning :is(.builder-page .component-panel,.builder-page .properties-panel,
+ .flow-builder .flow-toolbox,.flow-builder .flow-settings,
+ .dashboard-builder-layout .dashboard-builder-sidebar,.dashboard-builder-layout .dashboard-properties,
+ .report-builder-layout .report-outline,.report-builder-layout .report-fields-panel){max-width:100%;overscroll-behavior:contain}
+}
+@media(prefers-reduced-motion:reduce){
+ .lightning :is(.builder-page,.flow-builder,.dashboard-builder-layout,.report-builder-layout) :is(button,.component-panel,.properties-panel,.flow-settings,.flow-toolbox){scroll-behavior:auto;transition-duration:0s}
+}
+
+
+/* Object Manager lists / record-page introduction stay inside the editor grid. */
+.lightning .md-object-editor-main,.lightning .md-object-editor-main>*{min-width:0;max-width:100%}
+.lightning .md-object-editor-main :is(.slds-table,.data-table){width:100%}
+.lightning .md-object-editor-main :is(.table-scroll,.object-setting-surface,.section-toolbar){max-width:100%;min-width:0}
+.lightning .md-object-editor-main :is(.records-empty,.empty-state,.object-page-empty,.object-setting-surface) :is(h2,p){
+  max-width:100%;min-width:0;overflow-wrap:anywhere
+}
+@media(min-width:1200px){
+ .lightning .md-object-editor-split .object-subnav button{min-height:40px;white-space:normal;overflow-wrap:normal;overflow:visible;text-overflow:clip}
+}

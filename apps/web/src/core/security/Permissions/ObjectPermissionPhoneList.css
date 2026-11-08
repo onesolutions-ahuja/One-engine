@@ -1,0 +1,18 @@
+.permission-phone-object-list{display:none}
+@media(max-width:599px),(max-height:500px) and (pointer:coarse){
+ .permission-phone-object-list{display:block;margin:12px 0}
+ .permission-desktop-matrix{display:none!important}
+ .permission-phone-inset-list,.permission-phone-switches{border-radius:13px;background:var(--md-ios-surface,#fff);overflow:hidden}
+ .permission-phone-object{width:100%;min-height:64px;display:flex;align-items:center;gap:10px;text-align:left;padding:10px 14px;border:0;border-bottom:.5px solid var(--md-ios-separator,#c6c6c8);background:var(--md-ios-surface,#fff);color:var(--md-ios-text,#1c1c1e)}
+ .permission-phone-object>span{flex:1;min-width:0;display:grid;gap:3px}
+ .permission-phone-object strong{font-size:16px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+ .permission-phone-object small{font-size:13px;color:var(--md-ios-secondary,#686870)}
+ .permission-phone-switches>label{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:51px;padding:8px 14px;font-size:16px;border-bottom:.5px solid var(--md-ios-separator,#c6c6c8)}
+ .permission-phone-switches input[type=checkbox]{appearance:none;-webkit-appearance:none;width:51px;height:31px;border-radius:20px;background:var(--md-ios-separator,#e5e5ea);position:relative;transition:background .18s;cursor:pointer;flex:none}
+ .permission-phone-switches input[type=checkbox]:checked{background:#34c759}
+ .permission-phone-switches input[type=checkbox]::before{content:'';position:absolute;width:27px;height:27px;border-radius:50%;left:2px;top:2px;background:#fff;box-shadow:0 1px 2px #0002;transition:transform .18s}
+ .permission-phone-switches input[type=checkbox]:checked::before{transform:translateX(20px)}
+ .permission-phone-switches input[type=checkbox]:focus-visible{outline:3px solid var(--md-ios-accent,#007aff);outline-offset:2px}
+ .permission-phone-help{font-size:14px;color:var(--md-ios-secondary,#686870);margin:0 0 12px}
+}
+@media(prefers-reduced-motion:reduce){.permission-phone-switches input[type=checkbox],.permission-phone-switches input[type=checkbox]::before{transition:none}}

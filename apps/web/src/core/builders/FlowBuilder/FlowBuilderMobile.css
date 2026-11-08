@@ -1,0 +1,48 @@
+/* Phone-only Flow Builder: accessible ordered steps, never a panned 560px canvas. */
+@media(max-width:599px),(max-height:500px) and (pointer:coarse){
+ .flow-mobile-builder{max-width:100vw;min-width:0;overflow-x:hidden}
+ .flow-mobile-builder .flow-topbar{height:auto;min-height:44px;flex-wrap:wrap;gap:8px}
+ .flow-mobile-builder .flow-toolbar-actions{display:flex;flex-wrap:wrap;gap:6px}
+ .flow-mobile-builder .flow-toolbar-actions :is(.btn,.icon-button){min-height:44px}
+ .flow-phone-top-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:12px;background:var(--md-ios-group,#f2f2f7)}
+ .flow-phone-top-actions p{margin:0;flex:1 0 100%;min-width:0;font-size:13px;line-height:1.4;color:var(--md-ios-secondary,#686870)}
+ .flow-phone-top-actions button{min-height:44px;white-space:normal;min-width:0;flex:1 1 120px;justify-content:center}
+ .flow-mobile-builder .flow-workarea{display:block!important;grid-template-columns:minmax(0,1fr)!important;min-width:0;max-width:100vw;overflow-x:hidden}
+ .flow-mobile-builder .flow-canvas{display:none!important}
+ .flow-mobile-builder .flow-zoom,.flow-mobile-builder .flow-properties-resize-handle{display:none!important}
+ .flow-mobile-builder .flow-toolbox{display:none!important}
+ .flow-mobile-builder .flow-toolbox-expanded .flow-toolbox{display:block!important;position:fixed;left:0;right:0;bottom:0;top:auto;z-index:980;max-height:78dvh;overflow:auto;width:100%;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px);background:var(--md-ios-surface,#fff)}
+ .flow-mobile-builder .flow-toolbox .flow-element-option{min-height:44px}
+ .flow-mobile-steps{display:grid;gap:0;background:var(--md-ios-surface,#fff);border-radius:13px;overflow:hidden;margin:14px 10px 24px}
+ .flow-mobile-step{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 14px;width:calc(100% - 0px);border:0;border-bottom:.5px solid var(--md-ios-separator,#c6c6c8);text-align:left;color:var(--md-ios-text,#1c1c1e);background:var(--md-ios-surface,#fff);font:inherit}
+ .flow-mobile-step.selected{background:var(--md-ios-group,#f2f2f7)}
+ .flow-mobile-step-number{height:32px;width:32px;flex:none;border-radius:999px;background:var(--md-ios-group,#f2f2f7);display:grid;place-items:center;font-size:14px;color:var(--md-ios-accent,#007aff);font-weight:700}
+ .flow-mobile-step-main{flex:1;min-width:0;display:grid;gap:3px}
+ .flow-mobile-step-main strong{font-size:16px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+ .flow-mobile-step-main small,.flow-mobile-step-main em{font-size:13px;font-style:normal;color:var(--md-ios-secondary,#686870)}
+ .flow-mobile-step>span:last-child{font-size:22px;color:var(--md-ios-secondary,#686870)}
+ .flow-mobile-builder .flow-settings{display:none!important}
+ .flow-mobile-builder .flow-mobile-inspector-open .flow-settings{display:block!important;position:fixed;left:0;right:0;bottom:0;top:auto;z-index:975;width:100%;max-width:100vw;max-height:83dvh;overflow:auto;border-radius:16px 16px 0 0;padding-bottom:env(safe-area-inset-bottom,0px);background:var(--md-ios-surface,#fff);box-shadow:0 -7px 28px rgb(0 0 0 / 20%)}
+ .flow-mobile-inspector-header{position:sticky;top:0;z-index:2;min-height:55px;padding:8px 15px;background:var(--md-ios-surface,#fff);display:flex;justify-content:space-between;align-items:center;border-bottom:.5px solid var(--md-ios-separator,#c6c6c8)}
+}
+@media(min-width:600px) and (min-height:501px){.flow-phone-top-actions,.flow-mobile-steps,.flow-mobile-inspector-header{display:none}}
+
+/* Override the legacy phone Flow Builder single-column rules in WorkspaceTheme:
+   its important declaration must not force the phone inspector/toolbox visible. */
+@media(max-width:599px), (max-height:500px) and (pointer:coarse){
+ .lightning .flow-builder.flow-mobile-builder .flow-workarea {
+   display:block!important;grid-template-columns:minmax(0,1fr)!important;overflow-x:hidden!important
+ }
+ .lightning .flow-builder.flow-mobile-builder .flow-workarea > .flow-toolbox,
+ .lightning .flow-builder.flow-mobile-builder .flow-workarea > .flow-settings {
+   display:none!important
+ }
+ .lightning .flow-builder.flow-mobile-builder .flow-workarea.flow-toolbox-expanded > .flow-toolbox {
+   display:block!important;position:fixed!important;left:0;right:0;bottom:0;top:auto;z-index:980;
+   width:100%;max-width:100%;max-height:78dvh;overflow-y:auto;border-radius:16px 16px 0 0
+ }
+ .lightning .flow-builder.flow-mobile-builder .flow-workarea.flow-mobile-inspector-open > .flow-settings {
+   display:block!important;position:fixed!important;left:0;right:0;bottom:0;top:auto;z-index:975;
+   width:100%;max-width:100%;max-height:83dvh;overflow-y:auto;border-radius:16px 16px 0 0
+ }
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="MetaDrive">
+<rect width="192" height="192" rx="36" fill="#007aff"/>
+<rect x="15" y="15" width="162" height="162" rx="29" fill="#0068df"/>
+<path d="M46 141V52L96 93L146 52V141" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

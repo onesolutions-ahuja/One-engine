@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "commonProperties": [],
+  "components": [
+    "smart_button/component.json",
+    "smart_toggle/component.json",
+    "smart_lookup/component.json",
+    "smart_selector/component.json",
+    "smart_tabs/component.json",
+    "smart_text/component.json",
+    "smart_textbox/component.json",
+    "smart_label/component.json",
+    "smart_card_grid/component.json",
+    "smart_image/component.json",
+    "smart_calendar/component.json",
+    "smart_navigation/component.json",
+    "smart_container/component.json",
+    "smart_cart/component.json",
+    "smart_table/component.json",
+    "smart_numpad/component.json",
+    "smart_icon/component.json"
+  ]
+}

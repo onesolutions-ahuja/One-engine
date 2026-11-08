@@ -1,0 +1,4 @@
+{
+  "description": "Known missing frontend SQL endpoint contracts. Do not treat these as implemented. Remove entries only after actual routes and tests exist.",
+  "unmatchedPaths": []
+}

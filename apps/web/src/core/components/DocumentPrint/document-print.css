@@ -1,0 +1,27 @@
+.md-document-print-overlay{position:fixed;inset:0;z-index:100000;background:var(--surface,#fff);color:#111;overflow-y:auto;padding:24px}
+.md-document-print-toolbar{display:flex;gap:12px;align-items:center;justify-content:flex-end;max-width:1000px;margin:0 auto 18px}
+.md-document-print-toolbar strong{margin-right:auto}
+.md-document-print-toolbar button{background:#fff;border:1px solid #ccc;border-radius:8px;padding:10px 16px;color:#111}
+.md-document-print{box-sizing:border-box;max-width:1000px;min-height:580px;margin:auto;padding:32px;background:#fff;color:#111;border:1px solid #ddd}
+.md-document-print header{display:flex;justify-content:space-between;gap:24px;align-items:start;border-bottom:2px solid #222;padding-bottom:20px}
+.md-document-print header h1{font-size:30px;margin:8px 0}
+.md-document-print-overline{letter-spacing:1px;font-size:10px}
+.md-document-print-number{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.md-document-print-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin:24px 0}
+.md-document-print-details div,.md-document-print-totals div{display:flex;justify-content:space-between;gap:16px}
+.md-document-print dt{color:#555}
+.md-document-print dd{margin:0;overflow-wrap:anywhere}
+.md-document-print table{width:100%;border-collapse:collapse;margin:24px 0;font-size:12px}
+.md-document-print th,.md-document-print td{padding:9px 7px;text-align:left;border-bottom:1px solid #ddd;vertical-align:top;overflow-wrap:anywhere}
+.md-document-print-totals{max-width:320px;margin:20px 0 24px auto}
+.md-document-print-totals div{margin:8px 0}
+.md-document-print footer{font-size:11px;color:#555;border-top:1px solid #ddd;padding-top:20px;margin-top:32px}
+@media print{
+ body:has(.md-document-print-overlay) *{visibility:hidden!important}
+ body .md-document-print-overlay,body .md-document-print-overlay *{visibility:visible!important}
+ .md-document-print-overlay{position:absolute;inset:0;z-index:2147483647;padding:0;background:white;overflow:visible}
+ .md-document-print-toolbar{display:none!important}
+ .md-document-print{border:none;max-width:none;padding:12mm 10mm;min-height:0}
+ .md-document-print tr{break-inside:avoid}
+ @page{size:A4;margin:8mm}
+}

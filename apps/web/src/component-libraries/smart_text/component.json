@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_text",
+  "label": "Smart Input Box",
+  "category": "Inputs",
+  "description": "Reusable Smart Input Box for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_text/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_text/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 260,
+    "defaultHeight": 48,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

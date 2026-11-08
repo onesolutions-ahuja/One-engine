@@ -1,0 +1,112 @@
+/* MetaDrive desktop density: modestly shrink shared application chrome on fine-pointer desktops.
+   Authored Page Builder components keep their own declared dimensions.
+   Browser zoom and CSS transforms are intentionally not used.
+
+   Readable defaults (Comfortable):
+   - Body ≥ 14px, labels/tables ≥ 13px, helper text ≥ 12px.
+   - Compact mode (further shrink) should be an explicit user preference, not the global default.
+*/
+@media (min-width: 900px) and (pointer: fine) {
+  .lightning {
+    --md-fs-xs: 12px;
+    --md-fs-sm: 13px;
+    --md-fs-md: 14px;
+    --md-fs-body: 14px;
+    --md-fs-lg: 16px;
+    --md-fs-h3: 18px;
+    --md-fs-h2: 22px;
+    --md-fs-h1: 26px;
+    --md-fs-display: 32px;
+    --md-space-1: 3px;
+    --md-space-2: 6px;
+    --md-space-3: 10px;
+    --md-space-4: 12px;
+    --md-space-6: 18px;
+    --md-space-8: 24px;
+    --md-space-12: 36px;
+    --md-control-height: 32px;
+    font-size: var(--md-fs-body);
+  }
+  .lightning .salesforce-header { height: 40px; gap: 10px; padding-inline: 14px; }
+  .lightning .icon-button { width: 32px; height: 32px; min-width: 32px; min-height: 32px; }
+  .lightning .app-strip { height: 38px; gap: 16px; padding-inline: 15px; }
+  .lightning .app-title strong { font-size: 12px; }
+  .lightning .app-icon { width: 22px; height: 22px; }
+  .lightning .primary-tab { padding-inline: 10px; }
+  .lightning .brand { font-size: 13px; gap: 6px; }
+  .lightning .brand-cloud { width: 18px; height: 18px; font-size: 11px; }
+  .lightning .setup-layout { min-height: calc(100dvh - 78px); }
+  .lightning .quick-find { padding: 11px 10px 10px; }
+  .lightning .quick-find-input { height: 28px; }
+  .lightning .tree-group-label { padding: 7px 11px 5px; }
+  .lightning .global-search { width: min(40vw, 315px); padding-inline: 7px; gap: 6px; }
+  .lightning .user-menu { padding-inline: 5px; }
+  .lightning .one-ui { --one-gap: var(--md-space-3); --one-pad: var(--md-space-4); }
+}
+/* Retain readable touch targets on tablets, phones and touch-first devices. */
+
+@media (min-width: 900px) and (pointer: fine) {
+  .lightning .tree-item { min-height: 28px; padding: 5px 9px 5px 13px; }
+  .lightning .setup-tree { padding-block: 6px 9px; }
+  .lightning .setup-tree-group { margin-top: 5px; }
+  .lightning .quick-find-title { font-size: 13px; margin-bottom: 6px; }
+  .lightning .global-search kbd { padding: 1px 4px; }
+  .lightning .notification-count { min-width: 14px; height: 14px; }
+  .lightning .notification-panel-heading { padding: 9px 11px; }
+  .lightning .notification-list li { gap: 4px; padding: 9px 11px; }
+  .lightning .md-scroll-area::-webkit-scrollbar { width: 6px; height: 6px; }
+
+  /* Tables and metadata lists: keep cells scannable */
+  .lightning :is(.one-table-wrapper, .records-list, .setup-table, [class*="table"]) {
+    font-size: max(var(--md-table-size, 13px), var(--md-fs-sm));
+  }
+}
+
+/* Setup chrome: these selectors deliberately match the specificity of the rules in
+   settingsAppearance.css / setupUsability.css (loaded around this file) so the
+   dense sizes actually apply. Collapsed rail rules are untouched. */
+@media (min-width: 900px) and (pointer: fine) {
+  .lightning .setup-layout .setup-sidebar:not(.setup-sidebar-collapsed) {
+    width: 232px;
+    min-width: 232px;
+  }
+  .lightning .setup-layout .setup-sidebar:not(.setup-sidebar-collapsed) .tree-item {
+    min-height: 36px;
+    padding: 4px 9px;
+    gap: 10px;
+    margin-block: 2px;
+    border-radius: 9px;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+  .lightning :is(.setup-layout, .mobile-settings-home) .md-setup-icon {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    flex: 0 0 24px;
+    border-radius: 7px;
+  }
+  .lightning :is(.setup-layout, .mobile-settings-home) .md-setup-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .lightning .setup-layout .setup-sidebar:not(.setup-sidebar-collapsed) .tree-item > span:not(.md-setup-icon) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.35;
+  }
+  .lightning .setup-layout .setup-sidebar:not(.setup-sidebar-collapsed) .tree-item.selected > span:not(.md-setup-icon) {
+    font-weight: 400;
+  }
+  .lightning .setup-layout .setup-sidebar:not(.setup-sidebar-collapsed) .setup-tree-group + .setup-tree-group {
+    margin-top: 12px;
+    padding-top: 6px;
+    border-top: 1px solid var(--md-border, #e0e5eb);
+  }
+}

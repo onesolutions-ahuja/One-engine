@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
+    <meta name="theme-color" content="#007aff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a84ff" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Une Solutions provides connected business software: POS, self-service kiosks, kitchen displays, online ordering, loyalty, appointments, WhatsApp automation and email reporting." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Une Solutions | Software that makes business flow" />
+    <meta property="og:description" content="Practical, connected software for restaurants, shops and service businesses. Explore POS, kiosk, KDS, ordering, loyalty and customer engagement." />
+    <meta property="og:url" content="https://unesolutions.co.uk/" />
+    <meta property="og:image" content="https://unesolutions.co.uk/une-solutions-logo.webp" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" href="/une-solutions-logo.webp" type="image/webp" />
+    <title>Une Solutions | Smart Software for Growing Businesses</title>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var spaPath = params.get('__spa');
+        if (!spaPath) return;
+        params.delete('__spa');
+        var restored = spaPath;
+        // Accept previously shared GitHub project URLs on the canonical custom domain.
+        if (restored.indexOf('/metadrive/') === 0) restored = restored.slice('/metadrive'.length);
+        if (!restored.startsWith('/') || restored.startsWith('//')) restored = '/';
+        var remainingQuery = params.toString();
+        if (remainingQuery) restored += (restored.indexOf('?') >= 0 ? '&' : '?') + remainingQuery;
+        window.history.replaceState({}, '', restored);
+      }());
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

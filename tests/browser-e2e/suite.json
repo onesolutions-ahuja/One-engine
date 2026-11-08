@@ -1,0 +1,6 @@
+{
+  "category": "browser-e2e",
+  "description": "Requires SQL test database, migrated schema, built frontend and Playwright; existing SQL E2E pipeline remains authoritative.",
+  "command": "node apps/server/scripts/builder-browser-smoke.mjs",
+  "tests": []
+}

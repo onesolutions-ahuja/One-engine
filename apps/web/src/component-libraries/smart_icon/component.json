@@ -1,0 +1,23 @@
+{
+  "apiName": "smart_icon",
+  "label": "Smart Icon",
+  "category": "Display",
+  "description": "Reusable monochrome SaaS icon with independent background and glyph colours.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_icon/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_icon/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 64,
+    "defaultHeight": 64,
+    "minWidth": 24,
+    "minHeight": 24
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": []
+}

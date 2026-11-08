@@ -1,0 +1,157 @@
+/* Outer ribbon height/overflow/scrollbar geometry is owned by PageBuilderRibbonLayout.css. */
+/* Shared Smart property catalog — stable across all Smart component selections. */
+/* Old ad-hoc editors must not duplicate or reflow the universal ribbon. */
+.office-builder-ribbon #page-builder-tab-content:not([aria-label="Component Action"]):has(>.smart-universal-ribbon)>:not(.smart-universal-ribbon){
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-universal-ribbon{
+  display:flex!important;flex:0 0 auto!important;align-items:stretch!important;
+  justify-content:flex-start!important;gap:0!important;
+  width:max-content!important;min-width:max-content!important;
+  height:148px!important;margin:0!important;padding:0!important;
+}
+.office-builder-ribbon .smart-universal-ribbon-section{
+  display:flex!important;flex-direction:column!important;flex:none!important;
+  width:max-content!important;min-width:118px!important;max-width:none!important;
+  padding:4px 8px!important;margin:0!important;
+  border-right:1px solid #cdd6e3!important;box-sizing:border-box!important;
+  background:transparent!important;
+}
+.office-builder-ribbon .smart-universal-ribbon-controls{
+  display:grid!important;grid-auto-flow:column!important;
+  grid-template-rows:repeat(3,35px)!important;
+  grid-auto-columns:minmax(145px,160px)!important;
+  gap:2px 6px!important;width:max-content!important;height:111px!important;
+  justify-content:start!important;justify-items:stretch!important;
+  align-content:start!important;align-items:stretch!important;
+}
+.office-builder-ribbon .smart-universal-property{
+  display:flex!important;flex-flow:row nowrap!important;align-items:center!important;
+  box-sizing:border-box!important;gap:5px!important;padding:1px 3px!important;
+  min-width:145px!important;max-width:160px!important;
+  height:35px!important;min-height:35px!important;max-height:35px!important;
+  font:500 10px/15px "Segoe UI",Arial,sans-serif!important;color:#233951!important;
+}
+.office-builder-ribbon .smart-universal-property-label{
+  display:block!important;flex:1 1 auto!important;min-width:0!important;
+  overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;
+  font-size:10px!important;
+}
+.office-builder-ribbon .smart-universal-property :is(input:not([type=checkbox]),select){
+  box-sizing:border-box!important;display:block!important;
+  flex:0 0 72px!important;min-width:72px!important;max-width:72px!important;
+  height:25px!important;min-height:25px!important;max-height:25px!important;
+  margin:0!important;padding:2px 4px!important;
+  border:1px solid #bfcbdb!important;border-radius:3px!important;
+  font:11px/19px "Segoe UI",Arial,sans-serif!important;
+  background:#fff!important;color:#1d3c61!important;
+}
+.office-builder-ribbon .smart-universal-property input[type=checkbox]{
+  flex:0 0 15px!important;width:15px!important;height:15px!important;
+}
+.office-builder-ribbon .smart-universal-property .metadata-array-property{
+  display:flex!important;flex-flow:row nowrap!important;
+  width:80px!important;max-width:80px!important;overflow:hidden!important;
+}
+.office-builder-ribbon .smart-universal-property .metadata-array-property button{
+  font:10px/13px "Segoe UI",Arial,sans-serif!important;
+  max-width:80px!important;overflow:hidden!important;text-overflow:ellipsis!important;
+}
+.office-builder-ribbon .smart-universal-property.is-disabled{
+  opacity:.35!important;filter:grayscale(1)!important;
+}
+.office-builder-ribbon .smart-universal-property :is(input,select):disabled{
+  pointer-events:none!important;cursor:not-allowed!important;
+}
+.office-builder-ribbon .smart-universal-ribbon-caption{
+  margin-top:auto!important;display:block!important;text-align:center!important;
+  font:500 11px/18px "Segoe UI",Arial,sans-serif!important;
+  color:#455b78!important;min-height:18px!important;
+  border-top:1px solid #e5eaf2!important;
+}
+
+.office-builder-ribbon .smart-universal-property textarea{
+  box-sizing:border-box!important;flex:0 0 72px!important;width:72px!important;height:25px!important;
+  min-height:25px!important;max-height:25px!important;resize:none!important;
+  font:10px/19px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon .smart-universal-property button{
+  flex:0 0 72px!important;max-width:72px!important;min-height:25px!important;
+  font:10px/18px "Segoe UI",Arial,sans-serif!important;
+  overflow:hidden!important;text-overflow:ellipsis!important;
+}
+.smart-universal-media-overlay{
+ position:fixed;inset:0;z-index:1700;display:flex;align-items:flex-start;justify-content:center;
+ padding:12vh 16px;box-sizing:border-box;background:#0d264e66;
+}
+.smart-universal-media-overlay>[role=dialog]{
+ width:min(520px,100%);max-height:75vh;overflow-y:auto;box-sizing:border-box;
+ padding:16px;border-radius:8px;background:white;border:1px solid #cbd7e8;
+ box-shadow:0 16px 52px #09213e55;
+}
+.smart-universal-media-overlay .metadata-array-property{display:flex;flex-direction:column;gap:10px}
+.smart-universal-media-overlay input[type=file],.smart-universal-media-overlay select{width:100%;max-width:100%;box-sizing:border-box}
+
+/* Native complex-field editors open in a spacious portal; no raw JSON requirement. */
+.smart-universal-editor-header{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ margin-bottom:12px;font:600 14px/20px "Segoe UI",Arial,sans-serif;
+}
+.smart-universal-media-overlay [role="dialog"] .metadata-component-properties{
+ width:100%;box-sizing:border-box;
+}
+.smart-universal-media-overlay [role="dialog"] .metadata-array-property{
+ width:100%;box-sizing:border-box;
+}
+.smart-universal-media-overlay [role="dialog"] :is(input,select,textarea){
+ max-width:100%;box-sizing:border-box;
+}
+.office-builder-ribbon .smart-universal-builder-command{
+ flex:0 0 148px;min-width:148px;max-width:148px;height:29px;
+ padding:4px 8px;border:1px solid #bfcde0;background:#fff;
+ color:#164779;border-radius:4px;font:500 11px/17px "Segoe UI",Arial,sans-serif;
+ cursor:pointer;white-space:nowrap;
+}
+.office-builder-ribbon .smart-universal-builder-command:disabled{
+ opacity:.4;cursor:not-allowed;
+}
+
+/* Complex editors live in the ribbon as their own scrollable section, never a popup. */
+.office-builder-ribbon #page-builder-tab-content>.smart-universal-ribbon:has(.smart-universal-complex-section){
+  height:350px!important;min-height:350px!important;
+}
+.office-builder-ribbon .smart-universal-complex-section{
+  flex:0 0 490px!important;width:490px!important;min-width:490px!important;
+  max-width:490px!important;height:348px!important;
+  padding:6px 10px!important;border-left:1px solid #cbd7e8!important;
+}
+.office-builder-ribbon .smart-universal-complex-header{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font:600 12px/20px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .smart-universal-complex-header button{
+  border:1px solid #bfcde0;border-radius:4px;background:#fff;
+  padding:2px 9px;color:#164779;cursor:pointer;
+}
+.office-builder-ribbon .smart-universal-complex-body{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  padding:5px 2px;max-width:100%;
+}
+.office-builder-ribbon .smart-universal-complex-body .metadata-component-properties{
+  width:100%;max-width:100%;box-sizing:border-box;
+}
+.office-builder-ribbon .smart-universal-complex-body :is(input,select,textarea){
+  max-width:100%;box-sizing:border-box;
+}
+
+/* Data ribbon always remains compact. Every property appears in its section. */
+.office-builder-ribbon .smart-universal-inline-complex{flex:0 0 180px;width:180px;max-width:180px;max-height:112px;overflow:auto;scrollbar-width:thin}
+.office-builder-ribbon .smart-universal-inline-complex .metadata-component-properties{width:100%;min-width:160px;font-size:11px}
+.office-builder-ribbon .smart-universal-inline-complex .component-optional-settings{display:block;margin:0;padding:0;border:0}
+.office-builder-ribbon .smart-universal-inline-complex .component-optional-settings>summary,
+.office-builder-ribbon .smart-universal-inline-complex .properties-section-title{display:none!important}
+/* Preserve functional metadata row controls and Add/Remove actions. */
+.office-builder-ribbon .smart-universal-inline-complex .metadata-array-property{display:flex;align-items:center;margin:0;padding:0;min-height:25px;gap:3px}
+.office-builder-ribbon .smart-universal-inline-complex .form-label{display:flex;align-items:center;gap:3px;margin:0}
+
+.office-builder-ribbon .smart-universal-inline-complex :is(select,input){min-height:24px;max-width:170px}

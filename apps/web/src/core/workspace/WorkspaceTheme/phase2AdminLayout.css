@@ -1,0 +1,481 @@
+/* Phase 2: administrative screens only. Published Page Runtime and Builder canvases are excluded.
+ * Structural spacing/density is shared; business behaviour, component properties and branding
+ * remain controlled by their owning metadata and theme tokens. Loaded after Phase 1 polish. */
+.lightning .md-admin-tabstrip {
+ display:flex;flex-wrap:nowrap;align-items:center;gap:6px;max-width:100%;
+ overflow-x:auto;scrollbar-width:thin;padding:6px;border:1px solid var(--md-border,#e0e5eb);
+ border-radius:var(--md-radius-md,8px);background:var(--md-surface-2,var(--md-canvas,#f8fafc));
+}
+.lightning .md-admin-tabstrip>button {
+ flex:0 0 auto;min-height:38px;white-space:nowrap;padding:7px 12px;
+ font-size:var(--md-label-size,13px);font-weight:600;color:var(--md-text,#192230);
+ background:transparent;border:1px solid transparent;border-radius:var(--md-radius-md,8px);
+}
+.lightning .md-admin-tabstrip>button[aria-selected="true"] {
+ color:var(--md-action-ink,var(--md-primary,#1d4ed8));background:var(--md-surface,#fff);
+ border-color:var(--md-border,#e0e5eb);box-shadow:var(--md-shadow-sm,0 1px 3px rgb(0 0 0 / 5%));
+}
+.lightning .md-admin-tabpanel {min-width:0;padding-top:14px}
+.lightning .md-admin-tabpanel>h3 {margin:0 0 8px;font-size:var(--md-fs-h3,18px);line-height:1.35}
+.lightning .md-admin-tabpanel>p {max-width:82ch;line-height:1.5;margin:0 0 14px;color:var(--md-text-secondary,var(--md-muted,#596579))}
+.lightning .md-admin-toolbar {
+ display:flex;flex-wrap:wrap;align-items:end;gap:10px 16px;padding:12px;
+ margin:12px 0;background:var(--md-surface-2,var(--md-canvas,#f8fafc));
+ border:1px solid var(--md-border,#e0e5eb);border-radius:var(--md-radius-md,8px);
+}
+.lightning .md-admin-toolbar>.form-label {flex:1 1 230px;max-width:380px;margin:0}
+.lightning .md-admin-toolbar>.checkbox-row {flex:0 1 auto;min-height:40px;margin:0}
+.lightning .md-admin-toolbar>.btn {min-height:38px;margin:0}
+.lightning .md-admin-licence-assignments {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.lightning .md-admin-settings-block {
+ min-width:0;background:var(--md-surface,#fff);border:1px solid var(--md-border,#e0e5eb);
+ border-radius:var(--md-radius-lg,12px);padding:14px;
+}
+.lightning .md-admin-settings-block>.form-label {margin-bottom:12px}
+.lightning .md-admin-settings-block>.md-admin-form-grid {margin:0}
+.lightning .md-admin-settings-block .md-admin-actions {margin:12px 0 0}
+.lightning .md-admin-checkbox-grid {max-width:100%;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+.lightning .md-admin-checkbox-grid>.checkbox-row {padding:5px 2px;min-height:32px;line-height:1.4}
+.lightning .md-admin-issuer {border:1px solid var(--md-border,#e0e5eb);border-radius:10px;margin:14px 0;padding:0;overflow:hidden}
+.lightning .md-admin-issuer>summary {cursor:pointer;padding:14px 16px;font-weight:650;color:var(--md-text,#192230);background:var(--md-surface-2,var(--md-canvas,#f8fafc))}
+.lightning .md-admin-issuer[open]>:not(summary) {margin-left:16px;margin-right:16px}
+.lightning .md-admin-issuer .md-admin-form-grid {margin-top:14px;margin-bottom:14px}
+.lightning .md-admin-issuer fieldset {margin-top:14px}
+.lightning .md-admin-issuer .md-admin-actions {margin-bottom:16px}
+.lightning .md-admin-subheading {margin:18px 0 10px;font-size:var(--md-fs-lg,16px);color:var(--md-text,#192230);font-weight:650}
+.lightning .md-admin-entity-list {display:grid;gap:8px;margin:12px 0}
+.lightning .md-admin-entity-row {
+ min-width:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;
+ padding:10px 12px;border:1px solid var(--md-border,#e0e5eb);border-radius:8px;
+ background:var(--md-surface,#fff);
+}
+.lightning .md-admin-entity-row>div {min-width:0;flex:1 1 250px;display:grid;gap:3px}
+.lightning .md-admin-entity-row strong {font-size:var(--md-label-size,13px);color:var(--md-text,#192230)}
+.lightning .md-admin-entity-row span,.lightning .md-admin-entity-row code {font-size:var(--md-helper-size,12px);color:var(--md-muted,#596579);overflow-wrap:anywhere}
+.lightning .md-admin-entity-row>.btn {flex:0 0 auto;min-height:34px}
+.lightning .md-admin-restriction-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px;align-items:end;padding:10px 0;border-bottom:1px solid var(--md-border,#e0e5eb)}
+.lightning .md-admin-restriction-hours {grid-template-columns:repeat(3,minmax(0,1fr))}
+.lightning .md-admin-restriction-grid .form-label {margin:0;min-width:0}
+.lightning .md-admin-restriction-grid>.btn {justify-self:start}
+.lightning .md-admin-password-grid {
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;
+ gap:8px 14px;
+}
+.lightning .md-admin-password-grid>.form-label {margin:0}
+.lightning .md-admin-password-grid>.md-admin-boolean-option {margin:0;align-self:end;min-height:40px}
+.lightning .md-admin-table-wrap {margin:12px 0;border:1px solid var(--md-border,#e0e5eb);border-radius:9px}
+.lightning .md-admin-table th {font-size:var(--md-table-size,13px);letter-spacing:0;background:var(--md-surface-2,var(--md-surface,#fff))}
+.lightning .md-admin-table td {padding-block:7px;max-width:280px}
+.lightning .md-admin-table tbody tr:hover {background:color-mix(in srgb,var(--md-primary,#1d4ed8) 4%,var(--md-surface,#fff))}
+.lightning .md-admin-empty-row {text-align:center;color:var(--md-muted,#596579);padding:18px!important}
+.lightning .company-workspace :is(.surface.permission-section,.company-workspace-card) {min-width:0}
+.lightning .company-workspace-section-security .company-workspace-stack>.surface.permission-section {padding:16px}
+.lightning .company-workspace .surface.permission-section :is(.form-control,input:not([type=checkbox]),select,textarea) {max-width:100%;box-sizing:border-box}
+.lightning .company-workspace .surface.permission-section>.form-label {max-width:min(100%,520px)}
+.lightning .company-workspace .surface.permission-section>h3 {margin:16px 0 10px;font-size:var(--md-fs-lg,16px)}
+.lightning .named-credentials-page>.section-toolbar {gap:12px;flex-wrap:wrap}
+.lightning .named-credentials-page .record-type-create {max-width:min(100%,400px)}
+.lightning .named-credentials-page .table-scroll {max-width:100%;overscroll-behavior-x:contain}
+.lightning .named-credentials-page .slds-table td:last-child .toolbar-actions {gap:5px;justify-content:flex-start}
+.lightning .named-credentials-page .slds-table :is(th,td) {font-size:var(--md-table-size,13px);padding:8px 10px}
+.lightning .named-credentials-page .slds-table :is(th,td):first-child {min-width:175px}
+.lightning .named-credential-modal {width:min(1040px,calc(100vw - 32px));max-height:min(90dvh,900px);margin:5dvh auto;overflow-y:auto;overscroll-behavior:contain}
+.lightning .named-credential-modal .named-credential-form-grid {display:grid;align-items:start;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
+.lightning .named-credential-modal .named-credential-form-grid>.named-credential-span-full {grid-column:1/-1}
+.lightning .permissions-page .permission-form-grid {gap:12px 16px}
+.lightning .permissions-page .permission-check-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:4px 12px}
+.lightning .permissions-page .permission-check-grid .checkbox-row {margin:0;min-width:0;overflow-wrap:anywhere}
+.lightning .permissions-page .permission-table-wrap {max-width:100%;overflow:auto;overscroll-behavior-x:contain}
+.lightning .permissions-page .permission-table-wrap .slds-table th {position:sticky;top:0;z-index:2;white-space:normal}
+.lightning .permissions-page .permission-matrix td {padding:7px 10px}
+.lightning .app-manager-workspace :is(.app-manager-step,.app-manager-form-card .form-label,.app-manager-selector-note,.app-manager-help-steps p) {font-size:var(--md-label-size,13px)}
+.lightning .app-manager-workspace :is(.app-manager-form-card .permission-help,.app-manager-step small,.app-manager-help-tip) {font-size:var(--md-helper-size,12px)}
+.lightning .app-manager-workspace .app-manager-actions {gap:8px;border-top:1px solid var(--md-border,#e0e5eb)}
+.lightning .app-manager-workspace .app-manager-help-column {min-width:0}
+.lightning .app-exchange .exchange-app-grid {gap:12px}
+.lightning .app-exchange .exchange-app-card {min-width:0}
+.lightning .app-exchange .exchange-card-meta {flex-wrap:wrap;gap:6px}
+.lightning :is(.flow-interviews,.flow-logs-page,.scheduled-flows-page) .table-scroll {max-width:100%;overflow:auto}
+.lightning :is(.flow-interviews,.flow-logs-page,.scheduled-flows-page) .slds-table :is(th,td) {font-size:var(--md-table-size,13px);padding:8px 10px}
+.lightning :is(.tenant-console,.company-workspace,.named-credentials-page,.permissions-page,.app-manager-workspace,.app-exchange) .permission-help {font-size:var(--md-helper-size,12px);line-height:1.5}
+@media(max-width:1024px) {
+ .lightning .md-admin-licence-assignments {grid-template-columns:1fr}
+ .lightning .md-admin-restriction-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .lightning .md-admin-password-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px) {
+ .lightning .md-admin-toolbar {display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;padding:10px}
+ .lightning .md-admin-toolbar>.form-label {max-width:none}
+ .lightning .md-admin-entity-row>.btn {width:auto}
+ .lightning .md-admin-restriction-grid,.lightning .md-admin-password-grid {grid-template-columns:minmax(0,1fr)}
+ .lightning .named-credential-modal {width:calc(100vw - 16px);max-height:calc(100dvh - 24px);margin:12px auto}
+ .lightning .named-credential-modal .named-credential-form-grid {grid-template-columns:minmax(0,1fr)}
+ .lightning .md-admin-tabpanel {padding-top:10px}
+}
+@media(pointer:coarse) {
+ .lightning .md-admin-tabstrip>button,.lightning .md-admin-entity-row>.btn {min-height:44px}
+}
+
+/* Content-size and mobile overflow fixes across remaining administrative views. */
+.lightning .named-credential-modal {position:relative;box-sizing:border-box;max-width:calc(100vw - 16px)}
+.lightning .named-credential-modal .modal-header {position:sticky;top:0;z-index:3;background:var(--md-surface,#fff)}
+.lightning .named-credentials-page .md-admin-pagination {margin-top:14px;gap:10px;flex-wrap:wrap}
+.lightning .permissions-page .permission-table-wrap {border:1px solid var(--md-border,#e0e5eb);border-radius:8px;scrollbar-width:thin}
+.lightning .permissions-page .permission-matrix :is(th,td) {font-size:var(--md-table-size,13px)}
+.lightning .permissions-page .permission-matrix tbody tr:hover {background:color-mix(in srgb,var(--md-primary,#1d4ed8) 5%,var(--md-surface,#fff))}
+.lightning .permissions-page .permission-matrix :is(button,input,select) {accent-color:var(--md-primary,#1d4ed8)}
+.lightning .permissions-page .permission-check-grid label {min-height:32px;align-self:start}
+.lightning .company-workspace :is(.permission-tabs,.company-workspace-tabs) button {font-size:var(--md-label-size,13px)}
+.lightning .tenant-domains .tenant-domain-item {min-width:0;overflow-wrap:anywhere}
+.lightning .tenant-domains .tenant-domain-add-edit .form-label {max-width:min(100%,470px)}
+.lightning .tenant-usage :is(.tenant-usage-grid,.tenant-usage-targets) {min-width:0}
+.lightning .tenant-usage .tenant-usage-stat {min-width:0;overflow-wrap:anywhere}
+.lightning .flow-interviews .records-table-wrap,.lightning .workspace .records-table-wrap[aria-label="Failed durable Flow jobs"],.lightning .workspace .records-table-wrap[aria-label="Paused and waiting Flow interviews"] {max-width:100%;overflow-x:auto;scrollbar-width:thin}
+.lightning .app-manager-workspace .app-manager-advanced summary {font-size:var(--md-label-size,13px)}
+.lightning .app-manager-workspace .app-manager-step {gap:8px}
+.lightning .app-manager-workspace .app-manager-top {min-width:0}
+@media(max-width:720px){.lightning .md-admin-settings-block {padding:10px}.lightning .md-admin-table-wrap {margin:10px 0}.lightning .company-workspace .md-admin-tabstrip {position:relative}}
+
+/* Do not force 940px audit tables on a phone: accessible row cards retain headers in the DOM. */
+.lightning .md-security-history-filters{margin:14px 0;gap:10px 14px}
+.lightning .md-security-history-filters>.md-admin-actions{align-self:end;margin:0;gap:8px}
+@media(max-width:899px){
+ .lightning .md-admin-table-wrap:has(.md-audit-table){overflow:visible}
+ .lightning .md-audit-table{min-width:0;width:100%;border-spacing:0}
+ .lightning .md-audit-table thead{display:none}
+ .lightning .md-audit-table,.lightning .md-audit-table tbody,.lightning .md-audit-table tr{display:block;min-width:0}
+ .lightning .md-audit-table tbody tr{padding:8px 12px;margin:10px 0;border:1px solid var(--md-border,#e0e5eb);border-radius:9px}
+ .lightning .md-audit-table td{display:grid;grid-template-columns:minmax(95px,35%) minmax(0,1fr);gap:8px;max-width:none;min-width:0;overflow-wrap:anywhere;padding:6px 0;border-bottom:1px solid var(--md-border,#e0e5eb)}
+ .lightning .md-audit-table td:last-child{border-bottom:0}
+ .lightning .md-audit-table td::before{content:attr(data-label);font-weight:600;color:var(--md-muted,#596579)}
+ .lightning .md-audit-table td[colspan]{display:block;text-align:center}
+ .lightning .md-audit-table td[colspan]::before{content:none}
+ .lightning .md-audit-table [data-long-id]{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+}
+
+/* Compact administrative chrome only; published page geometry is metadata-owned. */
+@media (min-width: 900px) and (pointer: fine) {
+  .lightning.md-setup-light:not(.page-builder-editing) .home-content {
+    max-width: 1600px;
+    padding: 18px 22px 28px;
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .welcome-banner {
+    padding: 18px 20px;
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .welcome-copy h2 {
+    font-size: 23px;
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .home-section-title {
+    margin: 18px 0 10px;
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .shortcut-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 208px), 1fr));
+    gap: var(--grid-gutter, 12px);
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .shortcut-card {
+    min-height: 106px;
+    padding: 12px;
+    grid-template-columns: 38px minmax(0, 1fr) 14px;
+    column-gap: 9px;
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .shortcut-icon {
+    width: var(--icon-tile, 36px);
+    height: var(--icon-tile, 36px);
+    border-radius: 10px;
+  }
+  .lightning.md-setup-light:not(.page-builder-editing) .shortcut-title {
+    font-size: 13px;
+  }
+}
+
+/* Keep Test and Webhook actions beside each other. Horizontal table scrolling
+   is safer than splitting a single connection's actions into several lines. */
+@media (min-width: 900px) and (pointer: fine) {
+  .lightning .named-credentials-page .slds-table {
+    width: 100%;
+    min-width: 800px;
+    table-layout: auto;
+  }
+  .lightning .named-credentials-page .slds-table :is(th, td):last-child {
+    width: 1%;
+    min-width: 306px;
+  }
+  .lightning .named-credentials-page .slds-table td:last-child .toolbar-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .lightning .named-credentials-page .slds-table td:last-child .toolbar-actions > button {
+    flex: 0 0 auto;
+  }
+}
+
+/* Two shorter configuration columns instead of one wide stack. */
+.lightning .named-credential-modal {
+  width: min(840px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: 16px auto;
+}
+.lightning .named-credential-modal .named-credential-form-grid {
+  gap: 10px 14px;
+}
+.lightning .named-credential-modal .named-credential-form-grid > * {
+  min-width: 0;
+}
+.lightning .named-credential-modal .connector-config-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  min-width: 0;
+}
+.lightning .named-credential-modal .connector-config-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 4px 6px;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+}
+.lightning .named-credential-modal .connector-config-row > label {
+  grid-column: 1 / -1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.lightning .named-credential-modal .connector-config-row > .form-control {
+  grid-column: 1;
+  min-width: 0;
+  width: 100%;
+}
+.lightning .named-credential-modal .connector-config-row > .icon-button {
+  grid-column: 2;
+}
+.lightning .named-credential-modal .connector-config-fields > .btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+@media (max-width: 720px) {
+  .lightning .named-credential-modal .connector-config-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Named Credential desktop toolbar overflow repair, found by 100%-zoom browser audit. */
+@media (min-width: 900px) and (pointer: fine) {
+  .lightning .named-credentials-page .table-scroll > .slds-table {
+    min-width: 980px;
+  }
+  .lightning .named-credentials-page .slds-table :is(th,td):last-child {
+    width: 370px;
+    min-width: 370px;
+  }
+  .lightning .named-credentials-page .slds-table td:last-child .toolbar-actions {
+    flex-wrap: nowrap;
+    width: max-content;
+    min-width: max-content;
+  }
+}
+
+
+/* Audit events: right gutter, actor readability, non-truncated identifiers. */
+.lightning .md-admin-table-wrap:has(.md-audit-table){
+  max-width:100%;overflow-x:auto;padding-right:24px;box-sizing:border-box
+}
+@media(min-width:900px){
+ .lightning .md-audit-table{min-width:920px;width:100%;table-layout:auto}
+ .lightning .md-audit-table :is(th,td):nth-child(2){min-width:140px;overflow-wrap:anywhere}
+ .lightning .md-audit-table :is(th,td):nth-child(5){min-width:185px}
+ .lightning .md-audit-table td[data-long-id]{max-width:none;white-space:normal;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+}
+
+/* Audit 2026-11-04: secondary security tabs must expose every route on phones. */
+@media (max-width: 700px) {
+  .lightning .company-workspace .md-admin-tabstrip {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 5px;
+  }
+  .lightning .company-workspace .md-admin-tabstrip > button {
+    flex: 1 1 auto;
+    min-height: 44px;
+    white-space: normal;
+    text-align: center;
+  }
+}
+/* Preserve row identity when scanning long setup/security tables horizontally. */
+@media (min-width: 900px) {
+  .lightning .md-admin-table-wrap:has(.md-audit-table) {
+    position: relative;
+    padding-right: 12px;
+    scrollbar-width: thin;
+  }
+  .lightning .md-audit-table :is(th,td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--md-surface,#fff);
+    min-width: 145px;
+    box-shadow: 2px 0 4px rgba(18,35,60,.08);
+  }
+  .lightning .md-audit-table th:first-child {z-index: 3;background:var(--md-surface-2,#f8fafc);}
+}
+
+/* Permission Sets: one task at a time on small screens, instead of stacking
+   the entire selector and the multi-thousand-pixel editor. */
+.lightning .md-permission-sets-mobile-back {display:none}
+@media (max-width: 1023px) {
+  .lightning .permissions-page .permission-workspace.md-permission-sets-list-mode,
+  .lightning .permissions-page .permission-workspace.md-permission-sets-detail-mode {display:block;min-width:0}
+  .lightning .permissions-page .md-permission-sets-list-mode .permission-editor {display:none}
+  .lightning .permissions-page .md-permission-sets-detail-mode .permission-list {display:none}
+  .lightning .permissions-page .md-permission-sets-list-mode .permission-list {
+    max-height:min(70dvh,700px);height:auto;width:100%;overflow:auto;border-right:0
+  }
+  .lightning .permissions-page .md-permission-sets-detail-mode .permission-editor {min-width:0;overflow:visible}
+  .lightning .md-permission-sets-mobile-back {display:inline-flex;min-height:44px;margin-bottom:12px}
+  .lightning .md-permission-mobile-save {
+    display:flex;position:sticky;bottom:0;z-index:6;justify-content:flex-end;
+    background:var(--md-surface,#fff);padding:12px 4px;border-top:1px solid var(--md-border,#e0e5eb)
+  }
+  .lightning .md-permission-mobile-save>.btn {min-height:44px}
+}
+@media (min-width: 1024px) {.lightning .md-permission-mobile-save{display:none}}
+/* RBAC tabs keep their reading order on small phones. */
+@media (max-width: 599px) {
+  .lightning .permissions-page .permission-tabs {
+    display:flex;flex-wrap:wrap;justify-content:flex-start;gap:5px;
+    max-width:100%;overflow:visible
+  }
+  .lightning .permissions-page .permission-tabs>button {
+    flex:1 1 auto;max-width:100%;min-height:44px;white-space:normal;text-align:center
+  }
+}
+
+/* Accordion grouping for long permission-set editors.
+   Default collapse below 1024 is controlled by the editor, not global zoom. */
+.lightning .permissions-page .md-permission-collapsible {
+  min-width:0;margin:10px 0;border:1px solid var(--md-border,#e0e5eb);
+  border-radius:var(--md-radius-md,8px);padding:8px 12px;
+}
+.lightning .permissions-page .md-permission-collapsible>summary {
+  cursor:pointer;min-height:40px;display:list-item;list-style:disclosure-closed inside;
+  font-weight:650;font-size:14px;padding:9px 0;
+}
+.lightning .permissions-page .md-permission-collapsible[open]>summary {list-style:disclosure-open inside}
+.lightning .permissions-page .md-permission-collapsible>summary:focus-visible {
+  outline:2px solid var(--md-primary,#1d4ed8);outline-offset:2px;
+}
+@media (max-width:1023px) {
+  .lightning .permissions-page .md-permission-collapsible>summary {min-height:44px}
+}
+
+/* One primary navigation affordance on narrow RBAC screens; no column-major 3×3 tab matrix. */
+.lightning .permissions-page .permission-area-select{display:none}
+.lightning .permissions-page .md-permission-list-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px}
+.lightning .permissions-page .md-permission-list-pagination .btn{min-height:40px}
+.lightning .permissions-page .permission-list-item .md-user-role-label{
+ display:inline-flex;width:max-content;max-width:100%;padding:2px 8px;margin-top:4px;
+ font-size:12px;background:var(--md-surface-2,#eef3f9);color:var(--md-text,#192230);border-radius:99px
+}
+.lightning .permissions-page .md-sharing-defaults{
+ min-width:0;max-width:100%;border:1px solid var(--md-border,#e0e5eb);
+ border-radius:8px;margin-bottom:12px;padding:12px
+}
+.lightning .permissions-page .md-sharing-defaults>summary{
+ cursor:pointer;min-height:44px;font-weight:600;display:list-item;padding:10px 4px
+}
+.lightning .permissions-page .md-sharing-mobile-heading{display:none}
+.lightning .permissions-page .md-permission-mobile-save{gap:12px;align-items:center}
+.lightning .permissions-page .md-permission-save-state{margin-right:auto;font-size:12px;color:var(--md-muted,#596579)}
+@media(max-width:1023px){
+ .lightning .permissions-page .md-sharing-mobile-heading{display:block}
+ .lightning .permissions-page .md-sharing-defaults .permission-table-wrap{overflow-x:auto;max-width:100%}
+ .lightning .permissions-page .md-permission-mobile-save{
+  position:sticky;bottom:0;z-index:8;background:var(--md-surface,#fff);
+  display:flex;align-items:center;flex-wrap:wrap;padding:10px;
+  border-top:1px solid var(--md-border,#e0e5eb);margin-top:16px
+ }
+}
+@media(min-width:1024px){
+ .lightning .permissions-page .md-permission-mobile-save{
+  display:flex;position:sticky;bottom:0;z-index:8;align-items:center;gap:12px;
+  padding:12px 15px;border-top:1px solid var(--md-border,#dce3eb);
+  background:var(--md-surface,#fff);margin-top:12px
+ }
+}
+@media(max-width:599px){
+ .lightning .permissions-page .permission-area-select{
+  display:grid;gap:6px;padding:10px 14px;background:var(--md-surface-2,#f5f7fa);
+  border:1px solid var(--md-border,#e0e5eb);border-radius:9px;margin:0 0 12px
+ }
+ .lightning .permissions-page .permission-area-select select{min-height:44px;width:100%}
+ .lightning .permissions-page .permission-tabs{display:none}
+ .lightning .permissions-page .md-permission-mobile-save .btn{min-height:44px}
+}
+
+
+/* Desktop table scanability: pinned identity/actions and an explicit scroll cue. */
+@media(min-width:1024px) {
+ .lightning .page-manager-table-scroll,.lightning .records-table-wrap.records-responsive-list{
+  max-width:100%;position:relative;overflow-x:auto;scrollbar-width:thin;
+  scrollbar-color:var(--md-scroll-thumb,#9baac0) transparent
+ }
+ .lightning .page-manager-table :is(th,td):first-child{
+  position:sticky;left:0;z-index:3;background:var(--md-surface,#fff);min-width:180px;
+  box-shadow:2px 0 5px rgba(15,23,42,.1)
+ }
+ .lightning .page-manager-table :is(th,td):nth-child(2){
+  position:sticky;left:180px;z-index:2;background:var(--md-surface,#fff);min-width:150px;
+  box-shadow:2px 0 5px rgba(15,23,42,.08)
+ }
+ .lightning .page-manager-table thead th:first-child,
+ .lightning .page-manager-table thead th:nth-child(2){z-index:5;background:var(--md-surface-2,#f8fafc)}
+ .lightning .records-data-table :is(th,td):first-child{
+  position:sticky;left:0;z-index:2;background:var(--md-surface,#fff);box-shadow:2px 0 6px rgba(15,23,42,.1)
+ }
+ .lightning .records-data-table:has(th:first-child input[type="checkbox"]) :is(th,td):first-child{min-width:40px}
+ .lightning .records-data-table:has(th:first-child input[type="checkbox"]) :is(th,td):nth-child(2){
+  position:sticky;z-index:2;background:var(--md-surface,#fff);left:40px;min-width:145px;box-shadow:2px 0 6px rgba(15,23,42,.08)
+ }
+ .lightning .records-data-table thead :is(th:first-child,th:nth-child(2)){z-index:4;background:var(--md-surface-2,#f8fafc)}
+}
+@media(max-width:1023px){
+ .lightning .page-manager-mobile-actions{display:flex;flex-wrap:wrap;gap:6px}
+ .lightning .page-manager-mobile-actions>.btn{min-height:44px}
+ .lightning .flow-history-pagination{flex-wrap:wrap}
+}
+.lightning .flow-history-pagination{display:flex;align-items:center;gap:10px;padding:12px 15px}
+.lightning .flow-history-pagination>span{margin-right:auto;font-size:13px}
+
+/* Short, predictable RBAC editing: user detail is selected from the list,
+   and every permission group starts collapsed on desktop as well. */
+.lightning .permissions-page .md-permission-collapsible{scroll-margin-top:80px}
+.lightning .permissions-page .md-permission-list-pagination{flex-wrap:wrap}
+.lightning .permissions-page .permission-user-card{min-width:0;max-width:100%}
+.lightning .permissions-page .permission-user-card summary{min-height:44px}
+
+/* A compact section index for mobile sharing settings. */
+.lightning .permissions-page .md-sharing-advanced{
+ margin:10px 0 16px;max-width:100%;min-width:0;
+ border:1px solid var(--md-border,#e0e5eb);border-radius:9px;padding:8px 12px
+}
+.lightning .permissions-page .md-sharing-advanced>summary{
+ cursor:pointer;font-weight:600;min-height:44px;padding:10px 4px
+}
+.lightning .permissions-page .md-sharing-advanced>summary:focus-visible,
+.lightning .permissions-page .md-sharing-defaults>summary:focus-visible{
+ outline:2px solid var(--md-primary,#1d4ed8);outline-offset:2px
+}
+
+/* Audit and monitoring tables become accessible labelled row cards through tablet portrait.
+   Override the legacy full-width scrollport declaration at this breakpoint. */
+@media (max-width:899px) {
+  .lightning .md-admin-table-wrap:has(.md-audit-table){
+    overflow:visible; padding-right:0; border:0; max-width:100%;
+  }
+  .lightning .md-admin-table-wrap .md-audit-table{min-width:0;width:100%;table-layout:auto}
+}

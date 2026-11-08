@@ -1,0 +1,106 @@
+.app-manager-list{border:1px solid var(--md-border,#e0e5eb);border-radius:10px;background:var(--surface,#fff);overflow:hidden;padding:0;max-width:none;width:100%;box-sizing:border-box}
+.app-manager-list-head{padding:var(--md-space-4,16px);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.app-manager-list-head h2{font-size:var(--md-fs-lg,16px);font-weight:600;margin:0 0 4px}
+.app-manager-list-head h2 span{color:#687789;background:#eef1f5;border-radius:12px;padding:3px 8px;font-size:12px;font-weight:500}
+.app-manager-list-head p{font-size:12px;color:#687789;margin:0}
+.app-manager-list-search{display:flex;align-items:center;gap:9px;min-height:var(--md-control-height,40px);min-width:180px;width:min(100%,300px);padding:0 11px;border:1px solid #d6dce5;border-radius:7px;color:#617189}
+.app-manager-list-search:focus-within{outline:2px solid var(--md-primary,#1d4ed8);outline-offset:1px}
+.app-manager-list-search input{width:100%;border:0;background:transparent;outline:none;min-width:0;font-size:13px;color:inherit}
+.app-manager-list-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb,#abb8c8) transparent;overscroll-behavior:contain}
+.app-manager-list-table{width:100%;border-collapse:collapse;text-align:left;min-width:690px;font-size:13px}
+.app-manager-list-table thead{background:#f8fafc}
+.app-manager-list-table th{font-weight:600;color:#475569;font-size:12px;padding:13px 16px;white-space:nowrap}
+.app-manager-list-table td{padding:14px 16px;border-top:1px solid #eef0f3;vertical-align:middle}
+.app-manager-list-table td code{font-size:12px;color:#44556c;overflow-wrap:anywhere}
+.app-manager-list-table tbody tr:hover{background:#f8fbff}
+.app-manager-list-name{display:flex;gap:10px;align-items:flex-start}
+.app-manager-list-name strong{font-size:13px;display:block}
+.app-manager-list-name small{display:block;font-size:11px;color:#6d7888;line-height:1.45;margin-top:3px}
+.app-manager-list-color{width:5px;min-height:31px;border-radius:4px;flex:none}
+.app-manager-list-actions{display:flex;gap:8px;align-items:center}
+.app-manager-list-actions .btn{min-height:var(--md-control-height,40px);display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}
+.app-manager-list-empty{text-align:center;padding:36px 16px;color:#64748b;font-size:13px}
+@media(max-width:670px){.app-manager-list-head{align-items:stretch;flex-direction:column}.app-manager-list-search{width:100%}}
+
+@media(pointer:coarse){.app-manager-list-actions .btn{min-height:var(--md-control-touch,44px)}}
+
+
+/* Phase 6: small-screen app management and discoverable actions. */
+.app-manager-list-result-count { margin:8px 16px 12px;color:var(--md-muted,#596779);font-size:13px; }
+.app-manager-list-actions button:focus-visible { outline:2px solid var(--md-primary,#1d4ed8);outline-offset:2px; }
+.app-manager-list-scroll { max-width:100%;overflow-x:auto;scrollbar-gutter:stable; }
+.app-manager-list-table th { white-space:nowrap; }
+.app-manager-list-actions { display:flex;gap:8px;flex-wrap:wrap; }
+@media(pointer:coarse) {
+ .app-manager-list-actions button { min-height:44px; }
+}
+@media(max-width:640px) {
+ .app-manager-list-head { flex-wrap:wrap;gap:12px; }
+ .app-manager-list-search { width:100%; }
+ .app-manager-list-actions button { min-height:44px; }
+}
+
+
+/* Compact application list: long descriptions never make 61px+ rows. */
+.app-manager-list-table{table-layout:fixed}
+.app-manager-list-table th,.app-manager-list-table td{padding:9px 12px}
+.app-manager-list-table tbody tr{height:48px}
+.app-manager-list-table :is(th,td):nth-child(1){width:18%}
+.app-manager-list-table :is(th,td):nth-child(2){width:18%}
+.app-manager-list-table :is(th,td):nth-child(3){width:26%}
+.app-manager-list-table :is(th,td):nth-child(4){width:11%}
+.app-manager-list-table :is(th,td):nth-child(5){width:11%}
+.app-manager-list-table :is(th,td):nth-child(6){width:16%}
+.app-manager-list-table td{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-manager-list-table .app-manager-list-name{min-width:0;align-items:center}
+.app-manager-list-table .app-manager-list-name strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:800px){.app-manager-list-table{min-width:900px}}
+
+
+/* Compact list appears immediately; tablet cards replace the very wide table. */
+@media (min-width:1024px){
+ .app-manager-list-table :is(th,td):first-child{position:sticky;left:0;z-index:2;background:var(--surface,#fff);box-shadow:2px 0 5px rgba(20,30,50,.1)}
+ .app-manager-list-table th:first-child{background:#f8fafc;z-index:3}
+}
+@media (max-width:1023px){
+ .app-manager-list .md-responsive-rows{margin:0;padding:0}
+ .app-manager-list-head{margin:0;padding:12px;gap:10px;flex-wrap:wrap}
+ .app-manager-list-head p{margin-top:4px}
+ .app-manager-list-search{min-height:44px}
+}
+@media(max-width:640px){.app-manager-workspace .page-heading.app-manager-top{padding-bottom:8px;margin-bottom:8px;min-height:auto}}
+
+/* Audit UX-0072/75/80–83: controls stay reachable at intermediate sizes. */
+.app-manager-list-table :is(th,td):last-child {
+  position: sticky;right: 0;z-index: 2;background: var(--surface,#fff);
+  box-shadow: -2px 0 5px rgba(20,30,50,.08);
+}
+.app-manager-list-table th:last-child { background: #f8fafc; z-index: 3; }
+.app-manager-list-table th button {
+  border: 0; padding: 0; font: inherit; font-weight: 600;
+  background: transparent; color: inherit; cursor: pointer;
+  text-align: left; min-height: 32px;
+}
+.app-manager-list-table th button:focus-visible { outline: 2px solid var(--md-primary,#1d4ed8); outline-offset: 2px; }
+.app-manager-list-search { min-height: 40px; }
+.app-manager-mobile-sort { display: none; }
+@media(max-width:1199px) {
+ .app-manager-list-table { min-width: 800px; }
+ .app-manager-list-scroll { max-width: 100%; overflow-x: auto; }
+}
+@media(max-width:1199px) {
+ .app-manager-mobile-sort { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 0 12px 8px; font-size: 13px; }
+ .app-manager-mobile-sort select { min-height: 40px; min-width: 140px; max-width: 100%; }
+}
+@media(max-width:360px) {
+ .app-manager-workspace, .app-manager-list { min-width: 0; max-width: 100%; }
+ .app-manager-list .md-responsive-rows, .app-manager-list .md-responsive-item { min-width: 0; }
+ .app-manager-list .md-responsive-item-text, .app-manager-list .md-responsive-trailing { min-width: 0; overflow-wrap: anywhere; }
+}
+
+/* The responsive application sorter exposes the same direction control as desktop headers. */
+@media(max-width:1199px) {
+ .app-manager-mobile-sort { min-width:0; }
+ .app-manager-sort-direction { min-height:44px;padding:0 12px;border:1px solid var(--md-border,#d6dce5);border-radius:7px;background:var(--surface,#fff);color:inherit;cursor:pointer;font:inherit; }
+ .app-manager-sort-direction:focus-visible { outline:2px solid var(--md-primary,#1d4ed8);outline-offset:2px; }
+}

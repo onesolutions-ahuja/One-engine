@@ -1,0 +1,117 @@
+/* Insert is a full-width gallery of the tenant's registered Smart components.
+   The search/category browser is intentionally absent. Outer ribbon height and
+   horizontal scrolling are governed by PageBuilderRibbonLayout.css. */
+.office-builder-ribbon .smart-insert-ribbon{
+ box-sizing:border-box!important;display:flex!important;flex-direction:row!important;
+ flex:1 1 auto;min-width:0;width:100%;height:114px!important;
+ align-items:stretch!important;gap:0!important;
+ font-family:"Segoe UI",Arial,sans-serif;color:#283c55;
+}
+.office-builder-ribbon .smart-insert-gallery{
+ box-sizing:border-box;display:flex;flex:1 1 auto;flex-direction:column;
+ min-width:0;min-height:0;width:100%;height:114px!important;
+}
+.office-builder-ribbon .smart-insert-gallery-row{
+ box-sizing:border-box;display:flex;flex:1 1 auto;flex-direction:row;
+ align-items:center;gap:3px;min-width:0;min-height:0;height:114px!important;
+}
+.office-builder-ribbon .smart-insert-pager{
+ box-sizing:border-box;display:flex;flex:0 0 24px;
+ align-items:center;justify-content:center;
+ width:24px;min-width:24px;height:32px;
+ padding:0;background:transparent;border:1px solid transparent;
+ border-radius:3px;color:#315783;cursor:pointer;
+}
+.office-builder-ribbon .smart-insert-pager:hover:not(:disabled){
+ background:#e0edff;border-color:#c5d9f5;
+}
+.office-builder-ribbon .smart-insert-pager:disabled{opacity:.25;cursor:default}
+.office-builder-ribbon .smart-insert-tiles{
+ box-sizing:border-box;display:grid;grid-template-rows:repeat(2,55px)!important;
+ grid-auto-flow:column;grid-auto-columns:76px!important;
+ flex:1 1 auto;gap:4px!important;align-content:center;
+ min-width:0;min-height:0;max-height:114px!important;height:114px!important;
+ overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;
+}
+.office-builder-ribbon .smart-insert-tiles::-webkit-scrollbar{display:none}
+.office-builder-ribbon .smart-insert-tile{
+ box-sizing:border-box;display:flex;flex-direction:column!important;
+ align-items:center!important;justify-content:center!important;
+ gap:4px!important;width:76px!important;height:55px!important;
+ min-width:0;padding:3px!important;
+ border:1px solid #c3cad4!important;border-radius:5px!important;
+ background:#fff!important;color:#283c55;
+ font:500 11px/1.2 "Segoe UI",Arial,sans-serif;
+ text-align:center!important;cursor:pointer;overflow:hidden;white-space:nowrap;
+}
+.office-builder-ribbon .smart-insert-tile:hover,
+.office-builder-ribbon .smart-insert-tile:focus-visible{
+ background:#edf5ff!important;border-color:#3987ec!important;
+}
+.office-builder-ribbon .smart-insert-tile-icon{
+ display:flex;align-items:center;justify-content:center;
+ flex:0 0 24px!important;color:#1f5fa8!important;
+}
+.office-builder-ribbon .smart-insert-tile-icon :is(svg,img){
+ width:24px!important;height:24px!important;
+}
+.office-builder-ribbon .smart-insert-tile-label{
+ box-sizing:border-box;flex:0 0 auto!important;
+ min-width:0;width:100%;font-size:11px!important;line-height:13px!important;
+ text-align:center!important;overflow:hidden!important;
+ text-overflow:ellipsis!important;white-space:nowrap!important;
+}
+.office-builder-ribbon .smart-insert-empty{
+ display:flex;align-items:center;gap:8px;
+ color:#687992;font-size:12px;min-width:310px;padding:12px;
+}
+
+.page-builder-design-dock .office-builder-ribbon :is(.smart-insert-ribbon,.smart-insert-gallery,.smart-insert-gallery-row,.smart-insert-tiles) {
+ height:auto!important; max-height:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon .smart-insert-tiles {
+ /* The default horizontal ribbon clips after two rows. In the left dock,
+    each registered Smart component must be reachable by vertical scrolling. */
+ display:grid!important;flex:0 0 auto!important;
+ grid-auto-flow:row!important;
+ grid-template-columns:repeat(auto-fill,minmax(min(100%,76px),1fr));
+ grid-template-rows:none!important;grid-auto-rows:55px;
+ align-content:start!important;height:auto!important;max-height:none!important;
+ overflow:visible!important;
+}
+.page-builder-design-dock .office-builder-ribbon .smart-insert-tile { width:100%!important; }
+.page-builder-design-dock .smart-insert-empty { grid-column:1/-1; min-width:0; }
+.page-builder-design-dock .smart-insert-pager { display:none; }
+
+
+/* The permanent left dock uses three vertical-gallery columns, not the
+ * inherited two-row horizontal ribbon or its fixed auto-columns. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .smart-insert-ribbon,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .smart-insert-gallery,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .smart-insert-gallery-row {
+ box-sizing:border-box!important;width:100%!important;min-width:0!important;
+ max-width:100%!important;flex:0 0 auto!important;height:auto!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .smart-insert-tiles {
+ box-sizing:border-box!important;display:grid!important;
+ grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ grid-template-rows:none!important;grid-auto-flow:row!important;
+ grid-auto-columns:auto!important;grid-auto-rows:64px!important;
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ height:auto!important;max-height:none!important;
+ gap:6px!important;overflow:visible!important;align-content:start!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .smart-insert-tile {
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ height:64px!important;white-space:normal!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .smart-insert-tile-label {
+ overflow:hidden!important;display:-webkit-box!important;-webkit-line-clamp:2;
+ -webkit-box-orient:vertical;white-space:normal!important;line-height:13px!important;
+}

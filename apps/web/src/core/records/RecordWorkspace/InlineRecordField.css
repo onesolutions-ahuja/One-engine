@@ -1,0 +1,12 @@
+/* Keep the control separate from field values in desktop record drawers.
+ * Do not change the record data or editable field permissions. */
+.record-inline-field:not(:has(.record-inline-field-editor)) {
+  display: inline-flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-width: 100%;
+  min-width: 0;
+}
+.record-inline-value {min-width:0;max-width:100%;overflow-wrap:anywhere;}
+.record-inline-edit {flex:0 0 auto;white-space:nowrap;margin:0;}

@@ -1,0 +1,56 @@
+/* Reusable installed-app launcher inside the shared authenticated top bar. */
+.header-installed-apps{display:inline-flex;align-items:center;gap:6px;padding:0 8px;min-width:120px;color:var(--md-muted,#596579);font-size:var(--md-fs-sm,12px);white-space:nowrap}
+.header-installed-apps select{height:var(--md-control-height,40px);min-width:100px;max-width:180px;border:1px solid var(--md-border,#e0e5eb);border-radius:8px;background:var(--surface,#fff);color:inherit;padding:0 8px;font:inherit;cursor:pointer}
+.header-installed-apps select:focus-visible{outline:2px solid var(--md-primary,#1d4ed8);outline-offset:2px}
+@media(max-width:800px){.header-installed-apps{min-width:0;padding:0 4px}.header-installed-apps>span{display:none}.header-installed-apps select{max-width:118px}}
+
+/* A single app launcher. Page-specific, metadata-declared actions share the top bar. */
+.header-page-context{display:inline-flex;align-items:center;gap:10px;min-width:0;margin-left:4px;white-space:nowrap}
+.header-page-title{font-size:13px;font-weight:700;color:var(--text,#1b2a3a);overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.header-page-action{flex:0 0 auto;min-height:var(--md-control-height,40px);padding:5px 10px;white-space:nowrap}
+.records-list-toolbar{flex-wrap:wrap}
+.records-list-context{display:flex;align-items:center;flex:1 1 380px;justify-content:flex-end;gap:10px;min-width:0;flex-wrap:wrap}
+.records-list-context .header-record-picker{flex:1 1 180px;max-width:260px;min-width:145px}
+.records-list-context .header-record-picker-control{min-height:var(--md-control-height,40px)}
+.records-list-context .header-record-picker-control input{min-height:var(--md-control-height,40px)}
+.records-list-context .records-search{flex:1 1 210px;width:230px;max-width:330px;min-height:var(--md-control-height,40px);margin:0}
+.records-list-actions{flex-wrap:wrap}
+@media(max-width:900px){.header-page-title{max-width:110px}.header-page-context{gap:5px}.header-page-action{font-size:var(--md-fs-sm,12px);padding:5px 7px}}
+@media(max-width:640px){.records-list-context{justify-content:flex-start;flex:1 1 100%}.records-list-context .header-record-picker,.records-list-context .records-search{max-width:none}.header-page-title{max-width:65px}}
+
+/* Ensure the object-picker list can expand below the Records toolbar. */
+.records-list-card{overflow:visible}
+.records-list-toolbar{position:relative;z-index:3}
+.records-list-context .header-record-picker-options{z-index:10}
+
+/* All metadata-driven app page navigation now lives in the one top bar. */
+.header-page-context{flex:0 1 auto;max-width:min(43vw,560px)}
+.header-page-tabs{display:flex;align-items:center;gap:3px;min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb,#abb8c8) transparent;overscroll-behavior:contain}
+.header-page-tab{min-height:var(--md-control-height,40px);border:1px solid transparent;background:transparent;color:var(--text,#334155);font:inherit;font-size:var(--md-fs-sm,12px);padding:8px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.header-page-tab:hover{background:#edf3fa}
+.header-page-tab.active{font-weight:700;color:var(--md-primary,#1d4ed8);background:#edf5ff;border-color:#d7e7fd}
+.header-page-tab:focus-visible{outline:2px solid var(--focus,#2574d8);outline-offset:1px}
+@media(max-width:1100px){.header-page-context{max-width:36vw}.header-page-tab{padding:7px 6px}}
+@media(max-width:640px){.header-page-context{max-width:55vw}.header-page-tabs{max-width:140px}}
+
+@media(pointer:coarse){.header-installed-apps select,.header-page-tab,.header-page-action{min-height:var(--md-control-touch,44px)}}
+
+.header-installed-apps :is(button,select):focus-visible,.header-page-action:focus-visible{outline:2px solid var(--md-focus-ring,var(--md-primary,#1d4ed8));outline-offset:2px}
+@media(max-width:320px){.header-page-context{min-width:0;max-width:100%}.header-page-tabs{min-width:0}}
+
+/* Keep selected app readable rather than squeezing the picker to 44px. */
+.header-installed-apps{flex:0 0 auto;min-width:160px}
+.header-installed-apps select{min-width:160px;max-width:200px;color:var(--md-text,#192230)}
+.header-mobile-app-name{display:none}
+@media(min-width:641px) and (max-width:900px){
+  .header-installed-apps{min-width:160px}
+  .header-installed-apps select{min-width:160px;max-width:170px}
+}
+@media(max-width:640px){
+  .header-installed-apps{display:none}
+  .header-mobile-app-name{
+    display:block;flex:0 1 auto;min-width:0;max-width:120px;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+    font-weight:600;font-size:12px;color:var(--md-text,#192230)
+  }
+}

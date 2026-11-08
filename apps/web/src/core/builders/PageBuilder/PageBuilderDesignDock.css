@@ -1,0 +1,589 @@
+/* Permanent left-docked Page Builder inspector. Retired top-ribbon toggles and
+ * collapsed-ribbon modes are intentionally not included. */
+
+/* Canvas area: dock on the left, canvas fills the rest. */
+.builder-page .page-builder-layout.canvas-unified-builder.has-design-dock{
+  display:flex!important;align-items:flex-start!important;
+}
+.builder-page .page-builder-layout.canvas-unified-builder.has-design-dock>.page-preview-area{
+  flex:1 1 0!important;width:auto!important;min-width:0!important;
+}
+.page-builder-design-dock{
+  box-sizing:border-box;flex:0 0 308px;width:308px;
+  position:sticky;top:0;max-height:calc(100vh - 96px);overflow-x:hidden;overflow-y:auto;
+  background:#f4f5f7;border-right:1px solid #ccd2dd;color:#25344c;
+}
+.page-builder-design-dock-header{
+  display:flex;align-items:center;gap:8px;height:44px;min-height:44px;
+  padding:0 8px 0 10px;background:#f8fafc;
+  border-bottom:1px solid #d6e0eb;font:500 12px/1.3 "Segoe UI",Arial,sans-serif;color:#334155;
+}
+.page-builder-design-dock-header>span{flex:1 1 auto}
+/* The same tab navigation moves out of the blue top ribbon into this light
+ * inspector. Override its background AND labels together; never dark-on-blue. */
+.page-builder-design-dock-header .office-ribbon-tabs{
+  flex:1 1 auto;min-width:0;height:43px;min-height:43px;
+  display:flex;align-items:center;gap:3px;padding:0;
+  background:transparent!important;overflow-x:auto;scrollbar-width:none;
+}
+.page-builder-design-dock-header .office-ribbon-tabs::-webkit-scrollbar{display:none}
+.page-builder-design-dock-header .office-ribbon-tabs>button[role=tab]{
+  box-sizing:border-box;flex:0 0 auto;min-height:34px;
+  padding:7px 10px;border:0;border-bottom:2px solid transparent;
+  border-radius:6px 6px 0 0;background:transparent!important;
+  color:#475569!important;font:500 12px/18px "Segoe UI",Arial,sans-serif!important;
+  white-space:nowrap;
+}
+.page-builder-design-dock-header .office-ribbon-tabs>button[role=tab].active,
+.page-builder-design-dock-header .office-ribbon-tabs>button[role=tab][aria-selected="true"]{
+  color:#1559b6!important;background:#e8f1ff!important;
+  border-bottom-color:#176ce5!important;font-weight:600!important;
+}
+.page-builder-design-dock-header .office-ribbon-tabs>button[role=tab]:hover:not(.active){
+  color:#164a85!important;background:#eef4fc!important;
+}
+.page-builder-design-dock-header .office-ribbon-tabs>button[role=tab]:focus-visible{
+  outline:2px solid #176ce5!important;outline-offset:-2px;
+}
+.page-builder-design-dock .page-builder-design-dock-ribbon{border-bottom:0}
+
+/* Dock tab panel: vertical, no fixed ribbon height, no horizontal scroll. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content{
+  display:block!important;box-sizing:border-box!important;
+  width:308px!important;height:auto!important;min-height:0!important;max-height:none!important;
+  padding:10px!important;overflow:visible!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]{
+  width:284px!important;min-width:0!important;max-width:284px!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]
+  >.smart-ribbon-group.smart-design2-group[data-design-three-row="true"]{
+  flex:none!important;width:284px!important;min-width:0!important;max-width:284px!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  padding:0!important;border:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-workbench{
+  width:284px!important;min-width:0!important;max-width:284px!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  gap:10px!important;
+}
+
+/* Row 0 wraps by width: area picker / eye X Y lock nesting / 6 align / 6 arrange. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]{
+  flex:none!important;flex-wrap:wrap!important;align-content:flex-start!important;
+  width:284px!important;min-width:0!important;max-width:284px!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  gap:6px 4px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-area-picker{
+  order:0!important;flex:0 0 284px!important;width:284px!important;height:30px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-area-select{height:28px!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-visibility{
+  order:1!important;flex:0 0 44px!important;width:44px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]>:is(.smart-property,.smart-design2-empty-position){
+  order:2!important;flex:0 0 120px!important;width:120px!important;min-width:120px!important;max-width:120px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]>.smart-property .smart-numeric{
+  flex:0 0 120px!important;width:120px!important;min-width:120px!important;max-width:120px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-r0-gap{display:none!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-actions{display:contents!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action{
+  order:5!important;width:66px!important;min-width:66px!important;max-width:66px!important;
+}
+/* Lock (C19) and nesting (C20) sit on the eye/X/Y line. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action:is([data-design-column="19"],[data-design-column="20"]){
+  order:3!important;width:58px!important;min-width:58px!important;max-width:58px!important;
+}
+/* Alignment (C7-C12) before distribute/layer/group (C13-C18). */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action:is([data-design-column="7"],[data-design-column="8"],
+    [data-design-column="9"],[data-design-column="10"],[data-design-column="11"],[data-design-column="12"]){
+  order:4!important;
+}
+
+/* R1-R3: unchanged SQL slot grid, stacked under row 0. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-workbench>.smart-ribbon-items{
+  height:auto!important;gap:6px!important;padding-top:8px!important;
+  border-top:1px solid #ccd2dd!important;width:284px!important;
+}
+
+
+/* Design categories are presentation-only. In the horizontal ribbon the
+   wrappers dissolve, preserving all 15 existing C7-C21 commands and R0 sizes. */
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-dimensions,
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-arrange-actions[data-design-section]{
+ display:contents!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-dimensions>:is(.smart-property,.smart-design2-empty-position){
+ box-sizing:border-box!important;display:inline-flex!important;
+ flex:0 0 80px!important;width:80px!important;min-width:80px!important;max-width:80px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:0!important;margin:0!important;align-items:center!important;overflow:hidden!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-dimensions>.smart-property>.smart-label{
+ display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-dimensions>.smart-property .smart-numeric{
+ box-sizing:border-box!important;flex:0 0 80px!important;width:80px!important;
+ min-width:80px!important;max-width:80px!important;height:26px!important;max-height:26px!important;
+ padding:0!important;margin:0!important;
+}
+/* In the left dock only, preserve existing dimensions/button widths while
+   placing the controls into named visual groups, without duplicating handlers. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"]{
+ display:flex!important;flex-flow:column nowrap!important;
+ align-items:flex-start!important;gap:8px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-dimensions,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"] .smart-design2-arrange-actions[data-design-section]{
+ box-sizing:border-box!important;display:flex!important;flex-flow:row wrap!important;
+ align-content:flex-start!important;align-items:center!important;
+ width:284px!important;min-width:284px!important;max-width:284px!important;
+ flex:none!important;height:auto!important;min-height:0!important;max-height:none!important;
+ gap:6px 4px!important;position:relative!important;
+ padding:23px 0 0!important;margin:0!important;
+ border-top:1px solid #ccd2dd!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions{order:1!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="dimensions"]{
+ order:2!important;padding-top:0!important;border:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="alignment"]{order:3!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="arrangement"]{order:4!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions::before,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="alignment"]::before,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="arrangement"]::before{
+ position:absolute;top:3px;left:2px;font:600 12px/16px "Segoe UI",Arial,sans-serif;
+ color:#183b68;pointer-events:none;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions::before{content:"Dimensions"}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="alignment"]::before{content:"Alignment"}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-arrange-actions[data-design-section="arrangement"]::before{content:"Arrangement"}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions>:is(.smart-property,.smart-design2-empty-position),
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions>.smart-property .smart-numeric{
+ box-sizing:border-box!important;flex:0 0 120px!important;
+ width:120px!important;min-width:120px!important;max-width:120px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions>.smart-design2-visibility{
+ flex:0 0 44px!important;width:44px!important;
+}
+/* SQL-backed Design rows remain independent and identically sized. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-ribbon-row[data-design-row]{
+ position:relative!important;margin-top:21px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-ribbon-row[data-design-row]::before{
+ position:absolute;top:-21px;left:2px;font:600 12px/16px "Segoe UI",Arial,sans-serif;
+ color:#183b68;pointer-events:none;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-ribbon-row[data-design-row="1"]::before{content:"Appearance"}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-ribbon-row[data-design-row="2"]::before{content:"Position"}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-ribbon-row[data-design-row="3"]::before{content:"Typography"}
+
+/* Appearance and Position each have a compact shared seventh grid cell.
+ * Labels and numeric values remain inside their own single bordered box. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-count{
+ position:relative!important;grid-column:7!important;grid-row:1!important;
+ left:auto!important;top:auto!important;
+ flex:0 0 110px!important;min-width:110px!important;width:110px!important;
+ max-width:110px!important;margin:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-count-choice{
+ position:static!important;top:auto!important;right:auto!important;
+ left:auto!important;z-index:auto!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-padding{
+ position:relative!important;grid-column:7!important;grid-row:1!important;
+ flex:0 0 76px!important;min-width:76px!important;width:76px!important;
+ max-width:76px!important;margin:0!important;
+}
+/* The optional Calendar/Image contextual editors occupy their own next line
+ * in the dock. They cannot extend the panel's horizontal scroll width. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group :is(.smart-design2-calendar-controls,.smart-design2-image-border){
+ position:static!important;box-sizing:border-box!important;
+ flex:0 0 auto!important;max-width:100%!important;
+ height:auto!important;min-height:26px!important;
+ flex-wrap:wrap!important;margin:4px 0 0!important;
+}
+/* Fixed Design matrix fits the compact dock, including scrollbar and padding.
+ * Preserve vertical scrolling for taller content but never scroll sideways. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon{
+ box-sizing:border-box!important;max-width:100%!important;
+}
+
+/* FIX: The left dock stacks its context vertically. A 284px flex basis on
+ * the area picker became 284px of HEIGHT and produced the enormous blank box.
+ * Keep its existing 284px width and 30px height instead. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-context[data-design-row="0"]>.smart-design2-area-picker{
+  box-sizing:border-box!important;order:0!important;
+  flex:0 0 30px!important;width:284px!important;min-width:284px!important;max-width:284px!important;
+  height:30px!important;min-height:30px!important;max-height:30px!important;
+}
+/* Compact dock; reserve enough room
+ * for the vertical scrollbar so the sixth 66px alignment button is visible. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content{
+  padding:10px 2px!important;
+}
+/* Lock, nesting and fill-canvas belong INSIDE Dimensions, not in an orphan
+ * second bordered section. Flatten only this nested command wrapper. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions
+ >.smart-design2-arrange-actions[data-design-section="dimensions"]{
+  display:contents!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-dimensions
+ >.smart-design2-arrange-actions[data-design-section="dimensions"]>.smart-design2-arrange-action{
+  flex:0 0 58px!important;width:58px!important;min-width:58px!important;max-width:58px!important;
+}
+
+
+/* One vertical inspector: reuse the existing SQL 26px property controls without
+ * resizing, reordering, or altering their disabled state in each Design area. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design-source{
+ box-sizing:border-box!important;display:block!important;
+ width:284px!important;min-width:284px!important;max-width:284px!important;
+ height:auto!important;min-height:0!important;max-height:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .smart-design2-workbench{
+ display:flex!important;flex-direction:column!important;gap:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-list{
+ box-sizing:border-box!important;display:flex!important;flex-direction:column!important;
+ width:284px!important;min-width:284px!important;max-width:284px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section{
+ box-sizing:border-box!important;display:block!important;
+ width:284px!important;min-width:284px!important;max-width:284px!important;
+ margin:0!important;padding:0!important;
+ border:0!important;border-bottom:1px solid #ccd2dd!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section-toggle{
+ box-sizing:border-box!important;display:flex!important;
+ width:100%!important;min-height:32px!important;align-items:center!important;
+ gap:7px!important;padding:5px 6px!important;margin:0!important;
+ border:0!important;background:transparent!important;
+ color:#183b68!important;font:600 12px/18px "Segoe UI",Arial,sans-serif!important;
+ text-align:left!important;cursor:pointer!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section-toggle svg{flex:0 0 15px;transition:transform .12s ease}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section-toggle[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section-toggle:hover{background:#e8f1ff!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section-toggle:focus-visible,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-heading button:focus-visible,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-remove:focus-visible,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-add-label:focus-visible{
+ outline:2px solid #176ce5!important;outline-offset:-2px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-inspector-section-content{
+ box-sizing:border-box!important;width:284px!important;
+ min-width:284px!important;max-width:284px!important;
+ padding:1px 0 9px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-section .smart-ribbon-items{
+ box-sizing:border-box!important;display:flex!important;
+ flex-direction:column!important;align-items:flex-start!important;
+ gap:0!important;width:284px!important;min-width:284px!important;
+ height:auto!important;min-height:0!important;max-height:none!important;
+ margin:0!important;padding:0!important;overflow:visible!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-section .smart-ribbon-row[data-design-row]{
+ width:284px!important;min-width:284px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-dimensions-section .smart-design2-context[data-design-row="0"]{
+ padding:0!important;
+}
+/* Existing dimensions and alignment buttons retain their exact widths. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-dimensions-section .smart-design2-context[data-design-row="0"] .smart-design2-dimensions,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-dimensions-section .smart-design2-context[data-design-row="0"] .smart-design2-arrange-actions{
+ width:284px!important;min-width:284px!important;max-width:284px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design-source .smart-source-heading{
+ display:flex!important;align-items:center!important;width:284px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design-source .smart-source-heading>.smart-inspector-section-toggle{
+ flex:1 1 auto!important;width:auto!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-add,.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-remove{
+ box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;
+ justify-content:center!important;width:26px!important;height:26px!important;
+ padding:0!important;margin:0 5px 0 0!important;
+ border:1px solid #b7c9df!important;border-radius:3px!important;
+ background:#fff!important;color:#29466b!important;cursor:pointer!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-entries{display:flex!important;flex-direction:column!important;gap:5px!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-entry{display:flex!important;align-items:center!important;gap:6px!important;padding:0 6px!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-entry>.smart-property{
+ box-sizing:border-box!important;display:flex!important;align-items:center!important;
+ gap:5px!important;min-height:26px!important;
+ width:205px!important;max-width:205px!important;flex:0 0 205px!important;
+ opacity:1;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-entry>.smart-property.disabled{opacity:.46!important}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-entry>.smart-property>.smart-label{
+ box-sizing:border-box!important;display:block!important;
+ width:52px!important;min-width:52px!important;flex:0 0 52px!important;
+ color:#253c5b!important;font:11px/26px "Segoe UI",Arial,sans-serif!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-entry .smart-select{
+ box-sizing:border-box!important;width:150px!important;min-width:150px!important;
+ max-width:150px!important;height:26px!important;min-height:26px!important;
+ border:1px solid #b7c9df!important;border-radius:3px!important;
+ background:#fff!important;color:#253c5b!important;font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-source-add-label{
+ display:inline-flex!important;align-items:center!important;gap:5px!important;
+ margin:8px 0 0 7px!important;padding:5px 8px!important;
+ border:1px solid #b7c9df!important;border-radius:3px!important;
+ background:#fff!important;color:#29466b!important;font:11px "Segoe UI",Arial,sans-serif!important;
+ cursor:pointer!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-source-add,.smart-source-remove,.smart-source-add-label):disabled{
+ opacity:.46!important;cursor:not-allowed!important;
+}
+
+/* The permanent inspector nests the original three-row matrix one level under
+ * an accordion panel. Reapply the ORIGINAL fixed SQL grid-area contract at the
+ * nested path: generic grid-area:auto!important otherwise pushes Image R2C5
+ * away from Width R2C4 even though both icons retain their correct widths. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]
+ >.smart-ribbon-group.smart-design2-group
+ .smart-design2-area-section .smart-ribbon-items
+ >.smart-ribbon-row[data-design-row]{
+ box-sizing:border-box!important;display:grid!important;
+ grid-auto-flow:row!important;grid-template-rows:26px!important;
+ grid-auto-rows:26px!important;column-gap:4px!important;row-gap:0!important;
+ justify-content:start!important;align-items:center!important;
+ width:284px!important;min-width:284px!important;max-width:284px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]
+ >.smart-ribbon-group.smart-design2-group
+ .smart-design2-area-section .smart-ribbon-items
+ >.smart-ribbon-row[data-design-row]>.smart-property{
+ grid-area:1 / var(--smart-slot-column,1) / span 1 / span 1!important;
+ grid-column:var(--smart-slot-column,1) / span 1!important;
+ grid-row:1 / span 1!important;justify-self:start!important;
+ box-sizing:border-box!important;
+ width:var(--smart-control-width)!important;min-width:var(--smart-control-width)!important;
+ max-width:var(--smart-control-width)!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+
+
+/* Compact accordion: replace the retired blank gaps with two thin lines
+ * separated by only 3px, consistently between EVERY adjacent section. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-list > .smart-design2-area-section{
+ margin-top:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-list > .smart-design2-area-section + .smart-design2-area-section{
+ border-top:1px solid #cbd5e1!important;
+ box-shadow:inset 0 3px 0 #f4f5f7,inset 0 4px 0 #cbd5e1;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-list > .smart-design2-area-section + .smart-design2-area-section
+ >.smart-inspector-section-toggle{padding-top:7px!important;}
+/* Moved legacy properties stay in Body below the unchanged 17-icon grid. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-supplemental {
+ box-sizing:border-box!important;display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:6px 8px!important;width:284px!important;max-width:284px!important;
+ padding:10px 6px 2px!important;border-top:1px solid #d6e0eb!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-supplemental-setting {
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:5px!important;min-width:0!important;min-height:26px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-supplemental-label {
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ color:#253c5b;font:11px/16px "Segoe UI",Arial,sans-serif;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-supplemental-setting > .smart-property {
+ flex:0 0 auto!important;min-width:0!important;
+}
+
+/* Compact shared Page Builder inspector: ~30% narrower than the original
+ * 440px CSS dock. At any browser zoom its CSS proportions remain identical.
+ * SQL property bindings, event handlers and disabled states stay unchanged. */
+.page-builder-design-dock{
+  --page-builder-dock-width:308px;
+  --page-builder-dock-content-width:284px;
+}
+.page-builder-design-dock-header{padding-left:5px;padding-right:4px;gap:2px}
+.page-builder-design-dock-header .office-ribbon-tabs{
+  justify-content:space-between;gap:0;
+}
+.page-builder-design-dock-header .office-ribbon-tabs>button[role=tab]{
+  padding:7px 5px!important;font-size:12px!important;
+}
+/* The same six fixed icon positions and compact numeric widths apply across
+ * Body, Header, Image, Badge and every other SQL-backed Design section. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-area-section .smart-ribbon-row[data-design-row]{
+  column-gap:4px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-area-section .smart-ribbon-row[data-design-row="1"],
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-area-section .smart-ribbon-row[data-design-row="3"]{
+  grid-template-columns:40px 40px 40px 40px 40px 60px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-area-section .smart-ribbon-row[data-design-row="2"]{
+  grid-template-columns:60px 60px 40px 40px!important;
+}
+/* Count and Padding are not dynamic toolbar slots. They occupy permanent
+ * places inside Extras and use the existing component eligibility checks. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-extras-fixed{
+  box-sizing:border-box;display:flex;flex-flow:row nowrap;align-items:center;
+  gap:8px;width:284px;min-width:0;max-width:100%;
+  padding:8px 6px 10px;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-extras-cell{
+  display:flex;align-items:center;flex:none;min-width:0;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-extras-fixed .smart-design2-count,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+  .smart-design2-extras-fixed .smart-design2-padding{
+  position:static!important;grid-area:auto!important;margin:0!important;
+}
+/* Match labels to controls; retain 12px type and the existing input height. */
+.page-builder-design-dock .page-builder-advanced-inline
+  .advanced-fixed-field:has(input[type="checkbox"]){
+  justify-content:flex-start!important;gap:6px!important;
+}
+.page-builder-design-dock .page-builder-advanced-inline
+  .advanced-fixed-field:has(input[type="checkbox"])>label{
+  white-space:normal;line-height:16px;
+}
+
+
+/* Smart Numpad Header uses the SAME SQL property controls as other components.
+ * Its formula-driven placeholder/prefix/suffix need a full-width editor, not the
+ * 2-column chip grid used by small Extras counters. Scoped to numpad only. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental {
+ grid-template-columns:minmax(0,1fr)!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental-setting {
+ display:grid!important;grid-template-columns:98px minmax(0,1fr)!important;
+ gap:5px!important;width:100%!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental-setting>.smart-property {
+ box-sizing:border-box!important;width:100%!important;
+ max-width:100%!important;min-width:0!important;flex:1 1 auto!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental-setting>.smart-property>.smart-label,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental-setting .smart-formula-prefix {
+ display:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental-setting .smart-formula-filter,
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-ribbon[data-smart-api="smart_numpad"] .smart-design2-area-section
+ .smart-design2-supplemental-setting .smart-formula {
+ flex:1 1 auto!important;min-width:0!important;width:100%!important;
+}

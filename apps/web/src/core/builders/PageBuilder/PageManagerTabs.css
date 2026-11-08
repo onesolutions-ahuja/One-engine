@@ -1,0 +1,78 @@
+/* Use the same neutral surface / raised-white selection as Company Settings tabs.
+   The shared md-admin-tabstrip remains the single base tab renderer. */
+.lightning .page-manager-view .page-manager-tab-groups {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.lightning .page-manager-view .page-manager-tab-groups .md-admin-tabstrip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding: 5px;
+  border: 1px solid var(--md-separator, var(--md-border, #e0e5eb));
+  border-radius: 13px;
+  background: var(--md-surface-2, #f4f6f9);
+}
+.lightning .page-manager-view .page-manager-tab-groups .md-admin-tabstrip > button {
+  flex: 0 0 auto;
+  min-height: var(--md-control-height, 40px);
+  padding: 8px 14px;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--md-text-2, #596579);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lightning .page-manager-view .page-manager-tab-groups .page-manager-main-tabs > button[aria-selected="true"] {
+  color: var(--md-action-ink, #0058bd);
+  background: var(--md-surface, #fff);
+  box-shadow: var(--md-shadow-sm, 0 1px 3px rgb(0 0 0 / 5%));
+}
+.lightning .page-manager-view .page-manager-tab-groups .page-manager-app-tabs {
+  background: var(--md-surface, #fff);
+}
+.lightning .page-manager-view .page-manager-tab-groups .page-manager-app-tabs > button[aria-selected="true"] {
+  color: var(--md-action-ink, #0058bd);
+  background: var(--md-surface, #fff);
+  border-color: var(--md-border, #e0e5eb);
+  box-shadow: var(--md-shadow-sm, 0 1px 3px rgb(0 0 0 / 5%));
+}
+.lightning .page-manager-view .page-manager-tab-groups .md-admin-tabstrip > button:hover:not([aria-selected="true"]) {
+  background: var(--md-surface, #fff);
+}
+.lightning .page-manager-view .page-manager-tab-groups .md-admin-tabstrip > button:focus-visible {
+  outline: 2px solid var(--md-primary, #1d4ed8);
+  outline-offset: 1px;
+}
+.lightning .page-manager-view .page-manager-filters .page-manager-layout-filter {
+  margin-left: auto;
+  min-width: min(180px, 100%);
+}
+@media (max-width: 700px) {
+  .lightning .page-manager-view .page-manager-tab-groups { gap: 10px; }
+  .lightning .page-manager-view .page-manager-filters .page-manager-layout-filter {
+    margin-left: 0;
+  }
+}
+
+
+/* Page type and application filters have distinct visible hierarchy. */
+.page-manager-tab-level{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+.page-manager-filter-label{flex:0 0 auto;min-width:84px;font-size:13px;font-weight:600;color:var(--md-text-secondary,#475569)}
+.page-manager-tab-level>.md-admin-tabstrip{min-width:0}
+@media(max-width:640px){.page-manager-tab-level{flex-wrap:wrap}.page-manager-filter-label{width:100%}}
+/* Device layouts a page has designed (e.g. "Custom · 26"), beside its device. */
+.page-layout-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;
+  border:1px solid #c9d7ea;background:#eef4fc;color:#1d4f8f;font-size:11px;line-height:16px;
+  font-weight:600;white-space:nowrap;vertical-align:middle}

@@ -1,0 +1,50 @@
+/* Shared workspace contrast repair. Loaded after legacy and app polish CSS.
+ * Use the existing appearance tokens; leave tenant-authored component styles alone.
+ * The setup shell's light appearance is preserved through its own scope.
+ */
+.lightning :is(
+  .notification-panel, .notification-panel-heading, .global-search,
+  .global-search kbd, .quick-find-input, .object-search,
+  .component-search, .mini-search, .app-utility-popover,
+  .records-view-popover-panel, .records-view-select select
+) {
+  background-color: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-separator);
+}
+.lightning :is(
+  .user-menu, .icon-button:hover, .primary-tab:hover,
+  .app-utility-history button:hover
+) {
+  background-color: var(--md-surface-2);
+  color: var(--md-text);
+}
+.lightning :is(.notification-list li.unread, .records-layout-switcher, .settings-view-row:hover) {
+  background-color: color-mix(in srgb, var(--md-primary) 9%, var(--md-surface));
+  color: var(--md-text);
+}
+.lightning :is(.app-title, .primary-tab.active, .app-utility-heading, .notification-panel strong) {
+  color: var(--md-text);
+}
+.lightning :is(.notification-panel small, .global-search kbd, .app-utility-history p) {
+  color: var(--md-text-2);
+}
+.lightning :is(.global-search input, .quick-find-input input, .object-search input,
+  .component-search input, .mini-search input, .app-utility-popover textarea) {
+  color: var(--md-text);
+  caret-color: var(--md-text);
+}
+.lightning :is(.global-search input, .quick-find-input input, .object-search input,
+  .component-search input, .mini-search input, .app-utility-popover textarea)::placeholder {
+  color: var(--md-text-2);
+  opacity: 1;
+}
+/* Keep the existing brand blue for decoration, while using a legible fill
+ * for small white button labels (WCAG AA normal text). */
+.lightning :is(.btn-primary, .button-primary):not(:disabled) {
+  background-color: var(--md-action-fill);
+  color: #fff;
+}
+.lightning :is(.btn-primary, .button-primary):not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--md-action-fill) 85%, black);
+}

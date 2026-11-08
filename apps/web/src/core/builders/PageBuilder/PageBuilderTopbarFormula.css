@@ -1,0 +1,111 @@
+/* Formula Bar in the topbar (between the tabs and Quick Access) and Source object
+ * selectors at the end of Design. Both reuse SmartRibbon's single Data engine; this
+ * file only places them. The retired Data tab no longer hosts either. */
+
+/* ---------- Topbar Formula Bar: compact, always visible ---------- */
+.office-builder-ribbon .office-ribbon-topbar-formula{
+  box-sizing:border-box;display:flex;align-items:center;
+  /* 200% of the original 440px target; shrinks beside Quick Access on narrow screens. */
+  flex:1 1 880px;min-width:0;max-width:880px;height:28px;margin:0 0 0 4px;overflow:visible;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula>.smart-ribbon.smart-topbar-formula{
+  display:flex!important;align-items:center!important;flex:1 1 auto!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  height:28px!important;min-height:0!important;max-height:28px!important;
+  padding:0!important;margin:0!important;border:0!important;background:transparent!important;overflow:visible!important;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-workspace{
+  display:flex;flex:1 1 auto;min-width:0;height:28px;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-formula-bar{
+  box-sizing:border-box;display:flex;align-items:center;gap:3px;
+  flex:1 1 auto;width:100%;min-width:0;height:28px;padding:0;border:0;background:transparent;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula :is(.smart-data-filter-button,.smart-data-image-upload){
+  box-sizing:border-box;position:relative;display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 30px;width:30px;height:26px;padding:0;
+  border:1px solid #b6c7de;border-radius:5px;background:#fff;color:#235a99;cursor:pointer;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-filter-button:not(:disabled):hover{
+  border-color:#2874d2;background:#eaf3ff;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula :is(.smart-data-filter-button,.smart-data-image-upload):disabled{
+  opacity:.46;cursor:not-allowed;background:#f0f2f6;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-fx-prefix{
+  box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+  flex:0 0 28px;width:28px;height:26px;
+  border:1px solid #b6c7de;border-radius:5px;
+  background:#f5f7fa;color:#667487;font:italic 600 17px Georgia,serif;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-active-binding{
+  display:inline-flex;flex:0 1 auto;align-items:center;max-width:96px;min-width:0;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  padding:0 4px;font:600 11px "Segoe UI",sans-serif;color:#355678;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-formula-input{
+  box-sizing:border-box;display:flex;flex:1 1 auto;width:auto;min-width:120px;max-width:none;height:26px;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-formula-input>.smart-formula{
+  box-sizing:border-box;flex:1 1 auto;width:100%;min-width:0;height:26px;
+  border:1px solid #b7c9e0;border-radius:5px;background:#fff;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-formula-input>.smart-formula :is(input,.smart-formula-highlight){
+  box-sizing:border-box;width:100%;height:100%;padding:2px 8px;font:12px/20px Consolas,monospace;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-formula-input>input{
+  box-sizing:border-box;width:100%;height:26px;min-width:0;padding:0 8px;
+  border:1px solid #becbdc;border-radius:5px;
+  color:#8895a6;background:#f2f4f8;font:12px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-items-source{
+  box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 auto;height:26px;padding:0 6px;white-space:nowrap;
+  font:600 11px "Segoe UI",Arial,sans-serif;
+  border:1px solid #bccbe0;border-radius:5px;background:#f0f5fd;color:#28517c;cursor:pointer;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-data-items-source[aria-pressed="true"]{
+  background:#dceafa;border-color:#4b83bc;color:#153e71;
+}
+.office-builder-ribbon .office-ribbon-topbar-formula .smart-upload-error{
+  position:absolute;top:30px;z-index:20;flex:none;
+}
+
+/* ---------- First Design section: collapsible Object Source ---------- */
+/* Horizontal ribbon: Source sits to the right of Design instead of being pushed off. */
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]:has(+.smart-design-source){
+  min-width:0!important;
+}
+/* Left dock: Object Source fits the compact Design matrix. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content>.smart-ribbon.smart-design-source{
+  display:block!important;box-sizing:border-box!important;
+  width:284px!important;min-width:0!important;max-width:284px!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  margin:0!important;padding:0!important;overflow:visible!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design-source>.smart-ribbon-group{
+  position:relative!important;display:block!important;box-sizing:border-box!important;flex:none!important;
+  width:284px!important;min-width:0!important;max-width:284px!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  margin:0!important;padding:21px 0 0!important;border:0!important;border-top:1px solid #ccd2dd!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design-source>.smart-ribbon-group::before{
+  content:"Data source";position:absolute;top:3px;left:2px;
+  font:600 12px/16px "Segoe UI",Arial,sans-serif;color:#183b68;pointer-events:none;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design-source .smart-ribbon-items{
+  display:flex!important;flex-direction:column!important;gap:6px!important;
+  width:auto!important;min-width:0!important;max-width:none!important;
+  height:auto!important;min-height:0!important;max-height:none!important;padding:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design-source .smart-ribbon-row{
+  display:flex!important;width:auto!important;min-width:0!important;max-width:none!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design-source .smart-ribbon-caption{display:none!important}

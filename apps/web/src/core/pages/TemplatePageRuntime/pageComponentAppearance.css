@@ -1,0 +1,704 @@
+/* Shared Page Builder / published Page Runtime control appearance.
+ * The editor frame is geometry, hit target and selection affordance ONLY.
+ * Invisible metadata wrappers do not become decorative boxes when styled.
+ * Every property override is opt-in and always styles the visible control.
+ */
+.record-component[data-page-appearance] {
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+}
+.record-component[data-page-appearance]:not([data-page-appearance="layout"]) {min-height:0;}
+/* Selection must not paint a square frame over authored native border/radius.
+ * Pointer selection is conveyed by the existing resize handles and ribbon. */
+.builder-editor-mode .modern-canvas-builder .record-component[data-page-appearance].selected {
+  outline:0!important;
+  outline-offset:0;
+  box-shadow:none!important;
+}
+.free-canvas-runtime-component[data-page-appearance] {
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  padding:0!important;
+}
+/* Preserve selections and resize handles; they only appear in edit mode.
+ * Never add visual chrome to component metadata hosts. */
+
+/* radius: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="radius"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="radius"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="radius"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="radius"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="radius"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="radius"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="radius"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="radius"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="radius"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="radius"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="radius"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="radius"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="radius"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="progress"][data-page-style~="radius"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="radius"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="radius"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="radius"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="radius"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="radius"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="radius"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="radius"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="radius"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="radius"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="radius"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="radius"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="radius"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="radius"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="radius"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="radius"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="radius"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="radius"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="radius"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="radius"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="radius"] .registered-component [role="dialog"] {
+  border-radius:var(--md-page-radius)!important;
+}
+
+/* padding: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="padding"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="padding"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="padding"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="padding"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="padding"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="padding"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="padding"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="padding"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="padding"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="padding"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="padding"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="padding"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="padding"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="progress"][data-page-style~="padding"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="padding"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="padding"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="padding"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="padding"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="padding"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="padding"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="padding"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="padding"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="padding"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="padding"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="padding"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="padding"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="padding"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="padding"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="padding"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="padding"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="padding"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="padding"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="padding"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="padding"] .registered-component [role="dialog"] {
+  padding:var(--md-page-padding)!important;
+}
+
+/* border: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="border"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="border"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="border"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="border"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="border"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="border"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="border"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="border"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="border"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="border"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="border"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="border"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="border"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="progress"][data-page-style~="border"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="border"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="border"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="border"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="border"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="border"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="border"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="border"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="border"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="border"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="border"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="border"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="border"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="border"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="border"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="border"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="border"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="border"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="border"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="border"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="border"] .registered-component [role="dialog"] {
+  border-width:var(--md-page-border-width)!important;
+  border-style:solid!important;
+}
+
+/* stroke: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="stroke"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="stroke"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="stroke"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="stroke"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="stroke"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="progress"][data-page-style~="stroke"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="stroke"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="stroke"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="stroke"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="stroke"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="stroke"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="stroke"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="stroke"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="stroke"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="stroke"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="stroke"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="stroke"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="stroke"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="stroke"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="stroke"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="stroke"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="stroke"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="stroke"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="stroke"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="stroke"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="stroke"] .registered-component [role="dialog"] {
+  border-color:var(--md-page-border-color)!important;
+}
+
+/* background: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="background"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="background"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="background"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="background"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="background"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="background"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="background"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="background"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="background"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="background"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="background"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="background"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="background"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="progress"][data-page-style~="background"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="background"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="background"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="background"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="background"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="background"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="background"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="background"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="background"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="background"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="background"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="background"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="background"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="background"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="background"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="background"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="background"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="background"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="background"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="background"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="background"] .registered-component [role="dialog"] {
+  background-color:var(--md-page-background)!important;
+}
+
+/* color: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="color"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="color"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="color"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="color"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="color"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="color"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="color"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="color"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="color"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="color"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="color"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="color"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="color"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="collection"][data-page-style~="color"] .registered-component .md-product-card,
+[data-page-appearance="progress"][data-page-style~="color"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="color"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="color"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="color"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="color"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="color"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="color"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="color"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="color"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="color"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="color"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="color"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="color"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="color"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="color"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="color"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="color"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="color"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="color"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="color"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="color"] .registered-component [role="dialog"] {
+  color:var(--md-page-color)!important;
+}
+
+/* shadow: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="shadow"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="shadow"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="shadow"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="shadow"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="shadow"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="collection"][data-page-style~="shadow"] .registered-component .md-product-card,
+[data-page-appearance="progress"][data-page-style~="shadow"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="shadow"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="shadow"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="shadow"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="shadow"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="shadow"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="shadow"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="shadow"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="shadow"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="shadow"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="shadow"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="shadow"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="shadow"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="shadow"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="shadow"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="shadow"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="shadow"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="shadow"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="shadow"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="shadow"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="shadow"] .registered-component [role="dialog"] {
+  box-shadow:var(--md-page-shadow)!important;
+}
+
+/* font-size: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="font-size"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="font-size"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="font-size"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="font-size"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="font-size"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="collection"][data-page-style~="font-size"] .registered-component .md-product-card,
+[data-page-appearance="progress"][data-page-style~="font-size"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="font-size"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="font-size"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="font-size"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="font-size"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="font-size"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="font-size"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="font-size"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="font-size"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="font-size"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="font-size"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="font-size"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="font-size"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="font-size"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="font-size"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="font-size"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="font-size"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="font-size"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="font-size"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="font-size"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="font-size"] .registered-component [role="dialog"] {
+  font-size:var(--md-page-font-size)!important;
+}
+
+/* font-weight: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="font-weight"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="font-weight"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="font-weight"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="font-weight"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="collection"][data-page-style~="font-weight"] .registered-component .md-product-card,
+[data-page-appearance="progress"][data-page-style~="font-weight"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="font-weight"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="font-weight"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="font-weight"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="font-weight"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="font-weight"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="font-weight"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="font-weight"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="font-weight"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="font-weight"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="font-weight"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="font-weight"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="font-weight"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="font-weight"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="font-weight"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="font-weight"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="font-weight"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="font-weight"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="font-weight"] .registered-component [role="dialog"] {
+  font-weight:var(--md-page-font-weight)!important;
+}
+
+/* text-align: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="text-align"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="text-align"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="text-align"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="text-align"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="text-align"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="collection"][data-page-style~="text-align"] .registered-component .md-product-card,
+[data-page-appearance="progress"][data-page-style~="text-align"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="text-align"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="text-align"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="text-align"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="text-align"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="text-align"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="text-align"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="text-align"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="text-align"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="text-align"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="text-align"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="text-align"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="text-align"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="text-align"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="text-align"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="text-align"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="text-align"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="text-align"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="text-align"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="text-align"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="text-align"] .registered-component [role="dialog"] {
+  text-align:var(--md-page-text-align)!important;
+}
+
+/* opacity: apply ONLY to the native visual surface of each component. */
+[data-page-appearance="input"][data-page-style~="opacity"] .registered-component input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-page-appearance="input"][data-page-style~="opacity"] .registered-component textarea,
+[data-page-appearance="input"][data-page-style~="opacity"] .registered-component select,
+[data-page-appearance="image"][data-page-style~="opacity"] .registered-component img,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .record-detail-grid,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .record-detail-field,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .fake-related,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .fake-related,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .report-chart-preview,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .component-demo-accordion,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .component-demo-activity,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .component-demo-highlights,
+[data-page-appearance="surface"][data-page-style~="opacity"] > .free-canvas-content-viewport > .component-demo-highlights,
+[data-page-appearance="collection"][data-page-style~="opacity"] .registered-component .md-product-card,
+[data-page-appearance="progress"][data-page-style~="opacity"] .registered-component progress,
+[data-page-appearance="layout"][data-page-style~="opacity"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="opacity"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="opacity"] > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="opacity"] > .free-canvas-content-viewport > .fake-tabs,
+[data-page-appearance="tabs"][data-page-style~="opacity"] > .record-fields-card,
+[data-page-appearance="tabs"][data-page-style~="opacity"] > .free-canvas-content-viewport > .record-fields-card,
+[data-page-appearance="input"][data-page-style~="opacity"] .registered-component input:not([type="checkbox"]):not([type="radio"]),
+[data-page-appearance="toggle"][data-page-style~="opacity"] .registered-component [role="switch"],
+[data-page-appearance="button"][data-page-style~="opacity"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="opacity"] .registered-component .smart-badge,
+[data-page-appearance="text"][data-page-style~="opacity"] .registered-component .smart-text,
+[data-page-appearance="surface"][data-page-style~="opacity"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="opacity"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="opacity"] .registered-component .smart-table,
+[data-page-appearance="calendar"][data-page-style~="opacity"] .registered-component .smart-calendar,
+[data-page-appearance="layout"][data-page-style~="opacity"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="opacity"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="opacity"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="opacity"] .registered-component form,
+[data-page-appearance="overlay"][data-page-style~="opacity"] .registered-component [role="dialog"] {
+  opacity:var(--md-page-opacity)!important;
+}
+
+/* Structural layout controls: these attributes describe internal children.
+ * Never use the Page Builder hitbox as a flex/grid layout surface. */
+[data-page-appearance="layout"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="collection"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="collection"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="form"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="form"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="conversation"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="conversation"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="cart"][data-page-style~="gap"] > .page-nested-layout,
+[data-page-appearance="cart"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="table"][data-page-style~="gap"] > .page-nested-layout ,
+[data-page-appearance="table"][data-page-style~="gap"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="gap"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="gap"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="gap"] .registered-component .smart-table,
+[data-page-appearance="layout"][data-page-style~="gap"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="gap"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="gap"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="gap"] .registered-component form {
+  gap:var(--md-page-gap)!important;
+}
+[data-page-appearance="layout"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="collection"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="collection"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="form"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="form"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="conversation"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="conversation"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="cart"][data-page-style~="align-items"] > .page-nested-layout,
+[data-page-appearance="cart"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="table"][data-page-style~="align-items"] > .page-nested-layout ,
+[data-page-appearance="table"][data-page-style~="align-items"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="align-items"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="align-items"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="align-items"] .registered-component .smart-table,
+[data-page-appearance="layout"][data-page-style~="align-items"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="align-items"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="align-items"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="align-items"] .registered-component form {
+  align-items:var(--md-page-align-items)!important;
+}
+[data-page-appearance="layout"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="layout"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="collection"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="collection"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="form"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="form"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="tabs"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="conversation"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="conversation"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="cart"][data-page-style~="justify-content"] > .page-nested-layout,
+[data-page-appearance="cart"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="table"][data-page-style~="justify-content"] > .page-nested-layout ,
+[data-page-appearance="table"][data-page-style~="justify-content"] > .free-canvas-content-viewport > .page-nested-layout,
+[data-page-appearance="surface"][data-page-style~="justify-content"] .registered-component .smart-container,
+[data-page-appearance="collection"][data-page-style~="justify-content"] .registered-component .smart-grid,
+[data-page-appearance="table"][data-page-style~="justify-content"] .registered-component .smart-table,
+[data-page-appearance="layout"][data-page-style~="justify-content"] .registered-component .smart-container,
+[data-page-appearance="tabs"][data-page-style~="justify-content"] .registered-component [role="tab"],
+[data-page-appearance="cart"][data-page-style~="justify-content"] .registered-component .smart-cart,
+[data-page-appearance="form"][data-page-style~="justify-content"] .registered-component form {
+  justify-content:var(--md-page-justify-content)!important;
+}
+
+/* Scroll inside the real component surface, not the invisible positioning frame. */
+[data-page-style~="overflow"] > .record-fields-card ,
+[data-page-style~="overflow"] > .free-canvas-content-viewport > .record-fields-card {
+  overflow-y:var(--md-page-overflow)!important;
+}
+/* Controls carry accessible focus, independent of editor selection borders. */
+[data-page-appearance="input"] .registered-component :is(input,textarea,select):focus-visible,
+[data-page-appearance="button"] .registered-component :is(button,a):focus-visible {
+  outline:2px solid var(--md-primary,#1d4ed8);
+  outline-offset:2px;
+}
+
+/* Reliable atomic native targets for the most commonly edited primitives.
+ * Keep these small, opt-in selectors independent of the grouped legacy
+ * component catalog rules above: an unsupported selector must not disable
+ * styling for every other native control in the list. Metadata host stays bare.
+ */
+[data-page-appearance="button"][data-page-style~="background"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="background"] .registered-component .smart-badge,
+[data-page-appearance="tabs"][data-page-style~="background"] .registered-component [role="tab"] {
+  background-color:var(--md-page-background)!important;
+}
+[data-page-appearance="button"][data-page-style~="radius"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="radius"] .registered-component .smart-badge,
+[data-page-appearance="tabs"][data-page-style~="radius"] .registered-component [role="tab"] {
+  border-radius:var(--md-page-radius)!important;
+}
+[data-page-appearance="button"][data-page-style~="padding"] .registered-component button,
+[data-page-appearance="badge"][data-page-style~="padding"] .registered-component .smart-badge,
+[data-page-appearance="tabs"][data-page-style~="padding"] .registered-component [role="tab"] {
+  padding:var(--md-page-padding)!important;
+}
+
+/* Office-style typography commands share the persisted appearance metadata. */
+[data-page-style~="font-style"] .registered-component {font-style:var(--md-page-font-style)!important}
+[data-page-style~="text-decoration"] .registered-component {text-decoration:var(--md-page-text-decoration)!important}
+
+/* Smart Card Grid has two different background/border layers:
+ * the collection surface and its individual item cards.
+ * Page-level Background / Fill and Border paint the outer component surface;
+ * cardBackgroundColor / cardBorderColor remain independent card appearance
+ * settings. In particular, never let page tokens override card metadata.
+ * Only opt-in authored page styles are painted. */
+[data-page-appearance="collection"][data-page-style~="background"]
+.registered-component.metadrive-component-smart_card_grid > section {
+  background-color: var(--md-page-background) !important;
+}
+[data-page-appearance="collection"][data-page-style~="stroke"]
+.registered-component.metadrive-component-smart_card_grid > section {
+  border-style: solid !important;
+  border-width: var(--md-page-border-width, 1px) !important;
+  border-color: var(--md-page-border-color) !important;
+}
+[data-page-appearance="collection"][data-page-style~="border"]
+.registered-component.metadrive-component-smart_card_grid > section {
+  border-style: solid !important;
+  border-width: var(--md-page-border-width) !important;
+}
+
+/* Shared renderer tokens for authored text metrics. Applied to native component
+   content, not the builder selection frame or canvas geometry. */
+[data-page-style~="line-height"] .registered-component {
+  line-height:var(--md-page-line-height)!important;
+}
+[data-page-style~="line-height"] .registered-component :is(.md-product-name,.md-product-description){
+  line-height:var(--md-page-line-height)!important;
+}
+[data-page-style~="letter-spacing"] .registered-component{
+  letter-spacing:var(--md-page-letter-spacing)!important;
+}
+[data-page-style~="font-family"] .registered-component{
+  font-family:var(--md-page-font-family)!important;
+}
+
+/* Smart Card Grid owns two independent layers:
+   Surface radius/padding affect the collection section, while cardRadius and
+   cardPadding remain on individual cards. Never override per-card inline style. */
+[data-page-appearance="collection"][data-page-style~="radius"]
+.registered-component.metadrive-component-smart_card_grid > section {
+  border-radius:var(--md-page-radius)!important;
+}
+[data-page-appearance="collection"][data-page-style~="padding"]
+.registered-component.metadrive-component-smart_card_grid > section {
+  padding:var(--md-page-padding)!important;
+}
+
+
+/* All component categories, including nested layout containers and Images,
+ * retain a keyboard-only focus affordance. It is never a pointer-selection border. */
+.builder-editor-mode .modern-canvas-builder .record-component[data-page-appearance].selected:focus-visible{
+ outline:2px dashed var(--md-primary,#1d4ed8)!important;
+ outline-offset:3px!important;
+ border-radius:var(--md-page-radius,8px)!important;
+}

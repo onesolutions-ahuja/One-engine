@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_image",
+  "label": "Smart Image",
+  "category": "Display",
+  "description": "Reusable Smart Image for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_image/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_image/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 320,
+    "defaultHeight": 300,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

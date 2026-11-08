@@ -1,0 +1,26 @@
+/* Canonical accessible authentication colour ramp. Use named variables throughout auth components.
+ * Brand: primary -> hover -> disabled; native fields deliberately use a light colour scheme. */
+.auth-screen {
+ --auth-color-primary:#0b57d0;
+ --auth-color-hover:#0946a7;
+ --auth-color-disabled:#698ac0;
+ --auth-color-accent:#1769d2;
+ --auth-color-link:var(--auth-color-primary);
+ --auth-color-ink:#192230;
+ --auth-color-text:#475569;
+ --auth-color-muted:#526175;
+ --auth-color-placeholder:#596579;
+ --auth-color-slate:#64748b;
+ --auth-color-control-border:#94a3b8;
+ --auth-color-border:#cbd5e1;
+ --auth-color-error-border:#b42318;
+ --auth-color-error-text:#9b332c;
+ --auth-color-white:#fff;
+ --auth-color-heading:#17243a;
+ --auth-color-stroke:#e8edf3;
+ --auth-color-divider:#e6eaf1;
+ --auth-color-soft-border:#e2e8f0;
+ --auth-color-gradient-start:#0b162b;
+ --auth-color-gradient-middle:#132b46;
+ --auth-color-gradient-end:#07111e;
+}

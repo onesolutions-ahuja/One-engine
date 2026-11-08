@@ -1,0 +1,164 @@
+/* Page list: retain its bounded scroll area and sticky header but let every
+ * column, including the leading Actions column, scroll normally. */
+.lightning {
+  --md-actions-col-width: 152px;
+}
+.lightning .page-manager-table-scroll {
+  max-height: max(320px, calc(100dvh - 300px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.lightning .page-manager-table-scroll:focus-visible {
+  outline: 2px solid var(--md-focus-ring, var(--md-primary));
+  outline-offset: -2px;
+}
+.lightning .page-manager-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--md-surface-2, #f6f8fb);
+}
+
+/* A narrow, non-frozen first column with four borderless icon actions. */
+.lightning .page-manager-table :is(th.page-manager-actions-heading, td.page-manager-actions) {
+  box-sizing: border-box;
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+  padding: 8px;
+}
+.lightning .page-manager-table .page-manager-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-icon-action {
+  box-sizing: border-box;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--md-text-secondary, #475569);
+  cursor: pointer;
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-icon-action:hover:not(:disabled) {
+  color: var(--md-primary, #1d4ed8);
+  background: color-mix(in srgb, var(--md-primary, #1d4ed8) 9%, transparent);
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-icon-action:focus-visible {
+  outline: 2px solid var(--md-focus-ring, var(--md-primary, #1d4ed8));
+  outline-offset: 1px;
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-icon-action:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-toggle.is-active {
+  color: var(--md-success, #15803d);
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-delete:hover:not(:disabled) {
+  color: var(--md-danger, #b42318);
+  background: color-mix(in srgb, var(--md-danger, #b42318) 9%, transparent);
+}
+
+/* Status remains readable without making the row taller. */
+.lightning .page-manager-table .page-status-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 24px;
+  padding: 0 10px;
+  line-height: 1;
+}
+.lightning .page-manager-table code {
+  font-size: .92em;
+}
+
+/* The layout menu is portalled to document.body so the table's scroll
+   container cannot clip it or paint its cells over the menu. */
+.lightning .page-manager-table .page-manager-design-split {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 48px;
+  min-width: 48px;
+  height: 32px;
+}
+.lightning .page-manager-table .page-manager-design-layout-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  min-width: 16px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--md-text-secondary, #475569);
+  cursor: pointer;
+}
+.lightning .page-manager-table .page-manager-design-layout-trigger:hover,
+.lightning .page-manager-table .page-manager-design-layout-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--md-primary, #1d4ed8) 9%, transparent);
+}
+.lightning .page-manager-table .page-manager-design-layout-trigger:focus-visible {
+  outline: 2px solid var(--md-focus-ring, var(--md-primary, #1d4ed8));
+  outline-offset: -2px;
+}
+.page-manager-design-layout-menu {
+  /* This menu is portalled to body, outside .lightning's light-theme tokens.
+   * Give the portal its own opaque surface, ink and native-control scheme. */
+  --md-surface: #ffffff;
+  --md-surface-2: #edf4ff;
+  --md-text-primary: #24354d;
+  --md-border: #cdd8e6;
+  color-scheme: light;
+  position: fixed;
+  z-index: 10000;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid var(--md-border, #d9e1eb);
+  border-radius: 9px;
+  background: var(--md-surface, #ffffff);
+  opacity: 1;
+  color: var(--md-text-primary, #1f2937);
+  font: 500 12px/1.4 "Segoe UI", Arial, sans-serif;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .18);
+}
+.page-manager-design-layout-option {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.page-manager-design-layout-option:hover,
+.page-manager-design-layout-option:focus-visible {
+  background: var(--md-surface-2, #f1f5f9);
+  color: #1257b1;
+  outline: none;
+}
+.page-manager-design-layout-option:focus-visible {
+  box-shadow: inset 0 0 0 2px #176ce5;
+}

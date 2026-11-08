@@ -1,0 +1,229 @@
+/* Data tab only: Source keeps its three SQL rows. The shared Formula bar
+   spans the top of every other section; lower sections use two rows. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon:has(>.smart-data-workspace){
+  display:flex!important;align-items:stretch!important;flex-wrap:nowrap!important;
+  min-width:100%!important;width:max-content!important;height:114px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon>.smart-data-workspace{
+  box-sizing:border-box;display:flex;flex:1 0 auto;flex-direction:column;
+  min-width:max-content;height:114px;min-height:114px;overflow:visible;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-bar{
+  box-sizing:border-box;display:flex;flex:0 0 34px;align-items:center;gap:4px;
+  width:100%;min-width:854px;height:34px;padding:4px 7px;
+  border-bottom:1px solid #e0e7f0;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-filter-button,
+.office-builder-ribbon #page-builder-tab-content .smart-data-image-upload{
+  box-sizing:border-box;position:relative;display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 40px;width:40px;height:26px;min-height:26px;max-height:26px;padding:0;
+  border:1px solid #b6c7de;border-radius:5px;background:#fff;color:#235a99;cursor:pointer;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-filter-button:not(:disabled):hover{
+  border-color:#2874d2;background:#eaf3ff;
+}
+.office-builder-ribbon #page-builder-tab-content :is(.smart-data-filter-button,.smart-data-image-upload):disabled{
+  opacity:.46;cursor:not-allowed;background:#f0f2f6;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-image-upload{
+  flex:0 0 35px;width:35px;min-width:35px;max-width:35px;
+  height:26px;min-height:26px;max-height:26px;margin-left:0;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-fx-prefix{
+  box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+  flex:0 0 34px;width:34px;height:26px;min-height:26px;max-height:26px;margin-left:0;
+  border:1px solid #b6c7de;border-radius:5px 0 0 5px;
+  background:#f5f7fa;color:#667487;font:italic 600 19px Georgia,serif;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-input{
+  box-sizing:border-box;display:flex;flex:0 0 600px;width:600px;min-width:600px;max-width:600px;
+  height:26px;min-height:26px;max-height:26px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-input>.smart-formula{
+  box-sizing:border-box;flex:1 1 auto;width:100%;min-width:0;height:26px;min-height:26px;max-height:26px;
+  border:1px solid #b7c9e0;border-left:0;border-radius:0 5px 5px 0;background:#fff;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-input>.smart-formula :is(input,.smart-formula-highlight){
+  box-sizing:border-box;width:100%;height:100%;padding:2px 10px;font:12px/20px Consolas,monospace;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-input>input{
+  box-sizing:border-box;width:100%;height:26px;min-height:26px;max-height:26px;min-width:0;padding:0 10px;
+  border:1px solid #becbdc;border-left:0;border-radius:0 5px 5px 0;
+  color:#8895a6;background:#f2f4f8;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-summary-name{
+  box-sizing:border-box;flex:0 0 115px;width:115px;min-width:115px;max-width:115px;
+  height:26px;min-height:26px;max-height:26px;margin-left:0;
+  padding:0 5px;border:1px solid #b6c7de;border-radius:5px;
+  font:11px "Segoe UI",sans-serif;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-summary-name:disabled{
+  background:#f0f2f6;color:#8795a7;cursor:not-allowed;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections{
+  box-sizing:border-box;display:flex;flex:1 0 auto;flex-flow:row nowrap;
+  align-items:stretch;min-width:max-content;height:80px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections>.smart-ribbon-group{
+  box-sizing:border-box!important;display:flex!important;position:relative!important;
+  flex:0 0 var(--smart-section-width)!important;
+  width:var(--smart-section-width)!important;min-width:var(--smart-section-width)!important;
+  max-width:var(--smart-section-width)!important;height:80px!important;min-height:80px!important;
+  max-height:80px!important;flex-direction:column!important;
+  padding:2px 7px 0!important;border:0!important;border-right:1px solid #cbd6e2!important;
+  background:transparent!important;overflow:visible!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections .smart-ribbon-items{
+  box-sizing:border-box!important;display:flex!important;flex:0 0 56px!important;
+  flex-direction:column!important;gap:4px!important;width:max-content!important;
+  height:56px!important;min-height:56px!important;padding:0!important;
+  overflow:visible!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections .smart-ribbon-row{
+  box-sizing:border-box!important;display:flex!important;flex:0 0 26px!important;
+  flex-direction:row!important;align-items:center!important;gap:2px!important;
+  height:26px!important;min-height:26px!important;width:max-content!important;
+  white-space:nowrap!important;margin:0!important;padding:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections .smart-property{
+  box-sizing:border-box!important;display:inline-flex!important;
+  flex:0 0 calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+  width:calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+  min-width:calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+  max-width:calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+  height:26px!important;min-height:26px!important;padding:0!important;
+  align-items:center!important;gap:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections .smart-ribbon-caption{
+  flex:0 0 18px!important;height:18px!important;line-height:17px!important;
+  margin-top:auto!important;font-size:11px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field .smart-label{display:none!important}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field .smart-data-field-pair{
+  box-sizing:border-box;display:flex;width:100%;height:26px;
+  border:1px solid #b7c9df;border-radius:5px;overflow:visible;background:#fff;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field .smart-data-field-name{
+  display:block;box-sizing:border-box;flex:1 1 0;min-width:0;padding:0 7px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border:0;border-radius:4px 0 0 4px;background:#fff;
+  color:#315279;font:11px "Segoe UI",Arial,sans-serif;text-align:left;cursor:pointer;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field .smart-data-field-fx{
+  box-sizing:border-box;flex:0 0 37px;width:37px;height:24px;
+  border:0;border-left:1px solid #c9d6e7;border-radius:0 4px 4px 0;
+  background:linear-gradient(#fff,#f1f3f6);color:#728096;
+  font:italic 600 17px Georgia,serif;cursor:pointer;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field .smart-data-field-fx.is-selected{
+  position:relative;z-index:2;border:1px solid #1669d7;
+  border-radius:5px;background:linear-gradient(#2685f7,#0650c3);
+  color:#fff;box-shadow:0 0 0 3px #b9dcff,0 2px 7px #2678dc80;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field:has(.is-selected) .smart-data-field-pair{
+  border-color:#1a76e4;background:#e9f2ff;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field:has(.is-selected) .smart-data-field-name{
+  background:#eaf4ff;color:#14569c;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-field.disabled .smart-data-field-name,
+.office-builder-ribbon #page-builder-tab-content .smart-data-field.disabled .smart-data-field-fx{
+  background:#f4f6f9;cursor:not-allowed;color:#97a5b6;
+}
+
+/* Density follows the same SQL design width: do not hide overflow or scrollbars. */
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+ .smart-property[data-property="defaultCheck"]{
+  box-sizing:border-box!important;justify-content:space-between!important;
+  padding:0 5px!important;border:1px solid #b7c9df!important;border-radius:5px!important;
+  background:#fff!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+ .smart-property[data-property="defaultCheck"]>.smart-label{
+  box-sizing:border-box!important;display:block!important;flex:1 1 auto!important;
+  min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  white-space:nowrap!important;font-size:11px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+ .smart-property[data-property="defaultCheck"] .smart-default-check-switch{
+  flex:0 0 auto!important;margin-left:auto!important;
+}
+
+/* Cart's final boundary is not a section separator. Keep the Source and
+ * Values separators, but never draw a trailing rule after Cart. */
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+  >.smart-ribbon-group[aria-label="Cart"],
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+  >.smart-ribbon-group:last-child{
+  border-right:0!important;
+}
+/* The generic multiselect used a fixed 155px width, overriding the SQL 105px
+ * track and spilling past the Cart boundary. Both levels must share the
+ * metadata-owned width; the 171px dropdown remains fully visible. */
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+  .smart-property[data-property="columnVisibility"] .smart-multiselect,
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+  .smart-property[data-property="columnVisibility"] .smart-multiselect-trigger{
+  box-sizing:border-box!important;
+  display:flex!important;align-items:center!important;
+  flex:1 1 auto!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+  .smart-property[data-property="columnVisibility"] .smart-multiselect-trigger>span{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* Higher specificity than the legacy global 4px three-row rule: use the
+ * same 2px horizontal gap as the Data section-width calculation. */
+.office-builder-ribbon #page-builder-tab-content
+  .smart-ribbon[data-three-row="true"] .smart-data-sections .smart-ribbon-row{
+  column-gap:2px!important;
+}
+
+
+/* Only Cart Summary 1–4: their SQL-defined 110px binding chips leave a
+   compact text region alongside the shared fx button. Do not resize chips. */
+.office-builder-ribbon #page-builder-tab-content .smart-data-sections
+  .smart-data-field:is([data-property="subtotalValue"],[data-property="totalValue"],
+    [data-property="taxValue"],[data-property="discountValue"]) .smart-data-field-name{
+  font-size:10px!important;
+}
+
+
+/* Selected-canvas binding UI: Source and one Formula Bar, without Values/Cart chips. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon:has(>.smart-data-workspace){
+ width:100%!important;min-width:680px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon>.smart-data-workspace{
+ min-width:0;flex:1 1 auto;width:auto;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-bar{
+ min-width:0;width:100%;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-formula-input{
+ flex:1 1 250px;width:auto;min-width:220px;max-width:none;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-active-binding{
+ display:inline-flex;flex:0 0 auto;align-items:center;max-width:145px;
+ overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+ padding:0 7px;font:600 11px "Segoe UI",sans-serif;color:#355678;
+}
+
+/* An optional collection is a SOURCE, not a visual field caption.
+   The Source controls remain three rows; this fits their existing footer. */
+.office-builder-ribbon #page-builder-tab-content
+ .smart-ribbon-group[data-smart-tab="Data"] .smart-ribbon-caption:has(.smart-data-items-source){
+ display:flex;align-items:center;justify-content:center;gap:7px;line-height:19px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-items-source{
+ box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+ height:16px;padding:0 5px;max-width:84px;white-space:nowrap;
+ font:600 9px/14px "Segoe UI",Arial,sans-serif;
+ border:1px solid #bccbe0;border-radius:3px;background:#f0f5fd;color:#28517c;
+ cursor:pointer;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-data-items-source[aria-pressed="true"]{
+ background:#dceafa;border-color:#4b83bc;color:#153e71;
+}

@@ -1,0 +1,80 @@
+/* Outer ribbon height/overflow/scrollbar geometry is owned by PageBuilderRibbonLayout.css. */
+.page-builder-advanced-ribbon{display:flex;gap:8px;align-items:stretch;min-width:max-content;height:100%}
+.page-builder-advanced-group{display:flex;flex-direction:column;justify-content:space-between;
+  padding:2px 10px 3px 2px;border-right:1px solid #d5deeb;min-height:120px}
+.page-builder-advanced-buttons{display:grid;grid-template-rows:repeat(3,31px);
+  grid-auto-flow:column;grid-auto-columns:190px;gap:4px 6px}
+.page-builder-advanced-buttons button{display:flex;align-items:center;justify-content:flex-start;
+  gap:8px;min-width:0;text-align:left;padding:4px 8px;border:1px solid #d5deeb;
+  border-radius:4px;background:#fff;color:#283f60;font:12px "Segoe UI",Arial,sans-serif;cursor:pointer}
+.page-builder-advanced-buttons button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page-builder-advanced-buttons button:hover:not(:disabled),.page-builder-advanced-buttons button[aria-pressed=true]{
+  background:#e9f1fd;border-color:#8eadd9}
+.page-builder-advanced-buttons button:disabled{opacity:.5;cursor:not-allowed}
+.page-builder-advanced-heading{font:11px "Segoe UI",Arial,sans-serif;color:#5e718a;
+  text-align:center;padding-top:4px}
+.page-builder-advanced-dialog{width:min(94vw,1100px);max-height:88vh;display:flex;flex-direction:column}
+.page-builder-advanced-dialog .page-builder-advanced-body{overflow:auto;min-height:80px;
+  padding:12px 18px;flex:1}
+.page-builder-advanced-dialog .page-builder-advanced-body .properties-panel{width:100%;
+  display:block!important;position:static!important;max-height:none!important;overflow:visible!important}
+.page-builder-advanced-dialog .office-ribbon-compact-strip{flex-wrap:wrap;height:auto;min-height:80px}
+.page-builder-advanced-dialog .page-builder-advanced-canvas-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.page-builder-advanced-dialog .page-builder-advanced-canvas-buttons button{min-width:90px}
+.page-builder-advanced-dialog .form-label{margin-bottom:10px}
+
+.page-builder-advanced-responsive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:12px 18px}
+.page-builder-advanced-responsive-field{display:flex;align-items:center;gap:6px}
+.page-builder-advanced-responsive-field .form-control{flex:1;min-width:0}
+.page-builder-advanced-responsive-field .btn{flex-shrink:0}
+.page-builder-advanced-responsive .properties-help{margin:0 0 12px}
+
+/* In-ribbon Grok tools. Align controls stay within the fixed-height Office ribbon. */
+.office-builder-ribbon #page-builder-tab-content:has(>.grok-canvas-ribbon){
+  display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.grok-canvas-ribbon{
+  display:flex;align-items:stretch;min-width:max-content;height:100%;gap:0;
+}
+.grok-canvas-ribbon>.office-ribbon-group{
+  position:relative;display:flex;flex-direction:column;justify-content:space-between;
+  flex:0 0 auto;min-width:max-content;height:112px;box-sizing:border-box;
+  padding:3px 9px 19px;border-right:1px solid #d5deeb;
+}
+.grok-canvas-ribbon .office-ribbon-stack{
+  display:grid;grid-template-rows:repeat(3,27px);grid-auto-flow:column;
+  grid-auto-columns:max-content;gap:3px 5px;align-content:start;
+}
+.grok-canvas-ribbon .office-ribbon-icon-button{
+  display:flex;align-items:center;gap:5px;min-width:105px;height:27px;
+  padding:2px 8px;border:1px solid #d4deeb;border-radius:4px;
+  background:white;color:#25466d;font:11px/15px "Segoe UI",Arial,sans-serif;
+}
+.grok-canvas-ribbon .office-ribbon-icon-button:disabled{opacity:.4;cursor:not-allowed}
+.grok-canvas-ribbon>.office-ribbon-group>span{
+  font:11px/15px "Segoe UI",Arial,sans-serif;text-align:center;color:#516780;
+}
+.grok-canvas-ribbon>.office-ribbon-group:last-child .office-ribbon-stack{
+  display:flex;flex-direction:column;gap:3px;justify-content:flex-start;
+  min-width:210px;max-width:240px;padding-top:3px;
+}
+
+
+/* Advanced fixed-section sizing and positions have one owner:
+ * PageBuilderRibbonLayout.css. No legacy nav/inspector form geometry. */
+.smart-filter-dialog header>.page-builder-visibility-modal-actions{display:flex;flex-direction:row;gap:8px;align-items:center}
+.smart-filter-dialog .page-builder-visibility-modal-actions button:disabled{opacity:.5;cursor:not-allowed}
+.smart-filter-dialog .component-visibility-editor>.form-label{max-width:390px}
+.smart-filter-dialog .component-visibility-editor .metadata-array-property{padding:12px;
+  border:1px solid #d8e1ec;border-radius:6px;margin:10px 0}
+/* Keep moved nesting and record settings in Advanced's scrollable inline
+   editor; never open an independent settings popup over the page canvas. */
+.page-builder-advanced-nesting{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px 18px;padding:4px 8px}
+.page-builder-advanced-nesting>.form-label{min-width:230px;max-width:340px}
+.page-builder-advanced-nesting .form-control{width:100%;max-width:100%}
+.page-builder-advanced-children{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.page-builder-advanced-children>strong{width:100%;font-size:12px}
+@media(max-width:700px){
+  .page-builder-advanced-inline{grid-template-columns:135px minmax(0,1fr);gap:6px}
+  .page-builder-advanced-inline-nav{padding-right:6px}
+}

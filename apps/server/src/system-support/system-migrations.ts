@@ -1,0 +1,310 @@
+import {createHash} from 'node:crypto';
+import {readdirSync,readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import type {SqlPersistence} from '../system-files/sql-persistence.js';
+
+/** Recover original migration files from the immutable SQL baseline.
+ * The old runner accepted any subset of known versions and ran missing files
+ * in filename order. We preserve that behaviour while verifying every receipt
+ * against the exact embedded original SQL before permitting a transition.
+ */
+export function planLegacyMigrationTransition(
+ source:string,receipts:ReadonlyArray<{version:string;checksum:string}>
+):Array<{name:string;sql:string}> {
+ const sections=[...source.matchAll(/^-- BEGIN ORIGINAL MIGRATION ([0-9a-z-]+\.sql)\n([\s\S]*?)^-- END ORIGINAL MIGRATION \1$/gm)]
+  .map(match=>({name:match[1],sql:match[2]}));
+ const names=sections.map(item=>item.name);
+ const beginCount=[...source.matchAll(/^-- BEGIN ORIGINAL MIGRATION /gm)].length;
+ const endCount=[...source.matchAll(/^-- END ORIGINAL MIGRATION /gm)].length;
+ if(sections.length!==279||beginCount!==279||endCount!==279||
+    new Set(names).size!==279||names.some((n,i)=>i>0&&names[i-1]>=n))
+  throw Error('Core SQL baseline does not contain exactly 279 ordered, paired original migrations');
+ const original=new Map(sections.map(m=>[m.name,m.sql]));
+ const applied=new Set<string>();
+ // An OCI production receipt from a previously shipped ribbon-normalisation step
+ // is not among the 279 archived originals. It is already applied to the DB;
+ // preserve its receipt without replaying unknown SQL or removing the checksum.
+ // This exception is deliberately exact, not a general ignore-unknown bypass.
+ const externalAppliedReceipt='20270123-normalize-builder-ribbon-properties.sql';
+ for(const receipt of receipts){
+  if(applied.has(receipt.version))throw Error('Duplicate legacy SQL migration receipt: '+receipt.version);
+  const sql=original.get(receipt.version);
+  if(sql===undefined){
+   if(receipt.version!==externalAppliedReceipt||!/^[a-f0-9]{64}$/.test(receipt.checksum))
+    throw Error('Unknown legacy SQL migration receipt: '+receipt.version);
+   // The original SQL was not archived: unlike the 279 originals, its receipt
+   // can only be shape-checked here. Never pretend its source was reverified.
+   applied.add(receipt.version);
+   continue;
+  }
+  if(createHash('sha256').update(sql).digest('hex')!==receipt.checksum)
+   throw Error('SQL system migration changed after application: '+receipt.version);
+  applied.add(receipt.version);
+ }
+ return sections.filter(m=>!applied.has(m.name));
+}
+
+/** Versioned, additive SQL system migrations; existing business records are untouched. */
+export async function applySystemMigrations(db:SqlPersistence) {
+ const folder=fileURLToPath(new URL('./migrations/',import.meta.url));
+ const files=readdirSync(folder).filter(name=>/^(?:\d{3}|\d{8})-[a-z0-9-]+\.sql$/.test(name)).sort();
+ if(files.length!==1||files[0]!=='20261107-core-baseline.sql')
+  throw Error('Exactly one approved Core SQL baseline version is required');
+ for(let attempt=0;attempt<4;attempt++){
+  try {
+   await db.transaction(async client=>{
+    let appliedNewMigration=false;
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['metadrive:system:migrations']);
+  await client.query(`CREATE TABLE IF NOT EXISTS md_system_migrations (
+   version text PRIMARY KEY,
+   checksum text NOT NULL,
+   applied_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  for(const name of files){
+   const source=readFileSync(new URL('./migrations/'+name,import.meta.url),'utf8');
+   const checksum=createHash('sha256').update(source).digest('hex');
+   // Existing production databases can have fewer than 279 receipts: older
+   // releases had not shipped every migration. Replay only missing originals
+   // in their historic order, retaining their receipts for safe API rollback.
+   // Unknown/modified receipts abort before making any SQL changes.
+   const prior=await client.query<{version:string;checksum:string}>(
+    "SELECT version,checksum FROM md_system_migrations WHERE version LIKE '%.sql'");
+   const old=prior.rows.filter(row=>row.version!==name);
+   if(old.length){
+    const baselineReceipt=prior.rows.find(row=>row.version===name);
+    if(baselineReceipt){
+     // The complete immutable baseline is already applied. Additional receipts
+     // may come from later releases and cannot be classified as legacy input.
+     // Verify the baseline checksum, preserve every receipt, and never replay
+     // historic DDL on an already-baselined production database.
+     if(baselineReceipt.checksum!==checksum)
+      throw Error('SQL system migration changed after application: '+name);
+     continue;
+    }
+    // First adoption still strictly validates every legacy receipt and
+    // replays only migrations missing from the original baseline archive.
+    const missing=planLegacyMigrationTransition(source,old);
+    for(const migration of missing){
+     await client.query(migration.sql);
+     appliedNewMigration=true;
+     await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',
+      [migration.name,createHash('sha256').update(migration.sql).digest('hex')]);
+    }
+    // Keep old migration receipts for rollback compatibility. If a later
+    // deployment step fails, the previous API has individual migration files
+    // and must not replay them against the upgraded database. The baseline
+    // receipt is written last, inside the same SQL transaction.
+    await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',[name,checksum]);
+    continue;
+   }
+
+   const existing=await client.query<{checksum:string}>(
+    'SELECT checksum FROM md_system_migrations WHERE version=$1',[name]);
+   if(existing.rows[0]) {
+    if(existing.rows[0].checksum!==checksum)
+     throw new Error('SQL system migration changed after application: '+name);
+    continue;
+   }
+   await client.query(source);
+   appliedNewMigration=true;
+   await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',[name,checksum]);
+  }
+  // Upgrade-safe global ribbon metadata. Reapplying these idempotent inserts
+  // works with the immutable single SQL baseline and already-created tenants.
+  await client.query(`
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,
+      default_value,min_value,max_value,choices,scope)
+    SELECT 'inputRows','Rows','Design2','Others','number',
+      COALESCE(MAX(sort_order),0)+1,'1'::jsonb,1,12,'[]'::jsonb,'component'
+    FROM md_builder_shared_properties
+    ON CONFLICT(property_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    VALUES('smart_text','inputRows',true)
+    ON CONFLICT(component_api,property_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slots
+     (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+    SELECT 'Others',COALESCE(MAX(area_order),0)+1,'extra_inputRows',
+      2,1,58,26,'inputRows','inputRows'
+    FROM md_builder_design2_slots
+    ON CONFLICT(area,slot_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    VALUES('smart_text','Others','extra_inputRows','inputRows')
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+
+  // Smart Toggle's legacy defaultCheck ribbon setting was retired. Reuse the
+  // existing, already-published defaultValue expression instead so Page Builder
+  // inventory CSV can set the starting ON/OFF state without a new property.
+  // Preserve all tenant instances and do not revive defaultCheck.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    SELECT 'smart_toggle','defaultValue',true
+    WHERE EXISTS(SELECT 1 FROM md_builder_shared_properties WHERE property_key='defaultValue')
+    ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
+  `);
+
+  // New generic Smart Selector; shared properties stay SQL-owned, and this
+  // upgrade is safe for databases that already applied the immutable baseline.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_components(component_api)
+    VALUES ('smart_selector') ON CONFLICT(component_api) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled)
+    SELECT id,'smart_selector','one-bundled:smart_selector',true FROM md_tenants
+    ON CONFLICT(tenant_id,api_name) DO NOTHING
+  `);
+  await client.query(`
+    WITH specs(property_key,label,tab_name,group_name,kind,default_json,choices,min_value,max_value,ordinal) AS (
+     VALUES
+     ('selectorOptionsFormula','Options formula','Data','Values','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,1),
+     ('calendarView','View','Design2','Body','choice',
+      '"month"'::jsonb,'["month","week","day"]'::jsonb,NULL::integer,NULL::integer,2),
+     ('calendarShowEvents','Show events','Design2','Body','boolean',
+      'true'::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,3),
+     ('calendarShowHeader','Show header','Design2','Header','boolean',
+      'true'::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,4),
+     ('calendarShowDateStrip','Date strip','Design2','Header','boolean',
+      'true'::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,5),
+     ('calendarEventColor','Event color','Design2','Focused','color',
+      '"#2563eb"'::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,6),
+     ('calendarBlockedColor','Blocked color','Design2','Focused','color',
+      '"#64748b"'::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,7),
+     ('calendarFreeColor','Unbooked color','Design2','Focused','color',
+      '"#f8fbff"'::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,8),
+     ('calendarStartHour','Start hour','Design2','Others','number',
+      '8'::jsonb,'[]'::jsonb,0,23,9),
+     ('calendarEndHour','End hour','Design2','Others','number',
+      '18'::jsonb,'[]'::jsonb,1,24,10),
+     ('calendarSlotMinutes','Slot minutes','Design2','Others','choice',
+      '"30"'::jsonb,'["15","30","60"]'::jsonb,NULL::integer,NULL::integer,11),
+     ('calendarTimeZone','Time zone','Design2','Others','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,12),
+     ('calendarStartSource','Start date/time','Data','Values','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,13),
+     ('calendarEndSource','End date/time','Data','Values','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,14),
+     ('calendarTitleSource','Event title','Data','Values','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,15),
+     ('calendarStatusSource','Event status','Data','Values','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,16)
+    ), missing AS (
+      SELECT specs.* FROM specs WHERE NOT EXISTS(
+        SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key
+      )
+    ), last_order AS (
+      SELECT COALESCE(MAX(sort_order),0) AS sort_order FROM md_builder_shared_properties
+    )
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,
+      choices,min_value,max_value,field_select,scope)
+    SELECT missing.property_key,missing.label,missing.tab_name,missing.group_name,
+     missing.kind,last_order.sort_order+ROW_NUMBER() OVER(ORDER BY missing.ordinal),
+     missing.default_json,missing.choices,missing.min_value,missing.max_value,
+     missing.tab_name='Data','component'
+    FROM missing CROSS JOIN last_order
+    ON CONFLICT(property_key) DO NOTHING
+  `);
+  // Match the Smart Text Body/Data/position property contract, without its
+  // multiline-only setting. This does not fork any common property definition.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules
+      (component_api,property_key,enabled,control_kind_override,value_key,
+       default_value_override,choices_override,enabled_when_override)
+    SELECT 'smart_selector',r.property_key,r.enabled,r.control_kind_override,r.value_key,
+      r.default_value_override,r.choices_override,r.enabled_when_override
+    FROM md_builder_ribbon_component_rules r
+    WHERE r.component_api='smart_text' AND r.property_key<>'inputRows'
+    ON CONFLICT(component_api,property_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT 'smart_selector',r.area,r.slot_key,r.property_key
+    FROM md_builder_design2_slot_rules r
+    WHERE r.component_api='smart_text' AND r.area='Body'
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    SELECT v.component_api,v.property_key,true FROM (VALUES
+     ('smart_selector','selectorOptionsFormula'),
+     ('smart_calendar','calendarView'),('smart_calendar','calendarShowEvents'),
+     ('smart_calendar','calendarShowHeader'),('smart_calendar','calendarShowDateStrip'),
+     ('smart_calendar','calendarEventColor'),('smart_calendar','calendarBlockedColor'),
+     ('smart_calendar','calendarFreeColor'),('smart_calendar','calendarStartHour'),
+     ('smart_calendar','calendarEndHour'),('smart_calendar','calendarSlotMinutes'),
+     ('smart_calendar','calendarTimeZone'),('smart_calendar','calendarStartSource'),
+     ('smart_calendar','calendarEndSource'),('smart_calendar','calendarTitleSource'),
+     ('smart_calendar','calendarStatusSource'),
+     ('smart_calendar','headerBodyColor'),('smart_calendar','headerTextColor'),
+     ('smart_calendar','headerTextSize'),('smart_calendar','headerBorderColor')
+    ) AS v(component_api,property_key)
+    JOIN md_builder_shared_properties p ON p.property_key=v.property_key
+    ON CONFLICT(component_api,property_key) DO NOTHING
+  `);
+  // Reuse the existing Header and Focused semantic targets for the calendar.
+  // Its native 16-control scaffold is untouched, including disabled cells.
+  await client.query(`
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT 'smart_calendar',v.area,v.slot_key,v.property_key FROM (VALUES
+     ('Header','fill','headerBodyColor'),('Header','text','headerTextColor'),
+     ('Header','size','headerTextSize'),('Header','border','headerBorderColor'),
+     ('Focused','fill','defaultValueColor')
+    ) AS v(area,slot_key,property_key)
+    JOIN md_builder_design2_slots s ON s.area=v.area AND s.slot_key=v.slot_key
+    JOIN md_builder_ribbon_component_rules r ON r.component_api='smart_calendar'
+      AND r.property_key=v.property_key AND r.enabled=true
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+  // Stable supplemental rows in existing Body, Header, Focused and Others
+  // sections. All selectors render these rows; SQL rules alone enable editors.
+  await client.query(`
+    WITH specs(area,property_key,ordinal) AS (VALUES
+     ('Body','calendarView',1),('Body','calendarShowEvents',2),
+     ('Header','calendarShowHeader',3),('Header','calendarShowDateStrip',4),
+     ('Focused','calendarEventColor',5),('Focused','calendarBlockedColor',6),
+     ('Focused','calendarFreeColor',7),
+     ('Others','calendarStartHour',8),('Others','calendarEndHour',9),
+     ('Others','calendarSlotMinutes',10),('Others','calendarTimeZone',11),
+     ('Others','showDays',12),('Others','firstDay',13)
+    )
+    INSERT INTO md_builder_design2_slots
+      (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+    SELECT spec.area,MIN(slot.area_order),'extra_calendar'||spec.property_key,
+      2,100+spec.ordinal,
+      CASE WHEN property.control_kind='choice' THEN 110
+           WHEN property.control_kind='expression' THEN 160
+           WHEN property.control_kind='number' THEN 58 ELSE 40 END,
+      26,spec.property_key,spec.property_key
+    FROM specs spec JOIN md_builder_design2_slots slot ON slot.area=spec.area
+      JOIN md_builder_shared_properties property ON property.property_key=spec.property_key
+    GROUP BY spec.area,spec.property_key,spec.ordinal,property.control_kind
+    ON CONFLICT(area,slot_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT 'smart_calendar',area,slot_key,property_key FROM md_builder_design2_slots
+    WHERE slot_key LIKE 'extra_calendar%'
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+  // Cover setup tables introduced by later migrations in the same transaction.
+  if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
+   });
+   return;
+  } catch(error) {
+   // A rolling deploy may overlap with the old instance's SQL work.
+   // Retry the entire atomic migration transaction only for PG deadlocks.
+   if((error as {code?:string})?.code!=='40P01'||attempt===3)throw error;
+   await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));
+  }
+ }
+
+}

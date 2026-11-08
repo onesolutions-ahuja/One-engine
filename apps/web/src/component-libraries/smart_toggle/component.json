@@ -1,0 +1,32 @@
+{
+  "apiName": "smart_toggle",
+  "label": "Smart Toggle",
+  "category": "Inputs",
+  "description": "Reusable Smart Toggle for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_toggle/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_toggle/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 160,
+    "defaultHeight": 48,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "click",
+      "label": "Click"
+    },
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

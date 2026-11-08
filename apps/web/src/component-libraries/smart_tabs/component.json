@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_tabs",
+  "label": "Smart Tabs",
+  "category": "Navigation",
+  "description": "Reusable Smart Tabs for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_tabs/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_tabs/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 340,
+    "defaultHeight": 120,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

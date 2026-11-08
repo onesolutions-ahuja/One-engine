@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UNEEngine</title>
+    <script>
+      (function () {
+        // GitHub Pages serves the custom domain from /; preserve SPA deep links.
+        var pathname = window.location.pathname;
+        if (pathname === '/metadrive') pathname = '/';
+        else if (pathname.indexOf('/metadrive/') === 0) pathname = pathname.slice('/metadrive'.length);
+        var relative = pathname + window.location.search + window.location.hash;
+        window.location.replace('/?__spa=' + encodeURIComponent(relative));
+      }());
+    </script>
+  </head>
+  <body></body>
+</html>

@@ -1,0 +1,490 @@
+/* Outer ribbon height/overflow/scrollbar geometry is owned by PageBuilderRibbonLayout.css. */
+/* Approved 26px / three-row Design ribbon. SQL supplies each item's row,
+ * order and full control width. Section widths are the maximum of the THREE rows,
+ * never the sum of all controls. The existing left/right ribbon arrows navigate
+ * horizontal overflow. No vertical wrapping or forced third row is permitted.
+ * Other tabs continue to use their existing ribbon CSS.
+ */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-compact-design="true"][data-three-row="true"]{
+ box-sizing:border-box!important;display:flex!important;
+ flex:0 0 auto!important;flex-flow:row nowrap!important;
+ align-items:stretch!important;align-content:stretch!important;
+ gap:0!important;min-width:100%!important;width:max-content!important;
+ height:114px!important;min-height:114px!important;max-height:114px!important;
+ background:transparent!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]>.smart-ribbon-group[data-design-three-row="true"]{
+ box-sizing:border-box!important;display:flex!important;flex:0 0 auto!important;
+ flex-direction:column!important;
+ position:relative!important;
+ width:var(--smart-section-width,auto)!important;min-width:var(--smart-section-width,auto)!important;max-width:var(--smart-section-width,auto)!important;
+ height:114px!important;min-height:114px!important;max-height:114px!important;
+ padding:6px 7px 1px!important;margin:0!important;
+ border:0!important;border-right:1px solid #cbd6e2!important;
+ border-radius:0!important;background:transparent!important;overflow:visible!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]>.smart-ribbon-group[data-design-three-row="true"]:last-of-type{
+ border-right:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group[data-design-three-row="true"]>.smart-ribbon-items{
+ box-sizing:border-box!important;display:flex!important;flex:0 0 auto!important;
+ flex-direction:column!important;align-items:flex-start!important;
+ justify-content:flex-start!important;align-content:flex-start!important;
+ gap:4px!important;
+ width:max-content!important;min-width:0!important;max-width:none!important;
+ height:86px!important;min-height:86px!important;max-height:86px!important;
+ grid-template-columns:none!important;grid-template-rows:none!important;
+ padding:0!important;margin:0!important;overflow:visible!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group .smart-ribbon-row{
+ box-sizing:border-box!important;display:flex!important;flex:0 0 26px!important;
+ flex-flow:row nowrap!important;align-items:center!important;justify-content:flex-start!important;
+ width:max-content!important;min-width:0!important;max-width:none!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ gap:2px!important;padding:0!important;margin:0!important;white-space:nowrap!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group .smart-ribbon-row>.smart-property{
+ box-sizing:border-box!important;display:inline-flex!important;
+ position:relative!important;grid-area:auto!important;
+ flex:0 0 calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+ width:calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+ min-width:calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+ max-width:calc(var(--smart-control-width) + var(--smart-caption-width,0px))!important;
+ height:var(--smart-control-height,26px)!important;
+ min-height:var(--smart-control-height,26px)!important;
+ max-height:var(--smart-control-height,26px)!important;
+ padding:0!important;margin:0!important;gap:0!important;
+ align-items:center!important;justify-content:flex-start!important;
+ white-space:nowrap!important;overflow:visible!important;
+}
+/* These controls are recognizable by their SVG, selected value and tooltip.
+ * Accessible names remain on the editor (not in a squeezed visible label). */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group .smart-ribbon-row>.smart-property>.smart-label{
+ display:none!important;
+}
+/* Fully contained 70px icon + numerical spinner, with ONE border/background.
+ * No gap counted outside the 70px total. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-numeric{
+ box-sizing:border-box!important;display:flex!important;align-items:center!important;
+ gap:0!important;padding:0!important;margin:0!important;
+ flex:0 0 100%!important;width:100%!important;
+ min-width:0!important;max-width:100%!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property[data-numeric-icon="true"] .smart-numeric{
+ border:1px solid #b7c9df!important;border-radius:3px!important;
+ background:#fff!important;overflow:hidden!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-property-glyph{
+ box-sizing:border-box!important;display:flex!important;flex:0 0 19px!important;
+ align-items:center!important;justify-content:center!important;
+ width:19px!important;min-width:19px!important;max-width:19px!important;
+ height:24px!important;margin:0!important;padding:0!important;color:#527091!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-property-glyph svg{
+ display:block!important;width:17px!important;height:17px!important;
+ min-width:17px!important;max-width:17px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property .smart-numeric input.smart-office-number{
+ box-sizing:border-box!important;display:block!important;
+ flex:1 1 auto!important;width:100%!important;min-width:0!important;max-width:100%!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:1px 0 1px 2px!important;font-size:11px!important;
+ line-height:22px!important;text-align:center!important;
+ background:#fff!important;color:#263b56!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property[data-numeric-icon="true"] input.smart-office-number{
+ border:0!important;border-radius:0!important;height:24px!important;
+ min-height:24px!important;max-height:24px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property .smart-select{
+ box-sizing:border-box!important;display:block!important;
+ flex:0 0 100%!important;width:100%!important;
+ min-width:0!important;max-width:100%!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:0 2px!important;font-size:11px!important;
+ background:#fff!important;color:#263b56!important;
+ text-overflow:ellipsis!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property .office-ribbon-colour-property{
+ box-sizing:border-box!important;display:inline-flex!important;
+ flex:0 0 100%!important;width:100%!important;
+ min-width:0!important;max-width:100%!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:2px 2px!important;gap:3px!important;
+ background:transparent!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property .smart-icons{
+ box-sizing:border-box!important;display:flex!important;flex:0 0 100%!important;
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ align-items:center!important;justify-content:flex-start!important;
+ gap:0!important;padding:0!important;margin:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property .smart-icons>button{
+ box-sizing:border-box!important;flex:0 0 28px!important;
+ width:28px!important;min-width:28px!important;max-width:28px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:3px!important;background:transparent!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property .smart-icon-toggle{
+ box-sizing:border-box!important;flex:0 0 100%!important;
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:3px!important;background:transparent!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"]
+ .smart-property .smart-visible-toggle{
+ display:inline-flex;flex:0 0 100%;align-items:center;justify-content:center;
+ width:100%;height:26px;padding:2px;
+ border:1px solid #b7c9df;border-radius:3px;
+ background:transparent;color:#294a70;cursor:pointer;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group>.smart-ribbon-caption{
+ box-sizing:border-box!important;position:static!important;
+ inset:auto!important;display:block!important;
+ flex:0 0 18px!important;width:100%!important;
+ height:18px!important;min-height:18px!important;max-height:18px!important;
+ margin:2px 0 0!important;padding:0!important;
+ line-height:17px!important;font-size:10px!important;text-align:center!important;
+ border-top:1px solid #d4deeb!important;border-radius:0!important;
+ background:transparent!important;white-space:nowrap!important;
+ overflow:hidden!important;text-overflow:ellipsis!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property.disabled{opacity:.52!important;filter:grayscale(1)!important;}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property.disabled :is(button,input,select){pointer-events:none!important;cursor:not-allowed!important;}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property :is(button,input,select):focus-visible{
+ outline:2px solid #2377c9!important;outline-offset:1px!important;
+}
+/* Keep the shared numeric editor's text cursor visible. The surrounding
+ * wrapper owns the focus ring; hiding the caret made mouse text editing appear
+ * impossible even though the native spinner arrows still worked. */
+.office-builder-ribbon #page-builder-tab-content .smart-property[data-numeric-icon="true"] input.smart-office-number:focus-visible{
+ outline:none!important;box-shadow:none!important;
+ caret-color:#263b56!important;cursor:text!important;
+ user-select:text!important;-webkit-user-select:text!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-property[data-numeric-icon="true"] .smart-numeric:focus-within{
+ outline:2px solid #2377c9!important;outline-offset:0!important;
+}
+
+/* Caption metadata is an inline editor prefix, not a new independent property.
+ * Caption + editor together take the specified widths (60+90, 35+99, etc).
+ * All other properties use an invisible (zero-width) caption. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group .smart-ribbon-row>.smart-property[data-design-caption="true"]>.smart-label{
+ box-sizing:border-box!important;display:inline-flex!important;
+ flex:0 0 var(--smart-caption-width)!important;
+ width:var(--smart-caption-width)!important;min-width:var(--smart-caption-width)!important;
+ max-width:var(--smart-caption-width)!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding:0 1px!important;margin:0!important;
+ align-items:center!important;justify-content:flex-start!important;
+ font-size:10px!important;line-height:26px!important;
+ white-space:nowrap!important;overflow:hidden!important;text-overflow:clip!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group .smart-ribbon-row>.smart-property .smart-numeric{
+ flex:0 0 var(--smart-control-width)!important;
+ width:var(--smart-control-width)!important;min-width:0!important;
+ max-width:var(--smart-control-width)!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-ribbon-row>.smart-property .smart-select{
+ flex:0 0 var(--smart-control-width)!important;
+ width:var(--smart-control-width)!important;min-width:0!important;
+ max-width:var(--smart-control-width)!important;
+}
+/* Three-row sections keep deliberate 8px side gutters and 2px icon gaps. */
+
+/* Three rows, 26px controls; section gutters are 8px each side. */
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"] .smart-icon-dropdown-trigger {
+ box-sizing:border-box!important;width:35px!important;min-width:35px!important;max-width:35px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;gap:1px!important;
+ background:#fff!important;color:#263b56!important;border:1px solid #b7c9df!important;border-radius:3px!important;
+ padding:0 2px!important;cursor:pointer;
+}
+.smart-icon-dropdown-popup{position:fixed;z-index:10000;display:flex;gap:2px;padding:4px;background:#fff;
+ border:1px solid #b7c9df;border-radius:5px;box-shadow:0 7px 20px #20314e35;}
+.smart-icon-dropdown-popup button{display:flex;align-items:center;justify-content:center;width:30px;height:30px;
+ background:#fff;color:#263b56;border:1px solid transparent;border-radius:3px;cursor:pointer;}
+.smart-icon-dropdown-popup button[aria-checked="true"]{background:#e6f0ff;border-color:#80a9e2;}
+.smart-icon-dropdown-popup button:focus-visible{outline:2px solid #2377c9;outline-offset:1px;}
+.smart-shadow-swatch{width:15px;height:15px;display:inline-block;border:1px solid #8595aa;border-radius:2px;background:#fff;}
+
+/* Unset Text, Border and Fill swatches use the pink/yellow tones from the
+ * Text Size SVG. Selected swatches still show the actual persisted colour. */
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"]
+ .smart-property .office-ribbon-colour-property .office-ribbon-colour-underline.is-unset{
+ background:linear-gradient(90deg,#ec2c88 0%,#a51d56 48%,#ffe153 52%,#ff8c2d 100%)!important;
+}
+
+/* Data and Layout reuse the same 26px three-row grid as Design. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-ribbon-group[data-smart-tab="Data"] .smart-property[data-property^="objectApiName"] .smart-label{
+ display:inline-flex!important;flex:0 0 52px!important;width:52px!important;font-size:11px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-ribbon-group[data-smart-tab="Data"] .smart-property[data-property^="objectApiName"]{gap:5px!important;}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-ribbon-group[data-smart-tab="Data"] .smart-property[data-property^="objectApiName"] .smart-select{
+ width:145px!important;flex:0 0 145px!important;max-width:145px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-property .smart-formula-filter{
+ width:100%!important;min-width:0!important;display:flex;align-items:center;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-property .smart-formula{flex:1 1 auto;min-width:0;}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-property .smart-formula input{
+ width:100%!important;max-width:100%!important;min-width:0!important;height:26px!important;min-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"] .smart-property .smart-filter-trigger{
+ flex:0 0 26px!important;width:26px!important;min-width:26px!important;height:26px!important;
+}
+
+/* Page and Canvas: one 114px content strip, matching the three-row Design ribbon. */
+.office-builder-ribbon #page-builder-tab-content>.office-ribbon-page-layout-groups{
+ height:114px!important;min-height:114px!important;max-height:114px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.office-ribbon-page-layout-groups>.une-sql-home-group{
+ height:114px!important;min-height:114px!important;max-height:114px!important;
+ padding:6px 8px 17px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.office-ribbon-page-layout-groups>.une-sql-home-group[data-shared-group="Page"]{
+ width:260px!important;min-width:260px!important;max-width:260px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.office-ribbon-page-layout-groups>.une-sql-home-group[data-shared-group="Canvas"]{
+ width:114px!important;min-width:114px!important;max-width:114px!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-sql-home-control{
+ min-height:26px!important;max-height:26px!important;height:26px!important;gap:5px!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-sql-home-control:has(>span){
+ justify-content:flex-start!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-page-layout>span:first-child{
+ flex:0 0 44px!important;width:44px!important;min-width:44px!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-page-layout>select{
+ height:26px!important;min-height:26px!important;max-height:26px!important;width:124px!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-page-layout>button{
+ height:26px!important;min-height:26px!important;border:1px solid #b7c9df!important;
+ border-radius:3px!important;background:#fff!important;color:#29466b!important;
+ cursor:pointer;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-version-only>.office-ribbon-version-controls{
+ display:flex!important;flex-direction:row!important;align-items:center!important;gap:4px!important;
+ width:198px!important;min-width:198px!important;height:26px!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-version-only .office-ribbon-version-controls>button:first-child,
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-version-only .office-ribbon-version-controls>button:last-child{
+ box-sizing:border-box!important;width:29px!important;min-width:29px!important;max-width:29px!important;
+ flex:0 0 29px!important;height:26px!important;min-height:26px!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-version-only .office-ribbon-version-controls>select{
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ width:154px!important;min-width:154px!important;max-width:154px!important;flex:0 0 154px!important;
+ border:1px solid #b7c9df!important;border-radius:3px!important;background:#fff!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon{
+ box-sizing:border-box!important;position:relative!important;width:96px!important;min-width:96px!important;
+ display:flex!important;justify-content:flex-start!important;align-items:center!important;gap:0!important;
+ border:1px solid #b7c9df!important;border-radius:3px!important;background:#fff!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon .une-ribbon-embedded-icon{
+ display:flex!important;justify-content:center!important;align-items:center!important;
+ width:21px!important;min-width:21px!important;flex:0 0 21px!important;height:24px!important;color:#527091!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon input{
+ width:72px!important;max-width:72px!important;min-width:72px!important;flex:0 0 72px!important;
+ height:24px!important;min-height:24px!important;max-height:24px!important;
+ padding:1px 2px!important;border:0!important;outline:0!important;
+ background:#fff!important;box-shadow:none!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon input:focus-visible{
+ outline:0!important;box-shadow:none!important;caret-color:auto!important;cursor:text!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon:focus-within{
+ outline:2px solid #2377c9!important;outline-offset:0!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-canvas-colour .office-ribbon-colour-property{
+ height:26px!important;min-height:26px!important;padding:2px 3px!important;
+}
+
+/* Layout density: Home Page and Canvas boxes now take only their actual
+ * content width. Keep the Canvas icon and spinner in one enclosed control,
+ * matching the selected component's numeric boxes on the Design ribbon. */
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon{
+ height:26px!important;padding:0!important;overflow:hidden!important;
+ background:#fff!important;border:1px solid #b7c9df!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon .une-ribbon-embedded-icon{
+ box-sizing:border-box!important;height:24px!important;
+ background:transparent!important;pointer-events:none!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon input{
+ box-sizing:border-box!important;flex:1 1 auto!important;
+ width:auto!important;min-width:0!important;max-width:none!important;
+ height:24px!important;border:0!important;border-radius:0!important;
+ background:transparent!important;box-shadow:none!important;
+}
+.office-builder-ribbon .office-ribbon-page-layout-groups .une-ribbon-size-with-icon input:focus-visible{
+ caret-color:auto!important;
+}
+/* Unsupported property controls retain the exact same complete borders,
+ * heights, embedded icons and alignment as enabled properties. Only their
+ * colours fade, never their geometry or control affordance. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property.disabled{
+ opacity:.66!important;filter:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property.disabled[data-numeric-icon="true"] .smart-numeric{
+ background:#f4f6f9!important;border-color:#c7d2e0!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property.disabled[data-numeric-icon="true"] input.smart-office-number{
+ background:transparent!important;color:#64758b!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-three-row="true"][data-smart-api]
+ .smart-ribbon-group .smart-property.disabled :is(.smart-select,.smart-icon-toggle,.smart-visible-toggle,.smart-icon-dropdown-trigger){
+ background:#f4f6f9!important;border-color:#c7d2e0!important;
+}
+
+/* Eight-tab approved ribbon: keep the original icons/controls, only change geometry. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group[aria-label="Header Supporting"]>.smart-ribbon-caption{
+ white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+ line-height:9px!important;font-size:10px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property.disabled{opacity:.45!important}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property:has(>.smart-formula-filter)>.smart-label{display:none!important}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter{
+ position:relative!important;gap:5px!important;height:26px!important;
+ width:100%!important;min-width:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter :is(.smart-formula-prefix,.smart-summary-label){
+ position:absolute!important;z-index:2;left:1px;top:1px;bottom:1px;
+ box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+ flex:0 0 67px;width:67px;min-width:67px;max-width:67px;padding:0 3px;
+ font:400 9px/1 "Segoe UI",Arial,sans-serif;color:#1f5fa8;
+ border:0;border-right:1px solid #c9d6ea;background:#fff;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter .smart-formula-prefix{pointer-events:none}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter input.smart-summary-label{
+ appearance:none!important;height:24px!important;max-height:24px!important;
+ text-align:center;pointer-events:auto!important;z-index:3!important;
+ border-radius:4px 0 0 4px!important;caret-color:#1f5fa8;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter input.smart-summary-label::placeholder{
+ color:#1f5fa8;opacity:1;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter input.smart-summary-label:focus-visible{
+ outline:2px solid #2877d1!important;outline-offset:-2px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter .smart-formula{
+ box-sizing:border-box;flex:1 1 auto!important;width:0!important;min-width:0!important;
+ height:26px!important;border:1px solid #9db9dd!important;border-radius:5px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter .smart-formula input,
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property .smart-formula-filter .smart-formula-highlight{
+ box-sizing:border-box!important;padding-left:75px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-property[data-property="defaultCheck"]{
+ border:1px solid #9db9dd!important;border-radius:5px!important;
+ padding-right:4px!important;justify-content:space-between!important;
+}
+
+
+/* Horizontal overflow is intentional across all three-row tabs. This selector
+   matches the original :has() specificity; the scrollbar cannot be suppressed
+   by the earlier Design geometry rule. */
+
+/* Compact Layout's SQL-backed Page controls as well as the shared Design rows.
+ * Geometry only: do not change background, fill, border or disabled colours.
+ * Keep overflow scrollable on smaller viewports; at desktop width the actual
+ * content fits without a horizontal scrollbar.
+ */
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ >.office-ribbon-page-layout-groups>.une-sql-home-group[data-shared-group="Page"]{
+ box-sizing:border-box!important;flex:0 0 260px!important;
+ width:260px!important;min-width:260px!important;max-width:260px!important;
+}
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ >.office-ribbon-page-layout-groups>.une-sql-home-group[data-shared-group="Canvas"]{
+ box-sizing:border-box!important;flex:0 0 114px!important;
+ width:114px!important;min-width:114px!important;max-width:114px!important;
+}
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .office-ribbon-page-layout-groups .une-ribbon-page-layout{
+ box-sizing:border-box!important;gap:5px!important;min-width:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .office-ribbon-page-layout-groups .une-ribbon-page-layout>select{
+ box-sizing:border-box!important;flex:0 0 115px!important;
+ width:115px!important;min-width:115px!important;max-width:115px!important;
+}
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .office-ribbon-page-layout-groups .une-ribbon-restore-only>button{
+ box-sizing:border-box!important;flex:0 0 80px!important;
+ width:80px!important;min-width:80px!important;max-width:80px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ padding-inline:3px!important;
+}
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .office-ribbon-page-layout-groups .une-ribbon-version-only>.office-ribbon-version-controls{
+ box-sizing:border-box!important;width:214px!important;min-width:214px!important;max-width:214px!important;
+}
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content
+ .office-ribbon-page-layout-groups .une-ribbon-version-only .office-ribbon-version-controls>select{
+ box-sizing:border-box!important;flex:0 0 148px!important;
+ width:148px!important;min-width:148px!important;max-width:148px!important;
+}
+
+
+/* Smart Tabs Tab Index: SQL supplies a 45px caption and 30px integer control.
+ * This is only the selected Layout / Tabs property; no unrelated controls move. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group[data-smart-tab="Layout"] .smart-property[data-property="tabIndex"]>.smart-label{
+ font-size:9px!important;letter-spacing:-.15px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group[data-smart-tab="Layout"] .smart-property[data-property="tabIndex"] input.smart-office-number{
+ -moz-appearance:textfield!important;appearance:textfield!important;
+ text-align:center!important;padding:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group[data-smart-tab="Layout"] .smart-property[data-property="tabIndex"] input.smart-office-number::-webkit-inner-spin-button,
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon[data-three-row="true"]
+ .smart-ribbon-group[data-smart-tab="Layout"] .smart-property[data-property="tabIndex"] input.smart-office-number::-webkit-outer-spin-button{
+ -webkit-appearance:none!important;margin:0!important;
+}

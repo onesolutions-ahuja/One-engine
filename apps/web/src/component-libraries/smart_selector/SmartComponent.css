@@ -1,0 +1,5 @@
+@import "../smart/shared/smart.css";
+.smart-runtime.smart_selector>.smart-selector{width:100%;height:100%;min-width:0;min-height:0}
+.smart-runtime.smart_selector .smart-selector-control{appearance:auto;display:block;width:100%;height:100%;min-height:0;max-height:100%;box-sizing:border-box;min-width:0;padding:0 12px;background-color:var(--smart-selector-bg,#fff);color:var(--smart-selector-fg,#253b56);font:inherit;cursor:pointer}
+.smart-runtime.smart_selector .smart-selector-control:focus-visible{outline:2px solid var(--smart-selector-focus,#2563eb);outline-offset:-2px}
+.smart-runtime.smart_selector .smart-selector-control:disabled{cursor:not-allowed;opacity:.62}

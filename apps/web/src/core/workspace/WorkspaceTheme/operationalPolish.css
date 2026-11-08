@@ -1,0 +1,74 @@
+/* Shared operational appearance. Reuses current record/flow and tenant permission
+ * components without changing their authorization, data access or job lifecycles.
+ */
+.lightning :is(.tenant-console,.tenant-domains,.tenant-usage-panel,.named-credentials-page,.automation-settings-page){
+ color:var(--md-text);background:var(--md-bg);min-width:0;
+}
+.lightning :is(.tenant-panel,.tenant-overview>div,.tenant-domains,.tenant-domain-item,.tenant-domain-add-edit){
+ border:.5px solid var(--md-separator);background:var(--md-surface);color:var(--md-text);
+ border-radius:var(--md-radius-lg);box-shadow:var(--md-shadow-sm);
+}
+.lightning :is(.tenant-table,.records-table,.slds-table){font-variant-numeric:tabular-nums}
+.lightning .tenant-table{border-collapse:separate;border-spacing:0;min-width:0}
+.lightning .tenant-table th{background:var(--md-surface-2);color:var(--md-text-2);position:sticky;top:0;z-index:2}
+.lightning .tenant-table td{background:var(--md-surface);border-color:var(--md-separator)}
+.lightning .tenant-table tr.tenant-row-selected td{background:color-mix(in srgb,var(--md-primary) 12%,var(--md-surface))}
+.lightning .tenant-table tbody tr:hover td{background:var(--md-fill)}
+.lightning :is(.tenant-button,.tenant-pagination button,.tenant-detail input,.tenant-detail textarea,.tenant-filter select){
+ border-color:var(--md-separator);background:var(--md-surface);color:var(--md-text);
+ border-radius:var(--md-radius-md);
+}
+.lightning .tenant-button-primary{background:var(--md-primary);color:var(--md-primary-contrast);border-color:var(--md-primary)}
+.lightning .tenant-button-primary:hover{background:var(--md-primary-hover);color:var(--md-primary-contrast)}
+.lightning .tenant-pill-active{
+ background:var(--md-success-surface,#ecfdf3);color:var(--md-success,#168657);
+}
+.lightning .tenant-pill-suspended{
+ background:var(--md-danger-surface,#fef3f2);color:var(--md-danger,#b42318);
+}
+.lightning :is(.tenant-detail-tabs button,.tenant-heading h1,.tenant-detail h2){color:var(--md-text)}
+.lightning .tenant-detail-tabs button.active{color:var(--md-primary);border-bottom-color:var(--md-primary)}
+.lightning .tenant-domain-proof code{
+ display:block;border:.5px solid var(--md-separator);border-radius:var(--md-radius-md);
+ padding:6px 8px;background:var(--md-surface-2);color:var(--md-text);
+}
+.lightning .tenant-domain-error{color:var(--md-danger)}
+.lightning .tenant-domain-notice{color:var(--md-success)}
+.lightning :is(.flow-logs,.flow-interviews,.scheduled-flows,.approval-process-manager,.automation-settings-page){
+ min-width:0;
+}
+.lightning :is(.flow-logs,.flow-interviews,.scheduled-flows,.approval-process-manager) :is(table,[role="table"]){
+ font-variant-numeric:tabular-nums;
+}
+.lightning :is(.flow-logs,.flow-interviews,.scheduled-flows) :is(th,[role="columnheader"]){
+ color:var(--md-text-2);background:var(--md-surface-2);font-weight:600;
+}
+.lightning :is(.flow-logs,.flow-interviews,.scheduled-flows) :is(td,[role="cell"]){
+ border-bottom:.5px solid var(--md-separator);background:var(--md-surface);
+}
+.lightning :is(.flow-logs,.flow-interviews,.scheduled-flows) :is(button,input,select):focus-visible{
+ outline:3px solid var(--md-focus-ring);outline-offset:1px;
+}
+/* Tenant Administration is inside the Setup shell, so viewport breakpoints
+ * do not describe the space available after the navigation sidebar. Query the
+ * tenant workspace itself and only create a split when BOTH panels can fit. */
+.lightning .tenant-console{container-type:inline-size}
+.lightning .tenant-console .tenant-columns{display:grid;grid-template-columns:minmax(0,1fr)}
+.lightning .tenant-console .tenant-columns>*{min-width:0;max-width:100%}
+@container (min-width:1560px){
+ .lightning .tenant-console .tenant-columns{
+  grid-template-columns:minmax(0,1.15fr) minmax(620px,.85fr);
+ }
+ .lightning .tenant-console .tenant-detail{position:sticky;top:15px;min-width:0}
+}
+@media(max-width:1023px){
+ .lightning .tenant-console .tenant-table-wrap{max-width:100%;overflow-x:auto}
+}
+@media(pointer:coarse){
+ .lightning :is(.tenant-console,.tenant-domains,.tenant-usage-panel) :is(button,input,select,textarea){
+ min-height:44px;touch-action:manipulation
+ }
+}
+@media(forced-colors:active){
+ .lightning :is(.tenant-panel,.tenant-overview>div,.tenant-domains){border:1px solid CanvasText}
+}

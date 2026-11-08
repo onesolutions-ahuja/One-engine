@@ -1,0 +1,403 @@
+/* Outer ribbon height/overflow/scrollbar geometry is owned by PageBuilderRibbonLayout.css. */
+/* Eight-tab Page Builder layout, keeping every existing icon/control asset. */
+.office-builder-ribbon #page-builder-tab-content>.office-ribbon-group{
+ height:114px!important;min-height:114px!important;max-height:114px!important;
+}
+.office-builder-ribbon .office-ribbon-selection-context{
+ max-width:250px!important;white-space:nowrap!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.ribbon-logic-rules,
+.office-builder-ribbon #page-builder-tab-content>.ribbon-advanced-actions{
+ width:max-content!important;min-width:0!important;padding:4px 12px 17px!important;
+}
+.office-builder-ribbon .ribbon-logic-rules .office-ribbon-stack,
+.office-builder-ribbon .ribbon-advanced-actions .office-ribbon-stack{
+ display:flex!important;flex-direction:column!important;gap:4px!important;
+}
+.office-builder-ribbon .ribbon-logic-rules button,
+.office-builder-ribbon .ribbon-advanced-actions button{
+ box-sizing:border-box;font:11px "Segoe UI",Arial,sans-serif;
+ height:26px!important;max-height:26px!important;border:1px solid #c3cad4;
+ border-radius:5px;background:#fff;color:#29476a;padding:3px 8px;
+}
+.office-builder-ribbon .ribbon-logic-rules button:disabled,
+.office-builder-ribbon .ribbon-advanced-actions button:disabled{opacity:.45}
+.office-builder-ribbon .preview-visibility-group{
+ max-width:min(760px,calc(100vw - 430px))!important;min-width:240px!important;
+ overflow:visible!important;
+}
+.office-builder-ribbon .preview-visibility-controls{
+ display:flex!important;flex-direction:column!important;gap:2px!important;
+ min-width:0!important;max-height:90px!important;
+}
+.office-builder-ribbon .preview-visibility-controls .office-ribbon-compact-strip{
+ max-height:67px!important;max-width:100%!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.canvas-preview-selector-group{
+ width:206px!important;min-width:206px!important;max-width:206px!important;
+ padding:3px 8px 17px!important;overflow:visible!important;
+}
+.office-builder-ribbon .ribbon-view-find{position:relative;overflow:visible!important;min-width:0!important}
+.office-builder-ribbon .ribbon-view-search{
+ box-sizing:border-box;display:flex;align-items:center;gap:5px;
+ border:1px solid #c3cad4;border-radius:5px;background:white;
+ height:26px;padding:0 6px;width:190px;
+}
+.office-builder-ribbon .ribbon-view-search input{
+ border:0!important;outline:0!important;height:24px!important;min-width:0;
+ width:100%!important;padding:0!important;font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon .ribbon-view-find-results{
+ position:absolute;z-index:6500;top:29px;left:0;
+ display:flex;flex-direction:column;min-width:260px;max-width:360px;
+ max-height:208px;overflow-y:auto;background:#fff;
+ border:1px solid #b7c9df;border-radius:5px;box-shadow:0 10px 20px #15253b27;
+}
+.office-builder-ribbon .ribbon-view-find-results button{
+ border:0;border-bottom:1px solid #e5ebf3!important;border-radius:0!important;
+ display:flex;align-items:center;justify-content:space-between;
+ width:100%;min-height:26px;gap:5px;padding:3px 7px;
+ background:#fff;text-align:left;font:11px "Segoe UI",Arial,sans-serif;cursor:pointer;
+}
+.office-builder-ribbon .ribbon-view-find-results button:hover{background:#edf5ff}
+.office-builder-ribbon .ribbon-view-find-results small{font-size:10px;color:#59718a}
+.office-builder-ribbon #page-builder-tab-content>.ribbon-view-zoom{
+ width:316px!important;min-width:316px!important;max-width:316px!important;
+ padding:3px 8px 17px!important;
+}
+.office-builder-ribbon .ribbon-view-zoom .office-ribbon-stack{gap:4px!important}
+.office-builder-ribbon .ribbon-view-zoom-buttons{display:flex;flex-flow:row nowrap;gap:4px}
+.office-builder-ribbon .ribbon-view-zoom-buttons button{
+ box-sizing:border-box;height:26px!important;min-height:26px!important;
+ padding:0 8px!important;font-size:11px!important;white-space:nowrap;
+}
+.office-builder-ribbon .ribbon-view-zoom-number{
+ display:flex;align-items:center;box-sizing:border-box;
+ border:1px solid #b7c9df;border-radius:5px;background:white;
+ gap:2px;width:78px;height:26px;padding:0 3px;font-size:11px;color:#29476a;
+}
+.office-builder-ribbon .ribbon-view-zoom-number input{
+ width:47px!important;min-width:0!important;max-width:47px!important;
+ height:24px!important;border:0!important;background:transparent;
+ text-align:center!important;padding:0!important;font-size:11px!important;
+}
+.office-builder-ribbon #page-builder-tab-content>.ribbon-view-canvas{
+ width:105px!important;min-width:105px!important;max-width:105px!important;
+ padding:3px 8px 17px!important;
+}
+
+/* Results portal is in document.body, outside the clipped ribbon container. */
+.ribbon-view-find-results{
+ z-index:6500;display:flex;flex-direction:column;
+ min-width:260px;max-width:360px;max-height:208px;overflow-y:auto;
+ background:#fff;border:1px solid #b7c9df;border-radius:5px;
+ box-shadow:0 10px 20px #15253b27;
+}
+.ribbon-view-find-results button{
+ box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;
+ min-height:26px;width:100%;gap:5px;padding:3px 7px;
+ border:0;border-bottom:1px solid #e5ebf3;background:#fff;
+ text-align:left;font:11px "Segoe UI",Arial,sans-serif;cursor:pointer;
+}
+.ribbon-view-find-results button:hover{background:#edf5ff}
+.ribbon-view-find-results small{font-size:10px;color:#59718a}
+
+/* Smart Actions stays inside the existing 26px controls and flow data contract. */
+.office-builder-ribbon #page-builder-tab-content>.smart-event-actions-ribbon{
+ flex:0 0 auto!important;height:114px!important;min-height:114px!important;
+ display:flex!important;gap:0!important;
+}
+.office-builder-ribbon .smart-event-actions-ribbon>.smart-event-group{
+ display:flex!important;flex-direction:column!important;
+ justify-content:space-between!important;padding:3px 12px 1px!important;
+ height:114px!important;min-width:160px!important;
+ border-right:1px solid #cbd6e2!important;
+}
+.office-builder-ribbon .smart-event-rows{display:flex;flex-direction:column;gap:4px}
+.office-builder-ribbon .smart-event-picker{display:flex;align-items:center;gap:4px;height:26px;
+ font:11px "Segoe UI",Arial,sans-serif;white-space:nowrap}
+.office-builder-ribbon .smart-event-picker>span{min-width:57px}
+.office-builder-ribbon .smart-event-picker>select{
+ box-sizing:border-box;width:150px;height:26px;border:1px solid #c3cad4;
+ border-radius:5px;background:#fff;color:#29476a;font:11px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .smart-event-picker>select:disabled{opacity:.45}
+
+
+/* Keep every ribbon tab navigable when the property inventory is wider than
+   the viewport. Earlier ribbon styles deliberately hid native scrollbars. */
+
+
+
+
+/* Preserve the entire third property row and group label above the scroller. */
+
+
+/* Prevent Logic and Actions groups from wrapping into clipped second rows. */
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content:has(>.preview-visibility-group),
+.office-builder-ribbon #page-builder-tab-content.office-ribbon-content:has(>.smart-event-actions-ribbon) {
+  flex-wrap:nowrap!important;
+}
+/* Audit regression: Logic is a single horizontal ribbon, not a vertical
+   133px editor inside a 90px slot. Keep the page-visibility checkbox
+   independent of the rule enable switch and let the ribbon scroll sideways. */
+.office-builder-ribbon .preview-visibility-group {
+  box-sizing:border-box!important;
+  flex:0 0 auto!important;
+  width:max-content!important;min-width:max-content!important;max-width:none!important;
+  padding-bottom:20px!important;
+}
+.office-builder-ribbon .preview-visibility-controls {
+  flex-direction:row!important;align-items:flex-start!important;
+  gap:8px!important;width:max-content!important;min-width:max-content!important;
+  max-height:90px!important;
+}
+.office-builder-ribbon .preview-visibility-controls>.ribbon-small-checkbox {
+  flex:0 0 auto!important;position:relative;align-self:flex-start;
+  margin-top:7px!important;white-space:nowrap;
+  min-width:155px;min-height:26px;z-index:1;
+}
+.office-builder-ribbon .preview-visibility-controls>.office-ribbon-compact-strip {
+  flex:0 0 auto!important;width:max-content!important;min-width:max-content!important;
+  height:90px!important;max-height:90px!important;align-items:flex-start!important;
+}
+.office-builder-ribbon .preview-visibility-controls .office-ribbon-mini-group {
+  flex-shrink:0!important;height:90px!important;min-height:90px!important;
+  max-height:90px!important;padding:2px 12px 19px 5px!important;gap:2px!important;
+}
+.office-builder-ribbon .preview-visibility-controls .office-ribbon-mini-group>label {
+  height:20px!important;min-height:20px!important;
+}
+.office-builder-ribbon .preview-visibility-controls .office-ribbon-mini-group :is(input:not([type=checkbox]),select) {
+  height:20px!important;max-height:20px!important;
+}
+.office-builder-ribbon .preview-visibility-controls .ribbon-condition-value {
+  height:20px!important;
+}
+.office-builder-ribbon .preview-visibility-controls .office-ribbon-commit-group {
+  height:90px!important;
+}
+/* Four Rules actions must fit in two rows above their group caption. */
+.office-builder-ribbon .ribbon-logic-rules .office-ribbon-stack {
+  display:grid!important;grid-template-rows:repeat(2,28px)!important;
+  grid-auto-flow:column!important;grid-auto-columns:160px!important;
+  gap:6px!important;
+}
+/* An 80px label and 145px picker cannot fit in a 160px Actions group.
+   Reserve their full width instead of drawing over the adjacent Cart group. */
+.office-builder-ribbon .smart-event-actions-ribbon>.smart-event-group {
+  flex:0 0 270px!important;min-width:270px!important;max-width:270px!important;
+}
+.office-builder-ribbon .smart-event-picker>span {min-width:90px!important}
+.office-builder-ribbon .smart-event-picker>select {width:145px!important;flex:0 0 145px!important}
+
+/* All components now use one metadata-backed Actions catalog, with no
+   separate Advanced Actions modal. Keep groups within the three-row ribbon. */
+
+.office-builder-ribbon .page-unified-actions-ribbon {
+  flex:0 0 auto!important;width:max-content!important;min-width:max-content!important;
+  height:114px!important;max-height:114px!important;align-items:flex-start!important;
+  gap:0!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.office-ribbon-mini-group {
+  flex:0 0 275px!important;min-width:275px!important;width:275px!important;
+  height:114px!important;max-height:114px!important;
+  padding:5px 12px 21px 9px!important;gap:4px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-library {
+  flex-basis:355px!important;width:355px!important;min-width:355px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .office-ribbon-mini-group>label {
+  display:flex!important;justify-content:space-between!important;align-items:center!important;
+  min-height:28px!important;max-width:100%!important;gap:7px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon :is(select,input) {
+  width:185px!important;max-width:185px!important;min-width:0!important;
+  height:26px!important;min-height:26px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-library select {
+  width:280px!important;max-width:280px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon small {
+  display:block;font-size:11px;white-space:nowrap;color:#53647d;
+}
+.office-builder-ribbon .page-unified-actions-ribbon :is(.page-action-details-toggle,.page-action-remove) {
+  display:inline-flex;align-items:center;gap:5px;align-self:flex-start;
+  width:auto!important;min-width:0!important;max-width:none!important;
+  padding:3px 8px!important;height:27px!important;
+  border:1px solid #b7c9df;border-radius:4px;background:#fff;color:#29476a;
+  font-size:11px;cursor:pointer;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-current-kind {
+  display:inline-block;max-width:185px;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-empty {
+  align-self:flex-start;margin:14px;padding:8px;color:#53647d;font-size:12px;
+}
+/* Preserve the original six event and component-custom slots. The unified
+   trigger/Flow catalog extends them, never replaces or hides the property rows. */
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-property-group {
+  box-sizing:border-box!important;flex:0 0 276px!important;
+  width:276px!important;min-width:276px!important;max-width:276px!important;
+  display:flex!important;flex-direction:column!important;justify-content:space-between!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-property-rows {
+  display:flex!important;flex-direction:column!important;gap:4px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-property-picker {
+  display:flex!important;align-items:center!important;justify-content:flex-start!important;
+  height:26px!important;min-height:26px!important;gap:6px!important;
+  white-space:nowrap!important;font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-property-picker>span {
+  flex:0 0 98px!important;min-width:98px!important;overflow:visible!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-property-picker>select {
+  box-sizing:border-box!important;flex:0 0 145px!important;
+  width:145px!important;min-width:145px!important;max-width:145px!important;
+  height:26px!important;padding:2px 3px!important;
+  border:1px solid #b7c9df!important;border-radius:4px!important;
+  background:#fff;color:#29476a;font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-property-picker>select:disabled {
+  opacity:.5!important;background:#edf1f6!important;cursor:not-allowed!important;
+}
+/* Stable two-by-two custom button slots inside their permanent section. */
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-property-group:has(.page-action-property-picker:nth-child(4)){
+  flex:0 0 522px!important;width:522px!important;min-width:522px!important;
+}
+.office-builder-ribbon .page-action-property-group:has(.page-action-property-picker:nth-child(4)) .page-action-property-rows{
+  display:grid!important;grid-template-columns:repeat(2,245px);grid-template-rows:repeat(2,26px);
+  grid-auto-flow:column;gap:4px 7px!important;align-items:start;
+}
+.office-builder-ribbon .page-action-property-group:has(.page-action-property-picker:nth-child(4)) .page-action-property-picker>span{
+  flex-basis:94px!important;min-width:94px!important;
+}
+.office-builder-ribbon .page-action-property-group:has(.page-action-property-picker:nth-child(4)) .page-action-property-picker>select{
+  flex:0 0 139px!important;width:139px!important;min-width:139px!important;max-width:139px!important;
+}
+/* Detailed mappings and destinations expand below the ribbon in document flow.
+   They are not another popup and are confined to the Actions tab. */
+.page-builder-inline-actions {
+  position:relative;z-index:2;isolation:isolate;
+  height:185px;min-height:125px;max-height:40vh;
+  resize:vertical;overflow:hidden;background:var(--surface,#fff);
+}
+.page-builder-inline-actions .page-ribbon-expanded-content {
+  overflow:auto;min-height:0;scrollbar-gutter:stable;
+}
+.page-builder-inline-actions .metadata-component-properties {
+  display:block!important;width:100%!important;max-width:none!important;
+}
+.page-builder-inline-actions .metadata-component-properties>.office-ribbon-data-section {
+  display:block!important;position:static!important;
+  width:100%!important;min-width:0!important;max-width:none!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  padding:0!important;margin:0!important;overflow:visible!important;border:0!important;
+}
+.page-builder-inline-actions .home-page-assignment {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));
+  gap:9px 16px;align-items:start;
+  padding:12px;margin:6px 0 12px;border:1px solid #dae2ec;border-radius:6px;
+}
+.page-builder-inline-actions .home-page-assignment>strong {
+  grid-column:1/-1;
+}
+.page-builder-inline-actions .home-page-assignment>.form-label {
+  min-width:0;max-width:100%;
+}
+.page-builder-inline-actions .home-page-assignment .form-control {
+  width:100%;max-width:100%;min-width:0;
+}
+
+/* One permanent editable formula bar and six fixed sections. */
+.office-builder-ribbon .page-action-ribbon-workspace .page-action-formula-bar{
+  box-sizing:border-box;display:flex;align-items:center;gap:5px;
+  flex:0 0 36px;height:36px;min-height:36px;
+  width:100%;padding:3px 8px 5px 4px;
+  border-bottom:1px solid #d6e1ee;background:#f5f8fd;
+}
+.office-builder-ribbon .page-action-formula-bar .page-action-formula-menu,
+.office-builder-ribbon .page-action-formula-bar .page-action-formula-symbol{
+  box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+  height:27px;flex:0 0 34px;border:1px solid #ccd9e8;border-radius:4px;
+  background:#fff;color:#304b71;font:italic 14px Georgia,serif;
+}
+.office-builder-ribbon .page-action-formula-bar>.smart-formula{
+  box-sizing:border-box;display:block;flex:1 1 auto;width:0;min-width:240px;height:27px;
+  border:1px solid #ccd9e8;border-radius:4px;background:#fff;
+}
+.office-builder-ribbon .page-action-formula-bar .smart-formula input{
+  box-sizing:border-box;width:100%;max-width:none;height:25px;
+  padding:0 10px;color:#304b71;font:12px Consolas,monospace;
+}
+.office-builder-ribbon .page-action-formula-bar .smart-formula input:disabled{
+  background:#f0f3f7;color:#8b9aaa;cursor:not-allowed;
+}
+.office-builder-ribbon .page-action-ribbon-workspace>.page-unified-actions-ribbon{
+  box-sizing:border-box!important;height:114px!important;min-height:114px!important;
+  max-height:114px!important;flex:0 0 114px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-library{
+  flex:0 0 350px!important;min-width:350px!important;width:350px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-custom-trigger{
+  display:flex;align-items:center;gap:4px;min-height:26px;width:100%;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-custom-trigger>input{
+  flex:1 1 auto!important;width:0!important;min-width:0!important;max-width:none!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-custom-trigger>button{
+  box-sizing:border-box;flex:0 0 86px;height:26px;border:1px solid #b7c9df;
+  border-radius:4px;background:#fff;color:#29476a;font-size:11px;
+}
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-custom-trigger>button:disabled{
+  color:#8491a2;background:#f2f5f9;cursor:not-allowed;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-selected{
+  flex:0 0 265px!important;width:265px!important;min-width:265px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-selected .page-action-current-kind{
+  width:175px;max-width:175px;
+}
+.office-builder-ribbon .page-unified-actions-ribbon [data-inactive="true"] .page-action-current-kind{
+  color:#8795a7;
+}
+/* Grid columns, not clipping: complex number adjustments expose every saved
+   field with horizontal scroll rather than hiding rows 4 onward. */
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-target,
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-parameters{
+  box-sizing:border-box!important;flex:0 0 auto!important;
+  display:grid!important;grid-template-rows:repeat(3,26px)!important;
+  grid-auto-flow:column!important;grid-auto-columns:320px!important;
+  align-content:start!important;justify-content:start!important;
+  row-gap:4px!important;column-gap:9px!important;
+  width:max-content!important;min-width:320px!important;max-width:none!important;
+  padding:5px 12px 23px 9px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-target>label,
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-parameters>label{
+  box-sizing:border-box!important;display:flex!important;
+  align-items:center!important;justify-content:space-between!important;
+  width:310px!important;min-width:310px!important;max-width:310px!important;
+  height:26px!important;min-height:26px!important;white-space:nowrap!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-target>label>input[type="checkbox"]{
+  width:15px!important;min-width:15px!important;height:15px!important;
+  margin:0 5px 0 0!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-target>.page-action-details-toggle{
+  box-sizing:border-box!important;align-self:start!important;margin:0!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-target>.office-ribbon-group-heading,
+.office-builder-ribbon .page-unified-actions-ribbon>.page-action-parameters>.office-ribbon-group-heading{
+  grid-row:auto!important;position:absolute!important;bottom:3px!important;
+}
+
+.office-builder-ribbon .page-unified-actions-ribbon .page-action-checkbox{
+  justify-content:flex-start!important;gap:8px!important;
+}
+.office-builder-ribbon .page-unified-actions-ribbon :is(.page-action-target,.page-action-parameters) :is(input,select):disabled{
+  opacity:.55;background:#edf1f6;cursor:not-allowed;
+}

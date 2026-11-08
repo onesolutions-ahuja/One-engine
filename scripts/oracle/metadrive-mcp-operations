@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Installed root-owned. No command strings, arbitrary paths or shell evaluation.
+set -Eeuo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+[[ $EUID == 0 && $# -ge 2 && $# -le 3 ]] || exit 64
+action=$1
+case "$2" in api) unit=metadrive-api.service;; worker) unit=metadrive-worker.service;; *) exit 64;; esac
+case "$action" in
+ status)
+  [[ $# == 2 ]] || exit 64
+  systemctl show "$unit" --property=Id,ActiveState,SubState,Result,MainPID,ExecMainStatus,ActiveEnterTimestamp
+  ;;
+ logs)
+  [[ $# == 2 ]] || exit 64
+  journalctl --unit="$unit" --lines=100 --no-pager --output=short-iso
+  ;;
+ restart)
+  [[ $# == 2 ]] || exit 64
+  systemd-run --quiet --collect --on-active=3s --unit="metadrive-mcp-restart-$(cat /proc/sys/kernel/random/uuid)" /usr/bin/systemctl restart "$unit"
+  echo 'Restart scheduled. Verify status after it completes.'
+  ;;
+ deploy_status)
+  [[ $# == 2 && $2 == api ]] || exit 64
+  status_file=/var/lib/metadrive/oci-deployment/status
+  trail_file=/var/lib/metadrive/oci-deployment/trail
+  build_log_file=/var/lib/metadrive/oci-deployment/build-output
+  if [[ -f "$status_file" ]]; then
+    # Only our root-owned installer and worker write this small status file.
+    [[ $(stat -c %u "$status_file") == 0 ]] || exit 1
+    cat "$status_file"
+  else
+    printf 'state=idle\n'
+  fi
+  # Versioned collector marker lets the UI distinguish old installed agents
+  # from an empty log (and makes installed-vs-repository drift visible).
+  printf 'log_collector=v2\n'
+  if [[ ! -f "$build_log_file" ]]; then
+    printf 'build_log_state=missing\n'
+  elif [[ $(stat -c %u "$build_log_file") != 0 || ! -r "$build_log_file" ]]; then
+    printf 'build_log_state=unreadable\n'
+  elif [[ ! -s "$build_log_file" ]]; then
+    printf 'build_log_state=empty\n'
+  else
+    printf 'build_log_state=available\n'
+  fi
+  # Append a bounded live trail so the UI can show progress without extra RPCs.
+  if [[ -f "$trail_file" && $(stat -c %u "$trail_file") == 0 ]]; then
+    printf 'trail_begin\n'
+    # Cap to last 40 lines to keep broker responses small.
+    tail -n 40 "$trail_file"
+    printf 'trail_end\n'
+  fi
+  # Only unprivileged npm build output is published as console text. Prefix
+  # each record so arbitrary build output cannot masquerade as RPC delimiters.
+  if [[ -f "$build_log_file" && $(stat -c %u "$build_log_file") == 0 && -r "$build_log_file" ]]; then
+    printf 'build_log_begin\n'
+    tail -n 100 "$build_log_file" | cut -c 1-500 | sed 's/^/| /'
+    printf 'build_log_end\n'
+  fi
+  # When a direct OCI job is running or failed, include a short journal snippet
+  # so the operator sees the exact failure without SSH.
+  if systemctl cat metadrive-oci-deploy-latest.service >/dev/null 2>&1 || \
+     systemctl is-active --quiet metadrive-oci-deploy-latest.service 2>/dev/null || \
+     systemctl is-failed --quiet metadrive-oci-deploy-latest.service 2>/dev/null; then
+    printf 'journal_begin\n'
+    journalctl --unit=metadrive-oci-deploy-latest.service --lines=40 --no-pager --output=short-iso 2>/dev/null \
+      | cut -c 1-400 || true
+    printf 'journal_end\n'
+  fi
+  ;;
+ deploy_latest)
+  [[ $# == 3 && $2 == api && $3 =~ ^[a-f0-9]{40}$ ]] || exit 64
+  test -x /usr/local/libexec/metadrive-oci-deploy-latest
+  exec 8>/run/lock/metadrive-oci-deploy-schedule.lock
+  flock -n 8 || { echo 'Deployment request already being processed' >&2; exit 75; }
+  if systemctl is-active --quiet metadrive-oci-deploy-latest.service; then
+    echo 'OCI deployment already running' >&2
+    exit 75
+  fi
+  # Unit name, program and working paths are fixed. A SHA is the only argument.
+  systemd-run --quiet --collect --unit=metadrive-oci-deploy-latest \
+    --property=RuntimeMaxSec=7200 \
+    --property=UMask=0077 \
+    /usr/local/libexec/metadrive-oci-deploy-latest "$3"
+  printf 'QUEUED %s\n' "$3"
+  ;;
+ activate_release)
+  [[ $# == 3 && $2 == api && $3 =~ ^[a-f0-9]{40}$ ]] || exit 64
+  test -f "/opt/metadrive/releases/gh-$3/apps/server/dist-system/system-support/entrypoint.js"
+  systemd-run --quiet --collect --on-active=3s --unit="metadrive-mcp-activate-$(cat /proc/sys/kernel/random/uuid)" /usr/local/libexec/metadrive-mcp-activate "$3"
+  echo 'Release activation scheduled. Verify health and journal before reporting deployment complete.'
+  ;;
+ *) exit 64;;
+esac

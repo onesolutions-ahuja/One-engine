@@ -1,0 +1,74 @@
+/* Page Builder-only portal: never loaded by published Page Runtime. */
+.office-builder-ribbon .page-component-navigator { min-width:0!important;overflow:visible!important;gap:5px!important }
+.office-builder-ribbon .page-component-navigator .ribbon-view-search { width:190px;padding:0 4px 0 6px }
+.office-builder-ribbon .page-component-navigator .ribbon-view-search input { flex:1 1 auto!important;min-width:0!important;width:0!important }
+.office-builder-ribbon .page-navigator-help { font:10px/15px "Segoe UI",Arial,sans-serif;color:#64748b;white-space:nowrap }
+.office-builder-ribbon .page-component-navigator .page-navigator-toggle,
+.office-builder-ribbon .page-component-navigator .page-navigator-clear {
+  flex:0 0 auto;display:grid;place-items:center;padding:0!important;margin:0!important;
+  height:22px!important;width:20px!important;min-height:22px!important;
+  border:0!important;background:transparent!important;color:#39536f!important;cursor:pointer
+}
+.office-builder-ribbon .page-component-navigator .page-navigator-toggle:focus-visible,
+.office-builder-ribbon .page-component-navigator .page-navigator-clear:focus-visible { outline:2px solid #2563b8!important }
+
+/* The dropdown lives in document.body, outside ribbon overflow and scale. */
+.page-navigator-popup.ribbon-view-find-results {
+  z-index:6500;box-sizing:border-box;display:flex;flex-direction:column;
+  min-width:0;max-width:calc(100vw - 12px);max-height:min(430px,calc(100vh - 20px));
+  overflow:hidden;border:1px solid #b7c9df;border-radius:8px;background:#fff;
+  box-shadow:0 12px 32px #15253b35;color:#263b55;font:12px "Segoe UI",Arial,sans-serif
+}
+.page-navigator-heading,.page-navigator-filters,.page-navigator-footer {
+  display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px
+}
+.page-navigator-heading {border-bottom:1px solid #e2e8f0}
+.page-navigator-heading strong {font-size:13px}
+.page-navigator-heading button {border:0;background:transparent;color:#4a5f7c;cursor:pointer}
+.page-navigator-filters {padding:7px 10px;background:#f8faff;border-bottom:1px solid #e7edf5}
+.page-navigator-filters label {display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600}
+.page-navigator-filters select {
+  max-width:224px;min-width:115px;height:27px;border:1px solid #cad5e4;border-radius:5px;
+  background:white;color:#273d56;font-size:11px;padding:3px 5px
+}
+.page-navigator-filters>span,.page-navigator-footer {font-size:10px;color:#59718a}
+.page-navigator-list {min-height:42px;overflow-y:auto;overscroll-behavior:contain}
+.page-navigator-row {display:flex;align-items:stretch;min-height:48px;border-bottom:1px solid #edf1f7}
+.page-navigator-row.is-active,.page-navigator-row:hover {background:#eef5ff}
+.page-navigator-row.is-selected {background:#eaf2ff;box-shadow:inset 3px 0 #2563b8}
+.page-navigator-option {
+  display:flex;align-items:center;flex:1 1 auto;min-width:0;gap:9px;padding:8px 7px 7px 11px;
+  background:transparent!important;border:0!important;color:inherit;text-align:left;cursor:pointer
+}
+.page-navigator-option>svg {flex:0 0 auto;color:#5c718c}
+.page-navigator-item-copy {display:flex;flex:1 1 auto;min-width:0;flex-direction:column;gap:2px}
+.page-navigator-item-copy strong {font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-navigator-item-copy small {font-size:10px;color:#62738b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-navigator-item-copy .page-navigator-binding {color:#38608d}
+.page-navigator-rename-button {
+  flex:0 0 30px;display:grid!important;place-items:center;border:0!important;background:transparent!important;
+  color:#57708b;cursor:pointer;padding:4px!important
+}
+.page-navigator-rename-button:disabled {opacity:.3;cursor:not-allowed}
+.page-navigator-rename-button:hover:not(:disabled) {background:#dce9fc!important}
+.page-navigator-rename {display:flex;align-items:center;gap:4px;flex:1;padding:7px 9px}
+.page-navigator-rename input {min-width:0;flex:1;height:28px;border:1px solid #9fb8d9;border-radius:4px;padding:4px 5px}
+.page-navigator-rename button {border:1px solid #b6c8e1;border-radius:4px;background:white;padding:4px 6px;cursor:pointer;font-size:11px}
+.page-navigator-empty {padding:24px 14px;text-align:center;color:#63748b}
+.page-navigator-footer {border-top:1px solid #e5ebf3;white-space:nowrap}
+.page-navigator-footer>span {max-width:62%;overflow:hidden;text-overflow:ellipsis}
+.page-navigator-popup :is(button,input,select):focus-visible {outline:2px solid #2563b8;outline-offset:0}
+
+/* Override legacy portal button rules, which otherwise force every action to 100% width. */
+.page-navigator-popup .page-navigator-option {
+  flex:1 1 auto;width:auto!important;min-height:42px;justify-content:flex-start!important;
+  border-bottom:0!important;padding:8px 7px 7px 11px!important
+}
+.page-navigator-popup .page-navigator-rename-button {
+  flex:0 0 30px;width:30px!important;min-width:30px!important;min-height:0!important;
+  justify-content:center!important;border-bottom:0!important
+}
+.page-navigator-popup .page-navigator-heading button,
+.page-navigator-popup .page-navigator-rename button {
+  width:auto!important;min-height:0!important;justify-content:center!important
+}

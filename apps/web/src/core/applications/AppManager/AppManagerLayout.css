@@ -1,0 +1,114 @@
+/* Guided App Manager presentation only; all metadata and save behaviour stays in AppManager. */
+.app-manager-workspace{max-width:none;min-width:0}
+.app-manager-workspace .app-manager-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+.app-manager-workspace .app-manager-top h1{margin:var(--md-space-1,4px) 0;font-size:var(--md-fs-h1,30px)}
+.app-manager-workspace .app-manager-top p{margin:0;font-size:var(--md-fs-md,13px);color:var(--muted,#64748b)}
+.app-manager-stepper{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;background:var(--surface,#fff);border:1px solid var(--md-border,#e0e5eb);border-radius:10px;padding:var(--md-space-3,12px) var(--md-space-4,16px);margin:12px 0}
+.app-manager-step{display:flex;align-items:center;gap:10px;min-width:0;text-decoration:none;color:var(--text,#192230);font-size:var(--md-label-size,13px);border-radius:8px;padding:5px}
+.app-manager-step:hover,.app-manager-step:focus-visible{background:var(--md-surface-2,#eff6fe);outline-color:var(--md-primary,#1d4ed8)}
+.app-manager-step-number{width:32px;height:32px;border-radius:50%;background:#edf1f7;display:grid;place-items:center;font-weight:700;flex:none}
+.app-manager-step.is-first .app-manager-step-number{background:var(--md-primary,#1d4ed8);color:white}
+.app-manager-step strong,.app-manager-step small{display:block;line-height:1.45}
+.app-manager-step small{color:var(--muted,#697789);font-size:var(--md-helper-size,12px)}
+.app-manager-layout{display:grid;grid-template-columns:minmax(0,2.5fr) minmax(260px,1fr);align-items:start;gap:16px}
+.app-manager-workspace .app-manager-form-card{min-width:0;max-width:none;width:100%;box-sizing:border-box;padding:0;overflow:visible;border:1px solid var(--md-border,#e0e5eb);border-radius:10px;background:var(--surface,#fff)}
+.app-manager-card-intro{padding:var(--md-space-4,16px);border-bottom:1px solid var(--md-border,#e0e5eb)}
+.app-manager-card-intro h2{margin:0 0 4px;font-size:var(--md-fs-lg,16px)}
+.app-manager-card-intro p{margin:0;color:var(--md-muted,#64748b);font-size:var(--md-label-size,13px);line-height:1.5}
+.app-manager-switcher{margin:12px 18px 0!important}
+.app-manager-workspace .app-manager-form-card form{display:grid;gap:0}
+.app-manager-form-section{padding:var(--md-space-4,16px);min-width:0;scroll-margin-top:105px}
+.app-manager-section-title{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+.app-manager-section-title>span{display:grid;place-items:center;width:29px;height:29px;border-radius:50%;background:#e7f0ff;color:var(--md-primary,#1d4ed8);font-weight:700;font-size:var(--md-fs-md,13px);flex:none}
+.app-manager-section-title h3{font-size:var(--md-fs-body,14px);line-height:1.35;margin:0 0 3px;font-weight:var(--md-weight-semibold,600)}
+.app-manager-section-title p{font-size:var(--md-label-size,13px);color:var(--md-muted,#64748b);margin:0;line-height:1.45}
+.app-manager-identity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--md-space-3,12px) var(--md-space-4,16px)}
+.app-manager-identity-grid>div{min-width:0}
+.app-manager-identity-grid .form-label{margin:0}
+.app-manager-identity-description{grid-row:2;grid-column:1}
+.app-manager-identity-brandColor{grid-row:2;grid-column:2}
+.app-manager-identity-grid small.permission-help{display:block;margin:4px 0 0;color:var(--md-muted,#64748b);line-height:1.4}
+.app-manager-workspace .app-manager-form-card .form-label{font-size:var(--md-label-size,13px);gap:5px}
+.app-manager-workspace .app-manager-form-card .form-control{font-size:var(--md-fs-md,13px);min-height:var(--md-control-height,40px)}
+.app-manager-workspace .app-manager-form-card textarea.form-control{min-height:70px}
+.app-manager-selectors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--md-border,#e0e5eb)}
+.app-manager-selectors .app-manager-form-section+ .app-manager-form-section{border-left:1px solid var(--md-border,#e0e5eb)}
+.app-manager-selector-note{font-size:var(--md-helper-size,12px);color:var(--md-muted,#596579);padding:0 18px 14px;margin:0}
+.app-manager-advanced{margin:0 18px 14px;border:1px solid var(--md-border,#e0e5eb);border-radius:8px}
+.app-manager-advanced>summary{cursor:pointer;padding:11px 12px;font-size:var(--md-fs-md,13px);font-weight:600}
+.app-manager-advanced>summary small{font-size:var(--md-helper-size,12px);color:var(--md-muted,#596579);font-weight:400;margin-left:6px}
+.app-manager-advanced-inner{border-top:1px solid var(--md-border,#e0e5eb);padding:10px}
+.app-manager-advanced .app-manager-fieldset{margin:8px 0;padding:12px}
+.app-manager-workspace .app-manager-form-card .form-error,.app-manager-workspace .app-manager-form-card .form-success{margin:4px 18px 10px}
+.app-manager-review-line{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 18px 4px;font-size:var(--md-label-size,13px)}
+.app-manager-review-line span{color:var(--md-muted,#64748b)}
+.app-manager-workspace .app-manager-actions{display:flex;justify-content:flex-end;gap:10px;padding:var(--md-space-3,12px) var(--md-space-4,16px);margin:0;border-top:0}
+.app-manager-workspace .app-manager-actions .btn{display:inline-flex;align-items:center;gap:7px}
+.app-manager-help-column{min-width:0;display:grid;gap:12px}
+.app-manager-side-card,.app-manager-readiness{border:1px solid var(--md-border,#e0e5eb);border-radius:10px;background:var(--surface,#fff);padding:var(--md-space-4,16px)}
+.app-manager-side-card h2{font-size:var(--md-fs-body,14px);margin:0 0 13px}
+.app-manager-help-steps{list-style:none;margin:0;padding:0;display:grid;gap:var(--md-space-4,16px)}
+.app-manager-help-steps li{display:flex;align-items:flex-start;gap:10px}
+.app-manager-help-steps li>span{width:27px;height:27px;border-radius:50%;background:#e8f0fe;color:var(--md-primary,#1d4ed8);display:grid;place-items:center;flex:none;font-size:var(--md-label-size,13px);font-weight:700}
+.app-manager-help-steps strong{font-size:var(--md-label-size,13px);display:block;margin-bottom:2px}
+.app-manager-help-steps p{font-size:var(--md-label-size,13px);line-height:1.45;color:var(--md-muted,#64748b);margin:0}
+.app-manager-help-tip{padding:12px;border-radius:7px;background:#eef5ff;color:#315c95;font-size:var(--md-label-size,13px);line-height:1.5;margin:15px 0 0}
+.app-manager-selection-summary>div{padding:8px 0;border-top:1px solid #edf0f5}
+.app-manager-selection-summary strong{font-size:var(--md-label-size,13px)}
+.app-manager-selection-summary p{font-size:var(--md-helper-size,12px);color:var(--md-muted,#64748b);line-height:1.4;margin:4px 0 0;overflow-wrap:anywhere}
+.app-manager-readiness{padding:0}
+.app-manager-readiness>summary{padding:13px 15px;cursor:pointer;font-size:var(--md-fs-md,13px);font-weight:700}
+.app-manager-readiness>summary span{display:block;font-weight:400;color:var(--md-muted,#64748b);font-size:var(--md-helper-size,12px);margin:4px 0 0}
+.app-manager-readiness .app-setup-guide{border:0;border-top:1px solid #edf0f5;border-radius:0;padding:12px;margin:0;background:transparent}
+.app-manager-readiness .app-setup-guide-heading{gap:6px}
+.app-manager-readiness .app-setup-guide-heading h2{display:none}
+.app-manager-readiness .app-setup-guide-heading p{font-size:var(--md-helper-size,12px)}
+.app-manager-readiness .app-setup-guide-item{padding:8px;gap:6px;flex-wrap:wrap}
+.app-manager-readiness .app-setup-guide-item-heading{font-size:var(--md-label-size,13px)}
+.app-manager-readiness .app-setup-guide-item-heading span{font-size:var(--md-helper-size,12px)}
+.app-manager-readiness .app-setup-guide-item .btn{margin-left:20px}
+@media(max-width:1100px){.app-manager-layout{grid-template-columns:minmax(0,1.7fr) minmax(230px,1fr)}.app-manager-stepper{gap:2px;padding:10px}.app-manager-step{gap:6px}.app-manager-step-number{height:32px;width:32px}}
+@media(max-width:900px){.app-manager-layout{grid-template-columns:1fr}.app-manager-help-column{grid-template-columns:repeat(2,minmax(0,1fr))}.app-manager-readiness{grid-column:1/-1}}
+@media(max-width:660px){.app-manager-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.app-manager-identity-grid,.app-manager-selectors,.app-manager-help-column{grid-template-columns:1fr}.app-manager-identity-description,.app-manager-identity-brandColor{grid-row:auto;grid-column:auto}.app-manager-selectors .app-manager-form-section+ .app-manager-form-section{border-left:0;border-top:1px solid var(--md-border,#e0e5eb)}.app-manager-workspace .app-manager-top{align-items:flex-start;flex-wrap:wrap}.app-manager-help-column .app-manager-readiness{grid-column:auto}}
+
+/* Explicit form and help overflow treatment shared across guided app creation. */
+.app-manager-workspace .app-manager-form-card .form-control{min-height:var(--md-control-height,40px)}
+.app-manager-readiness[open],.app-manager-side-card{min-height:0;overflow-wrap:anywhere}
+.app-manager-advanced-inner,.app-manager-readiness .app-setup-guide{min-width:0;overflow-wrap:anywhere}
+.app-manager-step{min-height:var(--md-control-height,40px)}
+@media(pointer:coarse){.app-manager-step,.app-manager-workspace .app-manager-form-card .form-control,.app-manager-workspace .app-manager-actions .btn{min-height:var(--md-control-touch,44px)}}
+
+/* UX-0074: asynchronous inline confirmation instead of blocking window.confirm(). */
+.app-manager-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgb(15 23 42 / 52%);
+  padding: 16px;
+}
+.app-manager-confirm-dialog {
+  width: min(420px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  border-radius: 14px;
+  background: #fff;
+  color: #17243a;
+  padding: 24px;
+  box-shadow: 0 20px 70px rgb(0 0 0 / 25%);
+}
+.app-manager-confirm-dialog h2 { font-size: 20px; margin: 0 0 12px; }
+.app-manager-confirm-dialog p { line-height: 1.5; }
+.app-manager-confirm-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.app-manager-confirm-actions .btn { min-height: 44px; }
+.app-manager-confirm-actions .btn-danger { color: #fff; background: #ad2727; border-color: #ad2727; }
+
+/* Setup steps are now a semantic ordered list (UX-0077). */
+.app-manager-stepper { list-style:none;margin:0;padding-inline-start:var(--md-space-3,12px); }
+.app-manager-stepper>.app-manager-step-item { list-style:none;min-width:0; }
+.app-manager-stepper .app-manager-step { display:flex;height:100%; }
+.app-manager-stepper .app-manager-step[aria-current="step"] {
+ background:var(--md-surface-2,#f1f6fd);outline:2px solid var(--md-primary,#1d4ed8);outline-offset:-2px;
+}
+.app-manager-stepper .app-manager-step:focus-visible { outline:2px solid var(--md-primary,#1d4ed8); }

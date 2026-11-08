@@ -1,0 +1,372 @@
+/* MetaDrive adaptive desktop/iPad design layer.
+ * Loaded after legacy workspace CSS; tenant-authored Page Runtime styles remain authoritative.
+ * Never put app-specific behaviour or component metadata into this stylesheet.
+ */
+:root {
+  --md-bg: #f5f5f7;
+  --md-canvas: var(--md-bg);
+  --md-surface: #ffffff;
+  --md-surface-2: #fafafc;
+  --md-surface-soft: var(--md-surface-2);
+  --md-sidebar: rgb(246 246 248 / 92%);
+  --md-separator: rgb(60 60 67 / 16%);
+  --md-border: var(--md-separator);
+  --md-text: #1d1d1f;
+  --md-text-2: #5c5c63;
+  --md-muted: var(--md-text-2);
+  --md-text-muted: var(--md-text-2);
+  --md-text-secondary: var(--md-text-2);
+  --md-fill: rgb(60 60 67 / 6%);
+  --md-primary: #007aff;
+  --md-primary-hover: color-mix(in srgb, var(--md-primary) 82%, black);
+  --md-focus-ring: color-mix(in srgb, var(--md-primary) 45%, transparent);
+  --md-primary-contrast: #ffffff;
+  --md-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  --md-radius-sm: 4px;
+  --md-radius-md: 6px;
+  --md-radius-lg: 10px;
+  --md-radius-xl: 14px;
+  --md-shadow-sm: 0 0 0 .5px rgb(0 0 0 / 8%), 0 1px 2px rgb(0 0 0 / 6%);
+  --md-shadow-md: 0 8px 30px rgb(0 0 0 / 18%);
+  --md-shadow-sheet: 0 24px 80px rgb(0 0 0 / 28%);
+  --md-fs-body: 14px;
+  --md-fs-sm: 13px;
+  --md-fs-xs: 12px;
+  --md-control-height: 32px;
+  --md-control-touch: 44px;
+  --md-ios-accent: var(--md-primary);
+  --md-ios-bg: var(--md-bg);
+  --md-ios-surface: var(--md-surface);
+  --md-ios-group: var(--md-surface-2);
+  --md-ios-text: var(--md-text);
+  --md-ios-secondary: var(--md-text-2);
+  --md-ios-separator: var(--md-separator);
+  --md-ios-pressed: var(--md-fill);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --md-bg: #1c1c1e;
+    --md-surface: #2c2c2e;
+    --md-surface-2: #242426;
+    --md-sidebar: rgb(38 38 40 / 94%);
+    --md-separator: rgb(84 84 88 / 55%);
+    --md-text: #f5f5f7;
+    --md-text-2: #c2c2c8;
+    --md-fill: rgb(255 255 255 / 8%);
+    --md-primary: #0a84ff;
+    --md-primary-contrast: #ffffff;
+  }
+}
+:root[data-theme="dark"], .lightning[data-theme="dark"] {
+  color-scheme: dark;
+  --md-bg: #1c1c1e;
+  --md-surface: #2c2c2e;
+  --md-surface-2: #242426;
+  --md-sidebar: rgb(38 38 40 / 94%);
+  --md-separator: rgb(84 84 88 / 55%);
+  --md-text: #f5f5f7;
+  --md-text-2: #c2c2c8;
+  --md-fill: rgb(255 255 255 / 8%);
+  --md-primary: #0a84ff;
+  --md-primary-contrast: #ffffff;
+}
+:root[data-theme="light"], .lightning[data-theme="light"] {
+  color-scheme: light;
+  --md-bg: #f5f5f7;
+  --md-surface: #ffffff;
+  --md-surface-2: #fafafc;
+  --md-sidebar: rgb(246 246 248 / 92%);
+  --md-separator: rgb(60 60 67 / 16%);
+  --md-text: #1d1d1f;
+  --md-text-2: #5c5c63;
+  --md-fill: rgb(60 60 67 / 6%);
+}
+/* The original --md-ios-* API continues to work for existing mobile pages. */
+.lightning {
+  --md-ios-accent: var(--md-primary);
+  --md-ios-bg: var(--md-bg);
+  --md-ios-surface: var(--md-surface);
+  --md-ios-group: var(--md-surface-2);
+  --md-ios-text: var(--md-text);
+  --md-ios-secondary: var(--md-text-2);
+  --md-ios-separator: var(--md-separator);
+  --md-ios-pressed: var(--md-fill);
+  --brand: var(--md-primary);
+  --brand-dark: var(--md-primary-hover);
+  --canvas: var(--md-bg);
+  --surface: var(--md-surface);
+  --border: var(--md-separator);
+  --text: var(--md-text);
+  --muted: var(--md-text-2);
+  font-family: var(--md-font);
+  color: var(--md-text);
+  background: var(--md-bg);
+}
+.lightning :is(.workspace, .home-content, .analytics-page, .settings-page, .object-manager, .permissions-page) {
+  color: var(--md-text);
+  background-color: var(--md-bg);
+}
+.lightning :is(.surface, .setup-card, .records-card, .records-list-card, .modal, .records-main-toolbar, .records-view-popover-panel, .app-utility-popover) {
+  background: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-separator);
+}
+.lightning :is(.setup-sidebar, .object-list-panel, .report-outline) {
+  background: var(--md-sidebar);
+  border-color: var(--md-separator);
+}
+.lightning .salesforce-header {
+  height: 52px;
+  min-height: 52px;
+  border-top: 0;
+  border-bottom: .5px solid var(--md-separator);
+  background: var(--md-sidebar);
+  box-shadow: none;
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+}
+.lightning .setup-layout { min-height: calc(100dvh - 52px); }
+.lightning :is(.btn, .icon-button, .quick-find-input, .object-search, .component-search, .mini-search) {
+  border-radius: var(--md-radius-md);
+}
+.lightning :is(.modal, [role="dialog"], .app-utility-popover) { border-radius: var(--md-radius-xl); }
+.lightning :is(.surface, .setup-card, .records-card, .records-list-card) { border-radius: var(--md-radius-lg); }
+.lightning :is(.tree-item.selected, .object-list-item.active, .permission-list-item.selected) {
+  color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface));
+  box-shadow: none;
+  border-radius: var(--md-radius-md);
+}
+.lightning .tree-group-label {
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: normal;
+  font-size: var(--md-fs-xs);
+  color: var(--md-text-2);
+}
+@media (hover: hover) {
+  .lightning :is(.tree-item, .object-list-item, .records-table tbody tr):hover { background: var(--md-fill); }
+}
+.lightning :is(.quick-find-input, .object-search, .component-search, .mini-search):focus-within {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 3px var(--md-focus-ring);
+}
+.lightning :is(button, a, input, select, textarea, summary, [role="button"]):focus-visible {
+  outline: 3px solid var(--md-focus-ring);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+.lightning .record-detail-field span {
+  font-size: 13px;
+  color: var(--md-text);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+.lightning .record-detail-field small { color: var(--md-text-2); }
+.lightning .records-main-toolbar { border-color: var(--md-separator); }
+.lightning .records-view-select select { appearance: none; background: var(--md-surface); color: var(--md-text); }
+.lightning .records-view-popover > summary,
+.lightning .records-view-popover-panel,
+.lightning .records-view-popover-panel :is(input, select) {
+  background-color: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-separator);
+}
+.lightning .records-layout-switcher { border-color: var(--md-separator); background: var(--md-surface-2); }
+.lightning .records-layout-switcher button.active { background: var(--md-surface); }
+.lightning .records-main-toolbar ~ .records-table-wrap .records-table th { background: var(--md-surface-2); }
+.lightning .records-main-toolbar ~ .records-table-wrap .records-table tbody tr:hover { background: var(--md-fill); }
+.lightning .sidebar-footer { background: var(--md-sidebar); border-color: var(--md-separator); }
+.lightning .app-strip { background: var(--md-surface); border-color: var(--md-separator); }
+.lightning .header-page-context { min-width: 0; }
+.lightning .header-page-tab.active { color: var(--md-primary); }
+.lightning .header-page-tab.active::after { background: var(--md-primary); }
+.lightning .md-sidebar-trigger { display: none; border: 0; background: transparent; color: var(--md-text); width: 36px; height: 36px; place-items: center; }
+.lightning + .md-sidebar-scrim, .lightning .md-sidebar-scrim { display: none; }
+
+@supports (backdrop-filter: blur(1px)) {
+  .lightning :is(.salesforce-header, .setup-sidebar, .app-utility-popover) { backdrop-filter: saturate(180%) blur(20px); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lightning :is(.salesforce-header, .setup-sidebar, .app-utility-popover) { backdrop-filter: none; }
+}
+@media (prefers-contrast: more) { :root { --md-separator: currentColor; } }
+@media (pointer: coarse) {
+  .lightning :is(.btn, .icon-button, .header-page-tab, .tree-item, .records-view-select select, .records-view-popover > summary, .md-sidebar-trigger) { min-height: 44px; }
+  .lightning :is(.icon-button, .md-sidebar-trigger) { min-width: 44px; }
+}
+/* Narrow regular windows and Stage Manager never sacrifice the canvas to panels. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .lightning .md-sidebar-trigger { display: grid; }
+  .lightning .md-sidebar-scrim { display: block; position: fixed; inset: 52px 0 0; z-index: 90; border: 0; border-radius: 0; background: rgb(0 0 0 / 25%); cursor: default; }
+  .lightning .setup-layout { position: relative; }
+  .lightning .setup-layout > .setup-sidebar {
+    position: fixed;
+    z-index: 100;
+    inset-block-start: calc(60px + env(safe-area-inset-top, 0px));
+    inset-inline-start: max(12px, env(safe-area-inset-left, 0px));
+    width: min(280px, calc(100vw - 40px));
+    min-width: 0;
+    max-width: min(280px, calc(100vw - 40px));
+    max-height: calc(100dvh - 76px);
+    overflow-y: auto;
+    border: 1px solid var(--md-separator);
+    border-radius: var(--md-radius-xl);
+    box-shadow: var(--md-shadow-sheet);
+  }
+  .lightning .setup-layout > .setup-sidebar.setup-sidebar-collapsed { display: none; }
+  .lightning .setup-layout > .workspace { min-width: 0; width: 100%; }
+  .lightning :is(.page-builder-layout > .component-panel, .flow-workarea > .flow-toolbox) {
+    max-height: min(35dvh, 320px);
+  }
+}
+@media (min-width: 1024px) {
+  .lightning .setup-sidebar { width: 240px; min-width: 240px; }
+  .lightning .setup-sidebar.setup-sidebar-collapsed { width: 56px; min-width: 56px; }
+}
+@media (min-width: 600px) and (pointer: coarse) {
+  .lightning :is(button, select, input, textarea, [role="button"]) { touch-action: manipulation; }
+}
+@media (max-width: 599px), (max-height: 500px) and (pointer: coarse) {
+  .lightning {
+    --md-fs-body: 17px;
+    --md-fs-sm: 15px;
+    --md-fs-xs: 13px;
+    --md-control-height: 44px;
+  }
+  .lightning .salesforce-header { height: 56px; min-height: 56px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lightning :is(.records-phone-row, .md-responsive-chevron, .md-sidebar-trigger) { transition: none; animation: none; }
+}
+
+
+/* Reuse the authorised app-page navigation metadata in a vertical sidebar.
+ * The existing header actions remain available; only duplicate tabs are hidden.
+ */
+.lightning .md-app-sidebar {
+  flex: 0 0 240px;
+  width: 240px;
+  min-width: 0;
+  background: var(--md-sidebar);
+  border-inline-end: .5px solid var(--md-separator);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 8px;
+  gap: 12px;
+}
+.lightning .md-app-sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 6px;
+}
+.lightning .md-app-sidebar-heading strong {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lightning .md-app-sidebar-heading button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--md-radius-md);
+  color: var(--md-text-2);
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+.lightning .md-app-sidebar nav {
+  display: grid;
+  gap: 3px;
+}
+.lightning .md-app-sidebar nav button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--md-radius-md);
+  background: transparent;
+  color: var(--md-text);
+  font: inherit;
+  font-size: var(--md-fs-body);
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lightning .md-app-sidebar nav button[aria-current="page"] {
+  background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface));
+  color: var(--md-primary);
+  font-weight: 600;
+}
+@media (hover: hover) {
+  .lightning .md-app-sidebar nav button:hover { background: var(--md-fill); }
+}
+@media (pointer: coarse) {
+  .lightning .md-app-sidebar nav button { min-height: 44px; }
+}
+@media (min-width: 600px) {
+  .lightning:has(.md-app-sidebar) .header-page-tabs { display: none; }
+}
+@media (min-width: 1024px) {
+  .lightning .md-app-sidebar-collapsed { flex-basis: 56px; width: 56px; }
+  .lightning .md-app-sidebar-collapsed .md-app-sidebar-heading strong,
+  .lightning .md-app-sidebar-collapsed nav button span { display: none; }
+  .lightning .md-app-sidebar-collapsed nav button {
+    font-size: 0;
+    text-align: center;
+    padding-inline: 3px;
+  }
+  .lightning .md-app-sidebar-collapsed nav button::before {
+    content: attr(data-short-label);
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+  }
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  .lightning .md-app-sidebar {
+    position: fixed;
+    z-index: 100;
+    inset-block-start: calc(60px + env(safe-area-inset-top, 0px));
+    inset-inline-start: max(12px, env(safe-area-inset-left, 0px));
+    max-height: calc(100dvh - 76px);
+    overflow: auto;
+    width: min(280px, calc(100vw - 40px));
+    border: 1px solid var(--md-separator);
+    border-radius: var(--md-radius-xl);
+    box-shadow: var(--md-shadow-sheet);
+  }
+  .lightning .md-app-sidebar-collapsed { display: none; }
+}
+
+/* Back and Forward belong to the single top toolbar; keep the title and
+ * search visible on iPad and preserve separate button focus semantics. */
+.lightning .md-toolbar-history{display:flex;align-items:center;gap:2px;flex:none;border-inline-end:.5px solid var(--md-separator);padding-inline-end:8px}
+.lightning .md-toolbar-history .icon-button{width:30px;height:32px;min-width:30px;color:var(--md-text-2);background:transparent}
+.lightning .md-toolbar-history .icon-button:hover{background:var(--md-fill)}
+@media(pointer:coarse){.lightning .md-toolbar-history .icon-button{min-width:44px;min-height:44px}}
+@media(min-width:600px) and (max-width:1023px){
+ .lightning .md-toolbar-history{gap:0;padding-inline-end:3px}
+}
+
+
+/* Readable action text and filled controls on both appearances. Keep the
+ * tenant brand accent independent from the contrast-safe text/fill variants. */
+:root,.lightning[data-theme="light"]{--md-action-ink:#0058bd;--md-action-fill:#0054aa}
+@media(prefers-color-scheme:dark){
+ :root:not([data-theme="light"]){--md-action-ink:#9acaff;--md-action-fill:#0054aa}
+}
+:root[data-theme="dark"],.lightning[data-theme="dark"]{
+ --md-action-ink:#9acaff;--md-action-fill:#0054aa;
+}

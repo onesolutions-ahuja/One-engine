@@ -1,0 +1,9 @@
+@import "../smart/shared/smart.css";
+.smart-runtime.smart_textbox{min-width:0;min-height:0}
+.smart-textbox-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;border-style:solid;border-width:1px}
+.smart-textbox-caption,.smart-textbox-value-panel{min-width:0;min-height:0;display:flex;align-items:safe center;box-sizing:border-box;padding:0 10px;overflow:hidden;line-height:1.2}
+.smart-textbox-caption{font-size:inherit}
+.smart-textbox-value-panel{padding:0 4px;min-width:0}
+.smart-textbox-value{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-height:0;padding:0 8px;white-space:pre-wrap;line-height:1.2;overflow-wrap:anywhere;overflow:auto;border:1px solid transparent;border-radius:3px;font:inherit}
+.smart-textbox-value[aria-readonly="true"]{cursor:default}
+@media(max-width:480px){.smart-textbox-caption,.smart-textbox-value-panel{padding:0 5px}.smart-textbox-value{padding:0 5px}}

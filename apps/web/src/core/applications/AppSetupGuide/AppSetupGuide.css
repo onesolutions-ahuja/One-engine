@@ -1,0 +1,18 @@
+.app-setup-guide{margin:0 0 var(--md-space-4,16px);border:1px solid var(--md-border,#e0e5eb);border-radius:12px;padding:16px;background:var(--surface-color,transparent)}
+.app-setup-guide-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.app-setup-guide-heading h2{font-size:var(--md-fs-lg,16px);font-weight:600;margin:0 0 4px}
+.app-setup-guide-heading p,.app-setup-guide-content p{margin:0;font-size:13px;line-height:1.5}
+.app-setup-guide-counts{display:flex;gap:7px;flex-wrap:wrap;font-size:12px}
+.app-setup-guide-counts span{border:1px solid var(--md-border,#e0e5eb);padding:5px 8px;border-radius:8px}
+.app-setup-guide-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.app-setup-guide-item{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--md-border,#e0e5eb);border-radius:8px;min-width:0}
+.app-setup-guide-icon{padding-top:2px;flex:0 0 auto;color:var(--text-secondary,#64748b)}
+.app-setup-guide-configured .app-setup-guide-icon{color:var(--md-success,#168657)}
+.app-setup-guide-action .app-setup-guide-icon{color:var(--md-warning,#b45309)}
+.app-setup-guide-content{flex:1;min-width:0}
+.app-setup-guide-item-heading{display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px;font-size:13px;margin-bottom:4px}
+.app-setup-guide-item-heading span{font-size:11px;color:var(--text-secondary,#64748b)}
+.app-setup-guide-content ul{font-size:12px;padding-left:17px;margin:6px 0 0;line-height:1.5}
+.app-setup-guide-item .btn{flex:0 0 auto;display:flex;align-items:center;gap:4px}
+.app-setup-guide-note{font-size:12px;line-height:1.5;margin:12px 0 0;color:var(--text-secondary,#64748b)}
+@media(max-width:640px){.app-setup-guide-item{flex-wrap:wrap}.app-setup-guide-item .btn{margin-left:26px}}

@@ -1,0 +1,160 @@
+/* Outer ribbon height/overflow/scrollbar geometry is owned by PageBuilderRibbonLayout.css. */
+/* Page Builder ribbon polish — loaded LAST (see pageBuilderView.tsx).
+   Presentation only: no metadata, property keys or actions are changed here.
+   Office-style compact property ribbon: label left, small fixed-size control
+   right (colour bar + chevron, 56px number, 96px dropdown). Each column is as
+   wide as its longest label, so nothing is ever truncated and no space is wasted. */
+
+.office-builder-ribbon{
+  --rb-border:#d3dbe7;
+  --rb-border-soft:#e6ebf3;
+  --rb-text:#1f3350;
+  --rb-label:#33475f;
+  --rb-accent:#2563b8;
+  --rb-field-border:#b9c6d8;
+  --rb-row:30px;
+}
+
+/* ── Scroll strip: arrows only, never over content ── */
+.office-builder-ribbon .office-ribbon-group-navigation button{width:24px;height:34px;border-radius:4px;box-shadow:0 1px 3px #0b254a24}
+.office-builder-ribbon .office-ribbon-group-navigation button:focus-visible{outline:2px solid var(--rb-accent);outline-offset:1px}
+
+/* ── Groups ── */
+.office-builder-ribbon .smart-universal-ribbon-section{
+  padding:4px 10px!important;border-right:1px solid var(--rb-border)!important;min-width:0!important;
+}
+.office-builder-ribbon .smart-universal-ribbon-section:last-child{border-right:0!important}
+.office-builder-ribbon .smart-universal-ribbon-caption{
+  border-top:1px solid var(--rb-border-soft)!important;
+  font:600 11px/18px "Segoe UI",Arial,sans-serif!important;color:#4a5f7c!important;
+}
+
+/* Three rows; every column sizes to its widest label. */
+.office-builder-ribbon .smart-universal-ribbon-controls{
+  grid-template-rows:repeat(3,var(--rb-row))!important;
+  grid-auto-columns:max-content!important;
+  gap:3px 16px!important;height:111px!important;
+}
+
+/* One row = label (left) + compact control (right-aligned in the column). */
+.office-builder-ribbon .smart-universal-property{
+  display:flex!important;flex-flow:row nowrap!important;align-items:center!important;gap:8px!important;
+  width:auto!important;min-width:0!important;max-width:none!important;
+  height:var(--rb-row)!important;min-height:var(--rb-row)!important;max-height:var(--rb-row)!important;
+  padding:0!important;
+}
+.office-builder-ribbon .smart-universal-property-label{
+  flex:1 1 auto!important;min-width:0!important;overflow:visible!important;text-overflow:clip!important;
+  white-space:nowrap!important;font:500 11px/14px "Segoe UI",Arial,sans-serif!important;color:var(--rb-label)!important;
+}
+
+/* Controls: fixed compact widths by kind, 24px tall. */
+.office-builder-ribbon .smart-universal-property :is(input:not([type=checkbox]),select,textarea),
+.office-builder-ribbon .smart-universal-property>button:not(.office-ribbon-colour-property){
+  flex:0 0 96px!important;width:96px!important;min-width:96px!important;max-width:96px!important;
+  height:24px!important;min-height:24px!important;max-height:24px!important;
+  padding:1px 6px!important;box-sizing:border-box!important;
+  border:1px solid var(--rb-field-border)!important;border-radius:3px!important;
+  background:#fff!important;color:var(--rb-text)!important;font:12px/20px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon .smart-universal-property select{padding-right:2px!important;text-overflow:ellipsis}
+.office-builder-ribbon .smart-universal-property input[type=number]{flex-basis:56px!important;width:56px!important;min-width:56px!important;max-width:56px!important}
+/* Unit suffix inside the field, e.g. "20 px". */
+.office-builder-ribbon .smart-unit-field{position:relative;flex:0 0 56px;width:56px;height:24px;display:block}
+.office-builder-ribbon .smart-unit-field>input[type=number]{width:56px!important;min-width:56px!important;max-width:56px!important;padding-right:20px!important}
+.office-builder-ribbon .smart-unit-field::after{
+  content:attr(data-unit);position:absolute;right:6px;top:0;line-height:24px;font:10px/24px "Segoe UI",Arial,sans-serif;color:#7a8aa3;pointer-events:none;
+}
+.office-builder-ribbon .smart-unit-field>input[type=number]::-webkit-inner-spin-button{display:none}
+.office-builder-ribbon .smart-universal-property>button:not(.office-ribbon-colour-property){
+  cursor:pointer;background:#f3f7fd!important;color:var(--rb-accent)!important;font-weight:600!important;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.office-builder-ribbon .smart-universal-property :is(input,select,textarea,button):focus-visible{
+  outline:2px solid var(--rb-accent)!important;outline-offset:0!important;
+}
+
+/* Boolean: checkbox sits where controls sit, right-aligned. */
+.office-builder-ribbon .smart-universal-property>input[type=checkbox]{
+  order:2;margin:0 0 0 auto!important;width:16px!important;height:16px!important;flex:0 0 16px!important;accent-color:var(--rb-accent);
+}
+
+/* Colour: Office "Font colour" button — glyph, colour bar underneath, chevron. */
+.office-builder-ribbon .smart-universal-property .office-ribbon-colour-property{
+  order:2;flex:0 0 auto!important;display:inline-flex!important;align-items:center;gap:2px;
+  width:auto!important;min-width:0!important;max-width:none!important;height:24px!important;min-height:24px!important;
+  padding:0 4px!important;border:1px solid transparent!important;border-radius:3px!important;background:transparent!important;
+  color:#33475f!important;cursor:pointer;margin-left:auto!important;
+}
+.office-builder-ribbon .smart-universal-property .office-ribbon-colour-property:hover:not(:disabled){
+  background:#e4edf9!important;border-color:#a9c2e6!important;
+}
+.office-builder-ribbon .smart-universal-property .office-ribbon-colour-property[aria-expanded=true]{
+  background:#d3e3f8!important;border-color:#7fa8de!important;
+}
+.office-builder-ribbon .office-ribbon-colour-property .office-ribbon-command-glyph{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+}
+.office-builder-ribbon .office-ribbon-colour-property .office-ribbon-colour-underline{
+  position:absolute;left:2px;right:2px;bottom:0;height:4px;border-radius:1px;box-shadow:0 0 0 1px #0b254a26;
+}
+/* Not set: hatched bar so it never looks like white or black. */
+.office-builder-ribbon .office-ribbon-colour-property .office-ribbon-colour-underline.is-unset{
+  background:repeating-linear-gradient(135deg,#fff 0 2px,#9aa8bd 2px 4px)!important;
+}
+.office-builder-ribbon .office-ribbon-colour-underline.is-unset:not(.x){background:#111827}
+.office-builder-ribbon .office-ribbon-colour-property:focus-visible{outline:2px solid var(--rb-accent);outline-offset:0}
+
+/* Unsupported for the selected component: greyed, never interactive. */
+.office-builder-ribbon .smart-universal-property.is-disabled{opacity:.42!important;filter:grayscale(1)!important}
+.office-builder-ribbon .smart-universal-property.is-disabled :is(input,select,textarea,button){
+  background:#f1f4f9!important;cursor:not-allowed!important;pointer-events:none!important;
+}
+
+/* Data tab: visible left-to-right scrollbar and fixed ribbon height. */
+
+/* All UNE applications own their properties. Never render duplicate SQL/ribbon
+   property editors over an existing application component. Shared tenant-built
+   components continue to use their own editor without this suppression. */
+.office-builder-ribbon #page-builder-tab-content[data-app-owned-une="true"][aria-label^="Component "]>:not(.une-app-owned-note){display:none!important}
+.office-builder-ribbon #page-builder-tab-content[data-app-owned-une="true"][aria-label^="Component "]{height:82px!important;min-height:82px!important;max-height:82px!important;overflow:hidden!important}
+.office-builder-ribbon .une-app-owned-note{display:flex;align-items:center;max-width:100%;padding:12px 18px;color:#44546b;font:12px/18px "Segoe UI",Arial,sans-serif}
+
+/* Interactive preview collapses the ribbon content, preserving its topbar. */
+.office-builder-ribbon.is-interactive-preview{
+  height:34px!important;min-height:34px!important;max-height:34px!important;overflow:visible!important;
+}
+.office-builder-ribbon.is-interactive-preview #page-builder-tab-content,
+.office-builder-ribbon.is-interactive-preview .office-ribbon-group-navigation{
+  display:none!important;height:0!important;min-height:0!important;max-height:0!important;padding:0!important;border:0!important;
+}
+/* Selected canvas drag cursors must not appear in live preview. */
+.builder-page.builder-interactive-preview .record-component.free-canvas-component,
+.builder-page.builder-interactive-preview .record-component.free-canvas-component.selected,
+.builder-page.builder-interactive-preview .record-component-head,
+.builder-page.builder-interactive-preview .record-component-head[data-canvas-move-handle]{
+  cursor:default!important;touch-action:auto!important;
+}
+.office-builder-ribbon .office-ribbon-quick-preview,
+.office-builder-ribbon .office-ribbon-quick-exitPreview{flex:0 0 30px;width:30px}
+.office-builder-ribbon .preview-visibility-group{min-width:max-content!important;max-width:none!important}
+.office-builder-ribbon .preview-visibility-controls{display:flex;align-items:flex-start;gap:8px;min-width:max-content}
+.office-builder-ribbon .preview-visibility-controls>.ribbon-small-checkbox{
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+  padding:5px 6px;font:11px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .preview-visibility-controls>.office-ribbon-compact-strip{
+  display:flex;flex-wrap:nowrap;min-width:max-content;gap:5px;
+}
+.office-builder-ribbon .preview-visibility-unselected{
+  display:block;padding:9px 7px;color:#53647d;font:12px "Segoe UI",Arial,sans-serif;
+}
+.page-builder-advanced-ribbon .page-builder-canvas-ribbon-group{min-width:max-content}
+.page-builder-advanced-ribbon .page-builder-canvas-ribbon-buttons{grid-auto-columns:170px}
+.page-builder-advanced-ribbon .page-builder-canvas-ribbon-buttons button{
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+
+
+/* Explicit LTR scroll for the universal inventory; do not suppress property
+   controls when their SQL groups exceed the available ribbon width. */

@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_navigation",
+  "label": "Smart Navigation Bar",
+  "category": "Navigation",
+  "description": "Reusable Smart Navigation Bar for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_navigation/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_navigation/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 520,
+    "defaultHeight": 54,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

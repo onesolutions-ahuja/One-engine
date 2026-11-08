@@ -1,0 +1,33 @@
+
+/* MD-03.5 shared platform/tenant domain console */
+.tenant-domains { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border, #d8dce5); }
+.tenant-domain-header, .tenant-domain-item-header, .tenant-domain-actions { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.tenant-domain-header h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.tenant-domain-header p { margin: 6px 0 12px; max-width: 52rem; }
+.tenant-domain-item { margin: 12px 0; padding: var(--md-space-3,12px); border: 1px solid var(--border, #d8dce5); border-radius: 8px; overflow-wrap: anywhere; }
+.tenant-domain-proof { display: grid; grid-template-columns: minmax(80px, 105px) minmax(0, 1fr); gap: 8px; margin: 12px 0; }
+.tenant-domain-proof code { word-break: break-all; white-space: normal; }
+.tenant-domain-actions { justify-content: flex-end; }
+.tenant-domain-add { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.tenant-domain-add label { min-width: 180px; flex: 1; }
+.tenant-domain-add input { width: 100%; }
+.tenant-domain-error { color: #b42318; display:flex; align-items:center; gap:8px; }
+.tenant-domain-notice { color: #087443; }
+
+/* Settings list consistency and responsive inline registration. */
+.tenant-domains { margin: 18px 0 22px; padding: var(--md-space-4,16px) var(--md-space-6,24px); border: 1px solid var(--md-border,#e0e5eb); border-radius: 9px; background: #fff; }
+.tenant-domain-header { margin-bottom: 14px; align-items: flex-start; }
+.tenant-domain-header h3 { color: var(--md-text,#192230); font-size: 16px; line-height: 1.4; }
+.tenant-domain-header p { color: var(--md-muted,#64748b); line-height: 1.55; margin: 5px 0 0; }
+.tenant-domain-item { background: #fff; border-color: var(--md-border,#e0e5eb); }
+.tenant-domain-add { margin-top: 12px; }
+.tenant-domain-add-edit { display: grid; grid-template-columns: minmax(0, 1fr); padding: 14px; background: #f8fbff; border: 1px solid #c9e4fa; border-radius: 8px; }
+.tenant-domain-add-edit label { min-width: 0; display: grid; gap: 6px; margin: 0; }
+.tenant-domain-add-edit input { min-height: var(--md-control-height,40px); box-sizing: border-box; }
+.tenant-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--md-control-touch,44px); border: 1px solid #d1d9e0; border-radius: 7px; padding: 6px 11px; background: #fff; color: var(--md-text,#192230); cursor: pointer; font: inherit; font-size: var(--md-fs-md,13px); }
+.tenant-button:hover:not(:disabled) { background: #f2f7fc; }
+.tenant-button-primary { background: var(--md-primary,#1d4ed8); color: #fff; border-color: var(--md-primary,#1d4ed8); }
+.tenant-button-primary:hover:not(:disabled) { background: var(--md-primary-hover,#1e40af); }
+.tenant-button-danger { color: #b42318; }
+.tenant-help { color: var(--md-muted,#64748b); font-size: var(--md-fs-md,13px); }
+@media(max-width: 640px) { .tenant-domains { padding: 14px; } .tenant-domain-proof { grid-template-columns: minmax(0, 1fr); } }

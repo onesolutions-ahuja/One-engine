@@ -1,0 +1,23 @@
+{
+  "apiName": "smart_textbox",
+  "label": "Smart Textbox",
+  "category": "Display",
+  "description": "Two-part read-only record field: left label (caption) and right metadata-bound value.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_textbox/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_textbox/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 440,
+    "defaultHeight": 46,
+    "minWidth": 140,
+    "minHeight": 34
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": []
+}

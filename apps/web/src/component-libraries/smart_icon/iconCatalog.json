@@ -1,0 +1,357 @@
+[
+  {
+    "id": "house",
+    "label": "Home",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "layout-dashboard",
+    "label": "Dashboard",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "menu",
+    "label": "Menu",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "search",
+    "label": "Search",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "list-filter",
+    "label": "Filter",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "arrow-left",
+    "label": "Back",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "arrow-right",
+    "label": "Forward",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "external-link",
+    "label": "External Link",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "ellipsis",
+    "label": "More",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "refresh-cw",
+    "label": "Refresh",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "globe",
+    "label": "Language",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "circle-help",
+    "label": "Help",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "info",
+    "label": "Info",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "chevron-right",
+    "label": "Chevron right",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "chevron-down",
+    "label": "Chevron down",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "chevron-up",
+    "label": "Chevron up",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "x",
+    "label": "Close",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "minus",
+    "label": "Minus",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "sliders-horizontal",
+    "label": "Customise",
+    "category": "Navigation & interface"
+  },
+  {
+    "id": "lock",
+    "label": "Lock",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "lock-open",
+    "label": "Unlock",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "settings",
+    "label": "Settings",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "shield-check",
+    "label": "Shield",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "key-round",
+    "label": "Key",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "user-round",
+    "label": "User",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "users-round",
+    "label": "Users",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "user-round-plus",
+    "label": "Add User",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "log-in",
+    "label": "Login",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "log-out",
+    "label": "Logout",
+    "category": "Security & accounts"
+  },
+  {
+    "id": "shopping-cart",
+    "label": "Cart",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "shopping-bag",
+    "label": "Bag",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "credit-card",
+    "label": "Card",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "wallet",
+    "label": "Wallet",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "receipt",
+    "label": "Receipt",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "package",
+    "label": "Package",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "truck",
+    "label": "Delivery",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "tag",
+    "label": "Tag",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "circle-dollar-sign",
+    "label": "Payment",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "chart-column",
+    "label": "Analytics",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "utensils",
+    "label": "Eat in",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "car",
+    "label": "Car",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "hamburger",
+    "label": "Burger",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "gift",
+    "label": "Gift",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "star",
+    "label": "Star",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "crown",
+    "label": "Crown",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "flame",
+    "label": "Flame",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "printer",
+    "label": "Printer",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "qr-code",
+    "label": "QR code",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "contactless",
+    "label": "Contactless",
+    "category": "Commerce & analytics"
+  },
+  {
+    "id": "message-circle",
+    "label": "Chat",
+    "category": "Communication"
+  },
+  {
+    "id": "messages-square",
+    "label": "Messages",
+    "category": "Communication"
+  },
+  {
+    "id": "mail",
+    "label": "Email",
+    "category": "Communication"
+  },
+  {
+    "id": "bell",
+    "label": "Alert",
+    "category": "Communication"
+  },
+  {
+    "id": "phone",
+    "label": "Phone",
+    "category": "Communication"
+  },
+  {
+    "id": "send",
+    "label": "Send",
+    "category": "Communication"
+  },
+  {
+    "id": "headset",
+    "label": "Support",
+    "category": "Communication"
+  },
+  {
+    "id": "video",
+    "label": "Video",
+    "category": "Communication"
+  },
+  {
+    "id": "message-square",
+    "label": "Comment",
+    "category": "Communication"
+  },
+  {
+    "id": "share-2",
+    "label": "Share",
+    "category": "Communication"
+  },
+  {
+    "id": "smartphone",
+    "label": "Smartphone",
+    "category": "Communication"
+  },
+  {
+    "id": "calendar-days",
+    "label": "Calendar",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "clock-3",
+    "label": "Clock",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "check",
+    "label": "Check",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "plus",
+    "label": "Add",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "pencil",
+    "label": "Edit",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "trash",
+    "label": "Delete",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "download",
+    "label": "Download",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "upload",
+    "label": "Upload",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "file-text",
+    "label": "Document",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "folder",
+    "label": "Folder",
+    "category": "Productivity & files"
+  },
+  {
+    "id": "timer",
+    "label": "Timer",
+    "category": "Productivity & files"
+  }
+]

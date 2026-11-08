@@ -1,0 +1,40 @@
+{
+  "apiName": "smart_card_grid",
+  "label": "Smart Card Grid",
+  "category": "Data",
+  "description": "Reusable Smart Card Grid for metadata-driven pages.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_card_grid/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_card_grid/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 600,
+    "defaultHeight": 350,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    },
+    {
+      "apiName": "click",
+      "label": "When a card is selected"
+    },
+    {
+      "apiName": "customButton1",
+      "label": "Custom Button 1"
+    },
+    {
+      "apiName": "customButton2",
+      "label": "Custom Button 2"
+    }
+  ]
+}

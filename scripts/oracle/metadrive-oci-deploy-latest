@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# Fixed OCI production build path. Installed root-owned; no caller-supplied
+# commands, repository URLs or filesystem paths.
+set -Eeuo pipefail
+export PATH=/usr/local/bin:/usr/bin:/sbin:/bin
+umask 077
+
+[[ $EUID == 0 && $# == 1 && $1 =~ ^[0-9a-f]{40}$ ]] || exit 64
+sha=$1
+repository=https://github.com/unedev00/uneengine.git
+status_dir=/var/lib/metadrive/oci-deployment
+status_file=$status_dir/status
+trail_file=$status_dir/trail
+build_log_file=$status_dir/build-output
+stage=initialising
+workspace=''
+result=failed
+last_error=''
+install -d -o root -g root -m 0700 "$status_dir"
+
+append_trail() {
+  local step=$1
+  local message=${2:-}
+  local stamp
+  stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  {
+    printf '%s %s' "$stamp" "$step"
+    if [[ -n "$message" ]]; then
+      printf ' — %s' "$message"
+    fi
+    printf '\n'
+  } >> "$trail_file"
+  # Keep the trail bounded so status stays small and readable in the UI.
+  if [[ $(wc -l < "$trail_file") -gt 80 ]]; then
+    tail -n 60 "$trail_file" > "$trail_file.tmp"
+    mv -f "$trail_file.tmp" "$trail_file"
+  fi
+  chmod 0600 "$trail_file" 2>/dev/null || true
+}
+
+# Flush a UTC timestamp for every complete npm output line, as it arrives.
+# The source command's exit status is preserved by bash pipefail.
+timestamp_build_output() {
+  TZ=UTC awk '{ print strftime("%Y-%m-%dT%H:%M:%SZ"), $0; fflush(); }'
+}
+
+write_status() {
+  local state=$1 step=$2 tmp
+  tmp=$(mktemp "$status_dir/.status.XXXXXXXX")
+  {
+    printf 'state=%s\n' "$state"
+    printf 'sha=%s\n' "$sha"
+    printf 'stage=%s\n' "$step"
+    printf 'updated_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    if [[ -n "$last_error" ]]; then
+      # Single-line, no newlines — keeps the status file parseable.
+      printf 'error=%s\n' "$(printf '%s' "$last_error" | tr '\n\r' '  ' | head -c 500)"
+    fi
+  } > "$tmp"
+  chmod 0600 "$tmp"
+  mv -f -- "$tmp" "$status_file"
+}
+cleanup() {
+  local code=$?
+  trap - EXIT
+  if [[ "$result" != succeeded ]]; then
+    if [[ -z "$last_error" ]]; then
+      last_error="Deployment failed at stage: $stage (exit $code)"
+    fi
+    append_trail "$stage" "FAILED: $last_error"
+    write_status failed "$stage" || true
+  fi
+  if [[ -n "$workspace" && -d "$workspace" ]]; then
+    rm -rf --one-file-system -- "$workspace"
+  fi
+  exit "$code"
+}
+trap cleanup EXIT
+
+# Reset both outputs for this run; root owns the files, never the npm builder.
+: > "$trail_file"
+: > "$build_log_file"
+chmod 0600 "$trail_file" "$build_log_file"
+append_trail initialising "Queued deploy of $sha"
+
+# No database credentials or production environment are passed into npm or git.
+# Use a dedicated identity, never the API account and never root.
+id metadrive-build >/dev/null
+workspace=$(mktemp -d /var/tmp/metadrive-oci-build.XXXXXXXX)
+chown metadrive-build:metadrive-build "$workspace"
+builder() {
+  /usr/sbin/runuser -u metadrive-build -- /usr/bin/env -i \
+    HOME="$workspace" npm_config_cache="$workspace/.npm" \
+    PATH=/usr/local/bin:/usr/bin:/bin GITHUB_SHA="$sha" PYTHONDONTWRITEBYTECODE=1 \
+    "$@"
+}
+stage=fetching
+write_status running "$stage"
+append_trail fetching "Fetching main @ $sha"
+builder git -C "$workspace" init --quiet
+builder git -C "$workspace" remote add origin "$repository"
+# Fetch the fixed production branch, not a caller-chosen ref or URL.
+if ! builder git -C "$workspace" -c protocol.file.allow=never fetch --no-tags --depth=1 origin refs/heads/main 2>"$workspace/.git-err"; then
+  last_error="git fetch failed: $(head -c 300 "$workspace/.git-err" | tr '\n' ' ')"
+  exit 1
+fi
+fetched=$(builder git -C "$workspace" rev-parse FETCH_HEAD)
+[[ "$fetched" == "$sha" ]] || {
+  stage=outdated-request
+  last_error="Main changed after deployment was requested (wanted $sha, got $fetched)"
+  echo "$last_error" >&2
+  exit 1
+}
+builder git -C "$workspace" checkout --quiet --force --detach "$sha"
+# Freeze all release/DB migration scripts before untrusted npm lifecycle hooks.
+# Cart migrations now run from the bundled release and must also be tamper checked.
+# Canonicalize archive metadata. Test runners create/remove temporary files in
+# scripts/*; those operations update directory mtimes without changing any
+# deployable script. Still detect added/deleted/modified paths, file contents,
+# types, symlinks, and permissions.
+deployment_script_digest() {
+  tar -C "$workspace" --sort=name --mtime='@0' --owner=0 --group=0 \
+    --numeric-owner --format=gnu -cf - scripts/oracle scripts/cart scripts/codextill \
+    | sha256sum | awk '{print $1}'
+}
+script_digest=$(deployment_script_digest)
+
+stage=validating
+write_status running "$stage"
+append_trail validating "npm ci + check"
+printf '%s $ npm ci\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$build_log_file"
+if ! builder npm --prefix "$workspace" ci 2>&1 | timestamp_build_output | tee -a "$build_log_file"; then
+  last_error="npm ci failed: $(tail -c 400 "$build_log_file" | tr '\n' ' ')"
+  exit 1
+fi
+printf '%s $ npm run check\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$build_log_file"
+if ! builder npm --prefix "$workspace" run check 2>&1 | timestamp_build_output | tee -a "$build_log_file"; then
+  last_error="npm run check failed: $(tail -c 400 "$build_log_file" | tr '\n' ' ')"
+  exit 1
+fi
+
+stage=building
+write_status running "$stage"
+append_trail building "npm run build"
+printf '%s $ npm run build\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$build_log_file"
+if ! builder npm --prefix "$workspace" run build 2>&1 | timestamp_build_output | tee -a "$build_log_file"; then
+  last_error="npm run build failed: $(tail -c 400 "$build_log_file" | tr '\n' ' ')"
+  exit 1
+fi
+# Persist only a bounded history after build; the UI sees a bounded tail throughout.
+tail -n 600 "$build_log_file" > "$build_log_file.tmp"
+mv -f "$build_log_file.tmp" "$build_log_file"
+chmod 0600 "$build_log_file"
+
+# Do not publish if a newer main revision arrived during the build.
+stage=checking-main
+write_status running "$stage"
+append_trail checking-main "Confirm main still at $sha"
+remote_sha=$(builder git -C "$workspace" ls-remote origin refs/heads/main | awk '{print $1}')
+[[ "$remote_sha" == "$sha" ]] || {
+  stage=outdated-request
+  last_error="Main changed during build; refusing to publish stale release (now $remote_sha)"
+  echo "$last_error" >&2
+  exit 1
+}
+# Refuse any build which modified the deployment scripts. Lock ownership of
+# these paths and their parent directories before invoking them as root.
+updated_digest=$(deployment_script_digest)
+[[ "$updated_digest" == "$script_digest" ]] || {
+  stage=modified-deployment-scripts
+  last_error="Deployment scripts changed during build; refusing to continue"
+  exit 1
+}
+chown root:root "$workspace" "$workspace/scripts"
+chown -R root:root "$workspace/scripts/oracle" "$workspace/scripts/cart" "$workspace/scripts/codextill"
+chmod 0755 "$workspace" "$workspace/scripts" "$workspace/scripts/oracle" "$workspace/scripts/cart" "$workspace/scripts/codextill"
+find "$workspace/scripts/oracle" "$workspace/scripts/cart" "$workspace/scripts/codextill" -type f -exec chmod a-w {} +
+stage=deploying
+write_status running "$stage"
+append_trail deploying "Full-stack backup + API + frontend"
+# Reuse the protected existing combined SQL-backup/API/worker/frontend deployment.
+# The common full-stack lock serialises this path with the normal Actions runner.
+if ! METADRIVE_OCI_DEPLOY_MONITOR=1 bash "$workspace/scripts/oracle/deploy-full-stack.sh" "$workspace" "$sha" 2>"$workspace/.deploy-err"; then
+  last_error="Full-stack deploy failed: $(tail -c 400 "$workspace/.deploy-err" | tr '\n' ' ')"
+  exit 1
+fi
+
+stage=verifying
+write_status running "$stage"
+append_trail verifying "Health checks"
+[[ "$(systemctl show metadrive-api.service -p WorkingDirectory --value)" == "/opt/metadrive/releases/gh-$sha" ]] || {
+  last_error="API WorkingDirectory does not match release gh-$sha"
+  exit 1
+}
+[[ "$(systemctl show metadrive-worker.service -p WorkingDirectory --value)" == "/opt/metadrive/releases/gh-$sha" ]] || {
+  last_error="Worker WorkingDirectory does not match release gh-$sha"
+  exit 1
+}
+grep -Fq "\"commit\":\"$sha\"" /var/www/metadrive-frontend/current/frontend-release.json || {
+  last_error="Frontend release.json does not report commit $sha"
+  exit 1
+}
+systemctl is-active --quiet metadrive-api.service || {
+  last_error="metadrive-api.service is not active after deploy"
+  exit 1
+}
+systemctl is-active --quiet metadrive-worker.service || {
+  last_error="metadrive-worker.service is not active after deploy"
+  exit 1
+}
+systemctl is-active --quiet nginx.service || {
+  last_error="nginx.service is not active after deploy"
+  exit 1
+}
+
+result=succeeded
+last_error=''
+append_trail completed "OCI production release deployed: $sha"
+write_status succeeded completed
+echo "OCI production release deployed: $sha"

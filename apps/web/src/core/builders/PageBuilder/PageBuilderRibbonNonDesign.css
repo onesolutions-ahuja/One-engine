@@ -1,0 +1,4 @@
+/* Preserved active disabled-control styling; retired gallery/image rules removed. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Data"] :is(input,select,button):disabled{
+  opacity:.38!important;filter:grayscale(1)!important;cursor:not-allowed!important;
+}

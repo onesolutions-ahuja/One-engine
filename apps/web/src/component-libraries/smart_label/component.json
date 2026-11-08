@@ -1,0 +1,23 @@
+{
+  "apiName": "smart_label",
+  "label": "Smart Label",
+  "category": "Display",
+  "description": "Read-only Smart text. Same data binding and styling as the Smart Input Box, but it never accepts input.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_label/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_label/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 260,
+    "defaultHeight": 40,
+    "minWidth": 24,
+    "minHeight": 16
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": []
+}

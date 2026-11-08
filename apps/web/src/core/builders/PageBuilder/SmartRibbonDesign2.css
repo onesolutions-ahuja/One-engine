@@ -1,0 +1,596 @@
+/* Design 2 only. Every icon, picker, spinner and toggle is still rendered
+ * by SmartRibbon's existing control engine. This file owns placement, not art.
+ * The original Design tab and its CSS remain untouched. */
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]{
+  width:max-content!important;
+  min-width:100%!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-design2-ribbon>.smart-ribbon-group.smart-design2-group{
+  --smart-section-width:490px;
+  box-sizing:border-box!important;
+  flex:0 0 490px!important;
+  width:490px!important;
+  min-width:490px!important;
+  max-width:490px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group>.smart-ribbon-items{
+  width:100%!important;
+  max-width:100%!important;
+  gap:4px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-ribbon-row{
+  gap:4px!important;
+  width:max-content!important;
+  max-width:100%!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-ribbon-row.smart-design2-top-row{
+  gap:4px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-area-picker{
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex:0 0 272px!important;
+  width:272px!important;
+  height:26px!important;
+  align-items:center!important;
+  border:1px solid #b7c9df!important;
+  border-radius:3px!important;
+  background:#fff!important;
+  overflow:hidden!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-area-picker>span{
+  box-sizing:border-box!important;
+  flex:0 0 86px!important;
+  width:86px!important;
+  padding:0 8px!important;
+  color:#91a5bd!important;
+  font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-area-select{
+  box-sizing:border-box!important;
+  flex:1 1 auto!important;
+  width:0!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:24px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:#263b56!important;
+  padding:0 6px!important;
+  font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-visibility{
+  box-sizing:border-box!important;
+  flex:0 0 28px!important;
+  height:26px!important;
+  min-height:26px!important;
+  max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-visibility:disabled{
+  opacity:.5!important;
+  cursor:not-allowed!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property:is(
+    [data-property="shadow"],[data-property="tableShadow"],
+    [data-property="summaryShadow"],[data-property="labelAlignment"],
+    [data-property="headerAlignment"],[data-property="supportingAlignment"],
+    [data-property="rowAlignment"],[data-property="summaryAlignment"],
+    [data-property="summary2Alignment"]) .smart-icon-dropdown-trigger{
+  box-sizing:border-box!important;
+  width:var(--smart-control-width)!important;
+  min-width:var(--smart-control-width)!important;
+  max-width:var(--smart-control-width)!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property.disabled{
+  opacity:.46!important;
+}
+
+/* Design 2 is a fixed SQL row/column matrix. Disabled slots retain their
+ * reserved cell instead of flex-compacting the enabled controls to the left. */
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-ribbon-row:not(.smart-design2-top-row){
+  display:grid!important;
+  grid-auto-flow:row!important;
+  grid-auto-rows:26px!important;
+  align-items:center!important;
+  justify-content:start!important;
+  column-gap:4px!important;
+  row-gap:0!important;
+  width:max-content!important;
+  max-width:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-ribbon-row:not(.smart-design2-top-row)>.smart-property{
+  grid-column-start:var(--smart-slot-column,auto)!important;
+  grid-column-end:span 1!important;
+  width:var(--smart-control-width)!important;
+  min-width:var(--smart-control-width)!important;
+  max-width:var(--smart-control-width)!important;
+  height:var(--smart-control-height,26px)!important;
+  min-height:var(--smart-control-height,26px)!important;
+  max-height:var(--smart-control-height,26px)!important;
+}
+/* The colour selector's inherited 44px/28px rules cannot enlarge a
+ * SQL-planned 40px/26px Design 2 cell. */
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property .office-ribbon-colour-property{
+  box-sizing:border-box!important;
+  flex:0 0 var(--smart-control-width)!important;
+  width:var(--smart-control-width)!important;
+  min-width:var(--smart-control-width)!important;
+  max-width:var(--smart-control-width)!important;
+  height:var(--smart-control-height,26px)!important;
+  min-height:var(--smart-control-height,26px)!important;
+  max-height:var(--smart-control-height,26px)!important;
+}
+
+/* Area selector is OUTSIDE the numbered property grid.
+ * The user-approved R1C1..R3C6 cells belong to properties, not the selector. */
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-design2-ribbon>.smart-ribbon-group.smart-design2-group{
+  --smart-section-width:400px!important;
+  flex:0 0 400px!important;
+  width:400px!important;
+  min-width:400px!important;
+  max-width:400px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-workbench{
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex-flow:column nowrap!important;
+  gap:2px!important;
+  align-items:flex-start!important;
+  width:380px!important;
+  height:110px!important;
+  min-height:110px!important;
+  max-height:110px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context{
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex:0 0 26px!important;
+  flex-flow:row nowrap!important;
+  align-items:center!important;
+  gap:4px!important;
+  width:304px!important;
+  height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-workbench>.smart-ribbon-items{
+  box-sizing:border-box!important;
+  display:flex!important;
+  flex-flow:column nowrap!important;
+  align-items:flex-start!important;
+  justify-content:flex-start!important;
+  gap:2px!important;
+  flex:0 0 auto!important;
+  width:max-content!important;
+  min-width:0!important;
+  max-width:none!important;
+  height:82px!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+/* Original R1C3 shape is a 40px icon, not a 94px text/gallery button. */
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property[data-design-slot="shape"] .smart-icon-gallery{
+  box-sizing:border-box!important;flex:0 0 40px!important;
+  width:40px!important;min-width:40px!important;max-width:40px!important;
+  height:26px!important;padding:0!important;margin:0!important;border:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property[data-design-slot="shape"] .smart-shapes-trigger{
+  box-sizing:border-box!important;display:flex!important;
+  width:40px!important;min-width:40px!important;max-width:40px!important;
+  height:26px!important;padding:1px 2px!important;gap:1px!important;
+  justify-content:center!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property[data-design-slot="shape"] .smart-shapes-trigger>span{
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property[data-design-slot="shape"] .smart-shapes-trigger>svg:first-child{
+  width:17px!important;min-width:17px!important;height:17px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property[data-design-slot="shape"] .smart-shapes-trigger>svg:last-child{
+  width:10px!important;min-width:10px!important;height:12px!important;
+}
+
+/* Design area selector and eye stay in row 0, above fixed R1-R3 controls.
+ * No duplicate area-name footer: four active rows fit the shared 114px height. */
+.office-builder-ribbon[aria-label="Page Builder ribbon"]:not(.is-interactive-preview)
+  #page-builder-tab-content.office-ribbon-content[aria-label="Component Design 2"]{
+  --page-ribbon-content-height:114px;
+  --page-ribbon-scroll-strip-height:127px;
+}
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]{
+  height:114px!important;min-height:114px!important;max-height:114px!important;
+}
+.office-builder-ribbon:not(.is-interactive-preview) #page-builder-tab-content.office-ribbon-content
+  >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]>.smart-ribbon-group.smart-design2-group[data-design-three-row="true"]{
+  height:114px!important;min-height:114px!important;max-height:114px!important;
+  padding-top:2px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]{
+  flex:0 0 26px!important;height:26px!important;
+  min-height:26px!important;max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-ribbon-row:not([data-design-row="0"]){
+  grid-template-rows:26px!important;
+  width:380px!important;
+  min-width:380px!important;
+  max-width:380px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-property .smart-icon-dropdown-trigger{
+  box-sizing:border-box!important;
+  flex:0 0 var(--smart-control-width)!important;
+  width:var(--smart-control-width)!important;
+  min-width:var(--smart-control-width)!important;
+  max-width:var(--smart-control-width)!important;
+  height:26px!important;
+}
+
+/* Row 0's prescribed four fixed cells: area selector (C1), eye (C2),
+ * X Position (C3 80x26), Y Position (C4 80x26). Nothing is auto-packed.
+ * R1-R3 retain their independent 380px property grid and SQL geometry. */
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-design2-ribbon>.smart-ribbon-group.smart-design2-group{
+  --smart-section-width:500px!important;
+  flex:0 0 500px!important;
+  width:500px!important;
+  min-width:500px!important;
+  max-width:500px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-workbench{
+  width:480px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]{
+  width:472px!important;
+  min-width:472px!important;
+  max-width:472px!important;
+  justify-content:flex-start!important;
+  gap:4px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]>.smart-property{
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  flex:0 0 80px!important;
+  width:80px!important;
+  min-width:80px!important;
+  max-width:80px!important;
+  height:26px!important;
+  min-height:26px!important;
+  max-height:26px!important;
+  margin:0!important;
+  padding:0!important;
+  align-items:center!important;
+  overflow:hidden!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]>.smart-property>.smart-label{
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]>.smart-property .smart-numeric{
+  box-sizing:border-box!important;
+  flex:0 0 80px!important;
+  width:80px!important;
+  min-width:80px!important;
+  max-width:80px!important;
+  height:26px!important;
+  min-height:26px!important;
+  max-height:26px!important;
+  margin:0!important;
+  padding:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]>.smart-property .smart-numeric input.smart-office-number{
+  box-sizing:border-box!important;
+  flex:1 1 auto!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  height:24px!important;
+  min-height:24px!important;
+  max-height:24px!important;
+}
+
+/* Design 2 contextual icon menus; no changes to the approved grid geometry. */
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .design2-icon-trigger{
+ box-sizing:border-box;display:flex;align-items:center;justify-content:center;
+ gap:1px;padding:1px;min-width:0;width:100%;height:26px;
+ border:1px solid #afc5df;border-radius:4px;background:#fff;
+ color:#163e63;cursor:pointer;
+}
+.office-builder-ribbon #page-builder-tab-content
+ .smart-design2-group .design2-icon-trigger:disabled{opacity:.45;cursor:not-allowed}
+.design2-icon-popup{
+ position:fixed;z-index:10000;display:flex;flex-direction:column;
+ min-width:130px;gap:2px;padding:3px;border:1px solid #b7c9df;
+ border-radius:4px;background:#fff;box-shadow:0 6px 18px #1e375433;
+}
+.design2-icon-popup>button{
+ box-sizing:border-box;display:flex;align-items:center;gap:10px;text-align:left;
+ width:100%;min-height:30px;padding:4px 8px;border:0;border-radius:3px;
+ background:#fff;color:#213c5c;cursor:pointer;font:12px "Segoe UI",Arial,sans-serif;
+}
+.design2-icon-popup>button:is(:hover,.is-selected){background:#daebfe;}
+.design2-icon-popup>button:focus-visible{outline:2px solid #1e79cb}
+
+/* FIX: The older three-row ribbon has a MORE SPECIFIC display:flex!important
+ * selector and grid-area:auto!important on child properties. Those two rules
+ * silently collapsed SQL R2C5/R3C6 image slots into C1. Override them ONLY
+ * inside Design 2 with a higher-specificity fixed six-column CSS grid.
+ * Columns and per-cell width still come from the approved SQL slot metadata.
+ */
+.office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]
+ >.smart-ribbon-group.smart-design2-group
+ .smart-design2-workbench>.smart-ribbon-items
+ >.smart-ribbon-row[data-design-row]{
+ display:grid!important;
+ grid-auto-flow:row!important;
+ grid-template-rows:26px!important;
+ grid-auto-rows:26px!important;
+ column-gap:4px!important;
+ row-gap:0!important;
+ justify-content:start!important;
+ align-items:center!important;
+ flex:0 0 26px!important;
+ box-sizing:border-box!important;
+ width:380px!important;
+ min-width:380px!important;
+ max-width:380px!important;
+ height:26px!important;
+ min-height:26px!important;
+ max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]
+ >.smart-ribbon-group.smart-design2-group
+ .smart-design2-workbench>.smart-ribbon-items
+ >.smart-ribbon-row[data-design-row]>.smart-property{
+ /* Explicitly override the legacy grid-area:auto!important declaration.
+    Each row has six fixed tracks, even where C1-C5 are empty. */
+ grid-area:1 / var(--smart-slot-column,1) / span 1 / span 1!important;
+ grid-column:var(--smart-slot-column,1) / span 1!important;
+ grid-row:1 / span 1!important;
+ justify-self:start!important;
+ box-sizing:border-box!important;
+ width:var(--smart-control-width)!important;
+ min-width:var(--smart-control-width)!important;
+ max-width:var(--smart-control-width)!important;
+ height:26px!important;
+ min-height:26px!important;
+ max-height:26px!important;
+}
+/* These 40px icon pickers are children of the SQL C5/C6 cells.
+ * Prevent generic (144px) Image dropdown styles from widening them. */
+.office-builder-ribbon #page-builder-tab-content
+ >.smart-ribbon.smart-design2-ribbon[data-three-row="true"]
+ .smart-design2-group .smart-ribbon-row[data-design-row]>.smart-property
+ .design2-icon-trigger{
+ box-sizing:border-box!important;
+ flex:0 0 var(--smart-control-width)!important;
+ width:var(--smart-control-width)!important;
+ min-width:var(--smart-control-width)!important;
+ max-width:var(--smart-control-width)!important;
+ height:26px!important;
+ min-height:26px!important;
+ max-height:26px!important;
+}
+
+/* Both Design 2 image/orientation and alignment menus use body-level portals.
+ * The canvas floating action toolbar has z-index:11000; the old 10000 popup
+ * was behind it, so Top/Left/Right/Bottom choices could not be clicked. */
+.design2-icon-popup,
+.smart-icon-dropdown-popup{
+ z-index:12000!important;
+}
+
+
+/* R0 C1-C21 is ONE fixed horizontal row. C5/C6 are deliberately reserved.
+ * The fifteen Arrange controls are C7-C21 at exactly 40x26px each.
+ * The ribbon's existing horizontal scroll handles narrower viewports;
+ * no auto-wrapping, collapsed controls, or rearranging by enabled state. */
+.office-builder-ribbon #page-builder-tab-content
+  >.smart-design2-ribbon>.smart-ribbon-group.smart-design2-group{
+  --smart-section-width:1244px!important;
+  flex:0 0 1244px!important;
+  width:1244px!important;
+  min-width:1244px!important;
+  max-width:1244px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-workbench{
+  width:1220px!important;
+  min-width:1220px!important;
+  max-width:1220px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-context[data-design-row="0"]{
+  box-sizing:border-box!important;
+  width:1220px!important;
+  min-width:1220px!important;
+  max-width:1220px!important;
+  flex-wrap:nowrap!important;
+  overflow:visible!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-r0-gap{
+  box-sizing:border-box!important;
+  display:block!important;
+  flex:0 0 40px!important;
+  width:40px!important;min-width:40px!important;max-width:40px!important;
+  height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-empty-position{
+  box-sizing:border-box!important;
+  display:block!important;
+  flex:0 0 80px!important;
+  width:80px!important;min-width:80px!important;max-width:80px!important;
+  height:26px!important;min-height:26px!important;max-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-actions{
+  box-sizing:border-box!important;
+  display:grid!important;
+  flex:0 0 656px!important;
+  grid-template-columns:repeat(15,40px)!important;
+  grid-template-rows:26px!important;
+  column-gap:4px!important;
+  row-gap:0!important;
+  width:656px!important;min-width:656px!important;max-width:656px!important;
+  height:26px!important;min-height:26px!important;max-height:26px!important;
+  padding:0!important;margin:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action{
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:40px!important;min-width:40px!important;max-width:40px!important;
+  height:26px!important;min-height:26px!important;max-height:26px!important;
+  padding:2px!important;margin:0!important;
+  border:1px solid #b7c9df!important;border-radius:3px!important;
+  background:#fff!important;color:#315577!important;
+  cursor:pointer!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action:disabled{
+  opacity:.42!important;cursor:not-allowed!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action:not(:disabled):hover{
+  background:#e9f2fc!important;
+}
+.office-builder-ribbon #page-builder-tab-content
+  .smart-design2-group .smart-design2-arrange-action[aria-pressed="true"]{
+  background:#d8eafa!important;border-color:#5c91cf!important;
+}
+
+/* Shared compact Appearance selector/value field. The dropdown replaces the
+ * old hand icon; both editors share one border and never add a second row. */
+.office-builder-ribbon .smart-design2-group .smart-design2-workbench{position:relative!important;}
+.office-builder-ribbon .smart-design2-group .smart-design2-count{
+ position:relative;grid-column:7;grid-row:1;
+ box-sizing:border-box;display:flex;align-items:center;
+ width:110px;min-width:110px;max-width:110px;
+ height:26px;min-height:26px;max-height:26px;
+ margin:0;padding:0;background:transparent;color:#1d4266;z-index:2;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-count-field{
+ box-sizing:border-box;display:inline-flex;align-items:center;gap:0;
+ flex:0 0 110px;width:110px;min-width:110px;max-width:110px;
+ height:26px;min-height:26px;max-height:26px;
+ padding:0;border:1px solid #b7c9df;border-radius:3px;background:#fff;
+ overflow:hidden;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-count-choice{
+ box-sizing:border-box!important;position:static!important;
+ flex:0 0 71px!important;width:71px!important;min-width:0!important;max-width:71px!important;
+ height:24px!important;min-height:24px!important;
+ border:0!important;border-right:1px solid #d4dfed!important;
+ border-radius:0!important;background:transparent!important;color:#1d4266!important;
+ font:10px/22px "Segoe UI",Arial,sans-serif!important;
+ padding:0 1px!important;margin:0!important;text-overflow:ellipsis;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-count-field input.smart-office-number{
+ box-sizing:border-box!important;flex:1 1 0!important;
+ width:36px!important;min-width:0!important;max-width:37px!important;
+ height:24px!important;min-height:24px!important;max-height:24px!important;
+ margin:0!important;padding:0!important;
+ border:0!important;border-radius:0!important;background:transparent!important;
+ color:inherit;text-align:center;font:11px/22px "Segoe UI",Arial,sans-serif!important;
+ font-variant-numeric:tabular-nums;
+ appearance:auto!important;-moz-appearance:auto!important;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-count-field
+ input.smart-office-number::-webkit-inner-spin-button,
+.office-builder-ribbon .smart-design2-group .smart-design2-count-field
+ input.smart-office-number::-webkit-outer-spin-button{
+ -webkit-appearance:auto!important;opacity:1!important;margin:0!important;
+}
+.office-builder-ribbon .smart-design2-group
+ :is(.smart-design2-days-trigger,.smart-design2-day-choice){
+ box-sizing:border-box!important;flex:1 1 0!important;min-width:0!important;
+ width:36px!important;height:24px!important;border:0!important;
+ padding:0!important;background:#fff!important;color:#1d4266!important;
+ font:10px "Segoe UI",Arial,sans-serif!important;text-align:center;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-count[data-supported="false"]
+ .smart-design2-count-field{opacity:.45;cursor:not-allowed;}
+
+/* Row 2, last slot: Card Grid padding uses its original persisted property.
+ * Other areas keep the exact same geometry with disabled editors. */
+.office-builder-ribbon .smart-design2-group .smart-design2-padding{
+ position:relative;grid-column:7;grid-row:1;
+ box-sizing:border-box;display:flex;align-items:center;
+ width:76px;min-width:76px;max-width:76px;height:26px;
+ border:1px solid #b7c9df;border-radius:3px;background:#fff;overflow:hidden;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-padding>select{
+ flex:0 0 49px;min-width:0;width:49px;max-width:49px;
+ height:24px;border:0;border-right:1px solid #d4dfed;
+ border-radius:0;background:transparent;color:#1d4266;
+ padding:0;font:10px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-padding input.smart-office-number{
+ box-sizing:border-box!important;flex:1 1 0!important;
+ width:25px!important;min-width:0!important;max-width:25px!important;
+ height:24px!important;min-height:24px!important;max-height:24px!important;
+ margin:0!important;padding:0!important;border:0!important;
+ text-align:center!important;font:10px "Segoe UI",Arial,sans-serif!important;
+ background:transparent!important;appearance:auto!important;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-padding[data-supported="false"]{
+ opacity:.45;cursor:not-allowed;
+}
+
+.office-builder-ribbon .smart-design2-group .smart-design2-calendar-controls,
+.office-builder-ribbon .smart-design2-group .smart-design2-image-border{
+ position:absolute;left:382px;top:30px;display:flex;gap:5px;align-items:center;height:26px;
+ z-index:2;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-calendar-controls>.smart-property{
+ display:flex;align-items:center;width:auto;min-width:76px;height:26px;
+}
+.office-builder-ribbon .smart-design2-group .smart-design2-calendar-controls .smart-label{display:none;}
+.office-builder-ribbon .smart-design2-group .smart-design2-calendar-controls .smart-weekdays button{height:26px;}
+/* The Canvas group is always pinned to the right edge of the Design ribbon. */
+.office-builder-ribbon[aria-label="Page Builder ribbon"] .office-ribbon-content[aria-label="Component Design 2"]{
+ position:relative;
+}
+.office-builder-ribbon[aria-label="Page Builder ribbon"] .design-canvas-settings{
+ position:sticky;right:0;margin-left:auto;flex:0 0 125px;z-index:6;
+ background:#f4f7fb;min-width:125px;padding:3px 5px;
+ box-shadow:-3px 0 6px #e4eaf0;
+}

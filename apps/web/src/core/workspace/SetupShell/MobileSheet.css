@@ -1,0 +1,9 @@
+/* The base mobile sheet styles live in MobileAppNavigation.css. This shared
+   footer stays within the iPhone safe area and above the software keyboard. */
+.md-mobile-sheet-footer{display:flex;gap:10px;padding:12px 16px max(12px,env(safe-area-inset-bottom,0px));border-top:.5px solid var(--md-ios-separator,#c6c6c8);background:var(--md-ios-surface,#fff)}
+.md-mobile-sheet-footer>button{min-height:44px;flex:1}
+@media(max-width:599px),(max-height:500px) and (pointer:coarse){
+ .md-mobile-sheet-backdrop{overscroll-behavior:contain}
+ .md-mobile-sheet{max-height:min(calc(100dvh - env(safe-area-inset-top,0px) - 8px),calc(100% - var(--keyboard-inset,0px)));margin-bottom:var(--keyboard-inset,0px);overscroll-behavior:contain}
+ :root.md-keyboard-open .md-mobile-sheet{padding-bottom:0}
+}

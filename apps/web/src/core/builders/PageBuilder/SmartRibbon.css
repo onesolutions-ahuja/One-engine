@@ -1,0 +1,882 @@
+/* Outer ribbon height/overflow/scrollbar geometry is owned by PageBuilderRibbonLayout.css. */
+/* Smart ribbon: scoped Office-style presentation for SQL-backed Data, Design and Layout.
+   Keep every property slot visible; applicability is handled by SmartRibbon.tsx.
+   Parent strip geometry comes exclusively from PageBuilderRibbonLayout.css;
+   this stylesheet defines only Smart editor control presentation. */
+.office-builder-ribbon #page-builder-tab-content>.smart-ribbon{
+  display:flex;flex:0 0 auto;align-items:stretch;gap:0;
+  width:max-content;min-width:100%;
+  background:var(--panel-background,#fff);color:#263b56;
+  font-family:"Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .smart-ribbon-group{
+  box-sizing:border-box;display:flex;flex:0 0 auto;flex-direction:column;
+  min-width:0;padding:4px 9px 0;
+  border-right:1px solid #cfdaea;
+}
+.office-builder-ribbon .smart-ribbon-group:last-child{border-right:0}
+.office-builder-ribbon .smart-ribbon-items{
+  display:grid;flex:1 1 auto;min-height:0;
+  grid-template-rows:repeat(3,30px);
+  grid-auto-flow:column;grid-auto-columns:max-content;
+  align-content:start;column-gap:11px;row-gap:3px;
+}
+.office-builder-ribbon .smart-property{
+  box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;
+  gap:7px;min-width:0;max-width:none;width:auto;height:30px;
+  margin:0;padding:0;white-space:nowrap;
+  font:400 11px/16px "Segoe UI",Arial,sans-serif;color:#263b56;
+}
+.office-builder-ribbon .smart-label{
+  flex:1 0 auto;min-width:0;max-width:none;
+  overflow:visible;text-overflow:clip;white-space:nowrap;
+}
+.office-builder-ribbon .smart-ribbon-caption{
+  box-sizing:border-box;flex:0 0 20px;display:block;margin-top:auto;
+  border-top:1px solid #e5ebf3;text-align:center;
+  font:600 11px/19px "Segoe UI",Arial,sans-serif;color:#35557f;
+}
+.office-builder-ribbon .smart-property.disabled{
+  opacity:.52;filter:grayscale(1);
+}
+.office-builder-ribbon .smart-property.disabled :is(button,input,select){cursor:not-allowed}
+.office-builder-ribbon .smart-property :is(button,input,select):focus-visible{
+  outline:2px solid #2877d1;outline-offset:1px;
+}
+
+/* One visual system for icons: 16px glyphs in 28px controls.
+   Preserve existing Office colour glyph + swatch + chevron functionality. */
+.office-builder-ribbon #page-builder-tab-content .smart-property .office-ribbon-colour-property{
+  box-sizing:border-box;display:inline-flex;flex:0 0 44px;
+  align-items:center;justify-content:center;gap:3px;
+  width:44px!important;min-width:44px!important;max-width:44px!important;
+  height:28px!important;min-height:28px!important;max-height:28px!important;
+  margin:0;padding:2px 4px!important;border:1px solid #b7c9e0;
+  border-radius:3px;background:#fff;color:#284568;cursor:pointer;
+}
+.office-builder-ribbon .smart-property .office-ribbon-colour-property:hover:not(:disabled),
+.office-builder-ribbon .smart-property .office-ribbon-colour-property[aria-expanded=true]{
+  background:#e7f1ff;border-color:#7eabe4;
+}
+.office-builder-ribbon .smart-property .office-ribbon-command-glyph{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:19px;height:21px;flex:0 0 19px;
+}
+.office-builder-ribbon .smart-property .office-ribbon-command-glyph>svg{
+  width:16px;height:16px;flex:0 0 16px;stroke-width:1.8;
+}
+.office-builder-ribbon .smart-property .office-ribbon-colour-property>svg{
+  width:11px;height:11px;flex:0 0 11px;
+}
+.office-builder-ribbon .smart-property .office-ribbon-colour-underline{
+  position:absolute;left:2px;right:2px;bottom:0;height:3px;border-radius:1px;
+}
+.office-builder-ribbon .smart-property .office-ribbon-colour-underline.is-unset{
+  background:repeating-linear-gradient(135deg,#fff 0 2px,#9aa8bd 2px 4px);
+}
+.office-builder-ribbon .smart-icons{
+  display:inline-flex;flex:0 0 auto;align-items:center;gap:2px;
+}
+.office-builder-ribbon .smart-icons button,
+.office-builder-ribbon .smart-icon-toggle,
+.office-builder-ribbon .smart-source-inline button,
+.office-builder-ribbon .smart-weekdays>button{
+  box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 28px;height:28px;min-width:28px;width:28px;
+  border:1px solid #bdcce0;border-radius:3px;
+  background:#fff;color:#284568;padding:4px;cursor:pointer;
+}
+.office-builder-ribbon .smart-icons button>svg,
+.office-builder-ribbon .smart-icon-toggle>svg,
+.office-builder-ribbon .smart-source-inline button>svg{
+  width:16px;height:16px;flex:0 0 16px;stroke-width:1.8;
+}
+.office-builder-ribbon .smart-icons button[aria-pressed=true],
+.office-builder-ribbon .smart-icon-toggle[aria-pressed=true]{
+  background:#d6e9ff;border-color:#73a7e6;color:#125ba7;
+}
+.office-builder-ribbon .smart-icons button span{
+  box-sizing:border-box;display:block;width:15px;height:15px;
+  background:#f4f7fc;border:1px solid #95abc5;
+}
+.office-builder-ribbon .smart-icon-toggle{width:28px}
+.office-builder-ribbon .smart-source-inline{display:flex;align-items:center;gap:5px}
+.office-builder-ribbon .smart-source-inline button{width:auto;flex:0 0 auto;padding:3px 6px;gap:5px}
+
+/* Labels and editors occupy the same baseline; never truncate property names. */
+.office-builder-ribbon #page-builder-tab-content .smart-property :is(.smart-select,select),
+.office-builder-ribbon #page-builder-tab-content .smart-property .smart-formula input{
+  box-sizing:border-box;height:28px!important;min-height:28px!important;max-height:28px!important;
+  border:1px solid #b7c9e0;border-radius:3px;
+  background:#fff;color:#284061;
+  font:11px/20px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-property .smart-select{
+  width:96px;min-width:76px;max-width:118px;
+  padding:2px 5px;text-overflow:ellipsis;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-property .smart-formula input{
+  width:155px;min-width:120px;max-width:155px;padding:2px 6px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-property .smart-source-inline select{
+  width:110px;min-width:100px;max-width:155px;padding:2px 4px;
+}
+.office-builder-ribbon .smart-property .smart-numeric{
+  display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-property input.smart-office-number{
+  /* Shorter number fields (Text Size, Corner Radius and all Smart numeric slots). */
+  box-sizing:border-box!important;flex:0 0 52px!important;
+  width:52px!important;min-width:52px!important;max-width:52px!important;
+  height:28px!important;min-height:28px!important;max-height:28px!important;
+  padding:2px 3px!important;text-align:center;
+  border:1px solid #b7c9e0;border-radius:3px;
+  background:#fff;color:#284061;
+  font:12px/20px "Segoe UI",Arial,sans-serif!important;
+  font-variant-numeric:tabular-nums;
+  appearance:auto;-moz-appearance:auto;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-property input.smart-office-number::-webkit-inner-spin-button,
+.office-builder-ribbon #page-builder-tab-content .smart-property input.smart-office-number::-webkit-outer-spin-button{
+  -webkit-appearance:auto;opacity:1;margin:0;
+}
+
+/* Compact accessible switches for Boolean properties and Default Check.
+   The browser checkbox remains a real checkbox; Default Check is a switch button. */
+.office-builder-ribbon #page-builder-tab-content .smart-property>input[type=checkbox]{
+  box-sizing:border-box!important;appearance:none;-webkit-appearance:none;
+  display:inline-flex;flex:0 0 30px!important;
+  width:30px!important;min-width:30px!important;max-width:30px!important;
+  height:18px!important;min-height:18px!important;max-height:18px!important;
+  padding:2px!important;margin:0!important;border:1px solid #a8b7c9;
+  border-radius:999px;background:#cbd4df;cursor:pointer;transition:background .12s;
+}
+.office-builder-ribbon .smart-property>input[type=checkbox]::before{
+  content:"";display:block;width:12px;height:12px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px #15365b35;transition:transform .12s;
+}
+.office-builder-ribbon .smart-property>input[type=checkbox]:checked{
+  background:#287de1;border-color:#287de1;
+}
+.office-builder-ribbon .smart-property>input[type=checkbox]:checked::before{transform:translateX(12px)}
+.office-builder-ribbon .smart-default-check-switch{
+  box-sizing:border-box;display:inline-flex;align-items:center;
+  flex:0 0 30px;width:30px;height:18px;
+  margin:0;padding:2px;border:1px solid #a8b7c9;
+  border-radius:999px;background:#cbd4df;cursor:pointer;
+}
+.office-builder-ribbon .smart-default-check-switch[aria-checked=true]{
+  background:#287de1;border-color:#287de1;
+}
+.office-builder-ribbon .smart-default-check-thumb{
+  display:block;width:12px;height:12px;border-radius:50%;
+  background:white;box-shadow:0 1px 2px #15365b35;transition:transform .12s;
+}
+.office-builder-ribbon .smart-default-check-switch[aria-checked=true] .smart-default-check-thumb{
+  transform:translateX(12px);
+}
+.office-builder-ribbon .smart-default-check-switch:disabled{cursor:not-allowed}
+
+/* Keep dropdowns usable; avoid touching the colour-picker and media portals. */
+.smart-weekdays{position:relative}
+.smart-weekdays>button{width:auto!important;min-width:48px!important;padding:3px 6px!important}
+ .smart-weekday-popup{position:fixed;z-index:6000;background:white;border:1px solid #b9c6d6;box-shadow:0 5px 16px #22334433;padding:8px;border-radius:4px}
+.smart-weekday-popup label{display:flex;gap:6px;align-items:center}
+.smart-dialog-backdrop{position:fixed;inset:0;z-index:5100;background:#0006;display:flex;align-items:center;justify-content:center}
+.smart-dialog{background:#fff;color:#243448;border:1px solid #c5d1df;border-radius:9px;box-shadow:0 15px 40px #0003;max-height:80vh;overflow:auto;min-width:380px;max-width:min(650px,95vw);padding:18px}
+.smart-dialog header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.smart-dialog header button{background:white;border:1px solid #b8c5d8;border-radius:4px;padding:5px 12px}
+/* Compact Smart Design groups are sized from their control tracks, not
+   stretched to fill a preset section width. Other groups (Typography, Tabs,
+   etc.) retain the shared ribbon layout and sizes. SQL continues to own
+   metadata, availability, and the visible label text. */
+.office-builder-ribbon .smart-ribbon-group:is(
+  [aria-label="Body"],[aria-label="Header"],[aria-label="Badge"],[aria-label="Image"]){
+  flex:0 0 auto;
+  width:max-content;
+  padding-inline:8px;
+}
+.office-builder-ribbon .smart-ribbon-group:is(
+  [aria-label="Body"],[aria-label="Header"],[aria-label="Badge"],[aria-label="Image"]) .smart-ribbon-items{
+  display:grid;
+  grid-auto-flow:row;
+  grid-auto-columns:auto;
+  grid-template-rows:repeat(3,32px);
+  align-items:center;
+  row-gap:4px;
+  column-gap:7px;
+}
+.office-builder-ribbon .smart-ribbon-group:is(
+  [aria-label="Body"],[aria-label="Header"],[aria-label="Badge"],[aria-label="Image"]) .smart-property{
+  width:100%;
+  min-width:0;
+  height:32px;
+}
+.office-builder-ribbon .smart-ribbon-group:is(
+  [aria-label="Body"],[aria-label="Header"],[aria-label="Badge"],[aria-label="Image"]) .smart-ribbon-caption{
+  width:100%;
+}
+
+/* BODY: the three colour controls share a single tightly spaced toolbar row.
+   The radius and shadow editors share the same left/right edges below it. */
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-ribbon-items{
+  grid-template-columns:repeat(3,52px);
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="backgroundColor"]{grid-area:1 / 1;justify-content:center}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="borderColor"]{grid-area:1 / 2;justify-content:center}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="labelColor"]{grid-area:1 / 3;justify-content:center}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="radius"]{grid-area:2 / 1 / 3 / -1;justify-content:space-between}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="shadow"]{grid-area:3 / 1 / 4 / -1;justify-content:space-between}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property:is(
+  [data-property="backgroundColor"],[data-property="borderColor"],[data-property="labelColor"])>.smart-label{display:none}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Body"]
+  .smart-property:is([data-property="backgroundColor"],[data-property="borderColor"],[data-property="labelColor"])
+  .office-ribbon-colour-property{
+  flex:0 0 48px!important;
+  width:48px!important;min-width:48px!important;max-width:48px!important;
+  height:30px!important;min-height:30px!important;max-height:30px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Body"]
+  .smart-property[data-property="radius"] input.smart-office-number{
+  flex:0 0 75px!important;
+  width:75px!important;min-width:75px!important;max-width:75px!important;
+  height:30px!important;min-height:30px!important;max-height:30px!important;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="shadow"] .smart-icons{gap:4px}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Body"] .smart-property[data-property="shadow"] .smart-icons button{
+  flex:0 0 32px;width:32px;min-width:32px;height:30px;
+}
+
+/* HEADER: icon group / empty row / Alignment. The alignment label occupies
+   an explicit first track so three buttons remain grouped beside it. */
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-ribbon-items{
+  grid-template-columns:repeat(3,60px);
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="wrapText"]{grid-area:1 / 1;justify-content:center}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerBold"]{grid-area:1 / 2;justify-content:center}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerBorderColor"]{grid-area:1 / 3;justify-content:center}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerAlignment"]{
+  grid-area:3 / 1 / 4 / -1;
+  justify-content:flex-start;
+  gap:8px;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerAlignment"]>.smart-label{
+  flex:0 0 70px;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property:is(
+  [data-property="wrapText"],[data-property="headerBold"],[data-property="headerBorderColor"])>.smart-label{display:none}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property:is(
+  [data-property="wrapText"],[data-property="headerBold"]) .smart-icon-toggle{
+  flex:0 0 36px;width:36px;height:32px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Header"]
+  .smart-property[data-property="headerBorderColor"] .office-ribbon-colour-property{
+  flex:0 0 52px!important;
+  width:52px!important;min-width:52px!important;max-width:52px!important;
+  height:32px!important;min-height:32px!important;max-height:32px!important;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerAlignment"] .smart-icons{gap:3px}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerAlignment"] .smart-icons button{
+  flex:0 0 30px;width:30px;min-width:30px;height:30px;
+}
+
+/* BADGE: the first two tracks are a shared Label -> Editor alignment system.
+   Visible and its switch form a separate adjacent pair, never pushed to
+   the far side. Row 3 is a genuinely compact three-icon toolbar. */
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-ribbon-items{
+  grid-template-columns:64px 64px 116px 100px;
+  column-gap:6px;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeAlignment"]{
+  grid-area:1 / 1 / 2 / 4;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeVisible"]{
+  grid-area:1 / 4;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeTextSize"]{
+  grid-area:2 / 1 / 3 / 4;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property:is(
+  [data-property="badgeAlignment"],[data-property="badgeTextSize"]){
+  display:grid;
+  grid-template-columns:82px 166px;
+  column-gap:8px;
+  justify-content:start;
+  align-items:center;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property:is(
+  [data-property="badgeAlignment"],[data-property="badgeTextSize"])>.smart-label{
+  flex:none;
+  min-width:0;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeVisible"]{
+  display:grid;
+  grid-template-columns:54px 34px;
+  column-gap:8px;
+  align-items:center;
+  justify-content:start;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeVisible"]>.smart-label{
+  flex:none;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeVisible"]>input[type=checkbox]{
+  justify-self:start;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeTextSize"] .smart-numeric{
+  justify-self:end;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeBold"]{
+  grid-area:3 / 1;justify-content:flex-start;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeTextColor"]{
+  grid-area:3 / 2;justify-content:flex-start;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeBodyColor"]{
+  grid-area:3 / 3;justify-content:flex-start;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property:is(
+  [data-property="badgeBold"],[data-property="badgeTextColor"],[data-property="badgeBodyColor"])>.smart-label{display:none}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Badge"]
+  .smart-property[data-property="badgeAlignment"] .smart-select{
+  width:166px;min-width:166px;max-width:166px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Badge"]
+  .smart-property[data-property="badgeTextSize"] input.smart-office-number{
+  flex:0 0 116px!important;
+  width:116px!important;min-width:116px!important;max-width:116px!important;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Badge"] .smart-property[data-property="badgeBold"] .smart-icon-toggle{
+  flex:0 0 42px;width:42px;height:32px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Badge"]
+  .smart-property:is([data-property="badgeTextColor"],[data-property="badgeBodyColor"]) .office-ribbon-colour-property{
+  flex:0 0 52px!important;
+  width:52px!important;min-width:52px!important;max-width:52px!important;
+  height:32px!important;min-height:32px!important;max-height:32px!important;
+}
+
+/* IMAGE: every row has the SAME label and editor columns. The narrower
+   border icon is right-aligned with the two dropdowns above and below it. */
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-ribbon-items{
+  grid-template-columns:72px 144px;
+  column-gap:8px;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-property[data-property="imagePlacement"]{grid-area:1 / 1 / 2 / -1}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-property[data-property="imageBorderColor"]{grid-area:2 / 1 / 3 / -1}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-property[data-property="imageFill"]{grid-area:3 / 1 / 4 / -1}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-property:is(
+  [data-property="imagePlacement"],[data-property="imageBorderColor"],[data-property="imageFill"]){
+  display:grid;
+  grid-template-columns:72px 144px;
+  column-gap:8px;
+  align-items:center;
+  justify-content:start;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-property:is(
+  [data-property="imagePlacement"],[data-property="imageBorderColor"],[data-property="imageFill"])>.smart-label{
+  flex:none;
+  min-width:0;
+}
+.office-builder-ribbon .smart-ribbon-group[aria-label="Image"] .smart-property[data-property="imageBorderColor"] .office-ribbon-colour-property{
+  justify-self:end;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Image"]
+  .smart-property:is([data-property="imagePlacement"],[data-property="imageFill"]) .smart-select{
+  width:144px;min-width:144px;max-width:144px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon-group[aria-label="Image"]
+  .smart-property[data-property="imageBorderColor"] .office-ribbon-colour-property{
+  flex:0 0 52px!important;
+  width:52px!important;min-width:52px!important;max-width:52px!important;
+  height:32px!important;min-height:32px!important;max-height:32px!important;
+}
+
+/* Smart Cart-only header text colour: reuse the open second row of the
+   existing Header controls, without changing other Smart component layouts. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerTextColor"]{
+  grid-area:2 / 1 / 3 / -1;
+  justify-content:flex-start;
+}
+
+/* Smart Cart-only Header Body Color uses the existing SQL R3/C2 slot and
+   standard fill palette. Its 35px control fits glyph + dropdown without
+   changing the shared Header ribbon geometry for Card Grid or Image. */
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerBodyColor"]
+  .office-ribbon-colour-property{
+  gap:0!important;
+  padding:2px!important;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header"] .smart-property[data-property="headerBodyColor"]
+  .office-ribbon-command-glyph{
+  flex:0 0 16px!important;
+  width:16px!important;
+}
+
+/* File chooser is invoked directly by the Upload Image action, never a modal. */
+.office-builder-ribbon .smart-ribbon>.smart-hidden-upload{display:none!important}
+.office-builder-ribbon .smart-upload-error{flex:0 0 200px;align-self:flex-start;overflow:hidden;
+  max-width:200px;white-space:nowrap;text-overflow:ellipsis;color:#b42318;font-size:11px}
+
+
+/* Formula field and source filter share one readable compact ribbon control. */
+.office-builder-ribbon .smart-formula-filter{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.office-builder-ribbon .smart-formula-filter .smart-formula{flex:0 0 155px;width:155px;min-width:155px;height:28px}
+.office-builder-ribbon #page-builder-tab-content .smart-property .smart-formula-filter .smart-formula input{
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ border:0!important;background:transparent!important;color:transparent!important;
+ caret-color:#193f73!important;font-family:Consolas,monospace!important;letter-spacing:0;
+}
+.office-builder-ribbon .smart-formula-filter .smart-formula-highlight{line-height:27px;font-size:12px}
+.office-builder-ribbon .smart-filter-trigger{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;position:relative;
+ width:30px;min-width:30px;height:28px;border:1px solid #b7c9e0;border-radius:4px;background:#fff;
+ color:#244a78;cursor:pointer;padding:4px}
+.office-builder-ribbon .smart-filter-trigger:hover:not(:disabled){background:#e7f1ff;border-color:#6199d7}
+.office-builder-ribbon .smart-filter-trigger:disabled{opacity:.55;cursor:not-allowed}
+.office-builder-ribbon .smart-filter-count{position:absolute;right:-6px;top:-7px;min-width:16px;height:16px;
+ border-radius:8px;background:#155d9f;color:#fff;font:bold 10px/16px "Segoe UI",Arial,sans-serif;text-align:center;padding:0 2px}
+
+/* Modal lives in document.body, not under the constrained 146px ribbon. */
+.smart-filter-backdrop{z-index:6200;padding:16px;background:rgba(19,36,58,.58)}
+.smart-dialog.smart-filter-dialog{display:flex;flex-direction:column;box-sizing:border-box;
+ width:min(760px,calc(100vw - 32px));min-width:0;max-width:760px;max-height:calc(100dvh - 32px);
+ overflow:hidden;padding:0;border:1px solid #b4c3d5;border-radius:12px;
+ background:#fff;color:#1e293b;box-shadow:0 24px 70px rgba(3,18,38,.32)}
+.smart-filter-dialog header{flex:none;box-sizing:border-box;display:flex;align-items:center;
+ justify-content:space-between;gap:16px;margin:0;padding:18px 24px;border-bottom:1px solid #d8e1ec;
+ background:#f7fafe}
+.smart-filter-dialog header>div{display:flex;flex-direction:column;min-width:0;gap:3px}
+.smart-filter-dialog header strong{font-size:19px;line-height:1.25;color:#163552}
+.smart-filter-dialog header span{color:#526980;font-size:13px;white-space:normal;overflow-wrap:anywhere}
+.smart-filter-dialog header button{flex:none;min-width:88px;min-height:38px;border:1px solid #1d61a5;
+ border-radius:6px;background:#1d61a5;color:white;font:600 14px "Segoe UI",Arial,sans-serif;cursor:pointer}
+.smart-filter-dialog header button:hover{background:#144e88}
+.smart-filter-dialog header button:focus-visible{outline:2px solid #1d61a5;outline-offset:3px}
+.smart-filter-dialog .smart-filter-dialog-body{padding:22px 24px 26px;overflow-y:auto;min-height:0}
+@media(max-width:600px){
+ .smart-filter-backdrop{padding:8px}
+ .smart-dialog.smart-filter-dialog{width:100%;max-height:calc(100dvh - 16px)}
+ .smart-filter-dialog header{padding:14px 16px}
+ .smart-filter-dialog .smart-filter-dialog-body{padding:16px}
+}
+
+/* SMART CART compact Design: preserve the three-row Office ribbon, but place
+   each control on deliberate short tracks instead of letting auto-flow reserve
+   a full label-and-editor column for every palette button.  Scope everything
+   to Smart Cart so other components and SQL-driven properties are unchanged. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Header Supporting"],[aria-label="Table"],[aria-label="Row"]){
+  flex:0 0 auto;
+  width:max-content;
+  padding-inline:8px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Header Supporting"],[aria-label="Table"],[aria-label="Row"]) .smart-ribbon-items{
+  display:grid;
+  grid-auto-flow:row;
+  grid-auto-columns:auto;
+  grid-template-rows:repeat(3,32px);
+  align-items:center;
+  column-gap:8px;
+  row-gap:4px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Header Supporting"],[aria-label="Table"],[aria-label="Row"]) .smart-property{
+  width:100%;
+  height:32px;
+  justify-content:flex-start;
+  gap:8px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Header Supporting"],[aria-label="Table"],[aria-label="Row"]) .smart-property>.smart-label{
+  flex:0 0 auto;
+}
+/* The two colour glyphs form the first row; their accessible name/title is
+   already supplied by RibbonColorPalette, so no visible label is lost from
+   alignment, number, or shadow controls. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-property:is(
+    [data-property="supportingBorderColor"],[data-property="supportingTextColor"],
+    [data-property="tableBackgroundColor"],[data-property="tableBorderColor"],
+    [data-property="rowBorderColor"],[data-property="rowLabelColor"])>.smart-label{
+  display:none;
+}
+
+/* Header Supporting: palettes / alignment / bold. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header Supporting"] .smart-ribbon-items{
+  grid-template-columns:88px 148px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header Supporting"] .smart-property[data-property="supportingBorderColor"]{grid-area:1 / 1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header Supporting"] .smart-property[data-property="supportingTextColor"]{grid-area:1 / 2}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header Supporting"] .smart-property[data-property="supportingAlignment"]{grid-area:2 / 1 / 3 / -1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header Supporting"] .smart-property[data-property="supportingBold"]{grid-area:3 / 1 / 4 / -1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Header Supporting"] .smart-property:is(
+    [data-property="supportingAlignment"],[data-property="supportingBold"])>.smart-label{
+  flex:0 0 84px;
+}
+
+/* Table: two colours / radius / three shadow presets. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-ribbon-items{
+  grid-template-columns:116px 152px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-property[data-property="tableBackgroundColor"]{grid-area:1 / 1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-property[data-property="tableBorderColor"]{grid-area:1 / 2}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-property[data-property="tableRadius"]{grid-area:2 / 1 / 3 / -1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-property[data-property="tableShadow"]{grid-area:3 / 1 / 4 / -1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-property[data-property="tableRadius"]>.smart-label{flex:0 0 130px}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Table"] .smart-property[data-property="tableShadow"]>.smart-label{flex:0 0 72px}
+
+/* Row: two colours / height / radius (rather than a wide second column). */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"]{
+  padding-inline:12px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-ribbon-items{
+  grid-template-columns:124px 88px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-property[data-property="rowBorderColor"]{grid-area:1 / 1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-property[data-property="rowLabelColor"]{grid-area:1 / 2}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-property[data-property="rowHeight"]{grid-area:2 / 1 / 3 / -1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-property[data-property="rowRadius"]{grid-area:3 / 1 / 4 / -1}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-property[data-property="rowHeight"]>.smart-label{flex:0 0 110px}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Row"] .smart-property[data-property="rowRadius"]>.smart-label{flex:0 0 98px}
+
+/* Keep native number spinners legible without recreating the former huge tracks. */
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Table"],[aria-label="Row"])
+  .smart-property input.smart-office-number{
+  flex:0 0 75px!important;
+  width:75px!important;min-width:75px!important;max-width:75px!important;
+}
+
+/* Smart Cart Summary: three fill/border/text colours on the first row, one
+   text-size control plus bold on the second, shadow choices on the third.
+   Radius/height/width share the right-hand label and number columns. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Summary"],[aria-label="Summary 2"]){
+  flex:0 0 auto;
+  width:max-content;
+  padding-inline:8px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Summary"],[aria-label="Summary 2"]) .smart-ribbon-items{
+  display:grid;
+  grid-auto-flow:row;
+  grid-auto-columns:auto;
+  grid-template-rows:repeat(3,32px);
+  align-items:center;
+  column-gap:6px;
+  row-gap:4px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Summary"],[aria-label="Summary 2"]) .smart-property{
+  width:100%;
+  height:32px;
+  justify-content:flex-start;
+  gap:6px;
+  min-width:0;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group:is([aria-label="Summary"],[aria-label="Summary 2"]) .smart-property>.smart-label{flex:0 0 auto}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-property:is(
+    [data-property="summaryBackgroundColor"],[data-property="summaryBorderColor"],
+    [data-property="summaryTextColor"],[data-property="summaryTextWeight"],
+    [data-property="summary2TextColor"],[data-property="summary2TextWeight"])>.smart-label{
+  display:none;
+}
+
+/* Fixed tracks match the reference without letting long metadata labels
+   enlarge the group. The 10px spacer separates colours from dimensions. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-ribbon-items{
+  grid-template-columns:repeat(3,78px) 10px 126px 80px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryBackgroundColor"]{grid-area:1 / 1;justify-content:center}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryBorderColor"]{grid-area:1 / 2;justify-content:center}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryTextColor"]{grid-area:1 / 3;justify-content:center}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryTextSize"]{grid-area:2 / 1 / 3 / 3}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryTextWeight"]{grid-area:2 / 3;justify-content:center}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryShadow"]{grid-area:3 / 1 / 4 / 4}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryRadius"]{grid-area:1 / 5 / 2 / 7}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryHeight"]{grid-area:2 / 5 / 3 / 7}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryWidth"]{grid-area:3 / 5 / 4 / 7}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryTextSize"]>.smart-label{flex:0 0 70px}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryShadow"]>.smart-label{flex:0 0 70px}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property:is(
+    [data-property="summaryRadius"],[data-property="summaryHeight"],[data-property="summaryWidth"])>.smart-label{flex:0 0 126px}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property input.smart-office-number{
+  flex:0 0 80px!important;
+  width:80px!important;min-width:80px!important;max-width:80px!important;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryShadow"] .smart-icons{gap:4px}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryShadow"] .smart-icons button{
+  flex:0 0 38px;width:38px;min-width:38px;height:32px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary"] .smart-property[data-property="summaryTextWeight"] .smart-icon-toggle{
+  flex:0 0 42px;width:42px;height:36px;
+}
+
+/* Summary 2 is its own narrow section: size across the top, then ONLY the
+   text colour palette and bold buttons, with no redundant on-screen labels. */
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-ribbon-items{
+  grid-template-columns:repeat(3,76px);
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-property[data-property="summary2TextSize"]{
+  grid-area:1 / 1 / 2 / -1;
+  justify-content:flex-end;
+  gap:10px;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-property[data-property="summary2TextColor"]{grid-area:2 / 2;justify-content:center}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-property[data-property="summary2TextWeight"]{grid-area:2 / 3;justify-content:center}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-property[data-property="summary2TextSize"] input.smart-office-number{
+  flex:0 0 114px!important;
+  width:114px!important;min-width:114px!important;max-width:114px!important;
+}
+.office-builder-ribbon .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-property[data-property="summary2TextWeight"] .smart-icon-toggle{
+  flex:0 0 42px;width:42px;height:36px;
+}
+.office-builder-ribbon #page-builder-tab-content .smart-ribbon[data-smart-api="smart_cart"]
+  .smart-ribbon-group[aria-label="Summary 2"] .smart-property[data-property="summary2TextColor"] .office-ribbon-colour-property{
+  flex:0 0 52px!important;
+  width:52px!important;min-width:52px!important;max-width:52px!important;
+  height:36px!important;min-height:36px!important;max-height:36px!important;
+}
+
+/* SQL choice defaults that are arrays render as reusable checkbox dropdowns. */
+.office-builder-ribbon .smart-property .smart-multiselect{flex:0 0 155px;min-width:155px;max-width:155px;height:28px}
+.office-builder-ribbon .smart-property .smart-multiselect-trigger{
+ display:flex;align-items:center;justify-content:space-between;gap:5px;
+ width:155px;min-width:155px;height:28px;box-sizing:border-box;
+ padding:2px 5px;background:#fff;border:1px solid #b7c9df;border-radius:3px;
+ color:#263b56;font:11px "Segoe UI",Arial,sans-serif;cursor:pointer}
+.office-builder-ribbon .smart-property .smart-multiselect-trigger:disabled{opacity:.55;cursor:not-allowed}
+.smart-multiselect-popup{position:fixed;z-index:10020;box-sizing:border-box;
+ max-height:235px;overflow:auto;display:flex;flex-direction:column;gap:5px;
+ padding:7px;border:1px solid #b7c9df;border-radius:5px;background:#fff;
+ box-shadow:0 10px 25px #20314e35;color:#263b56;font:12px "Segoe UI",Arial,sans-serif}
+.smart-multiselect-option{display:flex;align-items:center;gap:8px;padding:4px 6px;
+ cursor:pointer;white-space:nowrap}
+.smart-multiselect-option:hover{background:#edf5ff}
+.smart-multiselect-option input{accent-color:#2563eb}
+.smart-multiselect-done{align-self:flex-end;padding:3px 8px;border:1px solid #b7c9df;
+ border-radius:3px;background:#fff;cursor:pointer}
+
+/* Record editing needs usable vertical workspace even with only one condition.
+   Keep this scoped to Filter Records; visibility dialogs retain intrinsic height. */
+.smart-filter-backdrop .smart-dialog.smart-record-filter-dialog{
+  height:min(72dvh,720px)!important;
+  min-height:min(520px,calc(100dvh - 24px))!important;
+}
+.smart-filter-backdrop .smart-record-filter-dialog .smart-filter-dialog-body{
+  flex:1 1 auto;min-height:0;
+}
+
+/* Shared Filter Records modal: one scroll owner, compact search, and four
+   flexible field/operator/source/value columns on desktop. */
+.smart-filter-backdrop.smart-dialog-backdrop{
+  z-index:2147483000!important;isolation:isolate;backdrop-filter:blur(2px);
+  background:rgba(19,36,58,.66)!important;
+}
+.smart-filter-backdrop .smart-dialog.smart-filter-dialog{
+  box-sizing:border-box!important;
+  width:min(1140px,calc(100vw - 32px))!important;
+  max-width:min(1140px,calc(100vw - 32px))!important;
+  min-width:0!important;
+  max-height:calc(100dvh - 24px)!important;
+  overflow:hidden!important;
+}
+.smart-filter-backdrop .smart-filter-dialog header{
+  padding:12px 19px!important;gap:12px!important;
+}
+.smart-filter-backdrop .smart-filter-dialog header strong{
+  font-size:16px!important;line-height:1.2!important;
+}
+.smart-filter-backdrop .smart-filter-dialog header span{
+  font-size:11px!important;line-height:1.25!important;
+}
+.smart-filter-backdrop .smart-filter-dialog header button{
+  min-height:30px!important;min-width:72px!important;
+  font-size:12px!important;padding:4px 10px!important;
+}
+.smart-filter-backdrop .smart-filter-dialog .smart-filter-dialog-body{
+  padding:15px 19px 18px!important;overflow-y:auto!important;
+  overscroll-behavior:contain;scrollbar-gutter:stable;
+}
+.smart-filter-backdrop .metadata-record-filter-editor{
+  font-size:11.2px!important;line-height:1.3!important;
+}
+.smart-filter-backdrop .metadata-filter-intro{
+  gap:12px!important;padding-bottom:12px!important;
+}
+.smart-filter-backdrop .metadata-filter-intro strong{font-size:13px!important}
+.smart-filter-backdrop .metadata-filter-intro p{
+  font-size:11px!important;margin-top:3px!important;max-width:none!important;
+}
+.smart-filter-backdrop .metadata-filter-count{font-size:10px!important}
+.smart-filter-backdrop .metadata-filter-toolbar{
+  gap:12px!important;margin-bottom:12px!important;
+  grid-template-columns:minmax(0,320px) minmax(165px,210px)!important;
+  justify-content:start!important;
+}
+.smart-filter-backdrop .metadata-record-filter-editor label{
+  gap:4px!important;
+}
+.smart-filter-backdrop .metadata-record-filter-editor label>span:first-child{
+  font-size:10.5px!important;line-height:1.3!important;
+}
+.smart-filter-backdrop .metadata-record-filter-editor :is(input,select){
+  box-sizing:border-box!important;min-width:0!important;
+  height:32px!important;font-size:11.5px!important;
+  padding:5px 9px!important;border-radius:5px!important;
+}
+.smart-filter-backdrop .metadata-filter-search-input svg{top:8px!important;left:10px!important}
+.smart-filter-backdrop .metadata-filter-search-input input{padding-left:32px!important}
+.smart-filter-backdrop .metadata-filter-conditions{
+  max-height:none!important;overflow:visible!important;
+  gap:9px!important;padding:0!important;
+}
+.smart-filter-backdrop .metadata-filter-condition{
+  padding:11px 13px!important;border-radius:7px!important;
+}
+.smart-filter-backdrop .metadata-filter-condition-heading{
+  margin-bottom:8px!important;gap:9px!important;
+}
+.smart-filter-backdrop .metadata-filter-condition-heading strong{
+  font-size:12px!important;
+}
+.smart-filter-backdrop .metadata-filter-condition-heading button{
+  font-size:11px!important;padding:5px 8px!important;
+}
+.smart-filter-backdrop .metadata-filter-condition-grid{
+  display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr) minmax(0,1.15fr) minmax(0,1.15fr)!important;
+  justify-content:stretch!important;gap:9px!important;
+}
+.smart-filter-backdrop .metadata-filter-footer{margin-top:12px!important;gap:9px!important}
+.smart-filter-backdrop .metadata-filter-add{
+  min-height:32px!important;font-size:11px!important;padding:7px 11px!important;
+}
+.smart-filter-backdrop .metadata-filter-formula{margin-bottom:11px!important}
+.smart-filter-backdrop .metadata-filter-formula textarea{
+  box-sizing:border-box;min-height:55px!important;max-height:90px!important;
+  padding:7px 9px!important;font-size:11.5px!important;
+  width:100%!important;color:#233752!important;background:#fff!important;
+  border:1px solid #b5c4d8!important;border-radius:5px!important;
+  font-family:Consolas,monospace!important;
+}
+@media(max-width:850px){
+  .smart-filter-backdrop .metadata-filter-condition-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+}
+@media(max-width:510px){
+  .smart-filter-backdrop .smart-dialog.smart-filter-dialog{
+    width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;
+  }
+  .smart-filter-backdrop .metadata-filter-condition-grid,
+  .smart-filter-backdrop .metadata-filter-toolbar{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .smart-filter-backdrop .smart-filter-dialog .smart-filter-dialog-body{
+    padding:10px 12px 14px!important;
+  }
+}
+
+
+/* Compact filter dialog for selected-field and shared record conditions. */
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro{
+  padding-bottom:9px!important;align-items:center!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro p{display:none!important}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro-heading{
+  gap:8px 12px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro-heading .metadata-filter-logic{
+  display:flex!important;flex-direction:row!important;align-items:center!important;gap:7px!important;
+  margin-left:10px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro-heading .metadata-filter-logic>span{
+  font-size:11px!important;white-space:nowrap
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro-heading .metadata-filter-logic select{
+  width:205px!important;min-width:165px!important;height:32px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-cell{
+  gap:4px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-cell>span:first-child{
+  font-size:10.5px!important;line-height:1.3!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-condition{
+  padding:9px 12px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-condition-heading{
+  margin-bottom:6px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-condition-heading button{
+  width:27px!important;height:27px!important;padding:4px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-field-trigger{
+  width:100%!important;height:32px!important;padding:5px 9px!important;font-size:11.5px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-field-search svg{
+  top:8px!important;left:9px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-field-search input{
+  padding-left:30px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-inline-error{
+  font-size:10.5px!important;margin:0!important;padding:3px 5px!important
+}
+.smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-footer{
+  margin-top:9px!important
+}
+@media(max-width:650px){
+  .smart-filter-backdrop .metadata-record-filter-editor.is-compact .metadata-filter-intro-heading .metadata-filter-logic{
+    flex-basis:100%;margin-left:0!important;justify-content:space-between
+  }
+}

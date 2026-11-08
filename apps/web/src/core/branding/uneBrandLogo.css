@@ -1,0 +1,55 @@
+:where(.une-brand-logo) {
+  display: inline-block;
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  aspect-ratio: 160 / 101;
+  height: 40px;
+  width: auto;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.une-brand-logo > .une-brand-logo-image--static {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.une-brand-logo > .une-brand-logo-image--animated {
+  /* The supplied 800x800 animation has generous whitespace around the logo.
+     Match the tightly cropped 160x101 static fallback without layout shifts. */
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 106%;
+  max-width: none;
+  height: auto;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .une-brand-logo > .une-brand-logo-image--animated { display: none; }
+}
+
+/* Temporary visual continuity when the original binary has not been published.
+   Never animate on Save-Data, slow connections or reduced-motion devices. */
+.une-brand-logo--interim > .une-brand-logo-image--static {
+  animation: une-brand-live-colour 4s linear infinite;
+}
+
+@keyframes une-brand-live-colour {
+  0% { filter: hue-rotate(0deg); }
+  25% { filter: hue-rotate(90deg); }
+  50% { filter: hue-rotate(180deg); }
+  75% { filter: hue-rotate(270deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .une-brand-logo--interim > .une-brand-logo-image--static { animation: none; }
+}

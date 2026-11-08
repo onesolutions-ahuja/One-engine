@@ -1,0 +1,204 @@
+.smart-runtime{box-sizing:border-box;min-width:0;max-width:100%;font-family:system-ui,"Segoe UI",sans-serif}
+.smart-runtime *{box-sizing:border-box}.smart-button,.smart-search,.smart-field input{width:100%;min-height:38px;padding:8px 12px;border:1px solid #b8c7d7;border-radius:inherit}
+.smart-button{cursor:pointer}.smart-toggle{display:flex;align-items:center;gap:9px;padding:8px}.smart-field{display:flex;flex-direction:column;gap:4px}
+.smart-field span{font-size:.84em}.smart-card{width:100%}.smart-image-empty{display:flex!important;align-items:center;justify-content:center;background:#edf2f7;color:#64748b;font-size:12px}
+.smart-grid{display:grid;gap:12px;min-width:0}.smart-badge{position:absolute;z-index:2;top:8px;right:8px;background:#2563eb;border-radius:999px;padding:3px 8px}
+.smart-badge.image-top-left{right:auto;left:8px}.smart-badge.image-bottom-left{top:auto;bottom:8px;right:auto;left:8px}
+.smart-badge.image-bottom-right{top:auto;bottom:8px}.smart-badge.image-center{top:50%;left:50%;right:auto;transform:translate(-50%,-50%)}
+.smart-calendar{padding:10px;border:1px solid #e2e8f0}.smart-calendar-grid{display:grid;gap:2px;margin-top:10px}
+.smart-calendar-grid b,.smart-calendar-grid span,.smart-calendar-grid button{text-align:center;padding:7px 3px;border-radius:4px}.smart-calendar-grid span,.smart-calendar-grid button{background:#f5f8fc}.smart-calendar-grid button{border:1px solid transparent;color:inherit;font:inherit;cursor:pointer}.smart-calendar-grid button:focus-visible{outline:2px solid #2563eb;outline-offset:1px}
+.smart-tabs,.smart-navigation{display:flex;flex-wrap:wrap;gap:2px}.smart-navigation-item{display:inline-flex;align-items:center;gap:6px}.smart-tabs button,.smart-navigation button{cursor:pointer;border:1px solid #c9d7e5;padding:8px 12px;background:white;border-radius:4px}
+.smart-container{display:flex;flex-direction:column;min-height:0;max-height:100%;width:100%;height:100%}
+
+.smart-calendar-grid .smart-calendar-empty{background:transparent}
+.smart-lookup{position:relative}.smart-lookup-menu{position:absolute;z-index:15;top:100%;left:0;right:0;
+ background:#fff;border:1px solid #aec3db;box-shadow:0 8px 16px #0002;border-radius:5px;max-height:220px;overflow:auto}
+.smart-lookup-menu button{display:block;width:100%;text-align:left;background:white;border:0;
+ padding:8px 10px;color:#213d5f;cursor:pointer}
+.smart-lookup-menu button:hover{background:#eaf3ff}
+
+.smart-tabs-heading{display:block;padding:5px 7px}
+.smart-badge.image-top-center{left:50%;right:auto;transform:translateX(-50%)}
+.smart-badge.image-bottom-center{top:auto;bottom:8px;left:50%;right:auto;transform:translateX(-50%)}
+.smart-badge.text-left{top:auto;bottom:8px;left:8px;right:auto}
+.smart-badge.text-center{top:auto;bottom:8px;left:50%;right:auto;transform:translateX(-50%)}
+.smart-badge.text-right,.smart-badge.text-bottom{top:auto;bottom:8px;right:8px}
+
+.smart-runtime.smart_button,.smart-runtime.smart_lookup,.smart-runtime.smart_text{display:flex;align-items:stretch}
+.smart-runtime.smart_button>.smart-button,.smart-runtime.smart_lookup>.smart-lookup,.smart-runtime.smart_lookup .smart-search,
+.smart-runtime.smart_text>.smart-field,.smart-runtime.smart_text .smart-field input{height:100%;min-height:0;max-height:100%;flex:1 1 auto;min-width:0}
+.smart-runtime.smart_tabs,.smart-runtime.smart_toggle{background:transparent!important;border:0!important;box-shadow:none!important}
+.smart-tabs-shell{width:100%;height:100%}.smart-tabs{align-content:start}
+.smart-switch{display:flex;align-items:center;justify-content:center;width:100%;height:100%;position:relative;cursor:pointer}
+.smart-switch>input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;z-index:1;margin:0}
+.smart-switch-track{display:block;position:relative;width:54px;height:32px;max-width:100%;max-height:100%;border-radius:999px;transition:background .2s,box-shadow .2s}
+.smart-switch-thumb{position:absolute;top:3px;left:3px;width:24px;height:24px;max-height:calc(100% - 6px);aspect-ratio:1;background:white;border-radius:50%;box-shadow:0 1px 3px #0003;transition:left .2s}
+.smart-switch>input:checked+.smart-switch-track .smart-switch-thumb{left:calc(100% - 27px)}
+.smart-switch>input:focus-visible+.smart-switch-track{outline:2px solid #2563eb;outline-offset:3px}
+.smart-lookup .smart-search::placeholder{color:var(--smart-placeholder-color,#64748b);opacity:1}
+.smart-lookup .smart-lookup-menu button{font-size:inherit;text-align:inherit}
+
+/* The selection frame supplies geometry, never a second visible container.
+   Smart controls fill their published/editor footprint without spare space. */
+.smart-runtime.smart_text>.smart-input-box,
+.smart-runtime.smart_button>.smart-button,
+.smart-runtime.smart_lookup>.smart-lookup,
+.smart-runtime.smart_lookup .smart-search{width:100%;height:100%;min-height:0;max-height:100%;flex:1 1 auto;min-width:0}
+.smart-runtime.smart_text>.smart-input-box::placeholder{color:var(--smart-placeholder-color,#64748b);opacity:1}
+.smart-runtime.smart_image>.smart-card,
+.smart-runtime.smart_card_grid>.smart-grid,
+.smart-runtime.smart_calendar>.smart-calendar,
+.smart-runtime.smart_navigation>.smart-navigation{width:100%;height:100%;min-height:0}
+.smart-runtime.smart_card_grid>.smart-grid{grid-auto-rows:minmax(0,1fr)}
+.smart-runtime.smart_card_grid .smart-card{min-height:0}
+.smart-runtime.smart_tabs>.smart-tabs-shell{overflow:auto;min-height:0}
+.smart-runtime.smart_navigation>.smart-navigation{align-content:start}
+.smart-runtime.smart_toggle{padding:0;min-height:0}
+.smart-runtime.smart_toggle>.smart-switch{min-width:0;min-height:32px;display:flex;align-items:stretch}
+ /* Native Toggle track must not collapse when routed through the metadata-bound host. */
+ .smart-runtime.smart_toggle .smart-switch-track{min-height:28px}
+.smart-runtime.smart_toggle .smart-switch-track{display:flex;align-items:center;justify-content:flex-start;
+  padding:3px;width:100%;height:100%;max-width:none;max-height:none}
+.smart-runtime.smart_toggle .smart-switch-thumb{position:relative;left:auto;top:auto;
+  width:auto;height:100%;max-height:none;aspect-ratio:1;flex:none}
+.smart-runtime.smart_toggle .smart-switch>input:checked+.smart-switch-track{justify-content:flex-end}
+.smart-runtime.smart_toggle .smart-switch>input:checked+.smart-switch-track .smart-switch-thumb{left:auto}
+
+/* Native-surface sizing: technical SmartRuntime host has no visual decoration.
+   Both published and editor surfaces use the same metadata dimensions. */
+.smart-runtime {display:flex;flex-direction:column;box-sizing:border-box;
+ min-width:0;min-height:0;padding:0;border:0;background:transparent;box-shadow:none}
+.smart-runtime > :first-child{box-sizing:border-box;flex:1 1 auto;
+ width:100%;height:100%;min-width:0;min-height:0;max-width:100%;margin:0}
+.smart-runtime.smart_text > .smart-input-box,
+.smart-runtime.smart_button > .smart-button,
+.smart-runtime.smart_lookup .smart-search{box-sizing:border-box;width:100%;height:100%;
+ max-height:none;min-height:0;min-width:0;flex:1 1 auto}
+.smart-runtime.smart_lookup > .smart-lookup {display:flex;flex-direction:column;position:relative;min-height:0}
+.smart-runtime.smart_lookup .smart-lookup-menu {flex:none;height:auto;max-height:220px}
+.smart-runtime.smart_image > .smart-card,
+.smart-runtime.smart_card_grid > .smart-grid,
+.smart-runtime.smart_calendar > .smart-calendar,
+.smart-runtime.smart_navigation > .smart-navigation,
+.smart-runtime.smart_tabs > .smart-tabs-shell,
+.smart-runtime.smart_cart > .smart-cart-root,
+.smart-runtime.smart_container > .smart-container{
+ width:100%;height:100%;min-width:0;min-height:0;max-width:100%;flex:1 1 auto}
+.smart-runtime.smart_image > .smart-card > div:first-child{flex:1 1 auto;min-height:0}
+.smart-runtime.smart_image > .smart-card > div:first-child > :first-child{width:100%;height:100%}
+.smart-runtime.smart_tabs .smart-tabs{flex:1 1 auto;min-height:0;align-content:stretch}
+.smart-runtime.smart_tabs .smart-tabs button{flex-grow:1}
+.smart-runtime.smart_card_grid > .smart-grid{align-content:stretch}
+.smart-runtime.smart_calendar > .smart-calendar{display:flex;flex-direction:column;overflow:auto}
+.smart-runtime.smart_calendar > .smart-calendar .smart-calendar-grid{
+ display:grid;flex:1 1 auto;min-height:0;grid-auto-rows:minmax(0,1fr)}
+.smart-runtime.smart_calendar > .smart-calendar .smart-calendar-grid > *{min-height:0}
+.smart-runtime.smart_navigation > .smart-navigation {align-content:stretch;align-items:stretch}
+.smart-runtime.smart_navigation .smart-navigation-item{flex:1 1 auto;min-height:0}
+.smart-runtime.smart_cart > .smart-cart-root{overflow:auto}
+
+/* Scrollbars are derived from content overflow, never component metadata.
+   Keep each scroller inside its own resized Page Builder surface. */
+.smart-runtime.smart_navigation>.smart-navigation,
+.smart-runtime.smart_card_grid>.smart-grid,
+.smart-runtime.smart_tabs>.smart-tabs-shell{
+ overflow:auto!important;
+ overscroll-behavior:contain;
+ min-width:0;min-height:0;
+ scrollbar-width:thin;
+}
+.smart-runtime.smart_navigation>.smart-navigation{
+ flex-wrap:nowrap!important;
+ align-content:flex-start!important;
+ align-items:flex-start!important;
+}
+.smart-runtime.smart_navigation .smart-navigation-item{
+ flex:0 0 auto!important;
+ min-height:34px;
+ max-width:none;
+ white-space:nowrap;
+}
+.smart-runtime.smart_tabs>.smart-tabs-shell .smart-tabs{
+ width:max-content;min-width:100%;
+ height:max-content;min-height:100%;
+ flex-wrap:nowrap!important;align-content:flex-start!important;
+}
+.smart-runtime.smart_tabs>.smart-tabs-shell .smart-tabs>button{
+ flex:0 0 auto!important;
+ white-space:nowrap;
+}
+/* Configured cardsPerColumn determines visible rows. Overflow scrolls inside. */
+.smart-runtime.smart_card_grid>.smart-grid{
+ align-content:start!important;
+}
+.smart-runtime.smart_card_grid>.smart-grid .smart-card{
+ min-height:0;
+}
+
+/* Actionable cards reuse the shared Grid renderer and its metadata event contract. */
+.smart-grid-action{display:block;min-width:0;min-height:0;width:100%;height:100%;padding:0;border:0;background:transparent;text-align:inherit;font:inherit;color:inherit;cursor:pointer}
+.smart-grid-action>.smart-card{height:100%}
+.smart-grid-action:focus-visible{outline:2px solid #2563eb;outline-offset:2px;border-radius:12px}
+
+/* Page Builder design-time examples. The editor adds builderPreview to its
+   transient render props; published pages and live preview never receive it. */
+.smart-editor-image-placeholder{
+ display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;
+ background:repeating-linear-gradient(135deg,#f1f5f9 0 10px,#e9eff6 10px 20px);
+ color:#617489;font-size:clamp(11px,1vw,14px);font-weight:500;
+ text-align:center;letter-spacing:.01em;
+}
+.smart-editor-container-placeholder{
+ display:flex;align-items:center;justify-content:center;min-height:48px;height:100%;
+ color:#73839a;font-size:12px;text-align:center;
+ background:repeating-linear-gradient(135deg,#fff 0 14px,#f8fafc 14px 28px);
+ outline:1px dashed #cbd5e1;outline-offset:-2px;
+ pointer-events:none;
+}
+
+/* Button metadata may specify a font size larger than the fixed canvas box.
+   Never show half of a wrapped label or paint text outside the component.
+   The full label remains available through the button's title. */
+.smart-runtime.smart_button>.smart-button {
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  line-height:1.2;min-width:0;
+}
+
+/* A single native Button surface renders either its label, its selected icon,
+   both, or a blank geometric shape. No decorative extra border is added. */
+.smart-runtime.smart_button>.smart-button{
+  display:flex;flex-direction:row;align-items:center;justify-content:center;
+  /* Do not spend the entire height of a small user-sized button on padding. */
+  gap:6px;padding:0 10px;align-items:safe center;
+}
+.smart-button-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smart-button-glyph{
+  /* 24px for ordinary text; grows with large kiosk captions (1.1em). */
+  display:block;flex:0 0 auto;width:min(65%,max(24px,1.1em));height:min(65%,max(24px,1.1em));
+  -webkit-mask-size:contain;mask-size:contain;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  pointer-events:none;
+}
+.smart-button-shape{display:flex;align-items:center;justify-content:center;
+  max-width:100%;max-height:100%;width:100%;height:100%;pointer-events:none}
+
+/* Reusable card content/footer. The inner button uses the existing Smart click
+   action; card-only layouts keep their previous geometry and hit target. */
+.smart-card-details{display:flex;flex:0 0 auto;flex-direction:column;gap:6px;min-width:0;padding:4px 10px 10px}
+.smart-card-description{display:block;min-width:0;overflow-wrap:anywhere;font-size:.85em;line-height:1.35;color:var(--md-secondary-text,#667085)}
+.smart-card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.smart-card-value{min-width:0;overflow-wrap:anywhere;font-size:1.2em;line-height:1.2}
+.smart-card-button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;
+ max-width:100%;min-height:34px;padding:7px 11px;border:1px solid;cursor:pointer;
+ line-height:1.2;font-weight:700;text-align:center;white-space:normal;overflow-wrap:anywhere}
+.smart-card-button:disabled{opacity:.55;cursor:not-allowed}
+.smart-card-button:focus-visible{outline:2px solid var(--md-focus-ring,#2563eb);outline-offset:2px}
+
+/* Optional Design 2 Focus Fill metadata. Unset values preserve original appearance. */
+.smart-lookup[style*="--smart-lookup-focus-color"] .smart-lookup-menu button:is(:hover,:focus-visible){
+ background:var(--smart-lookup-focus-color)!important;
+}
+.smart-navigation[style*="--smart-navigation-focus-color"] .smart-navigation-item:focus-visible{
+ background:var(--smart-navigation-focus-color)!important;
+}

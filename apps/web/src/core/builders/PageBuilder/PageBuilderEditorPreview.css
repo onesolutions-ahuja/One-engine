@@ -1,0 +1,15 @@
+/* Canvas-only editing aids. Never imported by published page runtime. */
+.builder-editor-mode .modern-canvas-builder [data-builder-editor="true"].record-component:not(.selected):hover,
+.builder-editor-mode .modern-canvas-builder [data-builder-editor="true"].record-component:not(.selected):focus-visible{
+ outline:1px dashed #86a8d5;
+ outline-offset:-1px;
+}
+/* A small caption distinguishes unconfigured third-party renderers from a
+   missing component. It is a non-interactive editor overlay, not a border. */
+.builder-editor-mode .modern-canvas-builder [data-builder-editor="true"]>.page-editor-generic-hint{
+ position:absolute;right:8px;bottom:8px;z-index:1;max-width:calc(100% - 16px);
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ font:500 11px/1.3 system-ui,sans-serif;color:#667b95;
+ border:0;border-radius:4px;padding:3px 6px;
+ background:rgb(241 245 249 / 88%);pointer-events:none;
+}

@@ -1,0 +1,52 @@
+{
+  "apiName": "smart_numpad",
+  "label": "Smart Numpad",
+  "category": "Inputs",
+  "description": "Formula-prefilled editable numeric/PIN input with keypad and three configurable action buttons.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_numpad/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_numpad/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 320,
+    "defaultHeight": 420,
+    "minWidth": 200,
+    "minHeight": 270
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "click",
+      "label": "Enter / Submit"
+    },
+    {
+      "apiName": "change",
+      "label": "Value Changed"
+    },
+    {
+      "apiName": "clear",
+      "label": "Clear"
+    },
+    {
+      "apiName": "backspace",
+      "label": "Backspace"
+    },
+    {
+      "apiName": "customButton1",
+      "label": "Custom Button 1"
+    },
+    {
+      "apiName": "customButton2",
+      "label": "Custom Button 2"
+    },
+    {
+      "apiName": "customButton3",
+      "label": "Custom Button 3"
+    }
+  ]
+}

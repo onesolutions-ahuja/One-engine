@@ -1,0 +1,31 @@
+.smart-formula{position:relative;width:130px;height:25px;min-width:95px;border:1px solid #b7c5d5;border-radius:3px;background:#fff;font:12px/23px Consolas,monospace;overflow:visible}
+.smart-formula-highlight{position:absolute;inset:0;overflow:hidden;white-space:pre;padding:0 5px;pointer-events:none;color:#283e56}
+.smart-formula-field{font-weight:600;color:#1766c4}.smart-formula-string{color:#22743f}.smart-formula-operator{color:#703eb0}
+.smart-formula>input{position:absolute;inset:0;box-sizing:border-box;width:100%;height:100%;font:inherit;padding:0 5px;border:0;background:transparent;color:transparent;caret-color:#1d3556;outline-offset:1px}
+.smart-formula>input::selection{background:#b8d9f055}.smart-formula>input::placeholder{color:#8797aa}
+.smart-formula-list{position:absolute;left:0;top:26px;z-index:5100;min-width:210px;max-height:200px;overflow:auto;background:#fff;border:1px solid #a3b4ca;box-shadow:0 9px 25px #0002}
+.smart-formula-list button{display:block;width:100%;background:white;color:#29476a;text-align:left;border:0;padding:7px 9px;cursor:pointer}
+.smart-formula-list button:hover{background:#dff0ff}
+.smart-formula-list button.is-active,.smart-formula-list button[aria-selected="true"]{background:#d7eaff;color:#133e75;font-weight:700;outline:1px solid #7ea8de;outline-offset:-1px}
+
+.smart-formula-list{z-index:6000!important;overflow-y:auto;pointer-events:auto}
+
+.smart-formula-signature{max-width:min(650px,calc(100vw - 12px));padding:7px 10px;border-radius:5px;border:1px solid #9eb5d0;background:#fff;color:#223b5c;box-shadow:0 6px 22px #0002;font:12px/1.5 Consolas,monospace;pointer-events:none;overflow-wrap:anywhere}
+/* When autocomplete is open, argument help belongs inside the SAME dropdown.
+ * Never float the signature over the formula input or its visible typing caret. */
+.smart-formula-list .smart-formula-signature-inline{
+ position:sticky;top:0;z-index:1;box-sizing:border-box;width:100%;max-width:100%;
+ padding:7px 9px;margin:0;border:0;border-bottom:1px solid #b7c9e0;
+ border-radius:0;background:#f4f8ff;box-shadow:none;pointer-events:none;
+}
+.smart-formula-signature strong{margin-right:3px;color:#1766c4}
+.smart-formula-signature .is-current{font-weight:800;color:#132b4c;background:#dcecff;border-radius:3px}
+
+.smart-formula-error{position:absolute;top:calc(100% + 3px);left:0;min-width:210px;max-width:380px;background:#fff3f1;border:1px solid #e6a7a0;border-radius:4px;padding:5px 7px;color:#9a302a;font:11px/1.35 "Segoe UI",Arial,sans-serif;z-index:6200;box-shadow:0 5px 12px #0001}
+
+.smart-formula-confirm-backdrop{position:fixed;inset:0;z-index:7200;display:flex;align-items:center;justify-content:center;background:#172b4680}
+.smart-formula-confirm{background:#fff;color:#20344d;box-shadow:0 14px 40px #11213855;border-radius:9px;max-width:min(450px,calc(100vw - 24px));padding:18px 22px;font:13px "Segoe UI",Arial,sans-serif}
+.smart-formula-confirm strong{display:block;font-size:16px;margin-bottom:7px}
+.smart-formula-confirm p{margin:0 0 16px;color:#a23d30}
+.smart-formula-confirm button{border:1px solid #a7bddd;border-radius:5px;background:#fff;padding:8px 12px;color:#224976;cursor:pointer;margin-right:8px}
+.smart-formula-confirm button:first-of-type{background:#216ab3;color:#fff;border-color:#216ab3}

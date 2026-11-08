@@ -1,0 +1,160 @@
+/* Consistent appearance for MetaDrive's operational/admin UI.
+ * Only opt-in platform surfaces: never override tenant-authored Page Runtime
+ * elements or an independent ACE application's own component palette.
+ * Appearance flows from the existing --md-* theme (light, dark, high-contrast).
+ */
+.lightning {
+  --md-control-surface: var(--md-surface);
+  --md-control-text: var(--md-text);
+  --md-control-muted: var(--md-text-2);
+  --md-control-outline: var(--md-separator);
+}
+/* Search, forms and metadata editors must not combine dark text with a dark
+ * control or light text with a hardcoded white background. */
+.lightning :is(
+  .workspace-records, .object-manager, .permissions-page, .settings-page,
+  .app-manager, .app-manager-list, .tenant-console, .flow-logs-page,
+  .flow-interviews, .scheduled-flows, .named-credentials-page,
+  .page-manager-view, .approval-process-manager, .automation-settings-page
+) :is(
+  input[type="text"],input[type="search"],input[type="email"],
+  input[type="number"],input[type="date"],input[type="datetime-local"],
+  input[type="tel"],input[type="url"],input[type="password"],
+  select,textarea
+) {
+  background-color:var(--md-control-surface);
+  color:var(--md-control-text);
+  border-color:var(--md-control-outline);
+  caret-color:var(--md-control-text);
+}
+.lightning :is(
+  .workspace-records, .object-manager, .permissions-page, .settings-page,
+  .app-manager, .app-manager-list, .tenant-console, .flow-logs-page,
+  .flow-interviews, .scheduled-flows, .named-credentials-page,
+  .page-manager-view, .approval-process-manager, .automation-settings-page
+) :is(input,textarea)::placeholder {
+  color:var(--md-control-muted);
+  opacity:1;
+}
+/* Record-object and navigation pickers live in the shared workspace chrome.
+ * Avoid the original white dropdown with nearly white content in dark mode. */
+.lightning :is(
+  .header-record-picker-control,.header-record-picker-options,
+  .global-record-search-results,.header-list-search,
+  .records-search,.records-view-popover-panel
+) {
+  background-color:var(--md-control-surface);
+  color:var(--md-control-text);
+  border-color:var(--md-control-outline);
+}
+.lightning :is(
+  .header-record-picker-control,.header-list-search,.records-search,
+  .global-record-search-results
+) :is(input:not([type="checkbox"]),button:not(.btn-brand)) {
+  color:var(--md-control-text);
+}
+.lightning :is(.header-record-picker-options,.global-record-search-results)
+  :is(button,[role="option"]) {
+  background-color:var(--md-control-surface);
+  color:var(--md-control-text);
+}
+.lightning :is(.header-record-picker-options,.global-record-search-results)
+  :is(button,[role="option"]):is(:hover,:focus-visible,[aria-selected="true"],.selected) {
+  background-color:color-mix(in srgb,var(--md-primary) 12%,var(--md-control-surface));
+  color:var(--md-control-text);
+}
+.lightning :is(
+  .header-record-picker-options small,.global-record-search-results small,
+  .global-search-results-heading span,.header-search-empty,
+  .records-main-toolbar .records-list-context,
+  .records-main-toolbar > div:first-child > span
+) {
+  color:var(--md-control-muted);
+}
+/* Explicitly keep light CTA text only on filled, contrast-safe actions. */
+.lightning :is(.records-page,.page-manager-view,.object-manager,.settings-page)
+  .btn-brand:not(:disabled) {
+  background-color:var(--md-action-fill);
+  border-color:var(--md-action-fill);
+  color:#fff;
+}
+.lightning .records-layout-switcher button.active {
+  background-color:var(--md-surface);
+  color:var(--md-action-ink);
+}
+.lightning .records-layout-switcher button:not(.active) {
+  color:var(--md-text-2);
+}
+/* A record list with no rows must not stretch a two-item empty state into
+ * two large grid tracks. Keep empty-state messaging and creation action together. */
+.lightning .records-list-card > .records-empty-action {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+  gap:10px;
+  min-height:0;
+  padding:16px;
+}
+.lightning .records-page-heading { gap:12px; margin-bottom:14px; }
+.lightning .records-main-toolbar { row-gap:10px; }
+
+/* Builder/editor chrome, report/Flow setup and metadata lists share the
+ * platform palette too. The :where() specificity deliberately lets selected,
+ * error, primary, and tenant-authored component rules win. Preview canvas,
+ * published pages and app-authored visuals are intentionally excluded. */
+.lightning :where(
+  .metadata-card, .object-manager-menu, .object-list-panel,
+  .object-manager-picker-search, .object-manager-picker select,
+  .object-subnav-more, .builder-titlebar, .report-titlebar,
+  .builder-title-controls select, .builder-meta-bar > select,
+  .component-panel, .properties-panel, .component-category,
+  .component-option, .component-library-card, .device-picker,
+  .report-outline, .report-fields-panel, .report-type-modal,
+  .report-type-categories button:not(.active), .outline-field,
+  .report-type-select select, .report-summary, .report-run-filters,
+  .report-filter-editor select, .report-filter-editor input,
+  .flow-start-type, .flow-topbar, .flow-toolbox, .flow-settings,
+  .flow-element-option:not(.active):not(.selected),
+  .flow-node-inline-actions .icon-button, .flow-step,
+  .flow-end-node, .flow-zoom, .flow-zoom button,
+  .flow-bottom-bar, .flow-manager-item, .flow-validation,
+  .flow-route, .app-manager-assigned-page, .record-activity-list > li,
+  .record-chatter-posts > li, .connection-health-popover,
+  .profile-menu-panel, .profile-password-dialog
+) {
+  background-color:var(--md-surface);
+  color:var(--md-text);
+  border-color:var(--md-separator);
+}
+.lightning :where(.flow-toolbox,.flow-settings,.report-fields-panel,
+  .report-outline,.component-panel,.properties-panel)
+  :is(input,select,textarea)::placeholder {
+  color:var(--md-text-2);
+  opacity:1;
+}
+/* Preserve semantic accents on explicit active controls, not generic text. */
+.lightning :where(.report-type-categories button,.flow-element-option,
+  .object-list-item,.component-option):focus-visible {
+  outline:2px solid var(--md-focus-ring,var(--md-primary));
+  outline-offset:1px;
+}
+
+/* Accessible focus without changing tenant-authored components. */
+.lightning :is(
+  .records-page,.object-manager,.permissions-page,.settings-page,
+  .app-manager,.tenant-console,.flow-logs-page,.page-manager-view
+) :is(input,textarea,select):focus-visible {
+  outline:2px solid var(--md-focus-ring,var(--md-primary));
+  outline-offset:2px;
+}
+@media (max-width:640px) {
+  .lightning .records-page-heading { margin-bottom:12px; }
+  .lightning .records-main-toolbar { row-gap:12px; }
+}
+@media (forced-colors:active) {
+  .lightning :is(.header-record-picker-control,.header-record-picker-options,
+    .global-record-search-results,.records-view-popover-panel) {
+    border:1px solid CanvasText;
+  }
+}

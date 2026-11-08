@@ -1,0 +1,4 @@
+import SmartFieldInput from '../../../../component-libraries/shared/primitives/SmartFieldInput/SmartFieldInput';
+import type {ObjectMetadata} from '../../../metadata/Definitions/metadata';
+/** Responsive setting values retain the component registry's existing typed metadata. */
+export default function ResponsivePropertyEditor({id,value,disabled,objects,primaryObjectApiName,appObjectApiNames,onChange}:{id:string;value:string;disabled:boolean;objects:readonly ObjectMetadata[];primaryObjectApiName:string;appObjectApiNames:readonly string[];onChange:(value:string)=>void}){return <SmartFieldInput id={id} disabled={disabled} value={value} onChange={onChange} objects={objects} primaryObjectApiName={primaryObjectApiName} appObjectApiNames={appObjectApiNames} kind="text" multiline={value.length>90}/>}

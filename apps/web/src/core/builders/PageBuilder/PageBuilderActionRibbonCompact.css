@@ -1,0 +1,193 @@
+/* One Event column (three rows); the rest of Actions mirrors Data:
+   one Formula Bar row plus two rows per section. Styles are scoped to the
+   builder; horizontally scroll only when actual contents exceed the viewport. */
+.office-builder-ribbon[aria-label="Page Builder ribbon"]:not(.is-interactive-preview)
+ #page-builder-tab-content.office-ribbon-content[aria-label="Component Action"].office-ribbon-content{
+ --page-ribbon-scroll-strip-height:127px;
+}
+.office-builder-ribbon:not(.is-interactive-preview)
+ #page-builder-tab-content.office-ribbon-content>.page-action-ribbon-workspace.page-action-compact-workspace{
+ box-sizing:border-box!important;display:flex!important;flex-direction:row!important;
+ align-items:stretch!important;flex:0 0 auto!important;width:max-content!important;
+ min-width:100%!important;height:114px!important;min-height:114px!important;
+ max-height:114px!important;padding:0!important;gap:0!important;
+}
+.office-builder-ribbon .page-action-compact-event,
+.office-builder-ribbon .page-action-compact-group{
+ box-sizing:border-box;position:relative;flex:0 0 auto;display:flex;flex-direction:column;
+ align-items:stretch;justify-content:flex-start;height:100%;min-height:0;
+ padding:5px 8px 20px;border-right:1px solid #cbd6e2;
+}
+.office-builder-ribbon .page-action-compact-event{width:275px;min-width:275px;height:114px;}
+.office-builder-ribbon .page-action-compact-event-rows,
+.office-builder-ribbon .page-action-compact-rows{
+ box-sizing:border-box;display:grid;grid-template-rows:repeat(3,26px);
+ grid-auto-flow:row;row-gap:4px;align-items:start;
+}
+.office-builder-ribbon .page-action-slot,
+.office-builder-ribbon .page-action-compact-mapping{
+ display:flex;box-sizing:border-box;align-items:center;gap:2px;
+ height:26px;min-height:26px;max-height:26px;min-width:0;position:relative;
+ font:11px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .page-action-slot>label,
+.office-builder-ribbon .page-action-compact-mapping>span{
+ box-sizing:border-box;display:inline-flex;align-items:center;
+ flex:0 0 97px;min-width:0;max-width:97px;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+ color:#29476a;font-size:11px;
+}
+.office-builder-ribbon .page-action-slot>select,
+.office-builder-ribbon .page-action-compact-mapping>:is(input,select){
+ box-sizing:border-box;flex:1 1 auto;min-width:0!important;max-width:100%!important;
+ height:26px!important;min-height:26px!important;width:0!important;
+ padding:3px 5px;border:1px solid #b7c9df;border-radius:4px;
+ background:#fff;color:#29476a;font:11px "Segoe UI",Arial,sans-serif;
+}
+.office-builder-ribbon .page-action-slot.is-selected>select{
+ border-color:#1975dc;box-shadow:0 0 0 1px #8bbffa;
+ background:#eef5ff;
+}
+.office-builder-ribbon .page-action-slot .page-action-visibility-toggle{
+ box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+ flex:0 0 23px;width:23px;min-width:23px;height:26px;min-height:26px;
+ padding:0;margin:0;border:0;border-radius:3px;background:transparent;
+ color:#385b82;cursor:pointer;
+}
+.office-builder-ribbon .page-action-slot .page-action-visibility-toggle:hover:not(:disabled){
+ background:#e7f0fb;
+}
+.office-builder-ribbon .page-action-slot .page-action-visibility-toggle[aria-pressed="false"]{
+ color:#8997a9;
+}
+.office-builder-ribbon .page-action-slot .page-action-visibility-toggle:focus-visible{
+ outline:2px solid #1975dc;outline-offset:1px;
+}
+.office-builder-ribbon .page-action-slot .page-action-visibility-toggle:disabled{
+ opacity:.4;cursor:not-allowed;
+}
+.office-builder-ribbon .page-action-slot .page-action-icon-remove{
+ box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+ flex:0 0 26px;width:26px;height:26px;min-width:26px;
+ padding:0!important;margin:0!important;border:1px solid #b7c9df;
+ border-radius:4px;background:#fff;color:#ad3750;cursor:pointer;
+}
+.office-builder-ribbon .page-action-slot .page-action-icon-remove:disabled{
+ color:#9ca5b5;background:#f0f3f8;cursor:not-allowed;
+}
+.office-builder-ribbon .page-action-section-caption{
+ box-sizing:border-box;position:absolute;bottom:1px;left:0;right:0;
+ text-align:center;line-height:17px;min-height:18px;height:18px;
+ font:11px/17px "Segoe UI",Arial,sans-serif;color:#455b77;
+ border-top:1px solid #e0e7ef;
+}
+.office-builder-ribbon .page-action-compact-main{
+ display:flex;flex:1 0 auto;flex-direction:column;
+ min-width:max-content;height:114px;overflow:visible;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar{
+ box-sizing:border-box;display:flex;flex:0 0 34px;height:34px;min-height:34px;
+ align-items:center;gap:3px;width:100%;min-width:320px;
+ padding:3px 7px 3px;border-bottom:1px solid #d6e1ee;
+ background:#f5f8fd;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar
+ :is(.page-action-formula-menu,.page-action-formula-symbol){
+ display:inline-flex;align-items:center;justify-content:center;
+ box-sizing:border-box;flex:0 0 30px;width:30px;height:27px;
+ border:1px solid #ccd9e8;border-radius:4px;background:#fff;color:#304b71;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar>.smart-formula{
+ display:block;box-sizing:border-box;flex:1 1 0;
+ width:100%;min-width:130px;height:27px;border:1px solid #ccd9e8;
+ border-radius:4px;background:#fff;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar .smart-formula input{
+ box-sizing:border-box;width:100%;height:25px;padding:2px 8px;
+ color:#304b71;font:12px Consolas,monospace;
+}
+.office-builder-ribbon .page-action-compact-sections{
+ box-sizing:border-box;display:flex;flex-flow:row nowrap;
+ align-items:stretch;min-width:max-content;height:80px;
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-group{
+ box-sizing:border-box;height:80px;min-height:80px;max-height:80px;
+ padding:3px 8px 20px;gap:0!important;
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-custom{
+ width:524px;min-width:524px;
+}
+.office-builder-ribbon .page-action-compact-custom-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ grid-template-rows:repeat(2,26px);grid-auto-flow:column;
+ gap:4px 6px;align-content:start;height:56px;
+}
+.office-builder-ribbon .page-action-compact-custom .page-action-slot>label{
+ flex-basis:99px;max-width:99px;
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-extra{
+ width:265px;min-width:265px;
+}
+.office-builder-ribbon .page-action-compact-sections .page-action-compact-rows{
+ grid-template-rows:repeat(2,26px);height:56px;row-gap:4px;
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-group:last-child{
+ border-right:0!important;
+}
+.office-builder-ribbon .page-action-compact-group .page-action-mapping-error{
+ position:absolute;left:4px;bottom:-19px;z-index:20;
+ background:#fff1f1;color:#9f2138;font-size:10px;
+ border:1px solid #f0b6bd;padding:1px 4px;
+}
+.office-builder-ribbon .page-action-compact-mapping :is(input,select):disabled,
+.office-builder-ribbon .page-action-slot>select:disabled{
+ background:#eff2f7;color:#98a5b3;cursor:not-allowed;
+}
+
+/* Fixed 3 November property slots. Preserve every action/event option and
+ * existing bindings; style alone cannot remove a supported interaction. */
+.office-builder-ribbon .page-action-compact-event{
+  width:241px;min-width:241px;max-width:241px;
+}
+.office-builder-ribbon .page-action-slot{
+  width:225px;min-width:225px;max-width:225px;
+  height:26px;min-height:26px;max-height:26px;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar{
+  padding:0 7px;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar>.smart-formula{
+  box-sizing:border-box;flex:0 0 225px;width:225px;min-width:225px;max-width:225px;
+  height:34px;min-height:34px;max-height:34px;
+}
+.office-builder-ribbon .page-action-compact-workspace .page-action-formula-bar .smart-formula input{
+  box-sizing:border-box;width:100%;height:32px;padding:2px 8px;
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-custom{
+  width:472px;min-width:472px;max-width:472px;
+}
+.office-builder-ribbon .page-action-compact-custom-grid{
+  grid-template-columns:repeat(2,225px);
+}
+
+
+/* Audit DEF-043: reserve an actual text track for 'On Session Start' and
+   ensure the adjacent selector is reachable without overlapping labels. */
+.office-builder-ribbon .page-action-compact-event{width:325px;min-width:325px}
+.office-builder-ribbon .page-action-compact-event .page-action-slot>label{
+  flex:0 0 128px;min-width:128px;max-width:128px;
+  white-space:nowrap;overflow:visible;text-overflow:clip
+}
+.office-builder-ribbon .page-action-compact-event .page-action-slot>select{
+  min-width:140px!important;flex:1 1 140px!important
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-custom{
+  width:562px;min-width:562px
+}
+.office-builder-ribbon .page-action-compact-custom .page-action-slot>label{
+  flex:0 0 117px;min-width:117px;max-width:117px;
+  white-space:nowrap;overflow:visible;text-overflow:clip
+}
+.office-builder-ribbon .page-action-compact-sections>.page-action-compact-extra{
+  width:290px;min-width:290px
+}

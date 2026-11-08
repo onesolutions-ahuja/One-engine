@@ -1,0 +1,299 @@
+/* Design ribbon only — arrangements approved in the annotated screenshots.
+   Keep source metadata and each existing editor/action intact. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>.office-ribbon-part-group{
+  padding-left:5px!important;padding-right:5px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"]){
+  flex:0 0 174px!important;width:174px!important;min-width:174px!important;max-width:174px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities){
+  display:grid!important;grid-template-columns:45px 46px 66px!important;
+  grid-template-rows:39px 39px!important;gap:2px 3px!important;
+  justify-content:center!important;align-content:center!important;
+  justify-items:center!important;align-items:center!important;
+  height:84px!important;max-height:84px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>:nth-child(1){
+  grid-column:1!important;grid-row:1!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>:nth-child(2){
+  grid-column:2!important;grid-row:1!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>:nth-child(3){
+  grid-column:3!important;grid-row:1!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>:nth-child(4){
+  grid-column:1!important;grid-row:2!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group[data-ribbon-group="Surface"]
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>:nth-child(5){
+  grid-column:2!important;grid-row:2!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group[data-ribbon-group="Card"]
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>:nth-child(5){
+  grid-column:3!important;grid-row:2!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capabilities:not(.office-ribbon-typography-capabilities)>.office-ribbon-direct-number{
+  display:grid!important;grid-template-columns:66px!important;grid-template-rows:23px 12px!important;
+  justify-items:center!important;align-items:center!important;width:66px!important;min-width:66px!important;
+  max-width:66px!important;height:39px!important;min-height:39px!important;
+  gap:1px!important;padding:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-direct-number .office-ribbon-command-glyph{
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-direct-number select{
+  grid-column:1!important;grid-row:1!important;
+  width:62px!important;min-width:62px!important;max-width:62px!important;
+  height:23px!important;font-size:11px!important;padding:1px 2px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-direct-number .office-ribbon-command-label{
+  grid-column:1!important;grid-row:2!important;justify-self:center!important;
+  width:66px!important;max-width:66px!important;font-size:9px!important;
+  text-align:center!important;white-space:nowrap!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Surface"],[data-ribbon-group="Card"])
+.office-ribbon-capability-icon{
+  width:45px!important;min-width:45px!important;max-width:45px!important;
+  height:39px!important;min-height:39px!important;max-height:39px!important;
+  gap:2px!important;
+}
+/* Heading and supporting text use the SAME grid structure, not independent hacks. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Heading"],[data-ribbon-group="Supporting text"]){
+  flex:0 0 169px!important;width:169px!important;min-width:169px!important;max-width:169px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-layout.office-ribbon-typography-capabilities{
+  display:grid!important;grid-template-columns:1fr!important;
+  grid-template-rows:34px 27px 19px!important;gap:1px!important;
+  align-content:center!important;justify-items:stretch!important;
+  width:100%!important;height:84px!important;max-height:84px!important;
+  overflow:visible!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-top,
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-middle{
+  display:grid!important;grid-template-columns:64px 79px!important;
+  gap:3px!important;justify-content:center!important;align-items:center!important;
+  height:100%!important;width:100%!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-top >*{
+  min-width:0!important;max-width:none!important;justify-self:center!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-top .office-ribbon-compact-size select{
+  width:62px!important;min-width:62px!important;max-width:62px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-middle .office-ribbon-direct-number{
+  display:grid!important;grid-template-columns:16px 46px!important;
+  grid-template-rows:24px!important;gap:1px!important;width:64px!important;min-width:64px!important;
+  max-width:64px!important;height:26px!important;min-height:26px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-middle .office-ribbon-direct-number .office-ribbon-command-glyph{
+  display:flex!important;grid-column:1!important;grid-row:1!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-middle .office-ribbon-direct-number select{
+  grid-column:2!important;grid-row:1!important;width:46px!important;min-width:46px!important;
+  max-width:46px!important;height:23px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-middle .office-ribbon-direct-number .office-ribbon-command-label{
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-middle .office-ribbon-align-direct{
+  display:grid!important;grid-template-columns:repeat(3,23px)!important;gap:2px!important;
+  justify-content:center!important;justify-items:center!important;
+  height:25px!important;width:79px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-bottom{
+  display:flex!important;justify-content:flex-end!important;align-items:center!important;
+  width:100%!important;height:19px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-bottom .office-ribbon-weight-direct{
+  display:grid!important;grid-template-columns:repeat(3,23px)!important;
+  grid-template-rows:17px!important;gap:2px!important;justify-content:center!important;
+  justify-items:center!important;width:79px!important;height:18px!important;max-height:18px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-text-bottom .office-ribbon-weight-direct button{
+  width:23px!important;min-width:23px!important;max-width:23px!important;
+  height:17px!important;min-height:17px!important;
+}
+/* Badge screenshot: Fill + Size on top; Text + three weights below. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group[data-ribbon-group="Badge"]{
+  flex:0 0 137px!important;width:137px!important;min-width:137px!important;max-width:137px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout.office-ribbon-typography-capabilities{
+  display:grid!important;grid-template-columns:35px 81px!important;
+  grid-template-rows:40px 40px!important;gap:3px 4px!important;
+  justify-content:center!important;align-content:center!important;
+  width:100%!important;height:85px!important;max-height:85px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout>div{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  min-width:0!important;width:100%!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout .office-ribbon-badge-fill,
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout .office-ribbon-badge-size{grid-row:1!important}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout .office-ribbon-badge-text,
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout .office-ribbon-badge-weights{grid-row:2!important}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-layout .office-ribbon-capability-icon{
+  width:35px!important;min-width:35px!important;max-width:35px!important;
+  height:39px!important;min-height:39px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-size .office-ribbon-compact-size{
+  width:80px!important;min-width:80px!important;max-width:80px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-size select{
+  width:80px!important;min-width:80px!important;max-width:80px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-weights .office-ribbon-weight-direct{
+  display:grid!important;grid-template-columns:repeat(3,23px)!important;
+  gap:3px!important;width:80px!important;max-height:20px!important;
+  justify-items:center!important;justify-content:center!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"] .office-ribbon-badge-weights .office-ribbon-weight-direct button{
+  width:23px!important;min-width:23px!important;max-width:23px!important;
+  height:17px!important;min-height:17px!important;
+}
+/* Image screenshot: unscaled Fit/Shape above Position/Ratio in two compact columns. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group[data-ribbon-group="Image"]{
+  flex:0 0 116px!important;width:116px!important;min-width:116px!important;max-width:116px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group[data-ribbon-group="Image"] .office-ribbon-capabilities:not(.office-ribbon-typography-capabilities){
+  display:grid!important;grid-template-columns:repeat(2,49px)!important;
+  grid-template-rows:repeat(2,39px)!important;gap:3px 3px!important;
+  justify-content:center!important;align-content:center!important;
+  justify-items:center!important;width:100%!important;height:85px!important;max-height:85px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group[data-ribbon-group="Image"] .office-ribbon-capability-icon{
+  width:49px!important;min-width:49px!important;max-width:49px!important;
+  height:39px!important;min-height:39px!important;max-height:39px!important;
+}
+/* Theme + Surface: two compact aligned rows using existing metadata dropdowns. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-item-grid-extra:has(.office-ribbon-extra-field select[aria-label="Theme"]){
+  flex:0 0 173px!important;width:173px!important;min-width:173px!important;max-width:173px!important;
+  padding:3px 6px 19px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-item-grid-extra:has(.office-ribbon-extra-field select[aria-label="Theme"]) .office-ribbon-extra-grid{
+  display:flex!important;flex-direction:column!important;gap:3px!important;
+  justify-content:center!important;height:85px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-item-grid-extra:has(.office-ribbon-extra-field select[aria-label="Theme"]) .office-ribbon-extra-field{
+  display:grid!important;grid-template-columns:55px 96px!important;gap:4px!important;
+  height:28px!important;min-height:28px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-item-grid-extra:has(.office-ribbon-extra-field select[aria-label="Theme"]) .office-ribbon-extra-field select{
+  width:96px!important;min-width:96px!important;max-width:96px!important;
+  height:25px!important;
+}
+
+
+/* Typography overlap correction: both controls use the same 90px dropdown.
+   Reserve a complete column for numeric controls, never place alignment above it. */
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]>
+.office-ribbon-part-group:is([data-ribbon-group="Heading"],[data-ribbon-group="Supporting text"]){
+  flex:0 0 205px!important;width:205px!important;min-width:205px!important;max-width:205px!important;
+  padding:3px 7px 19px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-layout.office-ribbon-typography-capabilities{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:36px 36px 17px!important;gap:0!important;
+  width:100%!important;height:89px!important;min-height:89px!important;
+  max-height:89px!important;overflow:visible!important;align-content:center!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+:is(.office-ribbon-text-top,.office-ribbon-text-middle){
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:94px 80px!important;column-gap:5px!important;
+  align-items:center!important;justify-content:center!important;
+  width:100%!important;min-width:0!important;height:36px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-top .office-ribbon-compact-size{
+  display:grid!important;grid-template-rows:25px 11px!important;gap:0!important;
+  justify-items:center!important;align-items:center!important;
+  width:94px!important;min-width:94px!important;max-width:94px!important;
+  height:36px!important;min-height:36px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-top .office-ribbon-compact-size select{
+  box-sizing:border-box!important;display:block!important;width:90px!important;
+  min-width:90px!important;max-width:90px!important;height:25px!important;
+  min-height:25px!important;padding:2px 4px!important;font-size:12px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-middle .office-ribbon-direct-number{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:94px!important;grid-template-rows:25px 11px!important;
+  width:94px!important;min-width:94px!important;max-width:94px!important;
+  height:36px!important;min-height:36px!important;max-height:36px!important;
+  justify-items:center!important;align-items:center!important;
+  gap:0!important;padding:0!important;margin:0!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-middle .office-ribbon-direct-number .office-ribbon-command-glyph{
+  display:none!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-middle .office-ribbon-direct-number select{
+  box-sizing:border-box!important;grid-column:1!important;grid-row:1!important;
+  width:90px!important;min-width:90px!important;max-width:90px!important;
+  height:25px!important;min-height:25px!important;padding:2px 4px!important;
+  font-size:12px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-middle .office-ribbon-direct-number .office-ribbon-command-label{
+  display:block!important;grid-column:1!important;grid-row:2!important;
+  width:94px!important;min-width:94px!important;max-width:94px!important;
+  justify-self:center!important;text-align:center!important;
+  font:500 10px/11px "Segoe UI",Arial,sans-serif!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-middle .office-ribbon-align-direct{
+  grid-column:2!important;display:grid!important;
+  grid-template-columns:repeat(3,24px)!important;gap:3px!important;
+  justify-content:center!important;align-content:center!important;
+  align-items:center!important;justify-items:center!important;
+  width:80px!important;min-width:80px!important;max-width:80px!important;
+  height:28px!important;min-height:28px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-bottom{
+  justify-content:flex-end!important;width:100%!important;height:17px!important;
+}
+.office-builder-ribbon #page-builder-tab-content[aria-label="Component Properties"]
+.office-ribbon-text-bottom .office-ribbon-weight-direct{
+  display:grid!important;grid-template-columns:repeat(3,24px)!important;gap:3px!important;
+  justify-content:center!important;align-items:center!important;
+  width:80px!important;height:17px!important;max-height:17px!important;
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "apiName": "SystemPanel",
+    "label": "System Panel",
+    "category": "Layout",
+    "description": "Protected reusable information panel for Setup and tenant page, dashboard or Flow surfaces; no privileged operations.",
+    "scope": "platform-system",
+    "surfaces": [
+      "page",
+      "dashboard",
+      "flow",
+      "platform"
+    ],
+    "version": 1,
+    "defaults": {
+      "title": "Panel",
+      "description": "",
+      "accentColor": "#1b6586"
+    },
+    "jsx": "core/components/SystemPanel/SystemPanel.jsx",
+    "css": "core/components/SystemPanel/SystemPanel.css",
+    "resize": {
+      "defaultWidth": 440,
+      "defaultHeight": 200,
+      "minWidth": 180,
+      "minHeight": 90
+    }
+  }
+]

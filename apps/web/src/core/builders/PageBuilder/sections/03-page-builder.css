@@ -1,0 +1,441 @@
+
+.office-ribbon-inspector-host .canvas-position-grid .form-label,
+.office-ribbon-inspector-host .form-grid .form-label{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.office-ribbon-inspector-host .canvas-position-grid input{width:80px!important}
+.office-ribbon-inspector-host .canvas-align-choices{display:flex;flex-wrap:wrap;gap:3px;max-width:235px}
+.office-ribbon-inspector-host .canvas-align-choices button,
+.office-ribbon-inspector-host .btn-small{min-height:24px;height:auto;padding:3px 6px;font-size:12px}
+.office-ribbon-inspector-host .metadata-component-visual-editor.compact-ribbon-visual-editor {
+  display:inline-block;max-width:none;border-right:0!important;padding:0 6px!important
+}
+.office-ribbon-inspector-host .compact-visual-groups{height:80px;align-items:flex-start}
+.office-ribbon-inspector-host .compact-visual-group{height:78px;min-width:128px;max-width:215px}
+.office-ribbon-inspector-host .compact-visual-group select{width:104px}
+.office-ribbon-inspector-host details summary{cursor:pointer;font-size:12px;min-height:24px;white-space:normal}
+.office-ribbon-inspector-host .builder-advanced-panel[open],
+.office-ribbon-inspector-host .visual-advanced-properties[open]{
+  position:relative;z-index:3;background:var(--md-surface,#fff);
+  max-height:115px;overflow:auto
+}
+
+/* Consistent Office-style grouping across the ribbon and metadata editor. */
+.office-builder-ribbon .office-ribbon-group{display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;flex-shrink:0;border-right:1px solid #c8cdd4;padding:3px 10px 0;box-sizing:border-box}
+.office-builder-ribbon .office-ribbon-group>span:last-child{font-size:12px;text-align:center;color:#626d7e;padding:4px 0 2px}
+.office-builder-ribbon .office-ribbon-stack{grid-template-rows:repeat(3,27px);gap:2px}
+.office-builder-ribbon .office-ribbon-stack>button{display:flex;align-items:center;gap:7px;font-size:12px;min-height:27px;max-height:27px;white-space:nowrap}
+.office-builder-ribbon .office-ribbon-stack>button svg{width:16px;height:16px;flex:0 0 16px}
+.office-ribbon-library.office-ribbon-group{width:285px;min-width:285px;max-width:285px;gap:3px;overflow:hidden}
+.office-ribbon-library.office-ribbon-group>input,.office-ribbon-library.office-ribbon-group>select{height:25px;width:175px;flex:0 0 25px;font-size:12px}
+.office-ribbon-library.office-ribbon-group .office-ribbon-library-items{align-content:start;max-height:53px;overflow:auto;gap:2px}
+.office-ribbon-library-items button{display:inline-flex;align-items:center;gap:4px;max-height:24px;font-size:12px}
+.office-ribbon-library-items button svg{width:13px;height:13px;flex:none}
+.office-ribbon-inspector-host{max-width:100%;min-width:300px;flex:1 1 320px;overflow:auto}
+.office-ribbon-inspector-host .properties-panel{display:block!important;min-width:0!important}
+.office-ribbon-inspector-host .properties-panel .form-grid{display:grid;grid-template-columns:repeat(2,minmax(110px,1fr));gap:5px;max-width:280px}
+.office-ribbon-inspector-host .properties-panel .form-label{font-size:12px}
+.office-ribbon-inspector-host .properties-panel input:not([type=checkbox]),.office-ribbon-inspector-host .properties-panel select{box-sizing:border-box;max-width:170px;height:25px;font-size:12px}
+.office-ribbon-inspector-host .properties-panel .properties-section-title{font-size:12px;padding:2px 0}
+.office-ribbon-inspector-host .properties-panel .metadata-card{max-width:220px;min-width:140px}
+.office-ribbon-inspector-host .properties-panel .visual-preset-section{display:inline-flex;vertical-align:top;flex-direction:column;min-width:140px;max-width:200px;margin:3px;border-right:1px solid #c8cdd4;padding:3px 7px}
+.office-ribbon-inspector-host .compact-visual-groups{align-items:stretch;height:92px}
+.office-ribbon-inspector-host .compact-visual-group{justify-content:flex-start;gap:5px}
+
+
+/* Office ribbon final pass: three rows per group, persistent contextual editors. */
+.office-builder-ribbon .office-ribbon-tabs{gap:0;min-height:44px}
+.office-builder-ribbon .office-ribbon-group{min-width:158px;max-width:290px}
+.office-builder-ribbon .office-ribbon-stack{display:grid;grid-template-rows:repeat(3,27px);align-content:start;gap:3px}
+.office-builder-ribbon .office-ribbon-inline-field{display:flex;align-items:center;gap:6px;min-height:27px;font-size:12px;white-space:nowrap}
+.office-builder-ribbon .office-ribbon-inline-field svg{width:16px;height:16px;flex-shrink:0}
+.office-builder-ribbon .office-ribbon-inline-field input,
+.office-builder-ribbon .office-ribbon-inline-field select,
+.office-builder-ribbon .office-ribbon-version-group select{
+ min-width:0;width:132px;max-width:150px;height:25px;box-sizing:border-box;
+ background:var(--md-surface,#fff);color:var(--md-text,#243248);
+ border:1px solid #bbc6d6;border-radius:4px;padding:2px 5px;font-size:12px
+}
+.office-builder-ribbon .office-ribbon-inline-field input[type=number]{width:95px}
+.office-builder-ribbon .office-ribbon-status{font-size:12px;line-height:27px;white-space:nowrap;padding-left:6px}
+.office-builder-ribbon .office-ribbon-checkbox{display:inline-flex;align-items:center;gap:6px;min-height:27px;font-size:12px}
+.office-builder-ribbon .office-ribbon-version-group{min-width:190px}
+.office-builder-ribbon .office-ribbon-version-group select{width:174px;max-width:180px}
+.office-builder-ribbon .office-ribbon-library.office-ribbon-group{min-width:285px;width:285px;max-width:285px;gap:3px}
+.office-builder-ribbon .office-ribbon-library-items{
+ display:grid!important;grid-template-rows:repeat(3,25px);grid-auto-flow:column;
+ grid-auto-columns:max-content;align-items:start;justify-content:start;
+ max-height:84px!important;min-height:81px;gap:2px 5px;overflow-x:auto;overflow-y:hidden
+}
+.office-builder-ribbon .office-ribbon-library-items button{min-height:24px;max-height:24px}
+.office-builder-ribbon .office-ribbon-inspector-host{min-width:0;flex:1 1 auto;overflow:hidden}
+.office-ribbon-inspector-host .properties-panel{
+ display:flex!important;align-items:flex-start;gap:0;
+ min-width:0!important;height:144px!important;max-height:144px!important;
+ overflow-x:auto!important;overflow-y:auto!important;padding:3px 7px!important;
+ scrollbar-width:thin
+}
+.office-ribbon-inspector-host .properties-header{display:none!important}
+.office-ribbon-inspector-host .properties-help{display:none}
+.office-ribbon-inspector-host .properties-section-title,.office-ribbon-group-heading{
+ color:#35435a;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap;
+ padding:0 3px;margin:1px 0 3px
+}
+.office-ribbon-inspector-host .metadata-component-visual-editor{
+ display:inline-flex!important;align-items:flex-start;min-width:max-content;flex-shrink:0
+}
+.office-ribbon-inspector-host .compact-visual-groups{min-width:max-content;height:106px!important;gap:0;align-items:flex-start}
+.office-ribbon-inspector-host .compact-visual-group{
+ min-width:125px;max-width:240px;height:105px!important;padding:2px 9px!important;gap:4px
+}
+.office-ribbon-inspector-host .office-ribbon-exact-size{
+ min-width:300px;max-width:340px;overflow-y:auto
+}
+.office-ribbon-inspector-host .office-ribbon-exact-size .visual-advanced-grid{
+ display:grid;grid-template-columns:repeat(3,minmax(90px,1fr));gap:4px 6px;
+ max-width:none;max-height:none;overflow:visible;padding:0
+}
+.office-ribbon-inspector-host .visual-advanced-grid .form-label{
+ display:flex;flex-direction:column;align-items:stretch;gap:1px;min-height:0;font-size:12px
+}
+.office-ribbon-inspector-host .visual-advanced-grid .form-control{width:90px!important}
+.office-ribbon-inspector-host .page-component-style-editor{
+ display:grid!important;grid-template-rows:repeat(3,minmax(26px,auto));grid-auto-flow:column;
+ grid-auto-columns:minmax(135px,185px);align-items:start;gap:3px 8px;
+ flex-shrink:0;max-width:none;min-width:max-content;height:108px;
+ padding:2px 10px;border-left:1px solid #c8cdd4
+}
+.office-ribbon-inspector-host .page-component-style-editor>.form-label,
+.office-ribbon-inspector-host .page-component-style-editor>.checkbox-row,
+.office-ribbon-inspector-host .page-component-style-editor>.metadata-array-property{
+ min-width:132px;max-width:180px;margin:0;min-height:25px
+}
+.office-ribbon-inspector-host .page-component-style-editor>.office-ribbon-group-heading{align-self:center}
+.office-ribbon-inspector-host .page-component-style-editor .metadata-array-property{display:flex;gap:4px;align-items:center}
+.office-ribbon-inspector-host .page-component-style-editor .metadata-array-property input[type=color]{width:30px;height:24px}
+.office-ribbon-inspector-host .metadata-component-properties{
+ display:flex;flex-direction:row;align-items:flex-start;gap:0;
+ min-width:max-content;width:max-content;margin:0;padding:0
+}
+.office-ribbon-inspector-host .office-ribbon-data-section{
+ box-sizing:border-box;min-width:270px;max-width:310px;width:280px;height:112px;
+ padding:2px 9px;border-right:1px solid #c8cdd4;
+ overflow-y:auto;overflow-x:hidden;scrollbar-width:thin
+}
+.office-ribbon-inspector-host .office-ribbon-data-section>.form-label,
+.office-ribbon-inspector-host .office-ribbon-data-section>.checkbox-row{min-height:25px}
+.office-ribbon-inspector-host .office-ribbon-data-section>.office-ribbon-group-heading{position:sticky;top:0;background:var(--md-surface,#fff);z-index:1}
+.office-ribbon-inspector-host .canvas-position-editor{
+ display:inline-grid!important;grid-template-rows:repeat(3,minmax(25px,auto));
+ grid-auto-flow:column;grid-auto-columns:minmax(140px,230px);
+ align-items:start;gap:3px 7px;min-width:max-content;max-width:none!important;
+ min-height:108px;height:108px;overflow:visible
+}
+.office-ribbon-inspector-host .canvas-position-grid{max-width:250px}
+@media(max-width:900px){
+ .office-builder-ribbon .office-ribbon-content{overflow-x:auto}
+ .office-ribbon-inspector-host .properties-panel{height:144px!important;max-height:144px!important}
+ .office-builder-ribbon .office-ribbon-group{flex-shrink:0}
+}
+
+/* Presentation fields use persistent sections; no second accordion is needed. */
+.office-ribbon-inspector-host .metadata-component-presentation{
+ display:flex;align-items:flex-start;flex-shrink:0;gap:0;min-width:max-content;
+ height:107px;overflow:visible
+}
+.office-ribbon-inspector-host .office-ribbon-presentation-group{
+ display:grid;grid-template-rows:repeat(3,minmax(26px,auto));
+ grid-auto-flow:column;grid-auto-columns:minmax(125px,175px);
+ min-width:160px;max-width:none;gap:3px 7px;
+ height:106px;padding:2px 9px;
+ border-right:1px solid #c8cdd4;box-sizing:border-box
+}
+.office-ribbon-inspector-host .office-ribbon-presentation-group>.office-ribbon-group-heading{
+ align-self:center;margin:0
+}
+.office-ribbon-inspector-host .office-ribbon-presentation-group>.form-label,
+.office-ribbon-inspector-host .office-ribbon-presentation-group>.checkbox-row{
+ margin:0;min-height:25px;max-width:170px
+}
+.office-ribbon-inspector-host .office-ribbon-presentation-group input,
+.office-ribbon-inspector-host .office-ribbon-presentation-group select{
+ max-width:130px;height:24px
+}
+
+/* Final Office ribbon contract: three fixed rows per section, caption below. */
+.office-builder-ribbon .office-ribbon-content{
+  display:flex;align-items:stretch;gap:0;height:150px;min-height:150px!important;max-height:150px;
+  padding:5px 8px 3px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin
+}
+.office-builder-ribbon .office-ribbon-group{
+  display:flex;flex-direction:column;justify-content:space-between;min-width:148px;max-width:none;
+  padding:3px 10px 0;border-right:1px solid #c8cdd4;flex:0 0 auto;box-sizing:border-box
+}
+.office-builder-ribbon .office-ribbon-stack{
+  display:grid;grid-template-rows:repeat(3,28px);gap:3px;align-content:start
+}
+.office-builder-ribbon .office-ribbon-group>span:last-child{
+  display:block;margin-top:auto;padding:5px 0 3px;text-align:center;font-size:12px;
+  line-height:15px;color:#5f6979;white-space:nowrap
+}
+.office-builder-ribbon .office-ribbon-inline-field{display:flex;align-items:center;gap:5px;height:28px;min-height:28px;font-size:12px}
+.office-builder-ribbon .office-ribbon-inline-field .office-ribbon-field-name{min-width:46px;white-space:nowrap}
+.office-builder-ribbon .office-ribbon-inline-field input[type=text],
+.office-builder-ribbon .office-ribbon-inline-field input:not([type]){
+  width:124px!important;min-width:124px;max-width:124px;height:25px
+}
+.office-builder-ribbon .office-ribbon-inline-field input[type=number]{
+  width:72px!important;min-width:72px;max-width:72px;height:25px
+}
+.office-builder-ribbon .office-ribbon-inline-field select{width:112px;max-width:112px;height:25px}
+.office-builder-ribbon .office-ribbon-icon-line{
+  height:28px;min-height:28px;display:flex;align-items:center;gap:3px
+}
+.office-builder-ribbon .office-ribbon-icon-button{
+  width:27px;height:27px;min-width:27px;min-height:27px;padding:3px;
+  border:1px solid transparent;border-radius:4px;background:transparent;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer
+}
+.office-builder-ribbon .office-ribbon-icon-button:hover:not(:disabled){
+  background:#e6efff;border-color:#c5d8f4
+}
+.office-builder-ribbon .office-ribbon-icon-button[aria-pressed=true]{
+  background:#d7e7ff;border-color:#7caef4;color:#145aba
+}
+.office-builder-ribbon .office-ribbon-icon-button:disabled{opacity:.35;cursor:not-allowed}
+.office-builder-ribbon .office-ribbon-icon-group{min-width:130px}
+.office-builder-ribbon .office-ribbon-icon-group .office-ribbon-stack>div{max-height:28px}
+.office-builder-ribbon .office-ribbon-group-menu{position:relative;z-index:6;min-height:28px}
+.office-builder-ribbon .office-ribbon-group-menu summary{
+  min-height:27px;padding:3px 6px;display:flex;gap:5px;align-items:center;
+  font-size:12px;cursor:pointer;list-style:none;border-radius:3px
+}
+.office-builder-ribbon .office-ribbon-group-menu summary::-webkit-details-marker{display:none}
+.office-builder-ribbon .office-ribbon-group-menu[open]{z-index:20}
+.office-builder-ribbon .office-ribbon-group-menu-items{
+  position:fixed;z-index:9999;display:flex;flex-direction:column;min-width:144px;
+  background:var(--md-surface,#fff);border:1px solid #cad4e2;border-radius:5px;
+  box-shadow:0 4px 12px rgba(22,38,60,.18)
+}
+.office-builder-ribbon .office-ribbon-group-menu-items button{
+  min-height:30px;padding:5px 9px;text-align:left;border:0;white-space:nowrap;
+  background:transparent;display:flex;gap:6px;align-items:center;font-size:12px
+}
+.office-builder-ribbon .office-ribbon-group-menu-items button:hover:not(:disabled){background:#eff4ff}
+.office-builder-ribbon .office-ribbon-typography{min-width:182px}
+.office-builder-ribbon .office-ribbon-icon-line svg{flex:none}
+.office-builder-ribbon .office-ribbon-group .office-ribbon-stat{
+  display:flex;align-items:center;min-height:28px;line-height:16px;
+  padding:0 7px;font-size:12px;color:#6b7484
+}
+.office-ribbon-inspector-host{flex:1 1 auto;min-width:0;overflow:hidden}
+.office-ribbon-inspector-host .properties-panel{
+  display:flex!important;align-items:flex-start;gap:0;min-width:0!important;
+  height:130px!important;max-height:130px!important;overflow-x:auto!important;
+  overflow-y:hidden!important;padding:0 6px!important;scrollbar-width:thin
+}
+.office-ribbon-inspector-host .metadata-component-properties{
+  display:flex;flex-direction:row;gap:0;align-items:stretch;
+  width:max-content;min-width:max-content;height:124px
+}
+.office-ribbon-inspector-host .office-ribbon-data-section{
+  position:relative;display:grid;grid-template-rows:repeat(3,28px);
+  grid-auto-flow:column;grid-auto-columns:minmax(150px,max-content);
+  width:max-content;min-width:196px;max-width:none;height:124px;
+  box-sizing:border-box;padding:4px 9px 26px;border-right:1px solid #c8cdd4;
+  overflow:visible;gap:3px 5px;align-items:start
+}
+.office-ribbon-inspector-host .office-ribbon-data-section>.office-ribbon-group-heading{
+  position:absolute;inset:auto 3px 0;text-align:center;display:block;
+  height:19px;line-height:19px;white-space:nowrap;margin:0
+}
+.office-ribbon-inspector-host .office-ribbon-data-section>.properties-help{display:none}
+.office-ribbon-inspector-host .office-ribbon-data-section>.form-label{
+  display:flex;gap:4px;justify-content:space-between;align-items:center;
+  min-height:27px;height:27px;max-height:27px;margin:0;font-size:12px
+}
+.office-ribbon-inspector-host .office-ribbon-data-section>.form-label input,
+.office-ribbon-inspector-host .office-ribbon-data-section>.form-label select{
+  height:25px!important;width:112px!important;max-width:112px
+}
+.office-ribbon-inspector-host .office-ribbon-command{
+  display:flex;align-items:center;gap:6px;width:auto;height:27px;
+  min-height:27px;padding:3px 7px;background:transparent;border:1px solid transparent;
+  text-align:left;font-size:12px;white-space:nowrap
+}
+.office-ribbon-inspector-host .office-ribbon-command:hover{background:#e9f1ff;border-color:#bad2fb}
+.office-ribbon-inspector-host .office-ribbon-data-section>.office-ribbon-stat{
+  font-size:12px;color:#6b7484;line-height:27px;padding-inline:6px
+}
+.office-ribbon-inspector-host .metadata-component-visual-editor.compact-ribbon-visual-editor{
+  position:relative;min-height:121px;display:flex!important;padding:4px 5px 22px!important;
+  border-right:1px solid #c8cdd4!important
+}
+.office-ribbon-inspector-host .compact-ribbon-visual-editor legend{
+  position:absolute;bottom:0;left:0;right:0;text-align:center;
+  line-height:18px;height:18px;display:block
+}
+.office-ribbon-inspector-host .compact-visual-groups{
+  display:grid;grid-template-rows:repeat(3,28px);grid-auto-flow:column;
+  grid-auto-columns:176px;gap:3px 6px;height:auto!important;min-width:max-content
+}
+.office-ribbon-inspector-host .compact-visual-group{
+  display:flex;flex-direction:row;align-items:center;justify-content:start;
+  min-width:0;max-width:none;width:176px;height:28px!important;
+  margin:0!important;padding:0 5px!important;border-right:0!important
+}
+.office-ribbon-inspector-host .compact-visual-group .compact-visual-presets{display:none}
+.office-ribbon-inspector-host .compact-visual-label{display:flex;align-items:center;justify-content:space-between;width:100%;font-size:12px}
+.office-ribbon-inspector-host .compact-visual-label select{width:98px;min-width:98px;height:25px}
+.office-ribbon-inspector-host .office-ribbon-layout-responsive{
+  flex:0 0 auto;min-width:max-content;height:120px
+}
+.office-ribbon-inspector-host .office-ribbon-layout-responsive .page-component-style-editor{
+  display:grid!important;grid-template-rows:repeat(3,28px);
+  grid-auto-flow:column;grid-auto-columns:minmax(160px,184px);gap:3px 6px;
+  min-width:max-content;height:120px;overflow:visible;padding:4px 9px 22px;
+  border-right:1px solid #c8cdd4;position:relative
+}
+.office-ribbon-inspector-host .office-ribbon-layout-responsive .page-component-style-editor>.office-ribbon-group-heading{
+  position:absolute;bottom:0;left:0;right:0;text-align:center;margin:0
+}
+.office-ribbon-inspector-host .office-ribbon-layout-responsive .form-label{
+  display:flex;align-items:center;justify-content:space-between;
+  max-width:180px;height:27px;min-height:27px;gap:4px;font-size:12px
+}
+.office-ribbon-inspector-host .office-ribbon-layout-responsive .form-control{
+  max-width:90px;height:25px!important;min-height:25px!important
+}
+.office-ribbon-modal-backdrop{z-index:12000!important}
+.office-ribbon-config-modal{
+  width:min(840px,94vw);max-height:min(85vh,820px);display:flex;
+  flex-direction:column;padding:0;background:var(--md-surface,#fff)
+}
+.office-ribbon-config-modal .modal-header{
+  padding:12px 17px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid #d8dfe8;flex-shrink:0
+}
+.office-ribbon-config-modal .modal-header h2{font-size:16px;margin:0}
+.office-ribbon-modal-content{
+  padding:14px 18px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0
+}
+.office-ribbon-modal-content .metadata-component-properties,
+.office-ribbon-modal-content .office-ribbon-data-section{
+  display:block!important;width:auto;min-width:0;max-width:none;height:auto;
+  overflow:visible;border:0;padding:4px 0 12px
+}
+.office-ribbon-modal-content .office-ribbon-data-section>.office-ribbon-group-heading{
+  position:static;text-align:left;font-size:13px;margin-bottom:8px
+}
+.office-ribbon-modal-content .metadata-record-filter-editor .form-label{
+  display:flex;flex-direction:column;align-items:stretch;gap:4px
+}
+.office-ribbon-modal-content .metadata-filter-condition{
+  border:1px solid #e0e5ed;border-radius:6px;padding:12px;
+  display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:8px
+}
+.office-ribbon-modal-content .metadata-filter-condition>.row,
+.office-ribbon-modal-content .metadata-filter-condition>p{grid-column:1/-1}
+.office-ribbon-modal-actions{
+  flex-shrink:0;display:flex;justify-content:flex-end;align-items:center;
+  gap:8px;padding:10px 18px;border-top:1px solid #d8dfe8
+}
+
+/* Full-size Home Page Settings editor lives in a dialog, not an extra ribbon group. */
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host{
+  display:block;width:100%;min-width:0;max-width:none;overflow:visible
+}
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host .properties-panel{
+  display:block!important;position:static!important;width:100%!important;
+  height:auto!important;max-height:none!important;min-height:0;
+  overflow:visible!important;margin:0!important;padding:8px!important
+}
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host .properties-section-title{
+  margin:9px 0 5px;font-size:12px;font-weight:600
+}
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host .form-label,
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host .checkbox-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  max-width:600px;width:auto;min-height:32px;height:auto;margin:4px 0
+}
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host .form-control{
+  max-width:260px;height:30px!important;min-height:30px!important
+}
+.office-ribbon-page-settings-modal .office-ribbon-inspector-host details{
+  display:block;max-width:none;margin:8px 0;padding:7px 9px
+}
+
+/* Contextual tabs render their own controls. The previously shared inspector must
+   not leak technical details or duplicate metadata fields into another tab. */
+.office-builder-ribbon .office-ribbon-appearance{min-width:182px;max-width:182px}
+.office-builder-ribbon .office-ribbon-appearance .office-ribbon-inline-field{
+  display:grid;grid-template-columns:52px 112px;column-gap:6px;
+  height:28px;min-height:28px;margin:0;font-size:12px
+}
+.office-builder-ribbon .office-ribbon-appearance .office-ribbon-field-name{
+  min-width:52px;white-space:nowrap
+}
+.office-builder-ribbon .office-ribbon-appearance select{
+  box-sizing:border-box;width:112px!important;min-width:112px;
+  max-width:112px;height:25px!important;padding:2px 4px
+}
+.office-builder-ribbon .office-ribbon-typography .office-ribbon-inline-field .office-ribbon-field-name{
+  min-width:55px
+}
+.office-builder-ribbon .office-ribbon-typography .office-ribbon-inline-field input[type=number]{
+  width:70px!important
+}
+/* Restore the approved colour controls in one legible three-row group. */
+.office-ribbon-inspector-host .office-ribbon-colours{
+  display:flex;flex-direction:row;align-items:flex-start;
+  min-width:max-content;max-width:none;width:max-content;height:123px
+}
+.office-ribbon-inspector-host .office-ribbon-colours>.compact-ribbon-visual-editor{
+  position:relative;display:block!important;box-sizing:border-box;
+  flex:0 0 424px;min-width:424px;width:424px;max-width:424px;
+  height:123px!important;min-height:123px!important;
+  padding:3px 8px 23px!important;margin:0!important;overflow:visible
+}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-ribbon-visual-editor legend{
+  position:absolute;left:0;right:0;bottom:0;
+  height:18px;line-height:18px;text-align:center;white-space:nowrap
+}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-visual-groups{
+  display:grid!important;grid-template-columns:1fr!important;
+  grid-template-rows:repeat(3,29px)!important;grid-auto-flow:row!important;
+  grid-auto-columns:auto!important;width:404px;min-width:404px;
+  gap:3px!important;height:auto!important
+}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-visual-group{
+  display:flex!important;flex-direction:row!important;
+  align-items:center!important;justify-content:flex-start!important;
+  width:404px!important;min-width:404px!important;max-width:404px!important;
+  height:29px!important;margin:0!important;padding:0!important;
+  box-sizing:border-box;gap:7px!important
+}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-visual-label{
+  display:flex!important;align-items:center;justify-content:space-between;
+  gap:5px;flex:0 0 188px;width:188px;min-width:188px;white-space:nowrap
+}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-color-controls{gap:3px;flex-shrink:0}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-color-swatches{
+  display:flex;flex-direction:row;align-items:center;
+  width:max-content;gap:3px;flex-shrink:0
+}
+.office-ribbon-inspector-host .office-ribbon-colours .compact-color-swatches button{
+  width:17px;height:25px;min-width:17px;min-height:25px
+}
+.office-ribbon-inspector-host .office-ribbon-colours>.page-component-style-editor{
+  position:relative;display:grid!important;grid-template-rows:repeat(3,28px);
+  grid-auto-flow:column;grid-auto-columns:minmax(158px,max-content);
+  align-items:start;gap:3px 6px;height:123px;min-height:123px;
+  width:max-content;min-width:max-content;
+  border-right:1px solid #c8cdd4;padding:4px 10px 23px;margin:0
+}
+.office-ribbon-inspector-host .office-ribbon-colours>.page-component-style-editor>.office-ribbon-group-heading{
+  position:absolute;inset:auto 0 0;display:block;height:19px;
+  line-height:19px;text-align:center;margin:0;padding:0
+}
+.office-ribbon-inspector-host .office-ribbon-colours>.page-component-style-editor>.form-label{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:6px;height:28px;min-height:28px;margin:0;
+  min-width:158px;max-width:210px;font-size:12px;white-space:nowrap
+}

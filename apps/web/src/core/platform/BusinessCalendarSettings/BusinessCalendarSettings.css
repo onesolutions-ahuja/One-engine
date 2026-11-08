@@ -1,0 +1,57 @@
+.business-calendar{padding:16px;margin-bottom:16px}
+.business-calendar>header,.business-calendar-hours-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.business-calendar-actions,.business-calendar-form-actions{display:flex;align-items:center;gap:8px}
+.business-calendar h2{margin:0;font-size:16px}
+.business-calendar h3{margin:20px 0 5px;font-size:14px}
+.business-calendar p{color:var(--md-muted,#64748b);font-size:13px}
+.business-calendar-hours-heading p{margin:0}
+.business-calendar-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}
+.business-calendar label{display:grid;gap:6px;font-size:13px}
+.business-calendar-options span{display:flex;gap:8px}
+.business-calendar-options input[type=number]{width:76px}
+.business-calendar-options select,.business-calendar-options input,.business-calendar-time-field input{min-width:0;min-height:38px;padding:7px 9px;border:1px solid var(--md-border,#d5dce5);border-radius:6px;background:#fff;color:inherit;font:inherit}
+.business-calendar-days{display:grid;margin-top:10px;border-top:1px solid var(--md-border,#e0e5eb)}
+.business-calendar-day{display:grid;grid-template-columns:minmax(105px,1fr) 90px minmax(140px,1fr) 22px minmax(140px,1fr);align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--md-border,#e0e5eb)}
+.business-calendar-day>strong{font-size:14px}
+.business-calendar-readonly-value{display:block;padding:8px 0;font-size:14px;font-weight:500}
+.business-calendar-readonly-hours{grid-column:2/-1;font-size:14px;color:var(--md-text,#344054)}
+.business-calendar-empty-holidays{margin-bottom:0}
+.business-calendar-form-actions{justify-content:flex-end;margin-top:20px}
+.business-calendar-closed{display:flex!important;align-items:center;gap:7px!important}
+.business-calendar-time-field{grid-template-columns:auto minmax(110px,1fr);align-items:center;gap:9px!important}
+.business-calendar-time-separator{text-align:center;color:var(--md-muted,#64748b);font-size:13px}
+.business-calendar-holiday-entry{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.business-calendar-holiday-entry label{min-width:150px}
+.business-calendar-holidays{list-style:none;padding:0}
+.business-calendar-holidays li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--md-border,#e0e5eb)}
+.business-calendar-error{color:var(--md-danger,#b42318)}
+@media(max-width:700px){
+ .business-calendar-day{grid-template-columns:minmax(0,1fr) auto;gap:9px 12px}
+ .business-calendar-readonly-hours{grid-column:1/-1}
+ .business-calendar-closed{justify-self:end}
+ .business-calendar-time-field{grid-template-columns:1fr;gap:4px!important}
+ .business-calendar-time-separator{display:none}
+}
+@media(max-width:480px){
+ .business-calendar>header,.business-calendar-hours-heading{flex-direction:column}
+ .business-calendar-actions{width:100%}
+ .business-calendar-day{grid-template-columns:minmax(0,1fr) auto}
+ .business-calendar-day .business-calendar-readonly-hours{grid-column:1/-1}
+ .business-calendar-day .business-calendar-time-field{grid-column:1/-1;grid-template-columns:74px minmax(0,1fr)}
+}
+
+/* Four-viewport audit: keep business hours readable in the narrow setup rail.
+ * Desktop retains the inline timetable; tablet/laptop prioritise day and hours. */
+.business-calendar-day :is(label,input,select,span){font-size:max(13px,0.8125rem)}
+.business-calendar-day{min-width:0}
+@media(max-width:1100px){
+ .business-calendar-day{
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px 16px;align-items:start;padding:12px 4px
+ }
+ .business-calendar-day>strong{grid-column:1;align-self:center}
+ .business-calendar-closed{grid-column:2;justify-self:end}
+ .business-calendar-readonly-hours{grid-column:1/-1}
+ .business-calendar-time-field{grid-column:1/-1;min-width:0}
+ .business-calendar-time-separator{display:none}
+}

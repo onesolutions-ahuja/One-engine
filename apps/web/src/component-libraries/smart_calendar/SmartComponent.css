@@ -1,0 +1,50 @@
+@import "../smart/shared/smart.css";
+
+/* Month preserves the existing Smart Calendar footprint. Day/week scroll inside it. */
+.smart-runtime.smart_calendar>.smart-calendar{min-width:0;min-height:0;overflow:hidden;
+ display:flex;flex-direction:column;color:inherit}
+.smart-calendar-header{display:flex;align-items:center;gap:6px;padding:5px 6px;
+ border-bottom:1px solid;flex:0 0 auto;min-height:40px}
+.smart-calendar-header strong{min-width:0;flex:1 1 auto;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis}
+.smart-calendar-header button{border:1px solid #cbd5e1;border-radius:6px;
+ background:transparent;color:inherit;min-width:27px;height:28px;cursor:pointer}
+.smart-calendar-header button:focus-visible,.smart-calendar-date-strip button:focus-visible,
+.smart-calendar-event:focus-visible,.smart-calendar-slot:focus-visible{
+ outline:2px solid #2563eb;outline-offset:-2px}
+.smart-calendar-header .smart-calendar-today{min-width:44px;font-size:.82em}
+.smart-calendar-date-strip{display:flex;gap:3px;padding:5px 6px;overflow-x:auto;flex:0 0 auto}
+.smart-calendar-date-strip button{min-width:42px;flex:1 1 0;display:flex;flex-direction:column;
+ align-items:center;gap:2px;border:1px solid #dbe4ef;border-radius:7px;
+ background:#f7faff;color:inherit;cursor:pointer;padding:3px}
+.smart-calendar-date-strip button small{font-size:.75em;opacity:.82}
+.smart-calendar-month .smart-calendar-grid{flex:1 1 auto;overflow:auto;align-content:stretch}
+.smart-calendar-month .smart-calendar-grid button{display:flex;flex-direction:column;
+ align-items:center;justify-content:center;gap:2px;min-height:26px}
+.smart-calendar-count{display:inline-flex;justify-content:center;align-items:center;
+ background:#dbeafe;color:#1d4ed8;border-radius:10px;min-width:17px;
+ font-size:10px;padding:1px 4px}
+.smart-calendar-schedule-scroll{width:100%;max-width:100%;flex:1 1 auto;min-height:0;
+ overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.smart-calendar-schedule{display:grid;min-width:max-content;width:100%;
+ align-items:start;position:relative}
+.smart-calendar-times,.smart-calendar-day-column{min-width:0}
+.smart-calendar-day-heading{display:flex;justify-content:center;align-items:center;
+ height:32px;min-height:32px;position:sticky;top:0;background:#eef3f9;
+ border:1px solid #dbe3ed;z-index:4;font-size:.84em}
+.smart-calendar-time-label{display:flex;justify-content:center;align-items:flex-start;
+ height:34px;border-bottom:1px solid #e5ebf3;font-size:.76em;padding:4px 1px;color:#64748b}
+.smart-calendar-day-slots{position:relative;min-width:0}
+.smart-calendar-slot{position:absolute;left:0;right:0;width:100%;border:0;
+ border-top:1px solid #dbe3ed;border-right:1px solid #dbe3ed;
+ background:transparent;cursor:pointer}
+.smart-calendar-slot:disabled{cursor:default;opacity:.75}
+.smart-calendar-slot:not(:disabled):hover{background:#e6f3ff!important}
+.smart-calendar-event{position:absolute;left:3px;right:3px;width:calc(100% - 6px);
+ z-index:2;overflow:hidden;border:0;border-radius:5px;color:#fff;text-align:left;
+ padding:4px 6px;cursor:pointer;display:flex;flex-direction:column;gap:1px;
+ box-shadow:0 1px 3px #0002;font-size:11px}
+.smart-calendar-event strong{display:block;line-height:1.2;overflow:hidden;text-overflow:ellipsis;
+ white-space:nowrap;max-width:100%}
+.smart-calendar-event small{font-size:10px;line-height:1.2;white-space:nowrap}
+.smart-calendar-no-days{padding:12px}

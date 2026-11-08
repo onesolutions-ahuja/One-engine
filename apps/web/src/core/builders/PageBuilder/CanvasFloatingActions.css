@@ -1,0 +1,48 @@
+/* Editing controls are UI chrome, not part of tenant-authored component z-order. */
+.canvas-floating-actions-host{
+ position:fixed!important;z-index:11000!important;display:block!important;
+ width:max-content!important;max-width:calc(100vw - 16px)!important;
+ height:auto!important;min-height:0!important;pointer-events:auto;
+ overflow:visible!important;transform:none!important;
+}
+.canvas-floating-actions-host>.canvas-element-actions{
+ position:relative!important;inset:auto!important;left:auto!important;
+ top:auto!important;bottom:auto!important;right:auto!important;
+ transform:none!important;max-width:calc(100vw - 16px)!important;
+ z-index:auto!important;
+}
+/* Action menus, help titles and keyboard focus remain above every canvas layer. */
+.canvas-floating-actions-host .canvas-action-menu{z-index:1!important}
+.canvas-floating-actions-host :is(button,[role="menuitem"]):focus-visible{
+ outline:2px solid var(--md-focus-ring,#2563eb);outline-offset:2px;
+}
+
+/* Unlike authored content, resize chrome must be above every canvas sibling.
+   The overlay itself never steals content/scrolling hits. */
+.canvas-floating-resize-overlay{
+ position:fixed;inset:0;z-index:10990;pointer-events:none;overflow:visible;
+}
+.canvas-floating-resize-overlay>.free-canvas-resize-handle{
+ position:fixed;display:flex;align-items:center;justify-content:center;
+ width:18px;height:18px;min-width:18px;min-height:18px;
+ margin:0;padding:0;border:0;border-radius:0;background:transparent;
+ box-shadow:none;transform:translate(-50%,-50%);
+ pointer-events:auto;touch-action:none;user-select:none;z-index:1;
+}
+.canvas-floating-resize-overlay>.free-canvas-resize-handle::before{
+ content:"";display:block;width:8px;height:8px;box-sizing:border-box;
+ background:#fff;border:1.5px solid #2563eb;border-radius:1px;
+ box-shadow:0 0 0 1px #fff;
+}
+.canvas-floating-resize-overlay>.free-canvas-resize-handle:is(:hover,:focus-visible){
+ outline:0;
+}
+.canvas-floating-resize-overlay .floating-resize-n,
+.canvas-floating-resize-overlay .floating-resize-s{cursor:ns-resize}
+.canvas-floating-resize-overlay .floating-resize-e,
+.canvas-floating-resize-overlay .floating-resize-w{cursor:ew-resize}
+.canvas-floating-resize-overlay .floating-resize-ne,
+.canvas-floating-resize-overlay .floating-resize-sw{cursor:nesw-resize}
+.canvas-floating-resize-overlay .floating-resize-nw,
+.canvas-floating-resize-overlay .floating-resize-se{cursor:nwse-resize}
+

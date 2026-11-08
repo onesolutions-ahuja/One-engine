@@ -1,0 +1,415 @@
+/* One original PWA-style icon treatment, shared by desktop Setup, collapsed
+ * icon rail, and mobile Settings. SVG glyphs come from Lucide (ISC).
+ * Per-item colours come from SettingsNavigationIcon presentation metadata.
+ */
+.lightning :is(.setup-layout, .mobile-settings-home) .md-setup-icon {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  color: #fff;
+  background:
+    radial-gradient(ellipse at 18% 3%, rgb(255 255 255 / 24%), transparent 65%),
+    var(--md-icon-gradient, linear-gradient(150deg, #8795a9, #44546b));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 35%),
+    inset 0 -1px 0 rgb(0 0 0 / 9%), 0 2px 5px rgb(23 37 62 / 14%);
+}
+.lightning :is(.setup-layout, .mobile-settings-home) .md-setup-icon::before {
+  content: '';
+  position: absolute;
+  inset: 1px 2px auto;
+  height: 42%;
+  border-radius: 9px 9px 55% 55%;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 19%), transparent);
+  pointer-events: none;
+}
+.lightning :is(.setup-layout, .mobile-settings-home) .md-setup-icon svg {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  display: block;
+  color: #fff; /* override legacy .tree-item svg muted stroke */
+  stroke: currentColor;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 17%));
+}
+/* Apple-inspired gradients are original CSS, not Apple/SF Symbols assets. */
+.lightning .md-setup-icon-slate { --md-icon-gradient: linear-gradient(150deg, #8b9bb0, #536379); }
+.lightning .md-setup-icon-blue { --md-icon-gradient: linear-gradient(150deg, #51afff, #006bea); }
+.lightning .md-setup-icon-sky { --md-icon-gradient: linear-gradient(150deg, #53c6ff, #0086df); }
+.lightning .md-setup-icon-cobalt { --md-icon-gradient: linear-gradient(150deg, #548aff, #164be9); }
+.lightning .md-setup-icon-azure { --md-icon-gradient: linear-gradient(150deg, #48b6ff, #1471ff); }
+.lightning .md-setup-icon-royal { --md-icon-gradient: linear-gradient(150deg, #4d91ff, #0758dc); }
+.lightning .md-setup-icon-indigo { --md-icon-gradient: linear-gradient(150deg, #8790ff, #4c45d7); }
+.lightning .md-setup-icon-purple { --md-icon-gradient: linear-gradient(150deg, #b17aff, #7646e4); }
+.lightning .md-setup-icon-violet { --md-icon-gradient: linear-gradient(150deg, #ba83ff, #8245ed); }
+.lightning .md-setup-icon-orchid { --md-icon-gradient: linear-gradient(150deg, #c36dff, #8847ec); }
+.lightning .md-setup-icon-lavender { --md-icon-gradient: linear-gradient(150deg, #b999ff, #7362e8); }
+.lightning .md-setup-icon-pink { --md-icon-gradient: linear-gradient(150deg, #ff71b2, #ed1680); }
+.lightning .md-setup-icon-red { --md-icon-gradient: linear-gradient(150deg, #ff7778, #e92d48); }
+.lightning .md-setup-icon-coral { --md-icon-gradient: linear-gradient(150deg, #ff997b, #fb4e53); }
+.lightning .md-setup-icon-orange { --md-icon-gradient: linear-gradient(150deg, #ffc058, #fb8618); }
+.lightning .md-setup-icon-amber { --md-icon-gradient: linear-gradient(150deg, #ffca4d, #e89106); }
+.lightning .md-setup-icon-lime { --md-icon-gradient: linear-gradient(150deg, #91d95d, #42a934); }
+.lightning .md-setup-icon-green { --md-icon-gradient: linear-gradient(150deg, #75e67c, #21b14e); }
+.lightning .md-setup-icon-emerald { --md-icon-gradient: linear-gradient(150deg, #5cdc9e, #179e6a); }
+.lightning .md-setup-icon-teal { --md-icon-gradient: linear-gradient(150deg, #4bdacc, #0da8a5); }
+.lightning .md-setup-icon-cyan { --md-icon-gradient: linear-gradient(150deg, #48d3ef, #0e91bb); }
+.lightning .md-setup-icon-turquoise { --md-icon-gradient: linear-gradient(150deg, #52dfd2, #149cb4); }
+
+/* Actual Setup sidebar: grouped icons, pale selected row, rounded hit targets. */
+.lightning .setup-layout .setup-sidebar:not(.setup-sidebar-collapsed) .tree-item {
+  width: calc(100% - 16px);
+  margin-inline: 8px;
+  min-height: 44px;
+  gap: 10px;
+  border-radius: 11px;
+  padding: 5px 9px;
+}
+.lightning .setup-layout .setup-sidebar .tree-item > span:not(.md-setup-icon) {
+  flex: 1;
+  min-width: 0;
+  text-align: start;
+}
+.lightning .setup-layout .setup-sidebar .tree-item > svg:last-child {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+  color: var(--md-ios-secondary, #737b89);
+}
+.lightning .setup-layout .setup-sidebar .tree-item.selected {
+  color: var(--md-action-ink, #0058bd);
+  background: color-mix(in srgb, var(--md-primary) 13%, var(--md-surface));
+  box-shadow: none;
+}
+.lightning .setup-layout .setup-sidebar .quick-find-input {
+  border-radius: 11px;
+  background: var(--md-fill);
+}
+/* Desktop Setup collapse is a real icon rail, not a 56px text column.
+ * Keep the actual navigation buttons, RBAC and route handling untouched.
+ * Tablet (600–1023px) continues to use the existing overlay behaviour.
+ */
+@media (min-width: 1024px) {
+  .lightning .setup-layout > .setup-sidebar.setup-sidebar-collapsed {
+    flex: 0 0 64px;
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    overflow: hidden;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-sidebar-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-height: 56px;
+    padding: 6px 0;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-sidebar-toggle {
+    display: grid;
+    place-items: center;
+    position: relative;
+    z-index: 1;
+    flex: 0 0 42px;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    margin: 0;
+    padding: 0;
+    border-radius: 11px;
+    color: var(--md-text);
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-sidebar-toggle:hover {
+    background: var(--md-fill);
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed :is(
+    .setup-sidebar-toolbar > strong,
+    .quick-find,
+    .tree-group-label,
+    .sidebar-footer,
+    .tree-item > span:not(.md-setup-icon),
+    .tree-item > svg:last-child
+  ) {
+    display: none !important;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-tree {
+    min-width: 0;
+    padding: 4px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    scrollbar-gutter: auto;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-tree::-webkit-scrollbar {
+    width: 0;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-tree-group {
+    margin: 0;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .setup-tree-group + .setup-tree-group {
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid var(--md-separator);
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .tree-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    margin: 2px auto;
+    padding: 6px;
+    gap: 0;
+    border-radius: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .tree-item .md-setup-icon {
+    display: inline-grid !important;
+    flex: 0 0 34px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+  .lightning .setup-layout .setup-sidebar-collapsed .tree-item::before {
+    content: none !important;
+  }
+  /* A second accessible expand control remains visible in the header even
+   * if the sidebar rail scrolls. The existing React toggle handles both.
+   */
+  .lightning:has(.setup-layout > .setup-sidebar.setup-sidebar-collapsed) > .salesforce-header .md-sidebar-trigger {
+    display: grid;
+    place-items: center;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    color: var(--md-text);
+    background: var(--md-fill);
+    border-radius: 11px;
+  }
+}
+
+/* Existing mobile Setup rows: same reusable icon colours and inset separators. */
+.lightning .mobile-settings-home .mobile-settings-list {
+  background: var(--md-surface);
+  border: 1px solid var(--md-separator);
+  border-radius: 15px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 4%);
+}
+.lightning .mobile-settings-home .mobile-settings-item {
+  color: var(--md-text);
+  background: var(--md-surface);
+}
+.lightning .mobile-settings-home .mobile-settings-item:active { background: var(--md-fill); }
+.lightning .mobile-settings-home .mobile-settings-search {
+  border-radius: 12px;
+  background: var(--md-fill);
+}
+.lightning .mobile-settings-home .mobile-settings-search:focus-within {
+  outline: 3px solid var(--md-focus-ring);
+}
+
+/* Company Settings: same sections, fields and edit flow, new card and button paint. */
+.lightning .company-workspace .company-workspace-tabs,
+.lightning .company-workspace :is(.company-workspace-card, .company-workspace-stack > *, .surface.permission-section),
+.lightning .company-workspace .company-workspace-mobile-menu {
+  background: var(--md-surface);
+  border: 1px solid var(--md-separator);
+  border-radius: 16px;
+  box-shadow: 0 3px 16px rgb(0 0 0 / 4%);
+}
+.lightning .company-workspace .company-workspace-tabs {
+  background: var(--md-surface-2);
+  padding: 5px;
+  border-radius: 13px;
+  box-shadow: none;
+}
+.lightning .company-workspace .company-workspace-tabs button {
+  border-radius: 10px;
+  box-shadow: none;
+  color: var(--md-text-2);
+}
+.lightning .company-workspace .company-workspace-tabs button.active {
+  color: var(--md-action-ink, #0058bd);
+  background: var(--md-surface);
+  box-shadow: var(--md-shadow-sm);
+}
+.lightning .company-workspace :is(.btn, .company-developer-links button) {
+  border-radius: 10px;
+}
+.lightning .company-workspace :is(.btn-brand, .btn-primary) {
+  color: #fff;
+  border-color: var(--md-primary);
+  background: var(--md-primary);
+}
+.lightning .company-workspace :is(.btn-brand, .btn-primary):hover:not(:disabled) {
+  background: var(--md-primary-hover);
+}
+.lightning .company-workspace .company-workspace-mobile-section-icon {
+  border-radius: 9px;
+  background: var(--md-primary);
+}
+.lightning .company-workspace .company-workspace-mobile-menu button {
+  background: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-separator);
+}
+
+/* Restyle the existing persisted 'Closed' checkbox as an iOS switch.
+ * It stays an actual input, preserving change, keyboard, disabled and save behaviour.
+ */
+.lightning .company-workspace .business-calendar-closed input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 44px;
+  min-width: 44px;
+  height: 26px;
+  margin: 0;
+  border: 1px solid var(--md-separator);
+  border-radius: 100px;
+  background: #afb4bc;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 160ms ease;
+}
+.lightning .company-workspace .business-calendar-closed input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 22%);
+  transition: transform 160ms ease;
+}
+.lightning .company-workspace .business-calendar-closed input[type="checkbox"]:checked {
+  background: var(--md-primary);
+}
+.lightning .company-workspace .business-calendar-closed input[type="checkbox"]:checked::after {
+  transform: translateX(18px);
+}
+.lightning .company-workspace .business-calendar-closed input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--md-focus-ring);
+  outline-offset: 2px;
+}
+.lightning .company-workspace .business-calendar-closed input[type="checkbox"]:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* The existing named-credential switch remains bound to its current input. */
+.lightning .setup-layout .credential-switch-track {
+  border-radius: 100px;
+  background: #afb4bc;
+}
+.lightning .setup-layout .credential-switch input:checked + .credential-switch-track {
+  background: var(--md-primary);
+}
+
+/* Existing Setup Home shortcut cards; no extra links or dashboard elements. */
+.lightning .home-content:has(.welcome-banner) .shortcut-card {
+  border-radius: 16px;
+  border-color: var(--md-separator);
+  background: var(--md-surface);
+  box-shadow: 0 3px 14px rgb(0 0 0 / 5%);
+}
+.lightning .home-content:has(.welcome-banner) .shortcut-icon {
+  border-radius: 12px;
+  background: #247ff3;
+  color: white;
+}
+.lightning .home-content:has(.welcome-banner) .shortcut-card:nth-child(5n + 2) .shortcut-icon { background: #8a5ae7; }
+.lightning .home-content:has(.welcome-banner) .shortcut-card:nth-child(5n + 3) .shortcut-icon { background: #168b67; }
+.lightning .home-content:has(.welcome-banner) .shortcut-card:nth-child(5n + 4) .shortcut-icon { background: #c06e14; }
+.lightning .home-content:has(.welcome-banner) .shortcut-card:nth-child(5n + 5) .shortcut-icon { background: #1e8caa; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lightning .company-workspace .business-calendar-closed input[type="checkbox"],
+  .lightning .company-workspace .business-calendar-closed input[type="checkbox"]::after {
+    transition: none;
+  }
+}
+
+/* MetaDrive Setup uses the light macOS-inspired appearance shown in the design.
+ * The OS may prefer dark while legacy builder tables are hardcoded light; without
+ * local tokens this yields charcoal navigation + unreadable pale text on white.
+ * Respect an explicitly chosen dark theme, and exclude published standalone pages.
+ * No routing, component logic, tenant metadata or input behaviour changes.
+ */
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) {
+  color-scheme: light;
+  --md-bg: #f5f5f7;
+  --md-canvas: #f5f5f7;
+  --md-surface: #ffffff;
+  --md-surface-2: #fafafc;
+  --md-surface-soft: #fafafc;
+  --md-sidebar: rgb(246 246 248 / 96%);
+  --md-separator: rgb(60 60 67 / 16%);
+  --md-border: rgb(60 60 67 / 16%);
+  --md-text: #1d1d1f;
+  --md-text-2: #5c5c63;
+  --md-muted: #5c5c63;
+  --md-text-muted: #5c5c63;
+  --md-text-secondary: #5c5c63;
+  --md-fill: rgb(60 60 67 / 6%);
+  --md-primary: #007aff;
+  --md-primary-hover: #0069dd;
+  --md-primary-contrast: #ffffff;
+  --md-action-ink: #0058bd;
+  --md-action-fill: #0054aa;
+  --md-ios-accent: var(--md-primary);
+  --md-ios-bg: var(--md-bg);
+  --md-ios-surface: var(--md-surface);
+  --md-ios-group: var(--md-surface-2);
+  --md-ios-text: var(--md-text);
+  --md-ios-secondary: var(--md-text-2);
+  --md-ios-separator: var(--md-separator);
+  --md-ios-pressed: var(--md-fill);
+  background: var(--md-bg);
+  color: var(--md-text);
+}
+
+/* Fix the actual Page Builder list, whose light hardcoded table backgrounds were
+ * being paired with inherited dark-mode foreground colours.
+ */
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-view {
+  color: var(--md-text);
+}
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-header h1,
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-filters .form-label {
+  color: var(--md-text);
+}
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-filters .form-control,
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .header-installed-apps select {
+  background: var(--md-surface);
+  color: var(--md-text);
+  border-color: var(--md-border);
+}
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-table-scroll {
+  background: var(--md-surface);
+  border-color: var(--md-border);
+}
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-table thead th {
+  background: #f6f8fb;
+  color: #374151;
+  border-bottom-color: var(--md-border);
+}
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-table tbody td {
+  background: var(--md-surface);
+  color: #273244;
+  border-bottom-color: var(--md-border);
+}
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-table tbody td > small {
+  color: #64748b;
+}

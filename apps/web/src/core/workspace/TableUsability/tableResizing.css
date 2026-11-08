@@ -1,0 +1,73 @@
+/* Workspace data tables use one-line rows and horizontally scrolling columns.
+ * Existing Record Workspace resizing is intentionally kept independent.
+ */
+.md-table-scroll-host {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+table.md-resizable-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+table.md-resizable-table :is(th, td) {
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+table.md-resizable-table:not(.md-table-width-set) :is(th, td) { max-width: 360px; }
+table.md-resizable-table td :is(small, strong, code, span, a, button) {
+  white-space: nowrap !important;
+}
+table.md-resizable-table td:has(> :is(.toolbar-actions, .app-manager-list-actions)),
+table.md-resizable-table td.page-manager-actions {
+  max-width: none;
+  overflow: visible;
+}
+table.md-resizable-table td [class*="actions"] {
+  flex-wrap: nowrap;
+}
+table.md-resizable-table th.md-table-resize-header {
+  position: relative;
+  padding-right: 19px;
+}
+.md-table-column-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 4;
+  display: block;
+  border-right: 1px solid var(--md-separator, #d6dce5);
+  cursor: col-resize;
+  touch-action: none;
+}
+.md-table-column-handle:hover {
+  background: color-mix(in srgb, var(--md-primary, #1668d9) 14%, transparent);
+}
+.md-table-column-handle:focus-visible {
+  outline: 3px solid var(--md-focus-ring, var(--md-primary, #1668d9));
+  outline-offset: -3px;
+}
+@media (pointer: coarse) {
+  .md-table-column-handle { width: 18px; }
+}
+
+/* grok: make column resize handles more discoverable */
+.md-table-column-handle {
+  border-right: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.md-table-column-handle:hover,
+.md-table-column-handle:focus-visible {
+  border-right-color: var(--md-primary, #1d4ed8);
+  background: color-mix(in srgb, var(--md-primary, #1d4ed8) 16%, transparent);
+}
+table.md-resizable-table th.md-table-resize-header:hover .md-table-column-handle {
+  border-right-color: color-mix(in srgb, var(--md-primary, #1d4ed8) 40%, var(--md-border, #e0e5eb));
+}

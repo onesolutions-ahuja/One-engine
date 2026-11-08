@@ -1,0 +1,15 @@
+.page-inventory-import-dialog{width:min(760px,calc(100vw - 32px));max-height:90vh;overflow-y:auto}
+.page-inventory-import-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.page-inventory-picker,.page-inventory-file{min-width:0;display:flex;flex-direction:column;gap:8px}
+.page-inventory-picker select{min-height:150px;max-height:210px;font-size:13px}
+.page-inventory-file input[type=file]{width:100%;font:inherit}
+.page-inventory-file-name,.page-inventory-help{font-size:12px;line-height:1.45;margin:0;overflow-wrap:anywhere}
+.page-inventory-help{opacity:.8}
+.page-inventory-error{color:var(--color-danger,#aa3131);font-size:13px;overflow-wrap:anywhere}
+.page-inventory-valid{color:var(--color-success,#167046);font-size:13px}
+.page-inventory-validation{margin-top:14px}
+.page-inventory-issue-heading{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}
+.page-inventory-error-table{max-height:220px;overflow:auto}
+.page-inventory-error-table .records-table{width:100%;font-size:12px}
+.page-inventory-error-table td{overflow-wrap:anywhere;max-width:240px}
+@media(max-width:600px){.page-inventory-import-fields{grid-template-columns:1fr}.page-inventory-import-dialog{max-height:96vh}}

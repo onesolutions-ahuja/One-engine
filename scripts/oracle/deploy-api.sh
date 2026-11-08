@@ -76,6 +76,25 @@ if [[ ! -d "$RELEASE" ]]; then
 fi
 test -f "$RELEASE/apps/server/dist-system/system-support/entrypoint.js"
 test -f "$RELEASE/apps/server/dist-system/system-support/job-worker-entrypoint.js"
+# Connector packages were not included when the repository was moved to a new
+# GitHub account. Preserve existing, independently installed connector
+# manifests from the currently active known-good release instead of starting
+# an API that will crash while seeding the connector app catalogue. New
+# manifests supplied in the checkout always take precedence.
+connector_bundle="$RELEASE/apps/server/dist-system/connector-scripts"
+prior_connector_bundle="$OLD_API_RELEASE/apps/server/dist-system/connector-scripts"
+for connector in whatsapp sms-gate brevo uber-eats deliveroo just-eat; do
+  if [[ ! -f "$connector_bundle/$connector/scripts/install.mjs" ]]; then
+    if [[ ! -f "$prior_connector_bundle/$connector/scripts/install.mjs" ]]; then
+      echo "Missing required connector manifest in both releases: $connector" >&2
+      exit 1
+    fi
+    mkdir -p "$connector_bundle/$connector"
+    cp -a "$prior_connector_bundle/$connector/." "$connector_bundle/$connector/"
+  fi
+  test -s "$connector_bundle/$connector/scripts/install.mjs"
+done
+chown -R metadrive:metadrive "$connector_bundle"
 # Fail before switching services if a migration dependency is absent or unreadable.
 runuser -u metadrive -- test -r "$RELEASE/scripts/cart/migrate-cart-session-to-cart.mjs"
 runuser -u metadrive -- test -r "$RELEASE/scripts/codextill/ensure-smart-till-cart-flows.mjs"

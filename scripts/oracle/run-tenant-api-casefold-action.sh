@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 umask 077
 [[ "$EUID" -eq 0 && $# -eq 3 ]] || { echo "Expected protected OCI runner invocation" >&2; exit 64; }
-[[ "$GITHUB_REPOSITORY" == "unedev00/uneengine" && "$GITHUB_REF" == "refs/heads/main" ]] || exit 64
+[[ "$GITHUB_REPOSITORY" == "onesolutions-ahuja/One-engine" && "$GITHUB_REF" == "refs/heads/main" ]] || exit 64
 [[ "$(uname -m)" == "aarch64" ]] || exit 64
 mode="$1"
 requested_tenant="$2"

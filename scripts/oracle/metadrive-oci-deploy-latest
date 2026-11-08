@@ -7,7 +7,7 @@ umask 077
 
 [[ $EUID == 0 && $# == 1 && $1 =~ ^[0-9a-f]{40}$ ]] || exit 64
 sha=$1
-repository=https://github.com/unedev00/uneengine.git
+repository=https://github.com/onesolutions-ahuja/One-engine.git
 status_dir=/var/lib/metadrive/oci-deployment
 status_file=$status_dir/status
 trail_file=$status_dir/trail

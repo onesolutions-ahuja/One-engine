@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ObjectMetadata } from '../../metadata/Definitions/metadata';
 import { loadMentionContext, type MentionContext } from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 
@@ -16,6 +16,17 @@ export function explicitMentionRecordId(properties: Readonly<Record<string, unkn
   return matches.length === 1 ? String(matches[0].value) : '';
 }
 
+const EMPTY_MENTION_CONTEXT: MentionContext = Object.freeze({ records: {}, fields: {} }) as MentionContext;
+
+function isEmptyMentionContext(value: MentionContext): boolean {
+  return value === EMPTY_MENTION_CONTEXT ||
+    (Object.keys(value.records).length === 0 && Object.keys(value.fields).length === 0);
+}
+
+function stablePropertiesKey(properties: Readonly<Record<string, unknown>>): string {
+  try { return JSON.stringify(properties) ?? ''; } catch { return 'unserializable'; }
+}
+
 /**
  * Each fetch goes through the existing authenticated Object API.
  * Never infer a root record from records[0]; anonymous app pages have no active record.
@@ -25,10 +36,18 @@ export function useRelationshipMentionContext(
   objects: readonly ObjectMetadata[], root: string, recordId: string,
   properties: Readonly<Record<string, unknown>>, apiRequest: Request, revision = 0
 ): MentionContext {
-  const [context, setContext] = useState<MentionContext>({ records: {}, fields: {} });
+  const [context, setContext] = useState<MentionContext>(EMPTY_MENTION_CONTEXT);
+  // Callers rebuild `properties` on every render. Depending on its identity re-ran this
+  // effect each render, and the reset below then re-rendered again: an endless loop on
+  // every component of every page. Key the effect on the content instead.
+  const propertiesKey = useMemo(() => stablePropertiesKey(properties), [properties]);
+  const propertiesRef = useRef(properties);
+  propertiesRef.current = properties;
   useEffect(() => {
     let active = true;
-    setContext({ records: {}, fields: {} });
+    const properties = propertiesRef.current;
+    // Functional reset keeps the same object when already empty, so no extra render.
+    setContext(previous => isEmptyMentionContext(previous) ? previous : EMPTY_MENTION_CONTEXT);
     if (!root || !recordId || recordId.length > 256 || !objects.some(object => object.apiName === root)) {
       return () => { active = false; };
     }
@@ -40,8 +59,8 @@ export function useRelationshipMentionContext(
     void getRecord(root, recordId)
       .then(record => loadMentionContext(objects, root, record, properties, getRecord))
       .then(value => { if (active) setContext(value); })
-      .catch(() => { if (active) setContext({ records: {}, fields: {} }); });
+      .catch(() => { if (active) setContext(EMPTY_MENTION_CONTEXT); });
     return () => { active = false; };
-  }, [objects, root, recordId, properties, apiRequest, revision]);
+  }, [objects, root, recordId, propertiesKey, apiRequest, revision]);
   return context;
 }

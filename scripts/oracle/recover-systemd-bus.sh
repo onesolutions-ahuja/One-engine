@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 [[ "$EUID" == 0 && "$#" == 0 ]] || { echo 'Root-only preflight; no arguments allowed' >&2; exit 64; }
-[[ "${GITHUB_REPOSITORY:-}" == 'unedev00/uneengine' ]] || exit 64
+[[ "${GITHUB_REPOSITORY:-}" == 'onesolutions-ahuja/One-engine' ]] || exit 64
 [[ "$(uname -m)" == 'aarch64' ]] || exit 64
 [[ "$(cat /proc/1/comm)" == 'systemd' ]] || { echo 'PID 1 is not systemd; refusing recovery' >&2; exit 1; }
 

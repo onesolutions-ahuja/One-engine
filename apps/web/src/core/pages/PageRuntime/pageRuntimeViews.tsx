@@ -9,7 +9,8 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import { presentPageRecords, type ChannelGrant } from '../../records/RecordWorkspace/recordPresentationAdapters';
 import TemplatePageRuntimeLayout from '../TemplatePageRuntime/TemplatePageRuntimeLayout';
 import { loadFlowScreenRecordPage, loadFlowScreenRecords, getAccessToken } from '../../authentication/Client/authClient';
-import {shouldInvalidatePageComponent,pageComponentReadObjectNames,type PageMutationDetail} from './pageMutationScope';
+import {shouldInvalidatePageComponent,pageComponentReadObjectNames,applySavedRecordMutations,
+  type PageMutationDetail,type LoadedRecordListScope} from './pageMutationScope';
 import {requestPageMediaAsset} from './pageMediaAssetCoalescer';
 import { pageLayoutForRecord, compactLayoutForRecord, matchesLookupFilterGroup, relatedLookupFilterOperators, type RecordData } from '../../records/RecordWorkspace/recordMetadataUtils';
 import { formatRecordValue, parseCsvImport } from '../../records/RecordWorkspace/recordCsvUtils';
@@ -374,6 +375,7 @@ function MetadataBoundPageComponent({
   // Product catalogue or categories. Unknown writes and session changes still refresh everything.
   const readObjectApiNames=pageComponentReadObjectNames(objectApiName,properties,objects);
   const readObjectKey=JSON.stringify(readObjectApiNames);
+  const loadedListRef=useRef<{rows:Record<string,unknown>[];scope:LoadedRecordListScope}|null>(null);
   useEffect(() => {
     const sync = (event: Event) => {
       const detail = (event as CustomEvent<PageMutationDetail>).detail;
@@ -381,6 +383,18 @@ function MetadataBoundPageComponent({
       if (detail.sessionId && detail.sessionId !== sessionId) {
         setSessionId(detail.sessionId);
         setPageState({});
+        setRevision(value => value + 1);
+        return;
+      }
+      // Till speed: put the saved row straight into a list already on screen
+      // (cart lines) instead of re-querying it. Falls back to a refresh whenever
+      // the outcome could differ from a fresh server read.
+      const loaded=loadedListRef.current;
+      const patched=loaded?applySavedRecordMutations(loaded.rows,objectApiName,detail,loaded.scope):null;
+      if(patched){
+        setRecords(patched.records);
+        setRecordTotal(patched.total);
+        return;
       }
       setRevision(value => value + 1);
     };
@@ -399,6 +413,14 @@ function MetadataBoundPageComponent({
     properties,component.type,fields,objects,pageState,sessionId,revision,
     loadFlowScreenRecordPage,relatedKey?pageState[relatedKey]:undefined,disableActions);
   const recordQueryKey=JSON.stringify([recordQuery,relatedQuery]);
+  loadedListRef.current=recordsForQueryKey===recordQueryKey&&!dataLoading?{rows:records,scope:{
+    total:recordTotal,offset:recordOffset,pageSize:recordPageSize,readObjectApiNames,
+    relatedFilter:relatedQuery.filter,filters:recordQuery.filters,
+    hasUnpredictableFilter:Boolean(recordQuery.blocked||relatedQuery.blocked||
+      (recordQuery.filter&&!recordQuery.serverFilterable)||
+      (recordQuery.filters?.length&&recordQuery.filterLogic&&!/^\(?1\)?$/.test(recordQuery.filterLogic))||
+      properties.collectionFormula||properties.recordPresenterApiName||properties.liveRefreshEnabled)
+  }}:null;
   useEffect(()=>setRecordOffset(0),[objectApiName,recordQueryKey]);
   const lastRecordRequestKey=useRef('');
   useEffect(() => {
@@ -557,9 +579,9 @@ function MetadataBoundPageComponent({
     if(!toggleBinding||!toggleCanWrite)throw new Error('Toggle field is not editable.');
     try{
       await updateSmartToggleField(apiRequest,objectApiName,toggleBinding,next);
-      setActionError('');setRevision(value=>value+1);
+      setActionError('');
       window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-        detail:{pageSessionKey,sessionId}
+        detail:{pageSessionKey,sessionId,objectApiNames:[objectApiName]}
       }));
     }catch(error){setActionError(error instanceof Error?error.message:'Toggle update failed');throw error;}
   };
@@ -700,9 +722,12 @@ function MetadataBoundPageComponent({
           detail:{pageSessionKey,key:change.key,value:change.value}
         }));
       if(result.recordChanged){
-        setRevision(value=>value+1);
+        // Name the written Objects so only components reading them refresh
+        // (a CartLine write must not reload Product or MenuCategory).
         window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-          detail:{pageSessionKey,sessionId}
+          detail:{pageSessionKey,sessionId,
+            objectApiNames:result.mutatedObjectApiNames?.length?result.mutatedObjectApiNames:undefined,
+            recordChanges:result.recordChanges}
         }));
       }
       return {updated:true};
@@ -716,9 +741,8 @@ function MetadataBoundPageComponent({
         window.dispatchEvent(new CustomEvent('metadrive:page-local-state',{
           detail:{pageSessionKey,key:change.key,value:change.value}
         }));
-      setRevision(value=>value+1);
       window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-        detail:{pageSessionKey,sessionId}
+        detail:{pageSessionKey,sessionId,objectApiNames:[objectApiName]}
       }));
       return {updated:true};
     }

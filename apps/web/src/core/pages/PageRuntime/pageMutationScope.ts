@@ -105,3 +105,77 @@ export function applyCompleteRecordMutation(
  }
  return next;
 }
+
+export type LoadedRecordListScope={
+ /** Total rows the server reported for this exact query. */
+ total:number;
+ /** Rows already on screen came from page one. */
+ offset:number;
+ pageSize:number;
+ /** Objects this component reads (null = unknown, always refresh). */
+ readObjectApiNames:readonly string[]|null;
+ relatedFilter?:{field:string;value:string;related:boolean};
+ filters?:ReadonlyArray<{field:string;operator:string;value:string|string[]}>;
+ /** A formula, presenter or client-only filter means rows cannot be predicted. */
+ hasUnpredictableFilter:boolean;
+};
+
+/** Saved records (create/update/delete) applied to a list already on screen,
+ * so a till cart shows a new line from the save response with no re-query.
+ * Returns null whenever the result could differ from a fresh server read;
+ * the caller then refreshes as before.
+ */
+export function applySavedRecordMutations(
+ rows:ReadonlyArray<Record<string,unknown>>,objectApiName:string,
+ detail:PageMutationDetail|undefined,scope:LoadedRecordListScope
+):{records:Record<string,unknown>[];total:number}|null{
+ const changes=detail?.recordChanges;
+ const written=detail?.objectApiNames;
+ if(!Array.isArray(changes)||!changes.length||!Array.isArray(written))return null;
+ if(scope.hasUnpredictableFilter||scope.offset!==0||scope.readObjectApiNames===null)return null;
+ // Any other Object this component reads (lookups, aggregates) changed too: refresh.
+ if(scope.readObjectApiNames.some(name=>name!==objectApiName&&written.includes(name)))return null;
+ if(!written.includes(objectApiName))return null;
+ const own=changes.filter(change=>change.objectApiName===objectApiName);
+ if(!own.length)return null;
+ if((scope.filters?.length??0)>1)return null;
+ // Only a fully loaded list can take an insert or delete without a page shift.
+ if(rows.length!==scope.total||scope.total>=scope.pageSize)return null;
+ // New rows must carry every column the list already shows (formula fields etc.).
+ const columns=rows.length?Object.keys(rows[0]):null;
+ const matches=(record:Readonly<Record<string,unknown>>):boolean|null=>{
+  const related=scope.relatedFilter;
+  if(related){
+   if(!Object.hasOwn(record,related.field))return null;
+   if(String(record[related.field]??'')!==related.value)return false;
+  }
+  for(const filter of scope.filters??[]){
+   if(filter.operator!=='eq'||typeof filter.value!=='string')return null;
+   if(!Object.hasOwn(record,filter.field))return null;
+   if(String(record[filter.field]??'')!==filter.value)return false;
+  }
+  return true;
+ };
+ let next=rows.map(row=>({...row}));
+ let total=scope.total;
+ for(const change of own){
+  const record=change.record;
+  if(!record||typeof record.Id!=='string')return null;
+  const index=next.findIndex(row=>row.Id===record.Id);
+  if(change.operation==='delete'){
+   if(index>=0){next.splice(index,1);total--;}
+   continue;
+  }
+  if(!columns||columns.some(field=>!Object.hasOwn(record,field)))return null;
+  const fits=matches(record);
+  if(fits===null)return null;
+  if(index>=0){
+   if(fits)next[index]={...next[index],...record};
+   else{next.splice(index,1);total--;}
+  }else if(fits){
+   if(change.operation!=='create')return null;
+   next=[...next,{...record}];total++;
+  }
+ }
+ return {records:next,total};
+}

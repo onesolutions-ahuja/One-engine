@@ -18,6 +18,16 @@ const blank=(value:unknown)=>value===null||value===undefined||value==='';
 const stateName=(node:Expression):string|null=>
  node.kind==='reference'&&/^\$state\.[A-Za-z][A-Za-z0-9_]{0,63}$/.test(node.value)
   ?node.value.slice(7):null;
+const valueFunctions=new Set(['TODAY','NOW','TIMENOW','ADDDAYS','ADDMONTHS','DATE','DATEVALUE',
+ 'WEEKDAY','DAY','MONTH','YEAR','HOUR','MINUTE','VALUE','TEXT','LEFT','RIGHT','UPPER','LOWER',
+ 'LEN','ROUND','ROUNDUP','ROUNDDOWN','MIN','MAX','BLANKVALUE']);
+const formulaLiteral=(value:unknown):string=>{
+ if(value===null||value===undefined||value==='')return '""';
+ if(typeof value==='number'&&Number.isFinite(value))return String(value);
+ if(typeof value==='boolean')return value?'TRUE':'FALSE';
+ if(typeof value==='string'&&!/["\\\r\n]/.test(value))return '"'+value+'"';
+ throw Error('Filter value cannot be used inside a function');
+};
 const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=''):unknown=>{
  if(node.kind==='literal')return node.value;
  if(node.kind==='reference'&&node.value.startsWith('$session.')){
@@ -46,21 +56,55 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  if(node.kind==='unary'&&node.operator==='NOT')return !Boolean(asState(node.value,state,sessionId));
  if(node.kind==='binary'){
   const left=asState(node.left,state,sessionId),right=asState(node.right,state,sessionId);
+   const n=(v:unknown)=>typeof v==='number'?v:Number(v);
   switch(node.operator){
    case '=':case '==':return left===right;
    case '!=':case '<>':return left!==right;
    case 'AND':return Boolean(left)&&Boolean(right);
    case 'OR':return Boolean(left)||Boolean(right);
+   case '>':return n(left)>n(right);
+   case '>=':return n(left)>=n(right);
+   case '<':return n(left)<n(right);
+   case '<=':return n(left)<=n(right);
+   case '+':return n(left)+n(right);
+   case '-':return n(left)-n(right);
+   case '*':return n(left)*n(right);
+   case '/':return n(left)/n(right);
+   case '&':return String(left??'')+String(right??'');
   }
+ }
+ if(node.kind==='unary'&&node.operator==='-'){
+  const value=asState(node.value,state,sessionId);
+  if(typeof value==='number')return -value;
+ }
+ // Value-side functions such as TODAY(), NOW(), WEEKDAY(TODAY()) or ADDDAYS(TODAY(),-30):
+ // each argument is first resolved to a constant/state scalar (never a record field),
+ // then the shared formula evaluator runs the function. The result is still sent to the
+ // server as a plain filter value, so filtering stays server-side and permission-scoped.
+ if(node.kind==='call'&&valueFunctions.has(node.name)&&node.args.length<=8){
+  const args=node.args.map(arg=>formulaLiteral(asState(arg,state,sessionId)));
+  const result=evaluateFieldExpressionDetailed(node.name+'('+args.join(',')+')',{},{sessionId});
+  if(result.error)throw Error(result.error);
+  return result.value;
  }
  throw Error('IF condition must use constants or $state values (e.g. ISBLANK($state.categoryId))');
 };
 const simpleField=(node:Expression,fields:ReadonlyArray<FieldMetadata>):FieldMetadata|null=>{
  if(node.kind!=='reference')return null;
  // @Field or @Object.Field (the component's own Object): both name one field.
+ // @Object.Lookup.Field: one hop through a lookup on this Object. The Record API
+ // filters it server-side against the related record, with that record's access rules.
+ const related=/^(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(node.value);
+ if(related&&!/^(?:state|event|session)\./i.test(node.value)&&node.value.split('.').length===3){
+  const lookup=fields.find(f=>f.apiName===related[1]);
+  if(lookup&&(lookup.relationship||/^(lookup|reference|master)/i.test(String(lookup.dataType))))
+   return {apiName:related[1]+'.'+related[2],label:related[2],dataType:'Text'} as FieldMetadata;
+ }
  const match=/^(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(node.value);
  if(!match||/^(?:state|event|session)\./i.test(node.value))return null;
- return fields.find(f=>f.apiName===match[1])??null;
+ // Id is the record's system ID column; the Record API filters it like any field.
+ return fields.find(f=>f.apiName===match[1])
+  ??(match[1]==='Id'?{apiName:'Id',label:'Record ID',dataType:'Text'} as FieldMetadata:null);
 };
 const remap=(logic:string,offset:number):string=>
  logic.replace(/\b\d+\b/g,value=>String(Number(value)+offset));

@@ -2674,6 +2674,8 @@ export function createSystemServer(db:SqlPersistence) {
     const filterValue=queryString('filterValue');
     const filterOperator=queryString('filterOperator')??'Equals';
     const search=queryString('search');
+    const searchPrefix=queryString('searchPrefix');
+    if(searchPrefix!==undefined&&searchPrefix!=='1')throw new Error('Invalid search mode');
     const filtersValue=queryString('filters');
     const filterLogic=queryString('filterLogic');
     const cursorValue=queryString('cursor');
@@ -2695,7 +2697,7 @@ export function createSystemServer(db:SqlPersistence) {
     const objectApi=req.params.objectApi;
     if(typeof objectApi!=='string')throw new Error('Invalid object name');
     res.json(await records.list(actor.tenant_id,actor.user_id,objectApi,limit,offset,{
-      search,filterField,filterValue,filterOperator:filterOperator as 'Equals'|'Includes'|'Excludes',
+      search,prefixSearch:searchPrefix==='1',filterField,filterValue,filterOperator:filterOperator as 'Equals'|'Includes'|'Excludes',
       relatedField:queryString('relatedField'),relatedId:queryString('relatedId'),
       sortField:queryString('sortField')??view?.sort_field??undefined,
       sortDirection:(sortDirection as 'asc'|'desc'|undefined)??view?.sort_direction,

@@ -503,10 +503,10 @@ test('Page Builder activates existing list rows without false API-name duplicate
  assert.equal(metadataNameConflictExcept('serviceflowcalendar',pageNames,'serviceflowhome'),true);
  assert.equal(metadataNameConflictExcept('renamedhome',pageNames,'serviceflowhome'),false);
  const management=fs.readFileSync(new URL('../src/core/builders/PageBuilder/editor/management/usePageManagement.tsx',import.meta.url),'utf8');
- assert.match(management,/const previousApiName = candidate === page \? savedPageApiName\.current : candidate\.apiName/);
+ assert.match(management,/const previousApiName = listActivation \? candidate\.apiName : savedPageApiName\.current/);
  assert.match(management,/metadataNameConflictExcept\(candidate\.apiName, pages\.map\(item => item\.apiName\), previousApiName\)/);
  assert.match(management,/onSave\(nextPage, previousApiName\)/);
- assert.match(management,/if \(candidate === page\) savedPageApiName\.current = nextPage\.apiName/);
+ assert.match(management,/if \(!listActivation\) \{/);
 });
 
 test('Page Builder activation resolves the selected page app from persisted membership',async()=>{

@@ -68,7 +68,7 @@ export function mentionGroups(
   _appObjectApiNames: readonly string[] = [], query = '', kind: MentionKind = 'text'
 ): MentionGroup[] {
   const q = query.trim().replace(/^@/, '').toLowerCase();
-  return mentionPaths(objects, primaryObjectApiName).filter(node => kind !== 'formula' || node.steps.length === 0).map(node => ({
+  return mentionPaths(objects, primaryObjectApiName).map(node => ({
     objectApiName: node.object.apiName, label: node.object.label,
     primary: node.path === primaryObjectApiName, path: node.path, via: node.via,
     fields: objectFields(node.object).filter(field => {
@@ -115,7 +115,6 @@ export function validateMentionPath(
     seen.add(target.apiName);
   }
   if (!current) return null;
-  if (kind === 'formula' && steps.length > 0) return null; // server formula runtime has no related-record context
   const field = objectFields(current).find(field => field.apiName === parts[parts.length - 1]);
   if (!field || !isCompatibleField(field.formula?.returnType ?? field.dataType, kind)) return null;
   return { path: parts.slice(0, -1).join('.'), root: rootObjectApiName, target: current, field, steps };

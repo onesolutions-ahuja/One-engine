@@ -214,13 +214,36 @@ async function evaluatePageActionSqlOnServer(request,expression,ast,payload,page
  };
  // SQL children remain in SQL; only incompatible descendants resolve first.
  const prepared=await forSql(node,bind);
- const source=serializeFormulaSqlExpression(rewrite(prepared));
+ const rewritten=rewrite(prepared);
+ const source=serializeFormulaSqlExpression(rewritten);
  if(source.length>4000||generated>30||Object.keys(values).length>40)
   throw Error('SQL formula has too many Page inputs');
+ // A scalar remainder over bound inputs (e.g. ROUND of a cart SUM computed
+ // from page rows) runs here with the server's exact SQL number rules.
+ let local,hasLocal=false;
+ if(!hasRecordAggregate(rewritten)){
+  try{
+   local=localSqlResultValue(evaluateLocalSql(rewritten,name=>{
+    const key=name.startsWith('$state.')?name.slice(7):'';
+    if(key&&Object.prototype.hasOwnProperty.call(values,key))return localTyped(values[key]);
+    throw new LocalSqlUnsupported('Reference not bound');
+   }));
+   hasLocal=true;
+  }catch(error){
+   if(!(error instanceof LocalSqlUnsupported))throw error;
+   localStats.reasons[error.message]=(localStats.reasons[error.message]??0)+1;
+  }
+  if(hasLocal&&!verifyLocal()){localStats.local++;return local;}
+ }
  const result=await request('/formulas/evaluate',{
   method:'POST',body:JSON.stringify({formula:source,objectApi:objectApi||undefined,
    recordId:typeof recordId==='string'?recordId:undefined,state:values})
  });
+ if(hasLocal){
+  if(JSON.stringify(result.value)!==JSON.stringify(local))
+   console.warn('[LocalSql] mismatch',{expression:source,local,server:result.value});
+  else localStats.verified=(localStats.verified??0)+1;
+ }
  return result.value;
  };
 

@@ -15,12 +15,16 @@ type Mutation={objectApiNames?:readonly string[];recordChanges?:readonly Change[
 
 const maxSets=64;
 const maxRows=100;
-// Writes from other devices are only seen on reload: re-read a set after this long.
-const freshForMs=60_000;
+// Writes from other devices are only seen on reload: re-read a set after this
+// long. Writes from this browser patch held sets exactly. A till idles for
+// minutes between sales, so a short window would re-load on the next tap.
+const freshForMs=10*60_000;
 let scope:string|undefined;
 let generation=0;
 const sets=new Map<string,RecordSet>();
 const loading=new Map<string,Promise<RecordSet|null>>();
+// Broad sets that were too large to hold: go straight to the exact query.
+const tooLarge=new Set<string>();
 
 const keyOf=(object:string,filters:readonly SetFilter[])=>JSON.stringify([object,
  [...filters].sort((a,b)=>a.field<b.field?-1:a.field>b.field?1:a.value<b.value?-1:1)
@@ -40,7 +44,7 @@ function rowMatches(row:Row,filters:readonly SetFilter[]):boolean|null{
 }
 
 function touchScope(current:string|undefined){
- if(current!==scope){scope=current;sets.clear();loading.clear();generation++;}
+ if(current!==scope){scope=current;sets.clear();loading.clear();tooLarge.clear();generation++;}
 }
 
 function evict(){
@@ -91,19 +95,35 @@ export async function rowsForFilters(currentScope:string|undefined,object:string
  load:(object:string,filters:SetFilter[])=>Promise<{records:Row[];total:number}>):Promise<Row[]|null>{
  const held=heldRows(currentScope,object,filters);
  if(held)return held;
+ // Load the broadest small set first (the first criterion is the parent, e.g.
+ // "lines of this cart"): later questions about one product, open lines or
+ // totals are answered from it in memory instead of one request each.
+ if(filters.length>1&&!tooLarge.has(keyOf(object,filters.slice(0,1)))){
+  const coarse=await loadSet(currentScope,object,filters.slice(0,1),load);
+  if(coarse){
+   const answer=heldRows(currentScope,object,filters);
+   if(answer)return answer;
+  }
+ }
+ const exact=await loadSet(currentScope,object,filters,load);
+ return exact?heldRows(currentScope,object,filters)??[...exact.rows.values()]:null;
+}
+
+async function loadSet(currentScope:string|undefined,object:string,filters:readonly SetFilter[],
+ load:(object:string,filters:SetFilter[])=>Promise<{records:Row[];total:number}>):Promise<RecordSet|null>{
  const key=keyOf(object,filters);
  let pending=loading.get(key);
  if(!pending){
   const started=generation;
   pending=load(object,[...filters]).then(page=>{
    loading.delete(key);
+   if(page.total>maxRows||page.total>page.records.length)tooLarge.add(key);
    rememberCompleteRecordSet(currentScope,object,filters,page.records,page.total,started);
    return sets.get(key)??null;
   },error=>{loading.delete(key);throw error;});
   loading.set(key,pending);
  }
- const set=await pending;
- return set?[...set.rows.values()]:null;
+ return pending;
 }
 
 /** Apply a page save. Exact when the saved records carry every filter field;

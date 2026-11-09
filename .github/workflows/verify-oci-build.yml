@@ -14,8 +14,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Page components and formula regression tests
-        run: npm run test:components
+      - name: Page compiler, script and source regression tests
+        run: node scripts/run-archived-tests.mjs apps/web/test/pageCompiler.test.ts apps/web/test/pageSharedAggregates.test.ts apps/web/test/pageScriptRuns.test.ts
       - name: Compile server exactly as OCI
         run: npm run build --workspace apps/server
       - name: Compile frontend

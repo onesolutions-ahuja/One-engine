@@ -3,6 +3,7 @@ import type {SqlPersistence} from './sql-persistence.js';
 import type {RbacEngine} from './rbac-engine.js';
 import {TenantProvisioning} from './tenant-provisioning.js';
 import {TenantDeveloperMailbox} from '../system-support/tenant-developer-mailbox.js';
+import {tenantDeveloperDomain} from '../system-support/tenant-developer-domain.js';
 
 export class PlatformTenantService {
  constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine){}
@@ -270,10 +271,8 @@ export class PlatformTenantService {
     ||typeof x.adminName!=='string'||typeof x.email!=='string'
     ||typeof x.password!=='string'||typeof x.developerDomain!=='string'||!x.developerDomain.trim())
     throw new Error('Invalid tenant provisioning request: a developer domain is required');
-  const base=process.env.METADRIVE_TENANT_BASE_DOMAIN?.trim().toLowerCase();
-  const expectedDomain=base?x.tenantId.toLowerCase()+'.'+base:'';
-  if(!base||!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(base)
-     ||x.developerDomain.toLowerCase()!==expectedDomain)
+  const expectedDomain=tenantDeveloperDomain(x.tenantId);
+  if(x.developerDomain.trim().toLowerCase()!==expectedDomain)
     throw new Error('Invalid tenant domain: use the configured platform-owned tenant subdomain');
   const mail=new TenantDeveloperMailbox(this.db);
   if(typeof x.tenantDeveloperEmail!=='string'||!/^([a-z0-9][a-z0-9._+-]{0,62})@unesolutions\.co\.uk$/.test(x.tenantDeveloperEmail))
@@ -306,7 +305,8 @@ export class PlatformTenantService {
  }
  async developerEmailAvailability(tenantId:string,userId:string,slug:string){
   await this.requirePlatform(tenantId,userId);
-  return new TenantDeveloperMailbox(this.db).suggestions(slug);
+  const developerDomain=tenantDeveloperDomain(slug);
+  return {...await new TenantDeveloperMailbox(this.db).suggestions(slug),developerDomain};
  }
  async get(tenantId:string,userId:string,slug:string) {
   const platform=await this.platformScope(tenantId,userId);

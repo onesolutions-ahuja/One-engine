@@ -7,12 +7,12 @@ export type AdminControlDefinition=ComponentSettingDefinition&{
  inputType?:'text'|'email'|'password'|'color'; maxLength?:number;minLength?:number;
  pattern?:string;autoComplete?:string;placeholder?:string;multiline?:boolean;
 };
-export default function AdminPropertyControl({definition,value,disabled=false,onChange}:{
- definition:AdminControlDefinition;value:string;disabled?:boolean;onChange:(value:string)=>void;
+export default function AdminPropertyControl({definition,value,disabled=false,readOnly=false,onChange}:{
+ definition:AdminControlDefinition;value:string;disabled?:boolean;readOnly?:boolean;onChange:(value:string)=>void;
 }){
  const presentation=usePlatformSlotPresentation('field-'+definition.propertyKey);
  const label=presentation.label??definition.label;
- const common={disabled,required:definition.required??false,
+ const common={disabled,readOnly,required:definition.required??false,
   maxLength:definition.maxLength,minLength:definition.minLength,pattern:definition.pattern,
   placeholder:presentation.placeholder??definition.placeholder,'aria-label':label,value,
   onChange:(event:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>onChange(event.target.value)};

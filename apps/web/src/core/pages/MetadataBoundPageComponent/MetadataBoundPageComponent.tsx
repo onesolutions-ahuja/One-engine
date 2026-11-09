@@ -726,6 +726,18 @@ export default function MetadataBoundPageComponent({
       disabled:behaviorAction(properties,'click',behaviorContext??{formFactor})!=='enabled',
       loadAsset: (id:string) => requestPageMediaAsset<{contentType:string;contentBase64:string}>(apiRequest,id,getAccessToken()??''),
       loadCompanySettings: () => apiRequest('/metadata/currencies'),
+      // Search is independent of the list's existing 100-row pagination.
+      // Never widen unsupported/client-only filters into an unfiltered query.
+      searchRecords: async (search:string) => {
+        if(!objectApiName||recordQuery.blocked||relatedQuery.blocked||!recordQuery.serverFilterable)
+          throw new Error('Search requires an Object with server-compatible filters');
+        const page=await loadFlowScreenRecordPage(objectApiName,{
+          limit:20,offset:0,search,searchPrefix:true,forceRefresh:true,
+          filter:relatedQuery.filter??recordQuery.filter,
+          filters:recordQuery.filters,filterLogic:recordQuery.filterLogic
+        });
+        return page.records;
+      },
       onChange: (value: unknown, dispatch?:{actionHandled?:boolean}) => {
         publishComponentInput(component.id,value);
         if (!dispatch?.actionHandled && (actionFlows.change || (Array.isArray(pageBehaviors(properties)?.interactions)

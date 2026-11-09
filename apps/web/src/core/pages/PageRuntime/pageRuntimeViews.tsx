@@ -2,6 +2,7 @@ import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjust
 import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
 import {nextAccessibleTabIndex} from '../PageRuntime/tabKeyboardNavigation';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
+import {isRowIndependentFormula} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
 import {pageStateDependencies,applyPageSelection,implicitPageStateKeys,changedPageStateNames,
   pageStateChangeIsRelevant} from './pageStateDependencies';
 import { useFormFactor } from '../../workspace/Responsive/useFormFactor';
@@ -199,6 +200,23 @@ import {
 } from '../../metadata/Definitions/metadata';
 
 
+// Text and label boxes whose formulas never read a row field (e.g. till totals
+// built from SUMIFS) do not need their Object's rows: loading 100 rows into
+// each of 50 boxes and redrawing them on every save cost ~0.5 s per tap.
+// Their formulas still refresh on writes through useSqlFormulaDisplay.
+const rowFreeDisplayTypes=new Set(['Custom:smart_text','Custom:smart_label']);
+function displaysRowFields(type:string,properties:Readonly<Record<string,unknown>>):boolean{
+  if(!rowFreeDisplayTypes.has(type))return true;
+  if(properties.recordId||properties.collectionFormula||properties.recordPresenterApiName
+    ||properties.filterFormula||properties.relatedFilterKey)return true;
+  for(const value of Object.values(properties)){
+    if(typeof value!=='string')continue;
+    const text=value.trim();
+    if(text.startsWith('=')){if(!isRowIndependentFormula(text))return true;continue;}
+    if(/@[A-Za-z]|\{!/.test(text))return true;
+  }
+  return false;
+}
 export function createPageRuntimeViews(apiRequest: <T>(path:string, init?:RequestInit) => Promise<T>) {
 function RuntimeReportChart({ report, objects, recordContext }: {
   report: ReportMetadata | undefined; objects: ObjectMetadata[];
@@ -406,6 +424,7 @@ function MetadataBoundPageComponent({
   // Product catalogue or categories. Unknown writes and session changes still refresh everything.
   const readObjectApiNames=useMemo(()=>pageComponentReadObjectNames(objectApiName,properties,objects),
     [objectApiName,properties,objects]);
+  const readsRows=useMemo(()=>displaysRowFields(component.type,properties),[component.type,properties]);
   const readObjectKey=JSON.stringify(readObjectApiNames);
   const loadedListRef=useRef<{rows:Record<string,unknown>[];scope:LoadedRecordListScope}|null>(null);
   useEffect(() => {
@@ -421,6 +440,7 @@ function MetadataBoundPageComponent({
       // Till speed: put the saved row straight into a list already on screen
       // (cart lines) instead of re-querying it. Falls back to a refresh whenever
       // the outcome could differ from a fresh server read.
+      if(!readsRows)return;
       const loaded=loadedListRef.current;
       const patched=loaded?applySavedRecordMutations(loaded.rows,objectApiName,detail,loaded.scope):null;
       if(patched){
@@ -436,7 +456,7 @@ function MetadataBoundPageComponent({
     };
     window.addEventListener('metadrive:page-flow-mutated', sync);
     return () => window.removeEventListener('metadrive:page-flow-mutated', sync);
-  }, [pageSessionKey, sessionId, readObjectKey]);
+  }, [pageSessionKey, sessionId, readObjectKey, readsRows]);
   const fields = objects.find((item) => item.apiName === objectApiName)?.fields ?? [];
   const selectedRecordFilters=activePageRecordFilters(properties);
  const collectionPredicate=collectionRecordFilterFormula(properties,objectApiName,fields);
@@ -477,7 +497,7 @@ function MetadataBoundPageComponent({
     }
     setDataError('');
     setDataErrorForQueryKey('');
-    if (!objectApiName || recordQuery.blocked || relatedQuery.blocked) {
+    if (!objectApiName || !readsRows || recordQuery.blocked || relatedQuery.blocked) {
       setRecords([]);lastRecordsJson.current='';
       setRecordsForQueryKey('');
       setRecordTotal(0);
@@ -533,7 +553,7 @@ function MetadataBoundPageComponent({
         document.removeEventListener('visibilitychange', onVisible);
       }
     };
-  }, [objectApiName, recordQueryKey, recordOffset, revision, properties.recordPresenterApiName, properties.liveRefreshEnabled, disableActions]);
+  }, [objectApiName, recordQueryKey, recordOffset, revision, properties.recordPresenterApiName, properties.liveRefreshEnabled, disableActions, readsRows]);
   useEffect(() => {
     setChannelAccess({userId:'',viewAll:false,grants:[],eligibleAssignees:[]});
     const accessPath=String(properties.channelAccessPath??'');

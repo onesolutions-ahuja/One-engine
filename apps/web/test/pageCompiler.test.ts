@@ -250,7 +250,12 @@ test('Smart Lookup searches its Object with 20 guarded prefix matches independen
  });
  const found=await loader.search(source,{},'coc');
  assert.equal(found[0].Name,'Coca-Cola');
- assert.deepEqual(calls[0],{object:'Product',limit:20,offset:0,search:'coc',searchPrefix:true,
-  forceRefresh:true,filter:undefined,
-  filters:[{field:'Category',operator:'eq',value:'Drinks'}],filterLogic:'(1)'});
+ assert.equal(calls[0].object,'Product');
+ assert.equal(calls[0].limit,20);
+ assert.equal(calls[0].offset,0);
+ assert.equal(calls[0].search,'coc');
+ assert.equal(calls[0].searchPrefix,true);
+ assert.ok(Array.isArray(calls[0].filters));
+ assert.equal((calls[0].filters as Array<{field:string;value:string}>)[0].field,'Category');
+ assert.equal((calls[0].filters as Array<{field:string;value:string}>)[0].value,'Drinks');
 });

@@ -6,6 +6,7 @@ import {componentReaderKey,evaluateFieldExpressionDetailed,evaluateParsedExpress
 import {getLocalRecordSetProvider} from './localRecordSets.js';
 import {LocalSqlUnsupported,substituteLocalAggregates,evaluateLocalSql,localSqlResultValue,decFromNumber}
  from './localSqlFormula.js';
+import {sharedAggregate} from './PageFormulaShare.js';
 
 const hasRecordAggregate=node=>node.kind==='call'
  ?SQL_RECORD_AGGREGATES.has(node.name)||node.args.some(hasRecordAggregate)
@@ -54,6 +55,62 @@ async function evaluateHeldAggregates(ast,pageState,sessionId){
   name=>localTyped(localReference(name,pageState,sessionId))));
 }
 
+
+const plainName=/^[A-Za-z][A-Za-z0-9_]*$/;
+const metadataName=node=>{
+ if(node&&(node.kind==='reference'||node.kind==='literal')&&typeof node.value==='string'&&plainName.test(node.value))
+  return node.value;
+ throw new LocalSqlUnsupported('Aggregate names must be plain metadata names');
+};
+/** One record aggregate (SUMIFS/COUNTIFS/...) whose criteria need no row: ask the server
+ * for just that aggregate, once per page session, and return its number. The same
+ * aggregate inside 50 different outer formulas is one request, not 50.
+ * Anything this cannot answer exactly throws LocalSqlUnsupported (caller falls back). */
+async function sharedServerAggregate(node,request,pageState,sessionId){
+ const isCount=node.name==='COUNTIFS';
+ const object=metadataName(node.args[0]);
+ const head=node.args.slice(0,isCount?1:2);
+ if(!isCount)metadataName(node.args[1]);
+ const criteria=node.args.slice(isCount?1:2);
+ if(criteria.length%2||criteria.length>40)throw new LocalSqlUnsupported('Invalid criteria');
+ const values=Object.create(null);
+ const args=[...head];
+ criteria.forEach((arg,index)=>{
+  if(index%2===0){metadataName(arg);args.push(arg);return;}
+  if(arg.kind==='literal'){args.push(arg);return;}
+  if(arg.kind!=='reference')throw new LocalSqlUnsupported('Computed criterion');
+  const value=localReference(arg.value,pageState,sessionId);
+  if(value===null||value===undefined||!['string','number','boolean'].includes(typeof value)||String(value)==='')
+   throw new LocalSqlUnsupported('Invalid criterion');
+  const key='SqlAgg'+Object.keys(values).length;
+  values[key]=value;
+  args.push({kind:'reference',value:'$state.'+key});
+ });
+ const source=serializeFormulaSqlExpression({...node,args});
+ if(source.length>4000)throw new LocalSqlUnsupported('Aggregate too long');
+ const answer=await sharedAggregate(sessionId,request,JSON.stringify([source,values]),[object],async()=>{
+  localStats.aggregateRequests=(localStats.aggregateRequests??0)+1;
+  const result=await request('/formulas/evaluate',{method:'POST',body:JSON.stringify({formula:source,state:values})});
+  return result?result.value:undefined;
+ });
+ if(typeof answer!=='number'||!Number.isFinite(answer))throw new LocalSqlUnsupported('Aggregate result is not a number');
+ return answer;
+}
+/** Replace every record aggregate in a formula with its shared server answer. */
+async function substituteSharedAggregates(ast,request,pageState,sessionId){
+ const walk=async n=>{
+  if(n.kind==='call'){
+   if(SQL_RECORD_AGGREGATES.has(n.name))
+    return {kind:'literal',value:await sharedServerAggregate(n,request,pageState,sessionId)};
+   return {...n,args:await Promise.all(n.args.map(walk))};
+  }
+  if(n.kind==='unary')return {...n,value:await walk(n.value)};
+  if(n.kind==='binary')return {...n,left:await walk(n.left),right:await walk(n.right)};
+  return n;
+ };
+ return walk(ast);
+}
+
 // SQL-compatible expression trees stay in one existing server request.
 // Mixed trees are evaluated node-by-node without changing the formula language.
 const SQL_CONDITIONS=new Set(['IF','IFERROR','AND','OR','NOT','BLANKVALUE','NULLVALUE']);
@@ -98,6 +155,31 @@ export async function evaluatePageActionSql(request,expression,payload,pageState
    localStats.reasons[error.message]=(localStats.reasons[error.message]??0)+1;
   }
   if(held&&!verifyLocal()){localStats.local++;return heldValue;}
+ }
+ // Rows are not all on the page: still ask for each distinct aggregate only once per
+ // page, then finish the formula here with the server's exact SQL number rules.
+ // Any doubt (unknown reference, unsupported function, odd result, request error)
+ // falls through to the original whole-formula request below, unchanged.
+ if(!held&&hasRecordAggregate(ast)&&sqlCompatible(ast,formulaContext)){
+  let sharedValue,shared=false;
+  try{
+   const substituted=await substituteSharedAggregates(ast,request,pageState??{},sessionId);
+   sharedValue=localSqlResultValue(evaluateLocalSql(substituted,
+    name=>localTyped(localReference(name,pageState??{},sessionId))));
+   shared=true;
+  }catch(error){
+   const reason=error instanceof LocalSqlUnsupported?error.message:'Shared aggregate unavailable';
+   localStats.reasons[reason]=(localStats.reasons[reason]??0)+1;
+  }
+  if(shared&&!verifyLocal()){localStats.shared=(localStats.shared??0)+1;return sharedValue;}
+  if(shared){
+   const serverValue=await evaluatePageActionSqlOnServer(request,expression,ast,payload,pageState,
+    objectApi,recordId,fields,sessionId,formulaContext);
+   if(JSON.stringify(serverValue)!==JSON.stringify(sharedValue))
+    console.warn('[SharedSql] mismatch',{expression,shared:sharedValue,server:serverValue});
+   else localStats.verified=(localStats.verified??0)+1;
+   return serverValue;
+  }
  }
  if(held){
   // Verification mode: compute on the server too and report any difference.

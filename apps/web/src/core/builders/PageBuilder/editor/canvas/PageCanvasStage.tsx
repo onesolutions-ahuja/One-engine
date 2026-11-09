@@ -1,6 +1,8 @@
+import * as React from 'react';
 import { useEffect, useMemo } from 'react';
 import { compilePageCached } from '../../../../pages/PageCompiler/compilePage';
 import CompiledPreviewBar from '../../../../pages/PageCompiler/CompiledPreviewBar';
+import { CompiledPageProvider } from '../../../../pages/PageCompiler/CompiledPageRuntime';
 import { canvasScaleToFitWidth } from '../../../../pages/PageRuntime/pageCanvas';
 import { standaloneTemplateCanvasStyle } from '../../standaloneTemplateCanvasStyle';
 import BuilderTemplatePreviewLayout from '../../../TemplatePreview/BuilderTemplatePreviewLayout';
@@ -48,8 +50,14 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   const { renderPageComponent, renderRegion } = canvasRenderer;
   const { selectedGroupBounds, selectedGroupMembers } = componentProperties;
   // Preview runs the compiled page: compiled once per opened draft, not per component.
-  const compiledPreview = useMemo(() => previewMode && page.pageType !== 'Record Page'
-    ? compilePageCached(page, objects) : null, [previewMode, page, objects]);
+  const compiledPreview = useMemo(() => previewMode ? compilePageCached(page, objects, {strictLegacy:true}) : null, [previewMode, page, objects]);
+  // Record pages preview on the builder canvas: run it on the compiled runtime too.
+  const withRecordPreviewRuntime = (content: React.ReactElement) => compiledPreview && page.pageType === 'Record Page'
+    ? <><CompiledPreviewBar compiled={compiledPreview} />
+        <CompiledPageProvider compiled={compiledPreview} components={page.components} objects={objects} request={props.request}
+          pageSessionKey={(builderAppApiName || apps[0]?.apiName || 'Records') + ':' + page.apiName}
+          recordId={previewRecordId || String(previewRecord?.Id ?? '')}>{content}</CompiledPageProvider></>
+    : content;
   useEffect(() => {
     const previewArea = pagePreviewAreaRef.current;
     if (!fitCanvas || page.layoutMode !== 'free-canvas' || !previewArea) {
@@ -123,7 +131,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
                 formFactor={device} previewLayoutDevice={device}
                 onNavigate={(route:AppRoute) => { window.open(appRoutePath(route),'_blank','noopener,noreferrer'); }}
                 onLaunchFlow={onLaunchFlow} onStandaloneModeChange={() => {}} />
-            </div> : <div
+            </div> : withRecordPreviewRuntime(<div
               className={`record-preview ${page.layoutMode === 'free-canvas' ? 'free-canvas-preview' : page.pageType === 'Record Page' ? 'record-page-preview' : page.pageType === 'App Page' ? 'app-page-preview' : 'home-page-preview'} ${device === 'Phone' ? 'phone-preview' : device === 'Tablet' ? 'tablet-preview' : ''}`}
               style={{...(page.layoutMode === 'free-canvas' ? {
                 width: page.canvasWidth * (fitCanvas ? fitScale : canvasZoom/100),
@@ -200,7 +208,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
                     </div>
                   </div>}
               </>}
-            </div>}
+            </div>)}
           </div>
         </div>
   </>;

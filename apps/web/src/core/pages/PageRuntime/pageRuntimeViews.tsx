@@ -1424,7 +1424,8 @@ function LightningAppRuntime({
       pageRecordId={typeof layoutState.recordId==='string'?layoutState.recordId:undefined}/></React.Suspense>:null;
   const withCompiledRuntime=(content:React.ReactElement)=>compiledPage?.apiName===page.apiName
     ?<CompiledPageProvider compiled={compiledPage} components={page.components} objects={objects} request={apiRequest}
-      pageSessionKey={appId+':'+page.apiName} initialState={inScreenPage?inScreenContext?.values:undefined}>{content}</CompiledPageProvider>
+      pageSessionKey={appId+':'+page.apiName} initialState={inScreenPage?inScreenContext?.values:undefined}
+      sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}>{content}</CompiledPageProvider>
     :content;
   if(page.layoutMode==='free-canvas')return withCompiledRuntime(<><ResponsivePageCanvas page={page}>
     {childrenOf(page.components,null).map(component=>renderCanvasComponent(component))}

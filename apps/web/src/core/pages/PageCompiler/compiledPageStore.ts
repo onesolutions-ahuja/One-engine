@@ -86,13 +86,15 @@ export type SourceSnapshot={records:Record<string,unknown>[];total:number;loadin
  /** More rows exist on the server; loadMore fetches the next page. */
  hasMore:boolean;loadingMore:boolean;
  /** Filters as resolved for the last load (used to predict saved rows). */
- serverFilters?:ReadonlyArray<{field:string;operator:string;value:string}>;predictable:boolean;version:number};
+ serverFilters?:ReadonlyArray<{field:string;operator:string;value:string}>;
+ relatedFilter?:{field:string;value:string;related:boolean};predictable:boolean;version:number};
 export type SourceLoadResult={records:Record<string,unknown>[];total:number;
  serverFilters?:ReadonlyArray<{field:string;operator:string;value:string}>;predictable:boolean;
+ relatedFilter?:{field:string;value:string;related:boolean};
  /** The loader could not page (client-side filter): rows are all it will return. */
  paged:boolean};
-export type SourceLoad=(source:CompiledDataSource,state:State,window:{offset:number;limit:number})=>
- Promise<SourceLoadResult|null>;
+export type SourceLoad=((source:CompiledDataSource,state:State,window:{offset:number;limit:number})=>
+ Promise<SourceLoadResult|null>)&{invalidate?(objectApiNames?:readonly string[]):void};
 
 /** Rows per page while scrolling. */
 export const SOURCE_PAGE_SIZE=50;
@@ -107,9 +109,16 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
  const snapshots=new Map<string,SourceSnapshot>();
  const listeners=new Map<string,Set<Listener>>();
  const requests=new Map<string,number>();
+ // Sources re-reading right now. Refreshing is silent: subscribers redraw only if the rows really change.
+ const refreshing=new Set<string>();
  const sources=new Map(compiled.dataSources.map(source=>[source.id,source]));
  const componentReads=new Map(compiled.components.map(item=>[item.id,item.objectReads]));
  let loads=0;
+ const sameRows=(a:readonly Record<string,unknown>[],b:readonly Record<string,unknown>[]):boolean=>{
+  if(a===b)return true;
+  if(a.length!==b.length)return false;
+  try{return JSON.stringify(a)===JSON.stringify(b);}catch{return false;}
+ };
  const publish=(id:string,next:SourceSnapshot)=>{
   snapshots.set(id,next);
   listeners.get(id)?.forEach(listener=>listener());
@@ -136,27 +145,37 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   const request=(requests.get(id)??0)+1;
   requests.set(id,request);
   const previous=snapshots.get(id)??emptySnapshot;
-  // Keep showing current rows while the same source refreshes (no blank flash).
-  if(!previous.loading)publish(id,{...previous,loading:true});
+  // Keep showing current rows while the same source refreshes: no blank flash and,
+  // unlike before, no redraw of every reader just because a re-read started.
+  if(!previous.loading)refreshing.add(id);
   // A refresh keeps as many rows as the user has already scrolled through.
   const count=source.complete?COMPLETE_SOURCE_LIMIT:Math.max(SOURCE_PAGE_SIZE,previous.records.length);
   try{
    const result=await readRows(source,count);
    if(requests.get(id)!==request)return;
-   publish(id,result
-    ?{records:result.records,total:result.total,loading:false,loadingMore:false,error:'',serverFilters:result.serverFilters,
+   refreshing.delete(id);
+   const next:SourceSnapshot=result
+    ?{records:result.records,total:result.total,loading:false,loadingMore:false,error:'',serverFilters:result.serverFilters,relatedFilter:result.relatedFilter,
       hasMore:result.paged&&result.records.length<result.total,predictable:result.predictable,version:previous.version+1}
-    :{records:[],total:0,loading:false,loadingMore:false,error:'',hasMore:false,predictable:false,version:previous.version+1});
+    :{records:[],total:0,loading:false,loadingMore:false,error:'',hasMore:false,predictable:false,version:previous.version+1};
+   // Refresh by value: identical rows keep the same snapshot, so nothing redraws.
+   const latest=snapshots.get(id);
+   if(latest&&!latest.loading&&!latest.loadingMore&&!latest.error&&sameRows(latest.records,next.records)
+     &&latest.total===next.total&&latest.hasMore===next.hasMore&&latest.predictable===next.predictable
+     &&JSON.stringify(latest.serverFilters??null)===JSON.stringify(next.serverFilters??null)
+     &&JSON.stringify(latest.relatedFilter??null)===JSON.stringify(next.relatedFilter??null))return;
+   publish(id,next);
   }catch(error){
    if(requests.get(id)!==request)return;
-   publish(id,{...previous,loading:false,loadingMore:false,error:error instanceof Error?error.message:'Unable to load records',
-    version:previous.version+1});
+   refreshing.delete(id);
+   publish(id,{...(snapshots.get(id)??previous),loading:false,loadingMore:false,error:error instanceof Error?error.message:'Unable to load records',
+    version:(snapshots.get(id)??previous).version+1});
   }
  };
  const loadMore=async(id:string):Promise<void>=>{
   const source=sources.get(id);
   const current=snapshots.get(id);
-  if(!source||!current||!current.hasMore||current.loading||current.loadingMore)return;
+  if(!source||!current||!current.hasMore||current.loading||current.loadingMore||refreshing.has(id))return;
   const request=requests.get(id)??0;
   publish(id,{...current,loadingMore:true});
   try{
@@ -200,18 +219,25 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   saved(detail:PageMutationDetail):Promise<void>{
    const written=detail.objectApiNames;
    const work:Promise<void>[]=[];
+   // A new or deleted parent (a cart) is rediscovered on the next read.
+   if(!detail.optimistic)load.invalidate?.(written);
    for(const source of compiled.dataSources){
     if(written&&!readsObject(source,written))continue;
     const current=snapshots.get(source.id);
     const reads=source.components.map(id=>componentReads.get(id));
     const fullyLoaded=Boolean(current&&!current.hasMore&&current.records.length===current.total);
-    const patched=written&&current&&!current.loading
+    const patched=written&&current&&!current.loading&&!refreshing.has(source.id)
      ?applySavedRecordMutations(current.records,source.objectApiName,detail,{
        // Inserts and deletes are exact only when every row is on screen.
        total:current.total,offset:0,pageSize:fullyLoaded?current.total+1:0,
        readObjectApiNames:reads.some(item=>item===null)?null:[...new Set(reads.flat() as string[])],
-       filters:current.serverFilters,hasUnpredictableFilter:!current.predictable}):null;
-    if(patched){publish(source.id,{...current!,records:patched.records,total:patched.total,version:current!.version+1});continue;}
+       filters:current.serverFilters,relatedFilter:current.relatedFilter,hasUnpredictableFilter:!current.predictable}):null;
+    if(patched){
+     // Same rows after the patch: no new snapshot, no redraw.
+     if(patched.total!==current!.total||!sameRows(current!.records,patched.records))
+      publish(source.id,{...current!,records:patched.records,total:patched.total,version:current!.version+1});
+     continue;
+    }
     // A prediction the list cannot show exactly is skipped; the real save follows.
     if(detail.optimistic)continue;
     work.push(reload(source.id));

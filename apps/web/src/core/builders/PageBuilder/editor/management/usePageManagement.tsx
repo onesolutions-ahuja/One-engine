@@ -90,6 +90,14 @@ export function usePageManagement(
     try {
       const saved = await onSave(nextPage, candidate === page ? savedPageApiName.current : candidate.apiName);
       if (saved) {
+        // Save = compile: formulas, data loads and actions are rebuilt from the saved metadata.
+        const compiled=compilePage(nextPage,objects);
+        const errors=compiled.diagnostics.filter(entry=>entry.level==='error');
+        if(errors.length){
+          const label=(id:string)=>nextPage.components.find(item=>item.id===id)?.label||id;
+          onNotify('Saved. '+errors.length+' formula error'+(errors.length===1?'':'s')+' to fix: '
+            +errors.slice(0,3).map(entry=>label(entry.componentId)+' → '+entry.message).join('; ')+(errors.length>3?' …':''));
+        }
         // Save already applies active-page edits live. Only the initial
         // activation of a draft page needs a separate publish request.
         if (status === 'Active' && saved.draftRevision !== saved.publishedRevision) {
@@ -325,10 +333,10 @@ export function usePageManagement(
     try{
       const {page:layout}=await request<{page:LightningPageMetadata}>(
         `/metadata/pages/${encodeURIComponent(item.apiName)}/layouts/${variant}/editor`);
-      const compiled=compilePage(layout,objects);
+      const compiled=compilePage(layout,objects,{strictLegacy:true});
       downloadPageScript(compiled,'ts',item.apiName+'_'+variant);
       const errors=compiled.diagnostics.filter(entry=>entry.level==='error').length;
-      if(errors)onNotify('Script downloaded. '+errors+' formula error'+(errors===1?'':'s')+' found: open Preview → View code for details.');
+      if(errors)onNotify('Readable copy downloaded. '+errors+' issue'+(errors===1?'':'s')+' found (formula errors or components on the slow previous runtime): open Preview → View code for details.');
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the page script');}
     finally{setInventoryDownloading('');}
   };

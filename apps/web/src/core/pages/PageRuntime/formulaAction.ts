@@ -17,6 +17,26 @@ function queuedSave<T>(run:()=>Promise<T>):Promise<T>{
  return next;
 }
 
+// An action formula is parsed and split into its server part once, not on every tap.
+// The result is a plain read-only {dataSteps,totalSteps}; the formula text is the key.
+const splitCache=new Map<string,ReturnType<typeof splitServerDataActionPlan>>();
+const planCache=new Map<string,boolean>();
+function cachedSplit(formula:string):ReturnType<typeof splitServerDataActionPlan>{
+ if(splitCache.has(formula))return splitCache.get(formula)!;
+ const split=splitServerDataActionPlan(formula);
+ if(splitCache.size>=200)splitCache.clear();
+ splitCache.set(formula,split);
+ return split;
+}
+function cachedIsActionPlan(formula:string):boolean{
+ const known=planCache.get(formula);
+ if(known!==undefined)return known;
+ const result=isActionPlan(formula);
+ if(planCache.size>=200)planCache.clear();
+ planCache.set(formula,result);
+ return result;
+}
+
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 type Change={key:string;value:unknown};
 /** Simple assignment target; RHS uses the existing shared expression engine.
@@ -61,7 +81,7 @@ export async function executePageFormulaAction(
  recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>;
  predictionBatch?:string}>{
  const formula=String(binding.formula??'');
- if(isActionPlan(formula)){
+ if(cachedIsActionPlan(formula)){
   // Production diagnostics are disabled by default and scoped to this browser session.
   // Enable in DevTools: sessionStorage.setItem('metadrive:formula-timings','1')
   let timingEnabled=false;
@@ -83,7 +103,7 @@ export async function executePageFormulaAction(
     recordFields:objects.find(object=>object.apiName===objectApiName)?.fields.map(field=>field.apiName),
     state:pageState}};
   // Always attempt safe server-side CRUD. FOREACH remains in its existing runtime.
-  const split=keepForeach?null:splitServerDataActionPlan(formula);
+  const split=keepForeach?null:cachedSplit(formula);
   if(split){
    // Predict from held rows while the real save runs; never delay the save.
    let answered=false;

@@ -45,7 +45,8 @@ test('identical Object + filter reads share one data source',()=>{
  assert.deepEqual(unfiltered.map(source=>source.components),[['menu','mention']]);
  assert.deepEqual(product[0].components,['grid1','grid2','grid3']);
  const cart=compiled.dataSources.find(source=>source.objectApiName==='CartLine');
- assert.deepEqual(cart?.stateInputs,['activeCartId']);
+ // The cart follows its filter key and the usual active-cart keys (cart scope).
+ assert.deepEqual(cart?.stateInputs,['activeCartId','cartId','currentCartId']);
 });
 
 test('a state change redraws only its readers, not all components',()=>{
@@ -65,15 +66,19 @@ test('actions are compiled once and their server part split off',()=>{
  assert.deepEqual(click.writesObjects,['Cart','CartLine']);
 });
 
-test('collections, mentions and session references compile; rare features fall back per component',()=>{
+test('every feature compiles: collections, mentions, session references, related lists, cart scope',()=>{
  const compiled=compilePage(page,objects);
  const menu=compiled.components.find(item=>item.id==='menu')!;
  assert.equal(menu.mode,'compiled');
  assert.equal(compiled.dataSources.find(source=>source.id===menu.dataSourceId)!.complete,true,'a collection loads all its rows');
  assert.equal(compiled.components.find(item=>item.id==='mention')!.mode,'compiled');
+ assert.equal(compiled.stats.legacy,0,'nothing runs on a fallback engine');
  const related=compiled.components.find(item=>item.id==='related')!;
- assert.equal(related.mode,'legacy');
- assert.deepEqual(related.legacyReasons,['related list scope']);
+ assert.equal(related.mode,'compiled');
+ assert.deepEqual(compiled.dataSources.find(source=>source.id===related.dataSourceId)!.scope,
+  {kind:'key',key:'activeCartId',field:''});
+ const cart=compiled.components.find(item=>item.id==='cart')!;
+ assert.equal(compiled.dataSources.find(source=>source.id===cart.dataSourceId)!.scope.kind,'auto');
  assert.equal(compiled.components.find(item=>item.id==='grid1')!.mode,'compiled');
  assert.ok(compiled.diagnostics.some(d=>d.componentId==='broken'&&d.level==='error'));
 });
@@ -105,7 +110,7 @@ test('one store: a state write wakes only its readers; one load per shared sourc
  store.set('activeCartId','c-1');
  assert.deepEqual(woken,['cart','related'],'only the two components that show cart data wake up');
  const calls:string[]=[];
- const layer=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>'s',async(object)=>{
+ const layer=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>({sessionId:'s'}),async(object)=>{
   calls.push(object);
   return object==='Product'?{records:[{Id:'p1',Name:'Tea',Category:'Drinks'}],total:1}:{records:[],total:0};
  }),store.get);
@@ -134,7 +139,7 @@ test('lists load 50 rows, then the next 50 on scroll; a refresh keeps scrolled r
  const compiled=compilePage(list,objects);
  const all=Array.from({length:120},(_,i)=>({Id:'p'+i,Name:'P'+i}));
  const windows:string[]=[];
- const layer=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>'s',async(_o,{limit,offset})=>{
+ const layer=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>({sessionId:'s'}),async(_o,{limit,offset})=>{
   windows.push(offset+'+'+limit);
   return {records:all.slice(offset,offset+limit),total:all.length};
  }),()=>({}));
@@ -151,4 +156,38 @@ test('lists load 50 rows, then the next 50 on scroll; a refresh keeps scrolled r
  await layer.reload(id);
  assert.equal(layer.get(id).records.length,120,'refresh keeps what the user scrolled through');
  assert.deepEqual(windows,['0+100','100+20']);
+});
+
+test('a cart shows only its own cart: active cart first, else the session cart (found once, refreshed after a Cart save)',async()=>{
+ const {createCompiledDataLayer,createCompiledPageStore}=await import('../src/core/pages/PageCompiler/compiledPageStore');
+ const {compiledSourceLoader}=await import('../src/core/pages/PageCompiler/compiledSourceLoader');
+ const cartObjects=[...objects.filter(o=>o.apiName!=='Cart'),{...objects.find(o=>o.apiName==='Cart')!,
+  fields:[field('Name'),field('SessionKey')]}] as unknown as ObjectMetadata[];
+ const cartPage={...page,components:[{id:'cart',type:'Custom:smart_cart',label:'Cart',visible:true,
+  properties:{objectApiName:'CartLine'}}]} as unknown as LightningPageMetadata;
+ const compiled=compilePage(cartPage,cartObjects);
+ const store=createCompiledPageStore(compiled);
+ const reads:string[]=[];
+ const cartId='22222222-2222-4222-8222-222222222222';
+ let carts:Record<string,unknown>[]=[];
+ const loader=compiledSourceLoader(cartObjects,()=>({sessionId:'session-1'}),async(object,options)=>{
+  reads.push(object+':'+(options.filter?options.filter.field+'='+options.filter.value:'all'));
+  if(object==='Cart')return {records:carts,total:carts.length};
+  return {records:[{Id:'l1',Cart:cartId}],total:1};
+ });
+ const layer=createCompiledDataLayer(compiled,loader,store.get);
+ const id=compiled.dataSources[0].id;
+ await layer.start();
+ assert.equal(layer.get(id).records.length,0,'no cart yet: never all cart lines');
+ carts=[{Id:cartId,SessionKey:'session-1'}];
+ reads.length=0;
+ await layer.saved({objectApiNames:['Cart','CartLine']});
+ assert.deepEqual(reads,['Cart:SessionKey=session-1','CartLine:Cart='+cartId]);
+ reads.length=0;
+ await layer.saved({objectApiNames:['CartLine']});
+ assert.deepEqual(reads,['CartLine:Cart='+cartId],'the session cart is remembered');
+ reads.length=0;
+ store.set('activeCartId',cartId);
+ await layer.stateChanged(['activeCartId']);
+ assert.deepEqual(reads,['CartLine:Cart='+cartId],'active cart from page state, no lookup');
 });

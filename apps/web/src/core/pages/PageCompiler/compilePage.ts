@@ -1,11 +1,11 @@
 import {Parser,type Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
 import {compileActionPlan,isActionPlan,splitServerDataActionPlan,type ActionStep} from '../../../../../server/src/expression-engine/ActionFormulas.js';
+import {SQL_RECORD_AGGREGATES,serializeFormulaSqlExpression} from '../../../../../server/src/expression-engine/FormulaCategories.js';
 import {implicitPageStateKeys} from '../PageRuntime/pageStateDependencies';
 import {pageComponentReadObjectNames} from '../PageRuntime/pageMutationScope';
 import {activePageRecordFilters,needsMetadataComponentRuntime} from '../PageRuntime/pageComponentBindings';
 import {parseActionFormulaAssignment} from '../PageRuntime/formulaAction';
-import {pageBehaviors} from '../PageRuntime/pageBehaviorRuntime';
 import type {LightningPageMetadata,ObjectMetadata,PageComponentMetadata} from '../../metadata/Definitions/metadata';
 
 /**
@@ -55,8 +55,15 @@ export type CompiledComponent={
  /** Lower-case authored text, for state keys only known at run time (STATE() results). */
  searchText:string;
 };
+/** Which parent record scopes a list (a cart shows only its own lines). */
+export type CompiledRecordScope=
+ |{kind:'none'}
+ /** Parent id from a page state key (Related list: relatedFilterKey). */
+ |{kind:'key';key:string;field:string}
+ /** Active parent from page state (activeCartId…), else the parent owned by this page session. */
+ |{kind:'auto'};
 export type CompiledDataSource={
- id:string;objectApiName:string;components:string[];
+ id:string;objectApiName:string;components:string[];scope:CompiledRecordScope;
  /** Load every row (bounded): a COLLECTION/TABLE over these rows needs all of them.
   * Otherwise rows load 50 at a time as the user scrolls. */
  complete:boolean;
@@ -64,6 +71,9 @@ export type CompiledDataSource={
  /** Page state keys the filter reads: the source reloads only when one changes. */
  stateInputs:string[];
 };
+/** One distinct record aggregate (SUMIFS, COUNTIFS, ...) used on the page. However many
+ * components and outer formulas use it, the runtime asks the server for it ONCE. */
+export type CompiledAggregate={id:string;formula:string;objects:string[];uses:number;components:string[]};
 export type CompiledPage={
  compilerVersion:number;apiName:string;label:string;pageType:string;layoutMode:string;targetObject:string;
  revision:number|null;
@@ -77,8 +87,12 @@ export type CompiledPage={
  anyObjectReaders:string[];
  stateKeys:string[];
  diagnostics:Array<{componentId:string;level:'error'|'info';message:string}>;
+ /** Distinct aggregates over the whole page (computed once at compile time). */
+ aggregates:CompiledAggregate[];
  stats:{components:number;compiled:number;legacy:number;static:number;formulas:number;
-  actions:number;dataSources:number;componentsWithData:number};
+  actions:number;dataSources:number;componentsWithData:number;
+  /** Aggregate calls written on the page vs. distinct ones actually asked for. */
+  aggregateCalls:number;distinctAggregates:number};
 };
 
 const identifier=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
@@ -130,9 +144,25 @@ function collectFormulas(properties:Readonly<Record<string,unknown>>):CompiledFo
  }
  return found;
 }
+function collectAggregates(ast:Expression|null,found:Map<string,{node:Expression;uses:number}>):number{
+ let calls=0;
+ const visit=(node:Expression):void=>{
+  if(node.kind==='call'){
+   if(SQL_RECORD_AGGREGATES.has(node.name)){
+    calls++;
+    const key=JSON.stringify(node);
+    const entry=found.get(key);
+    if(entry)entry.uses++;else found.set(key,{node,uses:1});
+   }
+   node.args.forEach(visit);
+  }else if(node.kind==='unary')visit(node.value);
+  else if(node.kind==='binary'){visit(node.left);visit(node.right);}
+ };
+ if(ast)visit(ast);
+ return calls;
+}
 const stepList=(steps:readonly ActionStep[]):Array<{name:string;object:string}>=>
  steps.flatMap(step=>[{name:step.name,object:step.object},...stepList(step.body??[])]);
-const browserServiceSteps=new Set(['PRINT','CREATEPDF','CLOSESCREEN','EMAIL','WHATSAPP','SMS','WAIT']);
 
 export function compileComponentAction(event:string,raw:unknown):CompiledAction|null{
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
@@ -149,7 +179,9 @@ export function compileComponentAction(event:string,raw:unknown):CompiledAction|
  if(type==='SetFilter')return {...base,kind:'SetFilter'};
  if(type==='AdjustNumber')return {...base,kind:'AdjustNumber',
   writesObjects:typeof binding.objectApiName==='string'?[binding.objectApiName]:[]};
- if(type==='Flow'||typeof binding.flowApiName==='string'&&binding.flowApiName)
+ // An explicit actionType wins over a stale flowApiName left behind on the binding
+ // (same rule as pageDependencies.ts): a Formula click must stay a Formula.
+ if(type==='Flow'||type===''&&typeof binding.flowApiName==='string'&&binding.flowApiName)
   return {...base,kind:'Flow',flowApiName:String(binding.flowApiName??''),
    writesState:binding.outputs&&typeof binding.outputs==='object'&&!Array.isArray(binding.outputs)
     ?Object.values(binding.outputs as Record<string,unknown>).filter((k):k is string=>typeof k==='string'&&identifier.test(k)):[]};
@@ -178,31 +210,13 @@ export function compileComponentAction(event:string,raw:unknown):CompiledAction|
  }
 }
 
-/** Features the compiled runtime does not run natively yet. Such a component
- * keeps working on the previous runtime, inside the same compiled page. */
-function legacyReasons(component:PageComponentMetadata,formulas:readonly CompiledFormula[],
- actions:readonly CompiledAction[]):string[]{
- const p=component.properties??{};
- const reasons:string[]=[];
- const add=(when:unknown,reason:string)=>{if(when)reasons.push(reason);};
- add(p.relatedFilterKey,'related list scope');
- add(p.recordPresenterApiName,'record presenter');
- add(p.liveRefreshEnabled||p.liveFlowRefreshEnabled,'live refresh');
- add(p.channelAccessPath,'channel access');
- add(p.contactsObjectApiName,'contact choices');
- add(p.dataFieldFilters,'field-scoped filters');
- add(p.recordId,'fixed record id');
- add(Array.isArray(pageBehaviors(p)?.interactions)&&(pageBehaviors(p)!.interactions as unknown[]).length,'page interactions');
- for(const action of actions){
-  if(action.kind==='Flow')reasons.push('Flow action ('+action.event+')');
-  else if(action.kind==='SetFilter')reasons.push('filter action ('+action.event+')');
-  else if(action.kind==='Other')reasons.push('unsupported action ('+action.event+')');
-  else if(action.kind==='ActionPlan'&&action.steps.some(step=>browserServiceSteps.has(step.name)||step.name==='SCREEN'))
-   reasons.push('print/screen/message action ('+action.event+')');
-  else if(action.kind==='ActionPlan'&&/\bFLOW\s*\(|\bSCREEN\s*\(/i.test(action.formula??''))
-   reasons.push('Flow call in action ('+action.event+')');
- }
- return unique(reasons);
+/** Same rule as the previous runtime: an explicit related key wins; carts (or
+ * autoRecordScope) follow the active/session parent; everything else is unscoped. */
+export function recordScope(type:string,properties:Readonly<Record<string,unknown>>):CompiledRecordScope{
+ const key=typeof properties.relatedFilterKey==='string'?properties.relatedFilterKey:'';
+ if(key&&identifier.test(key))return {kind:'key',key,field:String(properties.relatedFieldApiName??'')};
+ const auto=properties.autoRecordScope===true||(properties.autoRecordScope!==false&&['smart_cart','Custom:smart_cart'].includes(type));
+ return auto?{kind:'auto'}:{kind:'none'};
 }
 export function usesCollections(properties:Readonly<Record<string,unknown>>,formulas:readonly CompiledFormula[]):boolean{
  return Boolean(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim()
@@ -240,8 +254,16 @@ function stableHash(text:string):string{
  return (h>>>0).toString(36);
 }
 
-export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMetadata[]):CompiledPage{
+export type CompileOptions={
+ /** Report a fallback to the previous runtime as an error. Every component now
+  * compiles, so this only guards against a future regression. */
+ strictLegacy?:boolean;
+};
+export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMetadata[],options:CompileOptions={}):CompiledPage{
  const diagnostics:CompiledPage['diagnostics']=[];
+ const aggregateFound=new Map<string,{node:Expression;uses:number}>();
+ const aggregateComponents=new Map<string,Set<string>>();
+ let aggregateCalls=0;
  const sources=new Map<string,CompiledDataSource>();
  const components:CompiledComponent[]=[];
  const allStateWrites=new Set<string>();
@@ -252,6 +274,15 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
   const formulas=collectFormulas(properties);
   for(const formula of formulas)if(formula.error)
    diagnostics.push({componentId:component.id,level:'error',message:formula.property+': '+formula.error});
+  for(const formula of formulas){
+   aggregateCalls+=collectAggregates(formula.ast,aggregateFound);
+   const own=new Map<string,{node:Expression;uses:number}>();
+   collectAggregates(formula.ast,own);
+   for(const key of own.keys()){
+    const set=aggregateComponents.get(key)??new Set<string>();
+    set.add(component.id);aggregateComponents.set(key,set);
+   }
+  }
   const actionFlows=properties.actionFlows;
   const actions=actionFlows&&typeof actionFlows==='object'&&!Array.isArray(actionFlows)
    ?Object.entries(actionFlows).map(([event,raw])=>compileComponentAction(event,raw))
@@ -259,10 +290,9 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
   for(const action of actions)if(action.error)
    diagnostics.push({componentId:component.id,level:'error',message:'Action '+action.event+': '+action.error});
   const runtime=libraryApiName!==''&&needsMetadataComponentRuntime(properties);
-  const reasons=runtime?legacyReasons(component,formulas,actions):[];
-  const mode:CompiledComponentMode=!runtime?'static':reasons.length?'legacy':'compiled';
-  if(mode==='legacy')diagnostics.push({componentId:component.id,level:'info',
-   message:'Runs on the previous runtime: '+reasons.join(', ')});
+  // Every data/state/action component runs compiled: there is no fallback engine.
+  const reasons:string[]=[];
+  const mode:CompiledComponentMode=runtime?'compiled':'static';
   const stateWrites=unique(actions.flatMap(action=>action.writesState));
   stateWrites.forEach(key=>allStateWrites.add(key));
   const stateBindings=properties.stateBindings;
@@ -273,14 +303,20 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
    const active=activePageRecordFilters(properties);
    const filterLogic=properties.filterLogic==='OR'?'OR':'AND';
    const filterFormula=typeof active.formula==='string'&&active.formula.trim()?active.formula.trim():undefined;
-   const key=JSON.stringify([objectApiName,active.filters??null,filterLogic,filterFormula??'']);
+   const scope=recordScope(component.type,properties);
+   const key=JSON.stringify([objectApiName,active.filters??null,filterLogic,filterFormula??'',scope]);
    const id=objectApiName+'#'+stableHash(key);
    dataSourceId=id;
    const existing=sources.get(id);
    const complete=usesCollections(properties,formulas);
    if(existing){existing.components.push(component.id);existing.complete||=complete;}
-   else sources.set(id,{id,objectApiName,components:[component.id],complete,filters:active.filters??null,
-    filterLogic,...(filterFormula?{filterFormula}:{}),stateInputs:filterStateInputs(active.filters,filterFormula)});
+   else{
+    const fields=objects.find(object=>object.apiName===objectApiName)?.fields??[];
+    const scopeInputs=scope.kind==='key'?[scope.key]:scope.kind==='auto'?implicitPageStateKeys(fields):[];
+    sources.set(id,{id,objectApiName,components:[component.id],scope,complete,filters:active.filters??null,
+     filterLogic,...(filterFormula?{filterFormula}:{}),
+     stateInputs:unique([...filterStateInputs(active.filters,filterFormula),...scopeInputs])});
+   }
   }
   components.push({id:component.id,type:component.type,label:component.label,
    ...(component.parentId?{parentId:component.parentId}:{}),...(component.region?{region:component.region}:{}),
@@ -308,12 +344,18 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
   else for(const object of item.objectReads)(objectReaders[object]??=[]).push(item.id);
  }
  const dataSources=[...sources.values()];
+ const aggregates:CompiledAggregate[]=[...aggregateFound.entries()].map(([key,entry])=>{
+  const first=entry.node.kind==='call'?entry.node.args[0]:undefined;
+  const object=first&&(first.kind==='reference'||first.kind==='literal')&&typeof first.value==='string'?first.value:'';
+  return {id:'',formula:serializeFormulaSqlExpression(entry.node),objects:object?[object]:[],
+   uses:entry.uses,components:[...(aggregateComponents.get(key)??[])].sort()};
+ }).sort((a,b)=>b.uses-a.uses||a.formula.localeCompare(b.formula)).map((item,index)=>({...item,id:'agg'+(index+1)}));
  const count=(mode:CompiledComponentMode)=>components.filter(item=>item.mode===mode).length;
  return {compilerVersion:PAGE_COMPILER_VERSION,apiName:page.apiName,label:page.label,targetObject:page.targetObject??'',
   pageType:page.pageType,layoutMode:page.layoutMode,
   revision:page.draftRevision??page.revision??page.publishedRevision??null,
-  components,dataSources,stateReaders,objectReaders,anyObjectReaders,stateKeys,diagnostics,
-  stats:{components:components.length,compiled:count('compiled'),legacy:count('legacy'),static:count('static'),
+  components,dataSources,stateReaders,objectReaders,anyObjectReaders,stateKeys,diagnostics,aggregates,
+  stats:{aggregateCalls,distinctAggregates:aggregates.length,components:components.length,compiled:count('compiled'),legacy:count('legacy'),static:count('static'),
    formulas:components.reduce((n,item)=>n+item.formulas.length,0),
    actions:components.reduce((n,item)=>n+item.actions.length,0),
    dataSources:dataSources.length,
@@ -321,11 +363,11 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
 }
 
 /** Cache: one compile per page version, shared by Preview, runtime and download. */
-const cache=new WeakMap<LightningPageMetadata,{objects:readonly ObjectMetadata[];compiled:CompiledPage}>();
-export function compilePageCached(page:LightningPageMetadata,objects:readonly ObjectMetadata[]):CompiledPage{
+const cache=new WeakMap<LightningPageMetadata,{objects:readonly ObjectMetadata[];strict:boolean;compiled:CompiledPage}>();
+export function compilePageCached(page:LightningPageMetadata,objects:readonly ObjectMetadata[],options:CompileOptions={}):CompiledPage{
  const hit=cache.get(page);
- if(hit&&hit.objects===objects)return hit.compiled;
- const compiled=compilePage(page,objects);
- cache.set(page,{objects,compiled});
+ if(hit&&hit.objects===objects&&hit.strict===Boolean(options.strictLegacy))return hit.compiled;
+ const compiled=compilePage(page,objects,options);
+ cache.set(page,{objects,strict:Boolean(options.strictLegacy),compiled});
  return compiled;
 }

@@ -1,5 +1,6 @@
 import {evaluatePageActionSql} from './SqlFormulaPageRequest.js';
 import {getSqlFormulaRequest} from './SqlFormulaRequest.js';
+import {noteSharedMutation} from './PageFormulaShare.js';
 import {Parser} from '../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../server/src/expression-engine/FormulaTokenizer.js';
 import {SQL_QUERY_FORMULAS,SQL_RECORD_AGGREGATES} from '../../../../server/src/expression-engine/FormulaCategories.js';
@@ -226,6 +227,8 @@ export function useSqlFormulaDisplay(properties,hooks){
   if(!config.readObjects.length||typeof window==='undefined')return undefined;
   const listener=event=>{
    if(!mutationAffectsFormulas(event.detail,properties.pageSessionKey,config.readObjects))return;
+   // Drop the page's shared answers for the written Objects before anyone re-asks.
+   noteSharedMutation(latestProperties.current.sessionId??'',event.detail);
    const written=Array.isArray(event.detail?.objectApiNames)?event.detail.objectApiNames:[];
    const previous=mutatedObjects.current;
    mutatedObjects.current=!written.length||previous===null

@@ -295,7 +295,7 @@ function RuntimeReportChart({ report, objects, recordContext }: {
 }
 
 function MetadataBoundPageComponent({
-  definition, component, objects, apps, pages, currentAppId, pageSessionKey, pageComponents, reports, availableFlows, formFactor, onNavigate, onLaunchFlow, disableActions = false, defaultObjectApiName = '', recordId = '', initialPageState, sessionIdOverride, children
+  definition, component, objects, apps, pages, currentAppId, pageSessionKey, pageComponents, reports, availableFlows, formFactor, onNavigate, onLaunchFlow, disableActions = false, builderPreview = false, defaultObjectApiName = '', recordId = '', initialPageState, sessionIdOverride, children
 }: {
   definition: LibraryComponentMetadata;
   component: PageComponentMetadata;
@@ -311,6 +311,9 @@ function MetadataBoundPageComponent({
   onNavigate: (route: AppRoute) => void;
   onLaunchFlow: (flowApiName: string, inputs?: Record<string, unknown>, context?:{requestId?:string}) => void;
   disableActions?: boolean;
+  /** Page Builder design canvas: lets the component show its builder-only aids
+   * (area tags for click-to-style, data binding markers). Never set at runtime. */
+  builderPreview?: boolean;
   defaultObjectApiName?: string;
   recordId?: string;
   initialPageState?:Record<string,unknown>;
@@ -1024,6 +1027,7 @@ function MetadataBoundPageComponent({
       },
       // Background refresh of rows already shown is not a loading state (no spinner flash).
       loading: dataLoading && recordsForQueryKey !== recordQueryKey, sessionId, stateChannel,
+      ...(builderPreview===true&&disableActions?{previewOnly:true,builderPreview:true}:{}),
       // Only bind scalar expressions when one authorised record is in scope.
       // Multi-row components resolve their per-row values inside their own renderer.
       ...(visibleRecords.length===1 ? {record:visibleRecords[0]} : {}),

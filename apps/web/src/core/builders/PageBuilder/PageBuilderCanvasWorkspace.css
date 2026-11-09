@@ -133,3 +133,9 @@
   pointer-events:none;padding:3px 6px;border-radius:4px;background:#1d4ed8;
   color:white;font-size:10px;line-height:1.25;white-space:nowrap;
 }
+
+/* Builder-only marker for the Design area being edited (Header, Row, Summary...).
+ * Set as a DOM attribute by the editor; never saved into the page. */
+.builder-page [data-design-area-active="true"]{
+  outline:2px solid #2877d1!important;outline-offset:-2px;
+}

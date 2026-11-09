@@ -34,18 +34,20 @@ export default function CanvasFloatingResizeHandles({componentId,componentLabel,
    setGeometry(old=>JSON.stringify(old)===JSON.stringify(result)?old:result);
   };
   const schedule=()=>{if(!frame)frame=window.requestAnimationFrame(reposition);};
+  // Hovering cannot move the anchor; only a pressed pointer (move/resize) can.
+  const whilePressed=(event:PointerEvent)=>{if(event.buttons)schedule();};
   reposition();
   const observer=new ResizeObserver(schedule);
   observer.observe(anchor);observer.observe(viewport);
   window.addEventListener('scroll',schedule,true);
   window.addEventListener('resize',schedule);
-  window.addEventListener('pointermove',schedule,true);
+  window.addEventListener('pointermove',whilePressed,true);
   return()=>{
    if(frame)window.cancelAnimationFrame(frame);
    observer.disconnect();
    window.removeEventListener('scroll',schedule,true);
    window.removeEventListener('resize',schedule);
-   window.removeEventListener('pointermove',schedule,true);
+   window.removeEventListener('pointermove',whilePressed,true);
   };
  },[componentId,viewportRef]);
  if(typeof document==='undefined')return null;

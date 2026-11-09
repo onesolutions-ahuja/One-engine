@@ -73,6 +73,7 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
   disabled={p.disabled===true||p.readonly===true||p.previewOnly===true}
   aria-label={key==="backspace"?"Backspace":key==="C"?"Clear":custom?label:key}
   data-numpad-key={key} data-numpad-custom={custom?"true":undefined}
+  data-design-area={p.builderPreview?(custom?"Button "+(Number(String(key).slice(-1))+1):"Button"):undefined}
   data-md-bind={p.builderPreview&&custom?key+"Label":undefined}
   data-md-bind-titles={p.builderPreview&&custom?"Custom button label":undefined}
   onFocus={()=>setFocusedKey(key)} onBlur={()=>setFocusedKey(previous=>previous===key?"":previous)}
@@ -102,7 +103,7 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
   };
  };
  return <div className="smart-numpad" style={bodyStyle} aria-label="Numeric keypad">
-  <div className="smart-numpad-input-wrap" style={{position:"relative"}}>
+  <div data-design-area={p.builderPreview?"Header":undefined} className="smart-numpad-input-wrap" style={{position:"relative"}}>
    {p.numpadPrefix&&!isPin&&<span className="smart-numpad-prefix" aria-hidden="true">{p.numpadPrefix}</span>}
    <input ref={inputRef} type={isPin?"password":"text"}
     className="smart-numpad-input" style={headerStyle}

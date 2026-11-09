@@ -95,7 +95,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   style={{background:colour(p.backgroundColor,"#fff"),border:border(p.borderColor),
    boxShadow:shadow(p.shadow),borderRadius:finite(p.radius,10,0,100),
    padding:0}}>
-  <div className="smart-table-scroll" role="region" tabIndex={0}
+  <div data-design-area={p.builderPreview?"Table":undefined} className="smart-table-scroll" role="region" tabIndex={0}
    aria-label="Table records" aria-busy={p.loading===true}
    style={{background:colour(p.tableBackgroundColor,"#fff"),
     border:border(p.tableBorderColor),borderRadius:finite(p.tableRadius,4,0,100),
@@ -104,7 +104,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    {columns.length?<table className="smart-table-native"
     style={p.rowWidth!==undefined&&p.rowWidth!==null&&p.rowWidth!==""
      ?{width:finite(p.rowWidth,0,0,10000)+"px",minWidth:0}:undefined}>
-    <thead><tr>{columns.map(col=><th scope="col" key={col.key}
+    <thead><tr data-design-area={p.builderPreview?"Header":undefined} >{columns.map(col=><th scope="col" key={col.key}
       data-md-bind={p.builderPreview&&col.index>0&&col.index<5?"column"+(col.index+1)+"Source":undefined}
       data-md-bind-titles={p.builderPreview?(col.label+" column value"):undefined}
       style={headingStyle}>{col.label}</th>)}
@@ -115,7 +115,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
      const active=selected===id;
      // Selected Row Border is retired: a selected row keeps its normal border.
      const borderColor=p.rowBorderColor;
-     return <tr key={id} tabIndex={0} aria-selected={active}
+     return <tr key={id} data-design-area={p.builderPreview?"Row":undefined} tabIndex={0} aria-selected={active}
        style={rowStyle(row)} onClick={()=>pick(row)}
        onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){
         event.preventDefault();pick(row);
@@ -145,6 +145,6 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    </table>:<p className="smart-table-empty">Select a table source to display fields.</p>}
    {!rows.length&&!p.loading&&<p className="smart-table-empty">No records</p>}
   </div>
-  <footer className="smart-table-footer" style={footerStyle}>{footerText}</footer>
+  <footer data-design-area={p.builderPreview?"Footer":undefined} className="smart-table-footer" style={footerStyle}>{footerText}</footer>
  </section>;
 }

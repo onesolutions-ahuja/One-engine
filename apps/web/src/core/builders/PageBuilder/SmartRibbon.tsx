@@ -95,6 +95,12 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
 
  const expandedInspector=inspectorSection===undefined?'Body':inspectorSection;
  const chooseInspectorSection=(section:string)=>onInspectorSectionChange?.(expandedInspector===section?null:section);
+ // Design 2 has three fixed sections. Their open/closed state is local; the
+ // active Design area comes from the canvas click (inspectorSection).
+ const [closedDesignSections,setClosedDesignSections]=useState<readonly string[]>(['Dimensions & Alignment']);
+ const designSectionOpen=(section:string)=>!closedDesignSections.includes(section);
+ const toggleDesignSection=(section:string)=>setClosedDesignSections(current=>
+   current.includes(section)?current.filter(item=>item!==section):[...current,section]);
  const [countKey,setCountKey]=useState('cardsPerRow');
  const [filtersOpen,setFiltersOpen]=useState(false);
  const [filterTarget,setFilterTarget]=useState('Record');
@@ -210,7 +216,10 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    .sort((a,b)=>a[1]-b[1]).map(([area])=>area)
    .filter(area=>area==='Others'||api!=='smart_numpad'||design2SlotRules.some(rule=>
      rule.componentApi===api&&rule.area===area));
- const activeDesign2Area=expandedInspector&&design2Areas.includes(expandedInspector)?expandedInspector:'Body';
+ // Focused/Others/Extras are not places on the canvas; they live in Others.
+ const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
+ const canvasDesign2Areas=design2Areas.filter(area=>!nonCanvasDesign2Areas.has(area));
+ const activeDesign2Area=expandedInspector&&canvasDesign2Areas.includes(expandedInspector)?expandedInspector:'Body';
  const approvedMatrixAreas=new Set(design2SlotRules.map(rule=>rule.area));
  // A SINGLE, fixed Design scaffold for all sections and selected components.
  // Image placement and fill participate in the shared Position/Typography rows.
@@ -291,10 +300,14 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      ['extra_cardGap','extra_selectionMode'].includes(slot.slotKey))
    .sort((a,b)=>a.order-b.order)
    .flatMap(slot=>{
+     // Use this component's rule, else any component's rule for the same slot,
+     // so the property is still listed (disabled) when this component lacks it.
      const rule=design2SlotRules.find(item=>item.componentApi===api&&
-       item.area===slot.area&&item.slotKey===slot.slotKey);
+       item.area===slot.area&&item.slotKey===slot.slotKey)??
+       design2SlotRules.find(item=>item.area===slot.area&&item.slotKey===slot.slotKey);
      const property=definitions.find(item=>item.id===rule?.propertyKey);
-     return property?.components.includes(api)?[{...property,
+     // Always listed; controls() disables it when this component lacks it.
+     return property?[{...property,
        tab:'Design2' as const,group:'Extras',designRow:slot.row,designOrder:slot.order,
        designWidth:slot.width,designHeight:slot.height,designCaptionWidth:0}]:[];
    }):[];
@@ -305,12 +318,14 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    .sort((a,b)=>a.areaOrder-b.areaOrder||a.order-b.order)
    .flatMap(slot=>{
      const rule=design2SlotRules.find(item=>item.componentApi===api&&
-       item.area===slot.area&&item.slotKey===slot.slotKey);
+       item.area===slot.area&&item.slotKey===slot.slotKey)??
+       design2SlotRules.find(item=>item.area===slot.area&&item.slotKey===slot.slotKey);
      const fixed=slot.area==='Others'||slot.slotKey.startsWith('extra_calendar');
      const property=definitions.find(item=>item.id===(fixed?slot.propertyKey:rule?.propertyKey));
      // Fixed Body/Header/Focused/Others rows persist for every component selection.
      // SQL property rules decide the enabled/disabled state, never row visibility.
-     return property&&(fixed||property.components.includes(api))?[{...property,
+     // Always listed for every selection; controls() enables/disables it.
+     return property?[{...property,
        tab:'Design2' as const,group:slot.area,
        designRow:slot.row,designOrder:slot.order,
        designWidth:slot.width,designHeight:slot.height,designCaptionWidth:0}]:[];
@@ -671,11 +686,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
     <div className="smart-design2-workbench">
       <section className="smart-inspector-section smart-design2-dimensions-section">
         <button type="button" className="smart-inspector-section-toggle"
-          aria-expanded={expandedInspector==='Dimensions & Alignment'}
-          onClick={()=>chooseInspectorSection('Dimensions & Alignment')}>
+          aria-expanded={designSectionOpen('Dimensions & Alignment')}
+          onClick={()=>toggleDesignSection('Dimensions & Alignment')}>
           <ChevronDown size={15} aria-hidden="true"/>Dimensions & Alignment
         </button>
-        {expandedInspector==='Dimensions & Alignment'&&<div className="smart-inspector-section-content">
+        {designSectionOpen('Dimensions & Alignment')&&<div className="smart-inspector-section-content">
       <div className="smart-design2-context" data-design-row={0}>
         <div className="smart-design2-dimensions" role="group" aria-label="Dimensions">
         {(()=>{
@@ -709,30 +724,48 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
         </div>}
       </section>
       <div className="smart-design2-area-list">
-        {design2Areas.map(area=><section className="smart-inspector-section smart-design2-area-section"
-          data-design-area={area} key={area}>
-          <button type="button" className="smart-inspector-section-toggle"
-            aria-expanded={expandedInspector===area} onClick={()=>chooseInspectorSection(area)}>
-            <ChevronDown size={15} aria-hidden="true"/>{area}
-          </button>
-          {expandedInspector===area&&<div className="smart-inspector-section-content">
-      {area!=='Extras'&&<div className="smart-ribbon-items">
-        {[1,2,3].map(row=><div key={row} className="smart-ribbon-row"
-          data-design-row={row} style={{gridTemplateColumns:design2GridColumns(row)}}>
-          {sectionRow(area,row).map(controls)}
-          </div>)}
-      </div>}
-
-      {design2AreaExtraProperties.some(property=>property.group===area)&&
-        <div className="smart-design2-supplemental" role="group" aria-label={area+' settings'}>
-          {design2AreaExtraProperties.filter(property=>property.group===area).map(property=>
-            <div className="smart-design2-supplemental-setting" key={property.id}>
-              <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
-              {controls(property)}
+      <section className="smart-inspector-section smart-design2-area-section smart-design2-properties-section" data-design-area={activeDesign2Area}>
+        <button type="button" className="smart-inspector-section-toggle"
+          aria-expanded={designSectionOpen('Properties')} onClick={()=>toggleDesignSection('Properties')}>
+          <ChevronDown size={15} aria-hidden="true"/>Properties
+          <span className="smart-design2-active-area" title="Click a part of the component on the canvas to edit it">{activeDesign2Area}</span>
+        </button>
+        {designSectionOpen('Properties')&&<div className="smart-inspector-section-content">
+          <div className="smart-ribbon-items">
+            {[1,2,3].map(row=><div key={row} className="smart-ribbon-row"
+              data-design-row={row} style={{gridTemplateColumns:design2GridColumns(row)}}>
+              {sectionRow(activeDesign2Area,row).map(controls)}
             </div>)}
+          </div>
         </div>}
-
-      {area==='Extras'&&<>
+      </section>
+      <section className="smart-inspector-section smart-design2-area-section smart-design2-others-section" data-design-area="Others">
+        <button type="button" className="smart-inspector-section-toggle"
+          aria-expanded={designSectionOpen('Others')} onClick={()=>toggleDesignSection('Others')}>
+          <ChevronDown size={15} aria-hidden="true"/>Others
+        </button>
+        {designSectionOpen('Others')&&<div className="smart-inspector-section-content">
+          {design2Areas.includes('Focused')&&<div className="smart-design2-others-group" role="group" aria-label="Focused">
+            <span className="smart-design2-supplemental-label">Focused</span>
+            <div className="smart-ribbon-items">
+              {[1,2,3].map(row=><div key={row} className="smart-ribbon-row"
+                data-design-row={row} style={{gridTemplateColumns:design2GridColumns(row)}}>
+                {sectionRow('Focused',row).map(controls)}
+              </div>)}
+            </div>
+          </div>}
+          {(()=>{
+            // One fixed list for every selection: same properties, same order.
+            const seen=new Set<string>();
+            const list=[...design2AreaExtraProperties,...design2SupplementalProperties]
+              .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
+            return list.length>0&&<div className="smart-design2-supplemental" role="group" aria-label="Other settings">
+              {list.map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
+                <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
+                {controls(property)}
+              </div>)}
+            </div>;
+          })()}
         <div className="smart-design2-extras-fixed" role="group" aria-label="Additional appearance and spacing controls">
           {/* Both editors occupy fixed positions, preserving component-aware availability. */}
           <div className="smart-design2-extras-cell">
@@ -828,18 +861,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             })()}
           </div>
         </div>
-        {design2SupplementalProperties.length>0&&
-          <div className="smart-design2-supplemental" role="group" aria-label="Extras settings">
-            {design2SupplementalProperties.map(property=>
-              <div className="smart-design2-supplemental-setting" key={property.id}>
-                <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
-                {controls(property)}
-              </div>)}
-          </div>}
-      </>}
-
-          </div>}
-        </section>)}
+        </div>}
+      </section>
       </div>
     </div>
   </section>:tab==='Data'?<>

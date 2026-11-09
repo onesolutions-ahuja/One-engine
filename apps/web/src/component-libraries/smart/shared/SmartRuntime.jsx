@@ -221,7 +221,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ...(focused&&focusedHeight>0?{height:"min(100%, "+focusedHeight+"px)"}:{}),
   ...(focused&&(focusedWidth>0||focusedHeight>0)?{margin:"auto"}:{})
  }} data-selected={selected?"true":undefined}>
-  {imageVisible&&<div data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{order:["right","bottom"].includes(p.imagePlacement)?2:0,
+  {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{order:["right","bottom"].includes(p.imagePlacement)?2:0,
     flex:horizontal?(imageWidth!==null?"0 0 "+imageWidth+"px":"1 1 50%"):
       single?(hasImageHeight?"0 1 "+imageHeight+"px":"1 1 auto"):
       grid?"1 1 "+imageHeight+"px":undefined,
@@ -275,22 +275,22 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     padding:fixedGridHeader
       ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
       :cardPadding===null?"4px 10px":cardPadding+"px"
-  }}>{header}</div>}
+  }} data-design-area={p.builderPreview?"Header":undefined}>{header}</div>}
   {grid&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
    style={cardPadding===null?undefined:{padding:cardPadding+"px"}}>
-   {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description"
+   {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
      style={{color:focusedText||p.supportingTextColor||undefined,
       fontWeight:focusedWeight??(typeof p.supportingBold==="boolean"?(p.supportingBold?700:400):undefined),
       fontSize:p.supportingTextSize!==undefined&&p.supportingTextSize!==null&&p.supportingTextSize!==""
        ?number(p.supportingTextSize,14,8,96):undefined,
       textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description}</span>}
-   {(value||buttonText||customButtons.length>0)&&<div className="smart-card-footer">
+   {(value||buttonText||customButtons.length>0)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer">
     {value&&<strong data-md-bind={p.builderPreview?"cardValue":undefined} data-md-bind-titles={p.builderPreview?"Card value":undefined} className="smart-card-value"
       style={{color:focusedText||p.footerTextColor||undefined,
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
         ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
-    {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" className="smart-card-button"
+    {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button":undefined} className="smart-card-button"
       disabled={!onButtonClick} aria-label={buttonText}
       style={{
        backgroundColor:p.cardButtonFill||p.accentColor||"#2563eb",
@@ -325,7 +325,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     })}
    </div>}
   </div>}
-  {Boolean(badge)&&<span data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
+  {Boolean(badge)&&<span data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
    color:p.badgeTextColor||"#fff",background:p.badgeBodyColor||"#2563eb",
    border:p.badgeBorderColor?"1px solid "+p.badgeBorderColor:undefined,
@@ -695,10 +695,10 @@ export default function SmartRuntime(p){
      justifyContent:alignItems(p.labelAlignment)}}>
     {caption|| (p.builderPreview?"Caption":"")}
    </span>
-   <div className="smart-textbox-value-panel" style={{
+   <div data-design-area={p.builderPreview?"Header":undefined} className="smart-textbox-value-panel" style={{
     backgroundColor:p.headerBodyColor||"#fff",color:p.headerTextColor||"#1e293b",
     justifyContent:alignItems(p.headerAlignment)}}>
-    <div key={p.textSource??""} className="smart-textbox-value" data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Textbox value":undefined} role="textbox"
+    <div key={p.textSource??""} className="smart-textbox-value" data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Textbox value":undefined} data-design-area={p.builderPreview?"Header Supporting":undefined} role="textbox"
       aria-label={caption||"Value"} aria-readonly={!editable}
       tabIndex={editable?0:undefined} contentEditable={editable}
       suppressContentEditableWarning={editable}
@@ -901,7 +901,7 @@ export default function SmartRuntime(p){
           boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
           borderColor:p.borderColor||undefined,borderRadius:number(p.radius,4),fontSize:number(p.textSize,16)}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>
-        {safeSrc&&<img src={safeSrc} alt="" style={{width:22,height:22,objectFit:fit}}/>}{label}
+        {safeSrc&&<img data-design-area={p.builderPreview?"Image":undefined} src={safeSrc} alt="" style={{width:22,height:22,objectFit:fit}}/>}{label}
       </button>;
     })}
   </nav>;

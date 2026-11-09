@@ -157,9 +157,9 @@ export function compileComponentAction(event:string,raw:unknown):CompiledAction|
  const formula=String(binding.formula??'').trim();
  try{
   const assignment=parseActionFormulaAssignment(formula);
-  if(assignment)return {...base,kind:'Formula',formula,
-   writesState:assignment.kind==='state'?[assignment.key]:[],
-   ...(assignment.kind==='filter'?{kind:'SetFilter' as const}:assignment.kind==='navigate'?{kind:'Navigate' as const}:{})};
+  if(assignment)return {...base,
+   kind:assignment.kind==='filter'?'SetFilter':assignment.kind==='navigate'?'Navigate':'Formula',
+   formula,writesState:assignment.kind==='state'?[assignment.key]:[]};
  }catch(error){return {...base,kind:'Formula',formula,error:error instanceof Error?error.message:String(error)};}
  if(!isActionPlan(formula)){
   const parsed=parseFormulaOnce(formula);

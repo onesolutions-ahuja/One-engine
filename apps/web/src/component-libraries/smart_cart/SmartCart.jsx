@@ -131,12 +131,12 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     ?Number(computed):null;
   if(!numeric)return <span className="smart-cart-qty-value">{display(computed)}</span>;
   return <div className="smart-cart-qty-controls" aria-label={"Quantity controls for "+String(name||"Product")}>
-   {showDecrease&&<button type="button" className="smart-cart-qty-button" style={smartCustomButtonAppearance(p,"qtyDecrease")}
+   {showDecrease&&<button type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-cart-qty-button" style={smartCustomButtonAppearance(p,"qtyDecrease")}
     aria-label={"Decrease quantity for "+String(name||"Product")}
     disabled={demo||!canDecrease||payload.recordId===null||quantity===null||quantity<=0}
     onClick={()=>fire?.(actions.qtyDecrease?'qtyDecrease':'qtyIcon',{...payload,delta:-1,operation:"decrement",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>−</button>}
    <span className="smart-cart-qty-value" aria-label={quantity===null?"Quantity not bound":"Quantity "+quantity}>{display(computed)}</span>
-   {showIncrease&&<button type="button" className="smart-cart-qty-button" style={smartCustomButtonAppearance(p,"qtyIncrease")}
+   {showIncrease&&<button type="button" data-design-area={p.builderPreview?"Button 2":undefined} className="smart-cart-qty-button" style={smartCustomButtonAppearance(p,"qtyIncrease")}
     aria-label={"Increase quantity for "+String(name||"Product")}
     disabled={demo||!canIncrease||payload.recordId===null||quantity===null}
     onClick={()=>fire?.(actions.qtyIncrease?'qtyIncrease':'qtyIcon',{...payload,delta:1,operation:"increment",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>+</button>}
@@ -145,14 +145,14 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  return <section className="smart-cart-root" aria-label="Smart Cart" style={{
   backgroundColor:p.backgroundColor||"#fff",border:border(p.borderColor),
   borderRadius:n(p.radius,12),boxShadow:shadow(p.shadow)}}>
-  <header className="smart-cart-header" style={{
+  <header data-design-area={p.builderPreview?"Header":undefined} className="smart-cart-header" style={{
    backgroundColor:p.headerBodyColor??"#255d9d",
    borderRadius:n(p.radius,12),
    height:n(p.headerBoxHeight,52,24),minHeight:n(p.headerBoxHeight,52,24),
    border:border(p.headerBorderColor),textAlign:align(p.headerAlignment),
     fontSize:n(p.headerTextSize,18,8,96),
    fontWeight:p.headerBold===false?400:700,color:p.headerTextColor||"#fff"}}><span data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Cart title":undefined}>{displayFormula("label",p.label,"Smart Cart")}</span></header>
-  <div data-md-bind={p.builderPreview?"cartSupportingSource":undefined} data-md-bind-titles={p.builderPreview?"Item count or supporting text":undefined} className="smart-cart-supporting" style={{
+  <div data-md-bind={p.builderPreview?"cartSupportingSource":undefined} data-md-bind-titles={p.builderPreview?"Item count or supporting text":undefined} className="smart-cart-supporting" data-design-area={p.builderPreview?"Header Supporting":undefined} style={{
    height:n(p.supportingBoxHeight,36,18),minHeight:n(p.supportingBoxHeight,36,18),
    backgroundColor:p.supportingBackgroundColor??undefined,
    fontSize:n(p.supportingTextSize,13,8,96),
@@ -160,7 +160,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
    fontWeight:p.supportingBold===true?700:400,color:p.supportingTextColor||"#586a81"}}>
    {supportingText}
   </div>
-  <div className="smart-cart-table" style={{
+  <div data-design-area={p.builderPreview?"Table":undefined} className="smart-cart-table" style={{
    backgroundColor:p.tableBackgroundColor||"#fff",border:border(p.tableBorderColor),
    borderRadius:n(p.tableRadius,8),boxShadow:shadow(p.tableShadow),'--smart-cart-columns':columns,
    ...(p.tableWidth!==undefined&&p.tableWidth!==null&&p.tableWidth!==""
@@ -208,7 +208,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
          ?{width:n(p.rowWidth,0,0,10000)+"px",maxWidth:"100%"}:{}),
         // Selected Row Border is retired: a selected row keeps its normal border.
         ...(selected?{backgroundColor:p.selectedRowColor??"#f2f7ff"}:{})
-       }}>
+       }} data-design-area={p.builderPreview?"Row":undefined}>
        <div className="smart-cart-row" role="button" tabIndex={0}
         aria-selected={selected} aria-expanded={selected}
         aria-label={"Select cart row "+String(name||i+1)}
@@ -224,7 +224,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
          textAlign:p.rowAlignment?align(p.rowAlignment):undefined}}>
        {visible.map(index=>{
         if(index===0)return <div key={index} className={"smart-cart-product "+(p.imagePlacement==="right"?"image-right":"image-left")}>
-         <span data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Product image":undefined} className="smart-cart-image-binding"><Picture src={src} alt={String(name||"Product")} loadAsset={p.loadAsset}
+         <span data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Product image":undefined} className="smart-cart-image-binding" data-design-area={p.builderPreview?"Image":undefined} ><Picture src={src} alt={String(name||"Product")} loadAsset={p.loadAsset}
           style={{width:n(p.imageHeight,44,16),height:n(p.imageHeight,44,16),
            border:border(p.imageBorderColor),borderRadius:4,
            objectFit:p.imageFill==="fit"?"contain":p.imageFill==="stretch"?"fill":"cover",
@@ -265,6 +265,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
            ?fieldExpression(action.key+"Label",raw,record)
            :action.label;
           return <button data-md-bind={p.builderPreview?(action.key+"Label"):undefined} data-md-bind-titles={p.builderPreview?(action.key==="customButton1"?"Custom Button 1 text":"Custom Button 2 text"):undefined} type="button" key={action.key}
+           data-design-area={p.builderPreview?(action.key==="customButton1"?"Button 4":"Button 5"):undefined}
            className="smart-cart-custom-action"
            style={smartCustomButtonAppearance(p,action.key)}
            disabled={demo||!actions[action.key]||itemId===null}
@@ -279,7 +280,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     </div>
    </>}
   </div>
-  <section className="smart-cart-summary" aria-label="Cart summary" style={{
+  <section data-design-area={p.builderPreview?"Summary":undefined} className="smart-cart-summary" aria-label="Cart summary" style={{
    backgroundColor:p.summaryBackgroundColor||"#f7f9fc",
    border:border(p.summaryBorderColor),borderRadius:n(p.summaryRadius,8),
    boxShadow:shadow(p.summaryShadow),minHeight:n(p.summaryHeight,148,40),
@@ -290,7 +291,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
      justifyContent:summaryJustify(p.summaryAlignment),
      fontWeight:p.summaryTextWeight===true?700:400,color:p.summaryTextColor||"#52657d"}}>
     <span data-md-bind={p.builderPreview?(label.toLowerCase()+"Label"):undefined} data-md-bind-titles={p.builderPreview?(label+" summary heading"):undefined}>{summaryLabels[label]}</span><span data-md-bind={p.builderPreview?(label.toLowerCase()+"Value"):undefined} data-md-bind-titles={p.builderPreview?(label+" amount"):undefined} aria-label={summaryAmounts[label]===null?summaryLabels[label]+" not bound":undefined}>{summaryAmounts[label]??"—"}</span></div>)}
-   <div className="smart-cart-summary-line smart-cart-total" style={{
+   <div data-design-area={p.builderPreview?"Footer":undefined} className="smart-cart-summary-line smart-cart-total" style={{
     fontSize:n(p.footerTextSize,p.summary2TextSize===undefined?18:n(p.summary2TextSize,18,8,96),8,96),
     fontWeight:typeof p.footerBold==="boolean"?(p.footerBold?700:400):
       p.summary2TextWeight===false?400:700,

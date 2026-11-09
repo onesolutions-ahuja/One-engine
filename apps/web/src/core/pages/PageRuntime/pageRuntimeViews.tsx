@@ -1001,7 +1001,10 @@ function MetadataBoundPageComponent({
     {dataError && dataErrorForQueryKey === recordQueryKey && <div className="records-message" role="alert">{dataError}</div>}
     {actionError && <div className="records-message" role="alert">{actionError}</div>}
     {namedSource.error && <div className="records-message" role="alert">{namedSource.error}</div>}
-    <RegisteredComponent definition={definition} layoutTransparent props={{
+    <RegisteredComponent definition={definition} layoutTransparent
+      // RegisteredComponent only trusts this host flag for builder mode; without it
+      // builderPreview is reset to false and builder aids (area tags) never render.
+      editorPreview={builderPreview===true&&disableActions} props={{
       ...rowResolvedProperties, ...componentLayoutProps(properties, formFactor),
       ...(definition.apiName.startsWith('smart_') && component.position
         ? {canvasFrameSized:true}:{}),

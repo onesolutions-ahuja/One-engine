@@ -126,6 +126,17 @@ const authorizeFormulaReferences=async(rbac:RbacEngine,actor:Actor,expression:st
   }
 };
 type Handler=(req:AuthenticatedRequest,res:Response)=>Promise<unknown>;
+/** Tenant web addresses change rarely: remember each answer for 60 s instead of
+ * querying md_tenant_domains on every API request (a hot path under load). */
+const tenantDomainCache=new Map<string,{known:boolean;at:number}>();
+async function tenantDomainKnown(db:SqlPersistence,host:string):Promise<boolean>{
+  const hit=tenantDomainCache.get(host);
+  if(hit&&Date.now()-hit.at<60_000)return hit.known;
+  const {rows}=await db.query('SELECT tenant_id FROM md_tenant_domains WHERE domain=$1',[host]);
+  if(tenantDomainCache.size>=2000)tenantDomainCache.clear();
+  tenantDomainCache.set(host,{known:rows.length>0,at:Date.now()});
+  return rows.length>0;
+}
 const route=(handler:Handler)=>(req:Request,res:Response,next:NextFunction)=>{
   // These routes use named parameters only; Express wildcard parameters are not registered here.
   Promise.resolve(handler(req as AuthenticatedRequest,res)).catch(next);
@@ -325,7 +336,7 @@ export function createSystemServer(db:SqlPersistence) {
       let host:string;
       try { const parsed=new URL(origin); if(!['https:','http:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.pathname!=='/' || parsed.search || parsed.hash) throw Error(); if(process.env.NODE_ENV==='production' && (parsed.protocol!=='https:' || (parsed.port && parsed.port!=='443')))throw Error(); host=parsed.hostname.toLowerCase(); }
       catch { res.status(403).json({error:'Unrecognised origin'});return; }
-      const authorized=await db.query('SELECT tenant_id FROM md_tenant_domains WHERE domain=$1',[host]);
+      const authorized={rows:await tenantDomainKnown(db,host)?[{}]:[]};
       if(!authorized.rows.length) {
         const publicOAuth=['/api/oauth/token','/api/oauth/revoke'].includes(req.path);
         const bearer=req.get('authorization');

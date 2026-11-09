@@ -60,8 +60,30 @@ export class SecurityMonitorService{
    }return deny;
   });return {id,blocked};
  }
+ // Request results are written in one statement every 0.5 s, not one UPDATE per request.
+ private readonly completed:Array<{tenant:string;id:string;status:number;elapsed:number;done:()=>void;fail:(e:unknown)=>void}>=[];
+ private completeTimer:ReturnType<typeof setTimeout>|null=null;
  async complete(tenant:string,id:string,status:number,elapsed:number){
-  await this.db.query('UPDATE md_monitor_events SET status_code=$3,elapsed_ms=$4 WHERE tenant_id=$1 AND id=$2',[tenant,id,status,Math.min(2147483647,Math.max(0,Math.floor(elapsed)))]);
+  return new Promise<void>((done,fail)=>{
+   this.completed.push({tenant,id,status,elapsed:Math.min(2147483647,Math.max(0,Math.floor(elapsed))),done,fail});
+   if(this.completed.length>=500){void this.flushCompleted();return;}
+   if(!this.completeTimer){
+    this.completeTimer=setTimeout(()=>{void this.flushCompleted();},500);
+    this.completeTimer.unref?.();
+   }
+  });
+ }
+ private async flushCompleted(){
+  if(this.completeTimer){clearTimeout(this.completeTimer);this.completeTimer=null;}
+  const batch=this.completed.splice(0,this.completed.length);
+  if(!batch.length)return;
+  try{
+   await this.db.query(`UPDATE md_monitor_events e SET status_code=v.status_code,elapsed_ms=v.elapsed_ms
+    FROM unnest($1::uuid[],$2::uuid[],$3::integer[],$4::integer[]) AS v(tenant_id,id,status_code,elapsed_ms)
+    WHERE e.tenant_id=v.tenant_id AND e.id=v.id`,
+    [batch.map(item=>item.tenant),batch.map(item=>item.id),batch.map(item=>item.status),batch.map(item=>item.elapsed)]);
+   batch.forEach(item=>item.done());
+  }catch(error){batch.forEach(item=>item.fail(error));}
  }
  async describe(tenant:string,user:string,before?:unknown,requestedLimit?:unknown){
   await this.rbac.require(tenant,user,'SecurityMonitoring','read');

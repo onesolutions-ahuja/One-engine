@@ -26,7 +26,9 @@ export function resolveSqlConnection(databaseUrl:string,env:NodeJS.ProcessEnv) {
 }
 export function resolveSqlPoolSize(env:NodeJS.ProcessEnv):number {
   const raw=env.METADRIVE_DB_POOL_MAX?.trim();
-  if(!raw)return 5; // Leave headroom for additional replicas, workers and administrative connections.
+  // 5 was too few under load (taps queued and timed out). 20 still leaves headroom within
+  // Postgres's default 100 connections; set METADRIVE_DB_POOL_MAX to tune (1-50).
+  if(!raw)return 20;
   if(!/^[1-9][0-9]*$/.test(raw))throw new Error('Invalid SQL connection pool size');
   const value=Number(raw);
   if(!Number.isSafeInteger(value)||value>50)throw new Error('Invalid SQL connection pool size');

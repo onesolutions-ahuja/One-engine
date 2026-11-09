@@ -32,16 +32,35 @@ const mustActor=(req:Req):Actor=>{
 
 /** Count completed authenticated API requests without recording URLs or payloads. */
 export function countTenantApiRequests(db:SqlPersistence){
+ // Counted in memory and written once every 5 seconds per tenant. One UPDATE per
+ // request made every busy user of a tenant queue on the same row.
+ const pending=new Map<string,number>();
+ let flushing=false;
+ const flush=async()=>{
+  if(flushing||!pending.size)return;
+  flushing=true;
+  const batch=[...pending.entries()];
+  pending.clear();
+  try{
+   await db.query(`INSERT INTO md_tenant_api_usage_daily(tenant_id,usage_date,request_count)
+    SELECT t.tenant_id,CURRENT_DATE,t.request_count
+    FROM unnest($1::uuid[],$2::integer[]) AS t(tenant_id,request_count)
+    ON CONFLICT(tenant_id,usage_date) DO UPDATE
+     SET request_count=md_tenant_api_usage_daily.request_count+EXCLUDED.request_count`,
+    [batch.map(([tenant])=>tenant),batch.map(([,count])=>count)]);
+  }catch(error){
+   // Keep the counts for the next try.
+   for(const [tenant,count] of batch)pending.set(tenant,(pending.get(tenant)??0)+count);
+   console.error('Unable to record tenant API usage',error);
+  }finally{flushing=false;}
+ };
+ const timer=setInterval(()=>{void flush();},5000);
+ timer.unref?.();
+ process.once('beforeExit',()=>{void flush();});
  return (req:AuthenticatedUsageRequest,res:Response,next:NextFunction)=>{
   const tenantId=req.actor?.tenant_id;
   if(!tenantId||req.method==='OPTIONS'){next();return;}
-  res.once('finish',()=>{
-   void db.query(`INSERT INTO md_tenant_api_usage_daily(tenant_id,usage_date,request_count)
-    VALUES($1,CURRENT_DATE,1)
-    ON CONFLICT(tenant_id,usage_date) DO UPDATE
-     SET request_count=md_tenant_api_usage_daily.request_count+1`,[tenantId])
-    .catch(error=>console.error('Unable to record tenant API usage',error));
-  });
+  res.once('finish',()=>{pending.set(tenantId,(pending.get(tenantId)??0)+1);});
   next();
  };
 }

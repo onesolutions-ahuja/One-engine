@@ -320,13 +320,12 @@ export function usePageEditorState(
   const selectRibbonTab = (tab: typeof ribbonTab) => {
     // Layout, Arrange and Data are retired: Source sits at the end of Design and the
     // Formula Bar is always in the topbar.
-    if(tab==='Component Layout'||tab==='Arrange'||tab==='Component Data')tab='Component Design 2';
+    if(tab==='Component Layout'||tab==='Arrange'||tab==='Component Data'||tab==='Preview')tab='Component Design 2';
+    if(tab==='Advanced')tab='Component Action';
     setRibbonTab(tab);
     setPageSettingsDialogOpen(false);
     if (tab === 'Add Block') { setPageSettingsOpen(false); openPalette('Components', 'All Components'); }
-    if (tab === 'Advanced') { setPageSettingsOpen(false); }
-    if (tab === 'Advanced') setAdvancedEditor('assignments');
-    else setAdvancedEditor(null);
+    setAdvancedEditor(null);
     const inspector = { 'Component Design 2': 'Design', 'Arrange': 'Position', 'Component Style': 'Design', 'Component Data': 'Data & Actions', 'Component Content': 'Data & Actions', 'Component Action': 'Visibility', 'Component Layout': 'Position', 'Component Responsive': 'Position' } as const;
     if (tab in inspector) { setPageSettingsOpen(false); openComponentInspector(inspector[tab as keyof typeof inspector]); }
   };

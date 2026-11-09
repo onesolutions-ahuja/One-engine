@@ -598,3 +598,108 @@
 }
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  .smart-design2-others-group{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
+
+/* Page Builder UI consolidation: one selector above all tabs, no Layers gutter. */
+.page-builder-design-dock .page-builder-design-dock-header {
+  height:auto!important;min-height:0!important;flex-direction:column!important;
+  align-items:stretch!important;gap:5px!important;padding:8px 8px 0!important;
+}
+.page-builder-design-dock .page-builder-global-selector {
+  box-sizing:border-box;width:100%;min-width:0;padding:0;margin:0;
+  background:transparent;border:0;flex:none;
+}
+.page-builder-design-dock .page-builder-global-selector .page-component-navigator,
+.page-builder-design-dock .page-builder-global-selector .ribbon-view-search {
+  box-sizing:border-box;width:100%!important;min-width:0!important;max-width:none!important;
+}
+.page-builder-design-dock .page-builder-global-selector .ribbon-view-search {
+  height:32px!important;padding:0 8px!important;
+}
+.page-builder-design-dock .page-builder-global-selector .ribbon-view-search input {
+  box-sizing:border-box;flex:1 1 auto;width:100%!important;min-width:0!important;
+}
+.page-builder-design-dock .page-builder-design-dock-header .office-ribbon-tabs {
+  flex:0 0 auto!important;width:100%!important;min-width:0!important;
+  height:40px!important;min-height:40px!important;justify-content:flex-start!important;
+}
+.page-builder-design-dock .page-builder-design-dock-header .office-ribbon-tabs>button[role=tab] {
+  flex:1 1 0!important;text-align:center!important;justify-content:center!important;
+}
+/* Canvas and Conditional Visibility use the same light accordion treatment as Design. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.page-builder-dock-section {
+  box-sizing:border-box;display:block;width:284px!important;min-width:0!important;
+  max-width:100%!important;height:auto!important;min-height:0!important;
+  max-height:none!important;margin:0!important;padding:0!important;
+  border:0!important;border-bottom:1px solid #ccd2dd!important;background:transparent!important;
+}
+.page-builder-design-dock .page-builder-dock-section>summary {
+  box-sizing:border-box;display:list-item;cursor:pointer;min-height:32px;
+  padding:6px 8px;color:#183b68;font:600 12px/20px "Segoe UI",Arial,sans-serif;
+}
+.page-builder-design-dock .page-builder-dock-section>summary:hover {background:#e8f1ff}
+.page-builder-design-dock .page-builder-dock-section>summary:focus-visible {
+  outline:2px solid #176ce5;outline-offset:-2px;
+}
+.page-builder-design-dock .page-builder-dock-section-body {
+  box-sizing:border-box;padding:5px 6px 12px;
+}
+.page-builder-design-dock .page-builder-canvas-fields {
+  display:flex;flex-wrap:wrap;gap:7px;align-items:center;
+  width:100%;min-width:0;margin-bottom:12px;
+}
+.page-builder-design-dock .page-builder-canvas-fields>.une-sql-home-control {
+  box-sizing:border-box;max-width:100%;min-width:0;
+}
+.page-builder-design-dock .page-builder-canvas-zoom {
+  display:flex;flex-wrap:nowrap;align-items:center;gap:5px;
+  box-sizing:border-box;width:100%;min-width:0;
+}
+.page-builder-design-dock .page-builder-canvas-zoom>button {
+  box-sizing:border-box;flex:1 1 auto;min-width:0;height:28px;
+  padding:3px 6px;border:1px solid #b7c9df;border-radius:4px;
+  background:#fff;color:#29476a;font:11px "Segoe UI",Arial,sans-serif;
+  white-space:nowrap;cursor:pointer;
+}
+.page-builder-design-dock .page-builder-canvas-zoom>button[aria-pressed="true"] {
+  background:#e8f1ff;border-color:#176ce5;
+}
+.page-builder-design-dock .page-builder-canvas-zoom .ribbon-view-zoom-number {
+  box-sizing:border-box;display:flex;flex:0 0 69px;align-items:center;
+  justify-content:center;min-width:0;width:69px;height:28px;gap:2px;
+  padding:0 3px;border:1px solid #b7c9df;border-radius:4px;background:#fff;
+  color:#29476a;font:11px "Segoe UI",Arial,sans-serif;
+}
+.page-builder-design-dock .page-builder-canvas-zoom .ribbon-view-zoom-number input {
+  box-sizing:border-box;display:block;flex:1 1 0;width:43px!important;min-width:0!important;
+  max-width:43px!important;height:24px!important;min-height:24px!important;
+  margin:0!important;padding:0!important;border:0!important;outline:0;
+  text-align:center!important;background:transparent!important;
+  font:11px "Segoe UI",Arial,sans-serif!important;
+}
+.page-builder-design-dock .page-builder-visibility-controls {
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+}
+.page-builder-design-dock .page-builder-visibility-controls .ribbon-small-checkbox {
+  display:flex;align-items:center;gap:5px;width:100%;margin:0;
+  color:#29476a;font:12px "Segoe UI",Arial,sans-serif;
+}
+.page-builder-design-dock .page-builder-visibility-controls>button {
+  display:inline-flex;align-items:center;justify-content:center;
+  box-sizing:border-box;height:28px;padding:3px 9px;border:1px solid #b7c9df;
+  border-radius:4px;background:#fff;color:#29476a;cursor:pointer;
+}
+.page-builder-design-dock .page-builder-visibility-controls>button:disabled {
+  opacity:.5;cursor:not-allowed;
+}
+/* Advanced keeps every control and validation handler, now below Actions. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
+  >.page-builder-advanced-inline {
+  box-sizing:border-box;width:100%!important;max-width:100%!important;
+  margin:8px 0 0!important;padding:0 10px 12px!important;gap:0!important;
+}
+.page-builder-design-dock #page-builder-tab-content[aria-label="Component Action"]
+  .page-builder-advanced-inline>.advanced-fixed-group {
+  border-right:0!important;border-bottom:1px solid #ccd2dd!important;
+  padding:8px 0!important;margin:0!important;
+}

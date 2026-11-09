@@ -98,6 +98,12 @@ test('generated TS is valid TypeScript and generated JS gives the interpreter re
   assert.equal(formulas[id](ctx),evaluateFieldExpression(formula.source,ctx.record,{pageState:{},sessionId:'s'}));
  }
  assert.equal(formulas['grid1:label'](ctx),'MENU 2');
+ // The converted TypeScript/JavaScript must supply the component Object context.
+ assert.equal(formulas['mention:textSource']({record:{Id:'p1',Name:'Tea'},state:{},sessionId:'s'}),'Tea');
+ const relationshipCtx={record:{Id:'p1',__mentionValues:{'@Product.Customer.Name':'Alice'}},
+  state:{},sessionId:'s',objectApiName:'Product'};
+ assert.equal(evaluateFieldExpressionDetailed('@Product.Customer.Name',relationshipCtx.record,{
+  rootObjectApiName:relationshipCtx.objectApiName}).value,'Alice');
  assert.throws(()=>formulas['broken:textSource'](ctx),/Formula error/);
 });
 

@@ -21,3 +21,33 @@ export function pageAppMembership(
 }
 export const pageIsUnassigned=(apiName:string,membership:Map<string,Set<string>>)=>
  ![...membership.values()].some(members=>members.has(apiName));
+
+/** Every installed app that already owns, assigns or navigates to this page. */
+export const pageActivationAppCandidates=(
+ apps:ReadonlyArray<Pick<LightningAppMetadata,'apiName'|'navigationPageApiNames'|'navigationOrder'>>,
+ page:Pick<LightningPageMetadata,'apiName'|'activationAssignments'|'ownerNamespace'>
+):string[]=>{
+ const membership=pageAppMembership(apps,[page]);
+ return apps.filter(app=>membership.get(app.apiName)?.has(page.apiName)).map(app=>app.apiName);
+};
+
+/** Never borrow the open editor's app for a different list row.
+ * A filter selects an associated app; an explicit editor selection may assign a new app.
+ * Ambiguous/unassigned pages require an explicit choice rather than guessing. */
+export const resolvePageActivationApp=(
+ apps:ReadonlyArray<Pick<LightningAppMetadata,'apiName'|'navigationPageApiNames'|'navigationOrder'>>,
+ page:Pick<LightningPageMetadata,'apiName'|'activationAssignments'|'ownerNamespace'>,
+ preferredAppApiName='',
+ allowExplicitAssignment=false
+):string|null=>{
+ const candidates=pageActivationAppCandidates(apps,page);
+ if(preferredAppApiName&&apps.some(app=>app.apiName===preferredAppApiName)
+   &&(allowExplicitAssignment||candidates.includes(preferredAppApiName)))return preferredAppApiName;
+ const assigned=[...new Set((page.activationAssignments??[])
+  .filter(a=>a.scope==='App Default'&&a.appId&&candidates.includes(a.appId))
+  .map(a=>a.appId as string))];
+ if(assigned.length===1)return assigned[0];
+ if(assigned.length>1)return null;
+ if(page.ownerNamespace&&candidates.includes(page.ownerNamespace))return page.ownerNamespace;
+ return candidates.length===1?candidates[0]:null;
+};

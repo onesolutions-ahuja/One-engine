@@ -1,8 +1,10 @@
+import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names.js';
+import {componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {namedCollectionNames} from './pageCollectionSession';
 import {activePageRecordFilters} from './pageComponentBindings';
 
 /** Dependency channels are derived from published Page metadata, not app names. */
-type Component = {id:string;properties:Readonly<Record<string,unknown>>};
+type Component = {id:string;type?:string;properties:Readonly<Record<string,unknown>>};
 type Channel = string;
 export type PageStateDependencies = ReadonlyMap<Channel,ReadonlySet<Channel>>;
 const identifier=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
@@ -13,7 +15,7 @@ function references(formula:unknown,inputs:Set<Channel>,available:ReadonlySet<st
  if(typeof formula!=='string')return;
  for(const match of formula.matchAll(/(?:\$state\.|@state\.)([A-Za-z][A-Za-z0-9_]{0,63})\b/g))
   inputs.add(state(match[1]));
- for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(?:Id|Name|Value|Field|Criteria)\b/g))
+ for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(?:Id|Name|Value|Text|Field|Criteria)\b/gi))
   inputs.add(collection(match[1]));
  // Direct @NamedCollection reads are dependencies too, including nested IFs.
  for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})(?![.\w])/g))
@@ -33,8 +35,15 @@ export function pageStateDependencies(components:readonly Component[]):PageState
  };
  const available=new Set(components.flatMap(item=>emitted(item.properties)
   .map(name=>name.replace(/ +/g,'_').toLowerCase())));
- for(const {properties:props} of components){
+ // Every component also publishes its own value under its page name
+ // (@CategoryTabs.state.Id), so picking a parent clears what depends on it.
+ const instanceNames=components.every(item=>typeof item.type==='string')
+  ?componentInstanceNames(components as Array<{id:string;type:string;properties:Record<string,unknown>}>)
+  :new Map<string,string>();
+ for(const {id,properties:props} of components){
   const inputs=new Set<Channel>(),outputs=new Set<Channel>();
+  const own=componentStateName(instanceNames.get(id)??props.navigatorName);
+  if(own)outputs.add(collection(own));
   const declared=typeof props.collectionFormula==='string'?props.collectionFormula:'';
   const names=[...new Set(emitted(props))];
   for(const name of names)outputs.add(collection(name));
@@ -49,7 +58,7 @@ export function pageStateDependencies(components:readonly Component[]):PageState
    if(source.source==='PageState'&&identifier.test(source.key))
     inputs.add(state(source.key));
    if(source.source==='CollectionState'){
-    const match=/^([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(Id|Name|Value|Field|Criteria)$/.exec(source.key);
+    const match=/^([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(Id|Name|Value|Text|Field|Criteria)$/i.exec(source.key);
     if(match)inputs.add(collection(match[1]));
    }
   }

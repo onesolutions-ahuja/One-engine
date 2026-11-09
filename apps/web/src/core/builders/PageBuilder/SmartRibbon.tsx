@@ -181,7 +181,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
   .sort((a,b)=>sourceObjectNames.indexOf(a.apiName)-sourceObjectNames.indexOf(b.apiName));
  const objectName=sourceObjectNames[0]??'';
  const object=objects.find(o=>o.apiName===objectName);
- const canFilterSessionCollection=stateOptions.some(item=>item.source==='CollectionState');
+ const canFilterSessionCollection=pageComponents.some(item=>Object.values(item.properties)
+  .some(value=>namedCollectionNames(value).length>0));
  const availableFilterFields=object?.fields??(canFilterSessionCollection?[...sessionCollectionFields]:[]);
  const update=(key:string,value:unknown)=>onChange({...properties,[key]:value},[key]);
  // Filter target comes from the originating button, not a second modal selector.

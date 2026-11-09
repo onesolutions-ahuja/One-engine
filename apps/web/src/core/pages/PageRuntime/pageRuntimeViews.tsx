@@ -99,7 +99,7 @@ import {scopedFieldAllows} from './fieldScopedRecordFilters';
 import {resolveSmartToggleFieldBinding,updateSmartToggleField} from './smartToggleFieldBinding';
 import {usePageComponentRelatedScope} from '../PageRuntime/usePageSessionRelatedQuery';
 import {filterRelatedRecords} from './filterRelatedRecords.mjs';
-import {resolveMentionProperties} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import { explicitMentionRecordId, useRelationshipMentionContext } from '../../records/RecordFormDialog/useRelationshipMentionContext';
 import { childrenOf, canNest, componentLayoutProps, hasPageComponentAppearance, pageAppearanceTarget, pageAppearanceStyleKeys, isLayoutContainer, rawLayoutParentId, reparentComponent, resolvePageComponentStyle, type LayoutDevice } from '../TemplatePageRuntime/pageComponentLayout';
 import {GlobalRecordSearch} from '../../../component-libraries/shared/primitives/GlobalRecordSearch/GlobalRecordSearch';
@@ -635,6 +635,33 @@ function MetadataBoundPageComponent({
   const filteredRecords=recordQuery.filters?currentQueryRecords:filterPageComponentRecords(
     currentQueryRecords,selectedRecordFilters.filters,fields,{pageState,recordId,sessionId},properties.filterLogic==='OR'?'OR':'AND');
   const visibleRecords=relatedField?filterRelatedRecords(filteredRecords,selectedId,relatedField):filteredRecords;
+  // Hydrate metadata-validated parent references on individual list rows.
+  // Never turn a paged Grid/Table/Cart into a full-Object read.
+  const rowMentionKey=JSON.stringify([recordQueryKey,recordOffset,revision,objectApiName,
+    visibleRecords.map(row=>row.Id),Object.entries(properties).filter(([,value])=>
+     typeof value==='string'&&value.includes('@'))]);
+  const [rowMentions,setRowMentions]=useState<{key:string;rows:Record<string,unknown>[]} |null>(null);
+  useEffect(()=>{
+   let active=true;
+   setRowMentions(null);
+   if(!objectApiName||!visibleRecords.length||
+     !referencedMentionPaths(properties,objects,objectApiName).some(path=>path.steps.length))
+    return()=>{active=false};
+   const getRecord=async(target:string,id:string)=>{
+    const result=await apiRequest<{record:Record<string,unknown>}>(
+     '/records/'+encodeURIComponent(target)+'/'+encodeURIComponent(id));
+    return result.record?.Id===id?result.record:undefined;
+   };
+   const getRecords=async(target:string,ids:readonly string[])=>
+    (await loadFlowScreenRecordPage(target,{limit:100,filters:[{field:'Id',operator:'in',value:[...ids]}]})).records;
+   void Promise.all(Array.from({length:Math.ceil(visibleRecords.length/100)},(_,i)=>
+    resolveCollectionMentionRows(objects,objectApiName,visibleRecords.slice(i*100,(i+1)*100),
+     properties,getRecord,getRecords))).then(parts=>{
+     if(active)setRowMentions({key:rowMentionKey,rows:parts.flat()});
+    }).catch(()=>{if(active)setRowMentions(null)});
+   return()=>{active=false};
+  },[rowMentionKey,properties,objects,objectApiName]);
+  const displayRows=rowMentions?.key===rowMentionKey?rowMentions.rows:visibleRecords;
   const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,objects,
     objectApiName,visibleRecords,recordTotal,revision,pageState,sessionId,pageSessionKey,component.id);
   // A configured record presenter may enforce additional channel visibility.
@@ -1025,6 +1052,18 @@ function MetadataBoundPageComponent({
       loadAsset: (id:string) => requestPageMediaAsset<{contentType:string;contentBase64:string}>(
         apiRequest,id,getAccessToken()??''), viewRevision: revision,
       loadCompanySettings: () => apiRequest('/metadata/currencies'),
+      // Search is independent of the list's existing 100-row pagination.
+      // Never widen unsupported/client-only filters into an unfiltered query.
+      searchRecords: async (search:string) => {
+        if(!objectApiName||recordQuery.blocked||relatedQuery.blocked||!recordQuery.serverFilterable)
+          throw new Error('Search requires an Object with server-compatible filters');
+        const page=await loadFlowScreenRecordPage(objectApiName,{
+          limit:20,offset:0,search,searchPrefix:true,forceRefresh:true,
+          filter:relatedQuery.filter??recordQuery.filter,
+          filters:recordQuery.filters,filterLogic:recordQuery.filterLogic
+        });
+        return page.records;
+      },
       onChange: (value: unknown) => {
         if (actionFlows.change || (Array.isArray(pageBehaviors(properties)?.interactions)
           &&(pageBehaviors(properties)!.interactions as Array<{event?:unknown}>).some(item=>item?.event==='change')))
@@ -1035,8 +1074,8 @@ function MetadataBoundPageComponent({
       ...(builderPreview===true&&disableActions?{previewOnly:true,builderPreview:true}:{}),
       // Only bind scalar expressions when one authorised record is in scope.
       // Multi-row components resolve their per-row values inside their own renderer.
-      ...(visibleRecords.length===1 ? {record:visibleRecords[0]} : {}),
-      ...(objectApiName ? { records: visibleRecords } : {}),
+      ...(displayRows.length===1 ? {record:displayRows[0]} : {}),
+      ...(objectApiName ? { records: displayRows } : {}),
       ...presented,
       // A typed collection is the Data Source; presenter defaults must not
       // overwrite its permission-checked, formula-filtered rows.

@@ -1,6 +1,6 @@
-import {namedCollectionNames} from '../../pages/PageRuntime/pageCollectionSession';
-import {formulaCollectionReferenceKey} from '../../../../../server/src/expression-engine/FormulaCollection.js';
-type SourceComponent={id:string;properties:Record<string,unknown>};
+import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
+import {componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState';
+type SourceComponent={id:string;type?:string;properties:Record<string,unknown>};
 export type PageStateChoice={source:'PageState'|'CollectionState';key:string;label:string};
 /** List metadata-declared state channels, not arbitrary strings or object data.
  * Stable names survive component renames and are scoped to the current page. */
@@ -9,11 +9,6 @@ export function pageStateChoices(components:readonly SourceComponent[]):PageStat
  const add=(item:PageStateChoice)=>entries.set(item.source+':'+item.key,item);
  for(const component of components){
   const props=component.properties;
-  const authored=Object.entries(props).filter(([key])=>key!=='collectionFormula')
-    .flatMap(([,value])=>namedCollectionNames(value));
-  const names=[...new Set(authored.length?authored:namedCollectionNames(props.collectionFormula))];
-  for(const name of names)for(const field of ['Id','Name','Value','Field','Criteria'])
-   add({source:'CollectionState',key:formulaCollectionReferenceKey(name)+'.state.'+field,label:name+'.state.'+field});
   const actions=props.actionFlows;
   if(actions&&typeof actions==='object'&&!Array.isArray(actions)){
    for(const config of Object.values(actions)){
@@ -40,6 +35,16 @@ export function pageStateChoices(components:readonly SourceComponent[]):PageStat
    for(const key of Object.values(bindings))
     if(typeof key==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key))
      add({source:'PageState',key,label:key});
+ }
+ // What each component publishes when the user picks, types or toggles:
+ // @CategoryTabs.state.Id / Value / Name / Text.
+ const names=components.every(item=>typeof item.type==='string')
+  ?componentInstanceNames(components as Array<{id:string;type:string;properties:Record<string,unknown>}>)
+  :new Map<string,string>();
+ for(const component of components){
+  const name=componentStateName(names.get(component.id)??component.properties.navigatorName);
+  if(name)for(const field of ['Id','Value','Name','Text'])
+   add({source:'CollectionState',key:name+'.state.'+field,label:name+'.state.'+field});
  }
  return [...entries.values()].sort((a,b)=>a.label.localeCompare(b.label));
 }

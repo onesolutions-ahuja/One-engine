@@ -22,8 +22,10 @@ import {compiledSourceLoader} from './compiledSourceLoader';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import type {LoadedPageScript} from './serverPageScript';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
+import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
+import {componentStateFromEvent,componentStateName,type ComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
-import {resolveMentionProperties} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import {explicitMentionRecordId,useRelationshipMentionContext} from '../../records/RecordFormDialog/useRelationshipMentionContext';
 import {resolveSmartToggleFieldBinding,updateSmartToggleField} from '../PageRuntime/smartToggleFieldBinding';
 
@@ -42,6 +44,10 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  /** The server-built page file this page runs from (null: the browser-compiled plan). */
  script:LoadedPageScript|null;
  data:CompiledDataLayer;request:Request;objects:ObjectMetadata[];pageSessionKey:string;recordId:string;
+ searchRecords(sourceId:string,query:string):Promise<Record<string,unknown>[]>;
+ /** Remember what the user picked/typed/toggled in a component, under its page
+  * name, so any formula, filter or action reads @Name.state.Id / Value / Text. */
+ publishState(componentId:string,value:unknown):void;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
  resetSession(next?:string):void;
@@ -73,9 +79,29 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   const sessionListeners=new Set<()=>void>();
   // Which selections clear which (Category → Product): computed once for the page.
   const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
-  const data=createCompiledDataLayer(compiled,
-   compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage),store.get);
-  return {compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
+  const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
+  const data=createCompiledDataLayer(compiled,sourceLoader,store.get);
+  const stateNames=new Map([...componentInstanceNames(components)].map(([id,name])=>[id,componentStateName(name)]));
+  const typing=new Map<string,number>();
+  const publish=(name:string,value:ComponentState)=>{
+   const changed=store.select('collection',name,value);
+   if(changed.length)void data.stateChanged(changed);
+  };
+  return {
+   publishState(componentId:string,value:unknown){
+    const name=stateNames.get(componentId);
+    const next=name?componentStateFromEvent(value):null;
+    if(!name||!next)return;
+    window.clearTimeout(typing.get(componentId));
+    // Typed text (Search Box) waits for a short pause, so lists reload once, not per key.
+    if(typeof value==='string')typing.set(componentId,window.setTimeout(()=>publish(name,next),250));
+    else publish(name,next);
+   },compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
+   searchRecords:async(sourceId:string,query:string)=>{
+    const source=compiled.dataSources.find(item=>item.id===sourceId);
+    if(!source)throw Error('Search Box has no configured Object data source');
+    return sourceLoader.search(source,store.get(),query);
+   },
    pageSessionKey,recordId,
    sessionId:()=>sessionId,
    subscribeSession(listener){sessionListeners.add(listener);return ()=>{sessionListeners.delete(listener);};},
@@ -240,6 +266,32 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const actionFlows=(properties.actionFlows&&typeof properties.actionFlows==='object'&&!Array.isArray(properties.actionFlows)
   ?properties.actionFlows:{}) as Record<string,unknown>;
  const fields=runtime.objects.find(item=>item.apiName===objectApiName)?.fields??[];
+ // Resolve metadata-validated parent lookups for each Card/Table row, not only
+ // for a single record page. Every read still goes through tenant/RBAC API.
+ const rowMentionKey=JSON.stringify([source.version,objectApiName,source.records.map(row=>row.Id),
+  Object.entries(properties).filter(([,value])=>typeof value==='string'&&value.includes('@'))]);
+ const [rowMentions,setRowMentions]=useState<{key:string;rows:Record<string,unknown>[]} |null>(null);
+ useEffect(()=>{
+  let active=true;
+  setRowMentions(null);
+  if(!objectApiName||!source.records.length||
+    !referencedMentionPaths(properties,runtime.objects,objectApiName).some(path=>path.steps.length))
+   return()=>{active=false};
+  const getRecord=async(target:string,id:string)=>{
+   const result=await runtime.request<{record:Record<string,unknown>}>(
+    '/records/'+encodeURIComponent(target)+'/'+encodeURIComponent(id));
+   return result.record?.Id===id?result.record:undefined;
+  };
+  const getRecords=async(target:string,ids:readonly string[])=>
+   (await loadFlowScreenRecordPage(target,{limit:100,filters:[{field:'Id',operator:'in',value:[...ids]}]})).records;
+  void Promise.all(Array.from({length:Math.ceil(source.records.length/100)},(_,i)=>
+   resolveCollectionMentionRows(runtime.objects,objectApiName,source.records.slice(i*100,(i+1)*100),
+    properties,getRecord,getRecords))).then(parts=>{
+    if(active)setRowMentions({key:rowMentionKey,rows:parts.flat()});
+   }).catch(()=>{if(active)setRowMentions(null)});
+  return()=>{active=false};
+ },[rowMentionKey,runtime,properties,source.records,objectApiName]);
+ const displayRows=rowMentions?.key===rowMentionKey?rowMentions.rows:source.records;
  // @Object.Field mentions: same authorised loader; it reads only when a record id is bound.
  const mentionRoot=runtime.compiled.targetObject||objectApiName;
  const boundRecordId=runtime.recordId||explicitMentionRecordId(properties);
@@ -326,6 +378,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    throw Error('This action is unavailable under the published Page rules.');
   const validation=behaviorValidation(properties,action.event,{formFactor});
   if(validation)throw Error(validation);
+  // Tabs, Navigation, Toggle, Search Box, Lookup, grids… publish their value
+  // first, so an action and any reader of @Name.state.* see the new pick.
+  if(['change','select','click'].includes(action.event))runtime.publishState(component.id,action.value);
   window.dispatchEvent(new CustomEvent('metadrive:in-screen-action',{
    detail:{pageSessionKey:runtime.pageSessionKey,componentId:component.id,event:action.event,value:action.value}}));
   // Page interactions (show/hide/set another component) are applied by the page layout.
@@ -548,7 +603,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   document.addEventListener('visibilitychange',onVisible);
   return ()=>{active=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',onVisible);};
  },[properties.liveFlowRefreshEnabled,properties.liveFlowRefreshEvents,properties.liveFlowRefreshIntervalMs]);
- const records=dataCollectionRows??source.records;
+ const records=dataCollectionRows??displayRows;
  const loading=source.loading&&source.version===0||namedSource.loading;
  // Scroll near the end of any list inside this component → load the next 50.
  const onScrollCapture=(event:React.UIEvent<HTMLElement>)=>{
@@ -584,14 +639,18 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(runtime.request,id,getAccessToken()??''),
    viewRevision:source.version,
    loadCompanySettings:()=>runtime.request('/metadata/currencies'),
+   searchRecords:(query:string)=>compiled.dataSourceId
+    ?runtime.searchRecords(compiled.dataSourceId,query)
+    :Promise.reject(new Error('Search Box requires an Object data source')),
    onChange:(value:unknown)=>{
+    runtime.publishState(component.id,value);
     const interactions=pageBehaviors(properties)?.interactions;
     if(actionFlows.change||(Array.isArray(interactions)&&(interactions as Array<{event?:unknown}>).some(item=>item?.event==='change')))
      void onAction({event:'change',value}).catch(()=>{});
    },
    loading,sessionId,stateChannel,
    ...(records.length===1?{record:records[0]}:{}),
-   ...(objectApiName?{records:source.records}:{}),
+   ...(objectApiName?{records:displayRows}:{}),
    ...presented,
    ...(dataCollectionRows?{records:dataCollectionRows}:{}),
    ...(objectApiName&&!dataCollectionRows?{recordPagination:{limit:SOURCE_PAGE_SIZE,offset:0,total:source.total,

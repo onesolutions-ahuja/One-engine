@@ -235,10 +235,7 @@ export function recordScope(type:string,properties:Readonly<Record<string,unknow
 }
 export function usesCollections(properties:Readonly<Record<string,unknown>>,formulas:readonly CompiledFormula[]):boolean{
  return Boolean(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim()
-  ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')||f.functions.includes('SUM')
-   // A bare @Field binding (e.g. text = @Name) turns the rows into a list collection,
-   // which must hold every row; so do search boxes and client-side category filters.
-   ||/^=?\s*@[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)?$/.test(f.source))
+  ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')||f.functions.includes('SUM'))
   ||typeof properties.filterKey==='string'&&properties.filterKey.trim()
   ||typeof properties.categoryFieldApiName==='string'&&properties.categoryFieldApiName.trim());
 }
@@ -266,6 +263,9 @@ function filterStateInputs(filters:unknown,formula:unknown):string[]{
  }
  if(typeof formula==='string')
   for(const match of formula.matchAll(/(?:\$state\.|@state\.)([A-Za-z][A-Za-z0-9_]{0,63})\b/g))keys.add(match[1]);
+ // @CategoryTabs.state.Id: the component's published value, under its name.
+ if(typeof formula==='string')
+  for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(?:Id|Name|Value|Text|Field|Criteria)\b/gi))keys.add(match[1]);
  return unique(keys);
 }
 function stableHash(text:string):string{

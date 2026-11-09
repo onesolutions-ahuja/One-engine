@@ -10,7 +10,8 @@ const names=['Column 1','Column 2','Column 3','Column 4','Column 5'];
 const headings=['Product','Unit price','Quantity','Total','Discount'];
 const tracks=['minmax(0,2.2fr)','minmax(0,1fr)','minmax(78px,1.35fr)','minmax(0,1fr)','minmax(0,1fr)'];
 const numericType=/^(Number|Currency|Percent|Integer|Decimal|Double|Float|Long|Short|Int)$/i;
-const directField=source=>/^@([A-Za-z][A-Za-z0-9_]*)$/.exec(typeof source==="string"?source.trim():"")?.[1]??null;
+// A direct field is @Field or @Object.Field (not a relationship path or formula).
+const directField=source=>/^=?\s*@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(typeof source==="string"?source.trim():"")?.[1]??null;
 const display=value=>value===null||value===undefined||value===""?"—":String(value);
 export default function SmartCart({p,records,Picture,expression,fieldAllowed,fire}){
  const allows=(key,row)=>typeof fieldAllowed!=='function'||fieldAllowed(key,row);

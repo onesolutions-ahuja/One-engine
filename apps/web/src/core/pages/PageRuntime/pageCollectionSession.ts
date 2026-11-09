@@ -38,9 +38,10 @@ export function namedCollectionName(formula:unknown):string|undefined{
  * IF and IFERROR select a branch lazily in the shared evaluator. */
 export function isCollectionSourceExpression(formula:unknown,knownCollections:readonly string[]=[]):boolean{
  if(typeof formula!=='string'||!formula.trim())return false;
- const names=new Set(knownCollections.map(name=>name.toLowerCase()));
+ // Named @Collection references are retired; only explicit data functions
+ // produce a collection. Keep the parameter for older callers.
+ void knownCollections;
  const returnsCollection=(node:Expression):boolean=>{
-  if(node.kind==='reference')return names.has(node.value.toLowerCase());
   if(node.kind!=='call')return false;
   if(node.name==='COLLECTION'||node.name==='TABLE')return true;
   if(node.name==='IF'&&node.args.length===3)

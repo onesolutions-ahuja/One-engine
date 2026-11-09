@@ -37,7 +37,7 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
 const expression=(...args)=>{
  const result=expressionResult(...args);
  // Non-display formula consumers retain their existing empty-value error contract.
- return result.error?"":text(result.value);
+ return result.error?"FORMULAERROR":text(result.value);
 };
 const formulaDisplayErrorColor="#dc2626";
 function SmartPicture({src,alt,loadAsset,style}){
@@ -58,7 +58,7 @@ const fieldAllows=(p,key,record)=>{
 const scopedExpression=(p,key,source,record)=>fieldAllows(p,key,record)
  ?(key==="textSource"&&p.dataCollection&&record&&
     (/(?:^|[=(,])\s*COLLECTION\s*\(/i.test(String(source??""))
-     ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_.]*(?:\s*(?:=|==|<>|!=|>=|<=|>|<)\s*.+)?\s*$/i.test(String(source??"")))
+     ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??"")))
     ?text(p.kind==="smart_card_grid"&&record.__collectionManual===false
       &&typeof record.Name==="string"&&record.Name.trim()
       ?record.Name:record.__collectionLabel??record.Name??"")
@@ -68,7 +68,7 @@ const scopedDisplayExpression=(p,key,source,record)=>{
  // A selected collection row already provides its authorised caption.
  if(key==="textSource"&&p.dataCollection&&record&&
    (/(?:^|[=(,])\s*COLLECTION\s*\(/i.test(String(source??""))
-    ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_.]*(?:\s*(?:=|==|<>|!=|>=|<=|>|<)\s*.+)?\s*$/i.test(String(source??""))))
+    ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??""))))
   return {value:scopedExpression(p,key,source,record)};
  const result=expressionResult(source,record,p.pageState,p.objectApiName,
   p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup);
@@ -108,7 +108,7 @@ const cardSelection=p=>{
  const stateKey=action?.actionType==="PageState"&&typeof action.stateKey==="string"
   ?action.stateKey:formula?.[1];
  const rhs=formula?.[2]?.trim();
- const source=rhs? /^@([A-Za-z][A-Za-z0-9_]*)$/.exec(rhs)?.[1]:null;
+ const source=rhs? /^@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(rhs)?.[1]:null;
  const pageValue=stateKey?p.pageState?.[stateKey]:undefined;
  if(pageValue!==undefined&&pageValue!==null&&pageValue!==""){
   const value=action?.actionType==="PageState"?String(action.value??""):"";
@@ -134,14 +134,17 @@ const selectedCard=(selection,record)=>{
 };
 function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=false}){
  const image=boundImage(p,record);
+ const imageError=image==='FORMULAERROR';
  // Distinguish an unset tenant brand from an unbound image in Builder previews.
  const tenantLogoReference=/^=?\s*(?:\$session\.tenant\.logo|\$tenant\.logo)$/i.test(String(p.imageSource??p.src??"").trim());
  const missingImageLabel=tenantLogoReference
   ?"Tenant logo unavailable — Company Settings › Branding":"Image Here";
  const preview=p.previewOnly===true||p.builderPreview===true||p.preview===true;
  const sample=Boolean(p.builderPreview===true&&record?.__builderSample===true);
- const header=scopedExpression(p,"textSource",p.textSource??p.title??p.label??"",record)||(sample?"Product Name":p.kind==="smart_card_grid"&&preview?"Text here":"");
- const badge=scopedExpression(p,"badgeText",p.badgeText??"",record);
+ const headerResult=scopedDisplayExpression(p,"textSource",p.textSource??p.title??p.label??"",record);
+ const header=text(headerResult.value)||(sample?"Product Name":p.kind==="smart_card_grid"&&preview?"Text here":"");
+ const badgeResult=scopedDisplayExpression(p,"badgeText",p.badgeText??"",record);
+ const badge=text(badgeResult.value);
  // Card Grid uses the same record-scoped, permission-aware formula evaluation as other Data fields.
  React.useEffect(()=>{
   if(p.kind==='smart_image')p.onFormulaDisplay?.({textSource:header,imageSource:image,badgeText:badge});
@@ -233,7 +236,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     ...(single?{display:"flex"}:{}),
     ...(grid?{overflow:"hidden",maxHeight:horizontal?undefined:imageHeight,
       backgroundColor:p.imageBackgroundColor||undefined}:{} )}}>
-   {single&&p.builderPreview&&!image
+   {imageError?<span role="alert" style={{color:formulaDisplayErrorColor,padding:8}}>FORMULAERROR</span>
+    :single&&p.builderPreview&&!image
      ?<div className="smart-image-empty smart-editor-image-placeholder" aria-label={missingImageLabel}
         style={{height:"100%",width:"100%",border:nativeImageBorder,
           borderRadius:number(p.radius,12),boxSizing:"border-box",overflow:"hidden"}}>
@@ -271,7 +275,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
     border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,
     backgroundColor:p.headerBodyColor||undefined,
-    color:focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
+    color:headerResult.error?formulaDisplayErrorColor:
+     focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
     whiteSpace:p.wrapText===false?"nowrap":"normal",
     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
     padding:fixedGridHeader
@@ -281,7 +286,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   {grid&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
    style={cardPadding===null?undefined:{padding:cardPadding+"px"}}>
    {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
-     style={{color:focusedText||p.supportingTextColor||undefined,
+     style={{color:description==='FORMULAERROR'?formulaDisplayErrorColor:
+      focusedText||p.supportingTextColor||undefined,
       backgroundColor:p.supportingBackgroundColor||undefined,
       border:p.supportingBorderColor?"1px solid "+p.supportingBorderColor:undefined,
       fontWeight:focusedWeight??(typeof p.supportingBold==="boolean"?(p.supportingBold?700:400):undefined),
@@ -296,7 +302,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      justifyContent:p.footerAlignment==="center"?"center":p.footerAlignment==="right"?"flex-end":
       p.footerAlignment==="left"?"flex-start":undefined}}>
     {value&&<strong data-md-bind={p.builderPreview?"cardValue":undefined} data-md-bind-titles={p.builderPreview?"Card value":undefined} className="smart-card-value"
-      style={{color:focusedText||p.footerTextColor||undefined,
+      style={{color:value==='FORMULAERROR'?formulaDisplayErrorColor:
+       focusedText||p.footerTextColor||undefined,
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
         ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
@@ -335,9 +342,10 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     })}
    </div>}
   </div>}
-  {Boolean(badge)&&<span data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
+  {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
-   color:p.badgeTextColor||"#fff",background:p.badgeBodyColor||"#2563eb",
+   color:badgeResult.error?formulaDisplayErrorColor:p.badgeTextColor||"#fff",
+   background:badgeResult.error?"#fff":p.badgeBodyColor||"#2563eb",
    border:p.badgeBorderColor?"1px solid "+p.badgeBorderColor:undefined,
    borderRadius:p.badgeRadius!==undefined&&p.badgeRadius!==null&&p.badgeRadius!==""
     ?number(p.badgeRadius,0,0,200):undefined,
@@ -417,13 +425,43 @@ function SmartLookup({p,style,fire}){
  React.useEffect(()=>setQuery(querySource),[querySource]);
  const placeholder=scopedExpression(p,"label",p.placeholder??p.label??"Search records…",recordOf(p));
  const [opened,setOpened]=React.useState(false);
- const candidates=recordsOf(p).slice(0,200).filter(item=>item&&typeof item==="object");
- const display=row=>scopedExpression(p,"textSource",p.textSource??row.Name??row.name??row.label??row.title??row.id??"",row);
- const matches=candidates.filter(row=>display(row).toLowerCase().includes(query.toLowerCase())).slice(0,20);
+ const [results,setResults]=React.useState([]);
+ const [busy,setBusy]=React.useState(false);
+ const [searchError,setSearchError]=React.useState("");
+ const listId=React.useId();
+ const search=typeof p.searchRecords==="function"?p.searchRecords:null;
+ // Search a full authorised Object, not the grid's currently loaded rows.
+ // Debounce and cancel obsolete responses so typing cannot show stale matches.
+ React.useEffect(()=>{
+  let active=true;
+  const term=query.trim();
+  setResults([]);
+  setSearchError("");
+  setBusy(false);
+  if(!opened||!term||p.builderPreview||p.previewOnly)return()=>{active=false};
+  if(!search){
+   setSearchError("Search Box requires an Object search source");
+   return()=>{active=false};
+  }
+  setBusy(true);
+  const timer=setTimeout(()=>{
+   Promise.resolve().then(()=>search(term)).then(rows=>{
+    if(active)setResults(Array.isArray(rows)?rows.slice(0,20):[]);
+   }).catch(error=>{
+    if(active)setSearchError(error instanceof Error?error.message:"Record search failed");
+   }).finally(()=>{if(active)setBusy(false)});
+  },300);
+  return()=>{active=false;clearTimeout(timer)};
+ },[query,search,opened,p.objectApiName,p.previewOnly,p.builderPreview]);
+ const candidates=p.builderPreview||p.previewOnly
+  ?recordsOf(p).slice(0,200).filter(row=>row&&typeof row==="object"):[...results];
+ const display=row=>text(scopedExpression(p,"textSource",p.textSource??row.Name??row.name??row.label??row.title??row.Id??row.id??"",row));
+ const matches=p.builderPreview||p.previewOnly
+  ?candidates.filter(row=>display(row).toLowerCase().includes(query.toLowerCase())).slice(0,20):candidates;
  return <div data-md-bind={p.builderPreview&&p.collectionFormula?"collectionFormula":undefined} className="smart-lookup" style={{...style,"--smart-placeholder-color":p.labelColor||"#64748b"}}>
   <input data-md-bind={p.builderPreview?"label lookupValueFormula":undefined} data-md-bind-titles={p.builderPreview?"Search placeholder|Search value":undefined} className="smart-search" type="search" role="combobox"
    aria-label={text(placeholder||"Search records")}
-   aria-expanded={opened&&matches.length>0} aria-controls="smart-lookup-suggestions"
+   aria-expanded={opened&&matches.length>0} aria-controls={listId}
    placeholder={text(placeholder||"Search records…")}
    style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16),color:p.labelColor||undefined,
     boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
@@ -431,13 +469,19 @@ function SmartLookup({p,style,fire}){
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}
    value={query} onFocus={()=>setOpened(true)}
    onChange={event=>{setQuery(event.target.value);setOpened(true);fire("change",event.target.value)}}/>
-  {opened&&query&&matches.length>0&&<div id="smart-lookup-suggestions" className="smart-lookup-menu" role="listbox" style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16)}}>
-   {matches.map((record,i)=><button type="button" key={text(record.id??i)} role="option"
+  {opened&&query.trim()&&matches.length>0&&<div id={listId} className="smart-lookup-menu" role="listbox" style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16)}}>
+   {matches.map((record,i)=><button type="button" key={text(record.Id??record.id??i)} role="option"
     aria-selected={false} style={{textAlign:"inherit",fontSize:"inherit"}} onMouseDown={event=>event.preventDefault()}
-    onClick={()=>{setQuery(display(record));setOpened(false);fire("select",{record,value:record.id??null})}}>
+    onClick={()=>{setQuery(display(record));setOpened(false);fire("select",{record,value:record.Id??record.id??null})}}>
      {display(record)}
    </button>)}
   </div>}
+  {opened&&query.trim()&&!p.builderPreview&&!p.previewOnly&&
+   (busy||searchError||!matches.length)&&
+   <div role={searchError?"alert":"status"} className="smart-lookup-feedback"
+    style={{color:searchError?"#dc2626":undefined}}>{
+      searchError?searchError:busy?"Searching…":"No matches found"
+    }</div>}
  </div>;
 }
 function SmartTabs({p,record,fire}){

@@ -29,6 +29,7 @@ export function tableFormulaObject(formula:string):string|null{
 }
 
 export function collectionFormulaReferences(formula:string,primaryObject='',knownCollections:readonly string[]=[],primaryFields?:readonly string[]):Array<{object:string;field:string}>{
+ void primaryObject;void knownCollections;void primaryFields;
  if(!/\bCOLLECTION\s*\(/i.test(formula))return [];
  const found=new Map<string,{object:string;field:string}>();
  const visit=(node:Expression):void=>{
@@ -36,10 +37,7 @@ export function collectionFormulaReferences(formula:string,primaryObject='',know
    const match=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(node.value);
    if(match&&!['state','session','event'].includes(match[1].toLowerCase()))
     found.set(match[0],{object:match[1],field:match[2]});
-   else if(primaryObject&&/^[A-Za-z][A-Za-z0-9_]*$/.test(node.value)
-     &&!knownCollections.some(name=>name.toLowerCase()===node.value.toLowerCase())
-     &&(!primaryFields||primaryFields.includes(node.value)))
-     found.set(primaryObject+'.'+node.value,{object:primaryObject,field:node.value});
+
   }else if(node.kind==='call'){
    node.args.forEach((arg,index)=>{
     if(node.name==='COLLECTION'&&index===0
@@ -76,8 +74,9 @@ export function usePageCollectionFormula(
    key!=='collectionFormula'&&typeof value==='string').map(([,value])=>String(value).trim());
  const explicit=expressions.find(value=>value.startsWith('=')&&namedCollectionNames(value).length>0)
    ??expressions.find(value=>value.startsWith('=')&&isCollectionSourceExpression(value,existingCollections))
-   ??expressions.find(value=>/^=\s*@[A-Za-z][A-Za-z0-9_]{0,79}(?:\.[A-Za-z][A-Za-z0-9_]*)?$/.test(value));
- const reference=expressions.find(value=>/^@[A-Za-z][A-Za-z0-9_]{0,79}(?:\.[A-Za-z][A-Za-z0-9_]*)?$/.test(value));
+   ;
+ const reference=expressions.find(value=>/^@[A-Za-z][A-Za-z0-9_]{0,79}$/.test(value)
+   &&objects.some(object=>('@'+object.apiName).toLowerCase()===value.toLowerCase()));
  const listExpression=expressions.find(value=>Boolean(parseCollectionListBinding(value,primaryObject)));
  const tableExpression=expressions.find(value=>/^=?\s*TABLE\s*\(/i.test(value));
  // List-expression metadata is distinct from scalar Boolean expressions. A
@@ -103,10 +102,11 @@ export function usePageCollectionFormula(
  // Only a metadata-authorised Object Field can become a record-list source.
  // A bare @name that is not a Field remains eligible as a saved named Collection.
  const directBinding=directField&&directMetadata?.fields.some(item=>item.apiName===directField)
+   &&(declared===source||declared==='='+source)
   ?{object:directObject,field:directField,criterion:'*',operator:'='}:null;
  const listBinding=parseCollectionListBinding(source,primaryObject)??directBinding;
- const namedListSource=listBinding&&listBinding.object===primaryObject
-  ?Object.entries(registry.collections).find(([key])=>key.toLowerCase()===listBinding.field.toLowerCase())?.[1]:undefined;
+ // Named Collection lookup as a Data Source was retired.
+ const namedListSource:PageNamedCollection|undefined=undefined;
  const primaryField=Boolean(listBinding&&objects.find(o=>o.apiName===listBinding.object)
    ?.fields.some(field=>field.apiName===listBinding.field));
  const unresolvedNamedList=Boolean(listBinding&&!namedListSource&&!primaryField
@@ -152,13 +152,15 @@ export function usePageCollectionFormula(
  },[key]);
  const result=(()=>{
  if(!source)return {collection:null,error:null,loading:false};
+ // A full @Object Data Source is the page's native paginated record array,
+ // not a synthetic COLLECTION() with a 200-row limit. Card/Grid/Cart use
+ // their existing row loaders and evaluate field properties per row.
+ if(fullObject)return {collection:null,error:null,loading:false};
  const saved=/^@([A-Za-z][A-Za-z0-9_]{0,79})$/.exec(source);
- if(saved){
-  const named=Object.entries(registry.collections).find(([name])=>name.toLowerCase()===saved[1].toLowerCase())?.[1];
-  if(named)return {collection:named,error:null,loading:false};
-  if(!directBinding&&!fullObject)return {collection:null,error:null,loading:false};
- }
- if(unresolvedNamedList)return {collection:null,error:null,loading:false};
+ if(saved&&!fullObject&&!directBinding)return {collection:null,
+   error:'FORMULAERROR: bare @Field and @NamedCollection are unsupported; use @Object.Field',loading:false};
+ if(unresolvedNamedList)return {collection:null,
+   error:'FORMULAERROR: unknown Object field: '+source,loading:false};
  if(!listBinding&&!isTableProjection&&!referencesNamed&&!isCollectionSourceExpression(source,existingCollections))
   return {collection:null,error:null,loading:false};
  const notSelected=refs.find(ref=>!selected.includes(ref.object))

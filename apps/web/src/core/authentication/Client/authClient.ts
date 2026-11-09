@@ -262,6 +262,10 @@ export type FlowScreenRecordPageOptions={
   filter?:{field:string;value:string;related:boolean};
   filters?:Array<{field:string;operator:string;value:string|string[]}>;
   filterLogic?:string;
+  /** Tenant/RBAC-checked Object search; never replaces list paging. */
+  search?:string;
+  /** Optional prefix matching is used only by Smart Lookup. */
+  searchPrefix?:boolean;
   forceRefresh?:boolean;
 };
 export async function loadFlowScreenRecordPage(
@@ -271,6 +275,11 @@ export async function loadFlowScreenRecordPage(
   if(!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0||offset>1000000)
     throw new Error('Invalid record page request');
   const params=new URLSearchParams({offset:String(offset)});
+  if(options.search!==undefined){
+    if(typeof options.search!=='string'||options.search.length>256)throw new Error('Invalid record search');
+    params.set('search',options.search);
+    if(options.searchPrefix===true)params.set('searchPrefix','1');
+  }
   if(options.filter){
     params.set(options.filter.related?'relatedField':'filterField',options.filter.field);
     params.set(options.filter.related?'relatedId':'filterValue',options.filter.value);

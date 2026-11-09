@@ -4,7 +4,13 @@ import ts from 'typescript';
 import {compilePage} from '../src/core/pages/PageCompiler/compilePage';
 import {generatePageScript} from '../src/core/pages/PageCompiler/generatePageScript';
 import {scriptFormulaOperators,scriptFormulaLibrary} from '../src/core/pages/PageCompiler/pageScriptHost';
-import {evaluateFieldExpression} from '../src/component-libraries/shared/FieldExpression.js';
+import {evaluateFieldExpression,evaluateFieldExpressionDetailed,evaluateCollectionFormula} from '../src/component-libraries/shared/FieldExpression.js';
+import {compileRecordFilterFormula,validateRecordFilterFormula} from '../src/core/pages/PageRuntime/recordFilterFormula';
+import {pageComponentRecordQuery} from '../src/core/pages/PageRuntime/pageComponentBindings';
+import {pageStateDependencies,applyPageSelection} from '../src/core/pages/PageRuntime/pageStateDependencies';
+import {pageStateChoices} from '../src/core/builders/PageBuilder/pageStateChoices';
+import {componentStateFromEvent} from '../../server/src/expression-engine/FormulaComponentState';
+import {relationshipFormulaFields} from '../src/core/builders/PageBuilder/relationshipFormulaFields';
 import type {LightningPageMetadata,ObjectMetadata} from '../src/core/metadata/Definitions/metadata';
 
 const field=(apiName:string,dataType='Text')=>({apiName,label:apiName,dataType,required:false,unique:false});
@@ -97,6 +103,12 @@ test('generated TS is valid TypeScript and generated JS gives the interpreter re
   assert.equal(formulas[id](ctx),evaluateFieldExpression(formula.source,ctx.record,{pageState:{},sessionId:'s'}));
  }
  assert.equal(formulas['grid1:label'](ctx),'MENU 2');
+ // The converted TypeScript/JavaScript must supply the component Object context.
+ assert.equal(formulas['mention:textSource']({record:{Id:'p1',Name:'Tea'},state:{},sessionId:'s'}),'Tea');
+ const relationshipCtx={record:{Id:'p1',__mentionValues:{'@Product.Customer.Name':'Alice'}},
+  state:{},sessionId:'s',objectApiName:'Product'};
+ assert.equal(evaluateFieldExpressionDetailed('@Product.Customer.Name',relationshipCtx.record,{
+  rootObjectApiName:relationshipCtx.objectApiName}).value,'Alice');
  assert.throws(()=>formulas['broken:textSource'](ctx),/Formula error/);
 });
 
@@ -192,11 +204,138 @@ test('a cart shows only its own cart: active cart first, else the session cart (
  assert.deepEqual(reads,['CartLine:Cart='+cartId],'active cart from page state, no lookup');
 });
 
-test('lists bound with @Field, search boxes and category filters load every row (not 50)',()=>{
+test('category filters still use complete sources, but scalar field formulas do not force an array',()=>{
  const listPage={...page,components:[
-  {id:'grid',type:'Custom:smart_card_grid',label:'G',visible:true,properties:{objectApiName:'Product',textSource:'@Name',filterKey:'category'}},
+  {id:'grid',type:'Custom:smart_card_grid',label:'G',visible:true,properties:{objectApiName:'Product',textSource:'@Product.Name',filterKey:'category'}},
+  {id:'row-fields',type:'Custom:smart_card_grid',label:'Row fields',visible:true,
+   properties:{objectApiName:'Product',textSource:'@Product.Name',badgeText:'=@Product.Price * 2'}},
+  {id:'dataset',type:'Custom:smart_card_grid',label:'Products',visible:true,
+   properties:{objectApiName:'Product',textSource:'@Product'}},
   {id:'plain',type:'Custom:smart_table',label:'T',visible:true,properties:{objectApiName:'Cart',titleFieldApiName:'Name'}}]} as unknown as LightningPageMetadata;
  const compiled=compilePage(listPage,objects);
  assert.equal(compiled.dataSources.find(s=>s.components.includes('grid'))!.complete,true);
- assert.equal(compiled.dataSources.find(s=>s.components.includes('plain'))!.complete,false,'other lists still page by 50');
+ // Complete collections are shared between components with identical Object/filter
+ // keys; test the scalar-only source independently of that shared category filter.
+ const standard=compilePage({...listPage,components:listPage.components.filter(
+  (item:any)=>item.id!=='grid')} as LightningPageMetadata,objects);
+ assert.equal(standard.dataSources.find(s=>s.components.includes('row-fields'))!.complete,false,'card fields evaluate per row');
+ assert.equal(standard.dataSources.find(s=>s.components.includes('dataset'))!.complete,false,'full Object array keeps native pagination');
+ assert.equal(standard.dataSources.find(s=>s.components.includes('plain'))!.complete,false,'other lists still page by 50');
+});
+
+test('qualified scalar fields and COLLECTION datasets have different contexts',()=>{
+ const products=[{Id:'p1',Name:'Tea',Price:4},{Id:'p2',Name:'Coffee',Price:6}];
+ const options={rootObjectApiName:'Product',collectionSources:{Product:products},
+  collectionSourceFields:{Product:['Id','Name','Price']}};
+ assert.equal(evaluateFieldExpressionDetailed('@Product.Name',products[0],options).value,'Tea');
+ assert.equal(evaluateFieldExpressionDetailed('=@Product.Price * 2',products[1],options).value,'12');
+ assert.equal(evaluateFieldExpressionDetailed('=SUM(@Product.Price)',products[0],options).value,'10');
+ assert.match(evaluateFieldExpressionDetailed('@Name',products[0],options).error??'',/Bare @Field/);
+ assert.match(evaluateFieldExpressionDetailed('@Menu',products[0],{
+  ...options,namedCollections:{Menu:{name:'Menu',items:['Tea']}}}).error??'',/named collection/);
+ // @Name.state.* reads what that component (or named collection) published.
+ assert.equal(evaluateFieldExpressionDetailed('@Menu.state.Value',products[0],{
+  ...options,namedCollectionSelections:{Menu:{Value:'Tea'}}}).value,'Tea');
+ const result=evaluateCollectionFormula('=COLLECTION("Menu", 2, 3)',{Product:products},{
+  primaryObject:'Product',collectionSourceFields:{Product:['Id','Name','Price']}});
+ assert.equal(result.error??null,null);
+ assert.deepEqual(result.value?.items,[2,3]);
+});
+
+test('relationship suggestions use the actual Object.Relationship.Field path',()=>{
+ const customer={apiName:'Customer',label:'Customer',pluralLabel:'Customers',
+  fields:[field('Name')]} as unknown as ObjectMetadata;
+ const product={...objects[0],fields:[...objects[0].fields,{
+  ...field('CustomerId','Lookup(Customer)'),
+  relationship:{relationshipName:'Customer',targetObject:'Customer'}}]} as ObjectMetadata;
+ const refs=relationshipFormulaFields([product,customer],['Product'],'','formula');
+ assert.ok(refs.some(item=>item.reference==='@Product.Name'));
+ assert.ok(refs.some(item=>item.reference==='@Product.Customer.Name'));
+});
+
+test('Smart Lookup searches its Object with 20 guarded prefix matches independently of pagination',async()=>{
+ const {compiledSourceLoader}=await import('../src/core/pages/PageCompiler/compiledSourceLoader');
+ const compiled=compilePage({...page,components:[{id:'lookup',type:'Custom:smart_lookup',
+  label:'Search Products',visible:true,
+  properties:{objectApiName:'Product',filters:[{field:'Category',operator:'Equals',value:'Drinks'}]}}]} as unknown as LightningPageMetadata,objects);
+ const source=compiled.dataSources[0];
+ const calls:Record<string,unknown>[]=[];
+ const loader=compiledSourceLoader(objects,()=>({sessionId:'s'}),async(object,options)=>{
+  calls.push({object,...options});
+  return {records:[{Id:'p1',Name:'Coca-Cola'}],total:1};
+ });
+ const found=await loader.search(source,{},'coc');
+ assert.equal(found[0].Name,'Coca-Cola');
+ assert.equal(calls[0].object,'Product');
+ assert.equal(calls[0].limit,20);
+ assert.equal(calls[0].offset,0);
+ assert.equal(calls[0].search,'coc');
+ assert.equal(calls[0].searchPrefix,true);
+ assert.ok(Array.isArray(calls[0].filters));
+ assert.equal((calls[0].filters as Array<{field:string;value:string}>)[0].field,'Category');
+ assert.equal((calls[0].filters as Array<{field:string;value:string}>)[0].value,'Drinks');
+});
+
+test('Tabs, Navigation, Toggle and Search Box values filter other components via @Name.state.*',()=>{
+ // What each kind of component sends when the user acts.
+ assert.deepEqual(componentStateFromEvent({index:0,value:'*',record:{Id:'*',Name:'All'}}),
+  {Id:'*',Name:'All',Value:'*',Text:'All',Field:'',Criteria:''},'Tabs: All');
+ assert.equal(componentStateFromEvent({index:1,value:'c1',label:'Drinks',record:{Id:'c1',Name:'Drinks'}})!.Id,'c1','Navigation');
+ assert.equal(componentStateFromEvent(true)!.Value,true,'Toggle');
+ assert.equal(componentStateFromEvent('coca')!.Text,'coca','Search Box text');
+ assert.equal(componentStateFromEvent({record:{Id:'p9',Name:'Coca Cola'},value:'p9'})!.Name,'Coca Cola','Lookup pick');
+ assert.equal(componentStateFromEvent(undefined),null,'a plain click publishes nothing');
+
+ const fields=[{apiName:'Id',dataType:'Id'},{apiName:'Name',dataType:'Text(80)'},
+  {apiName:'Category',dataType:'Lookup(Category)',relationship:{targetObject:'Category'}},
+  {apiName:'Active',dataType:'Checkbox'}] as never;
+ const picked=(name:string,value:unknown)=>({collectionSelections:{[name]:componentStateFromEvent(value)}});
+ const formula='=IF(ISBLANK(@CategoryTabs.state.Id), TRUE, @Product.Category = @CategoryTabs.state.Id)';
+ assert.equal(validateRecordFilterFormula(formula,fields),null,'builder accepts it');
+ assert.deepEqual(compileRecordFilterFormula(formula,fields,{}).filters,[],'nothing picked: every product');
+ assert.deepEqual(compileRecordFilterFormula(formula,fields,picked('CategoryTabs',{value:'c1',record:{Id:'c1',Name:'Drinks'}})).filters,
+  [{field:'Category',operator:'eq',value:'c1'}],'Drinks tab');
+ assert.deepEqual(compileRecordFilterFormula(formula,fields,picked('CategoryTabs',{value:'*',record:{Id:'*',Name:'All'}})).filters,
+  [{field:'Category',operator:'isNotBlank',value:''}],'All tab');
+ // OR with a pure state test, and a Toggle.
+ const all=compileRecordFilterFormula('=OR(@CategoryTabs.state.Id = "*", @Product.Category = @CategoryTabs.state.Id)',
+  fields,picked('CategoryTabs',{value:'*',record:{Id:'*'}}));
+ assert.equal(all.blocked,false);assert.deepEqual(all.filters,[]);
+ assert.deepEqual(compileRecordFilterFormula('=@Product.Active = @ActiveOnly.state.Value',fields,picked('ActiveOnly',true)).filters,
+  [{field:'Active',operator:'eq',value:'true'}]);
+
+ // The filter panel's "State value" uses the same channel.
+ const query=pageComponentRecordQuery([{field:'Category',operator:'Equals',
+  value:{source:'CollectionState',key:'CategoryTabs.state.Id',skipWhenBlank:true}}],fields,
+  {pageState:picked('CategoryTabs',{value:'c2',record:{Id:'c2',Name:'Snacks'}})});
+ assert.equal(query.blocked,false);
+ assert.equal(JSON.stringify(query).includes('c2'),true,'filter panel reads the tab');
+
+ // Display formulas read it too.
+ assert.equal(evaluateFieldExpressionDetailed('="Showing " & @CategoryTabs.state.Name',{},
+  {pageState:picked('CategoryTabs',{value:'c1',label:'Drinks',record:{Id:'c1',Name:'Drinks'}})}).value,'Showing Drinks');
+ assert.equal(evaluateFieldExpressionDetailed('@CategoryTabs.state.Id',{},{}).value,'','nothing picked reads blank');
+
+ // Every named component is offered in the builder, and picking a parent
+ // clears a child that depends on it (Category tabs → Sub-category tabs).
+ const components=[
+  {id:'a',type:'Custom:smart_tabs',properties:{navigatorName:'CategoryTabs'}},
+  {id:'b',type:'Custom:smart_tabs',properties:{navigatorName:'SubTabs',
+   filters:[{field:'Category',operator:'Equals',value:{source:'CollectionState',key:'CategoryTabs.state.Id'}}]}}];
+ const choices=pageStateChoices(components).map(item=>item.key);
+ assert.ok(choices.includes('CategoryTabs.state.Id')&&choices.includes('SubTabs.state.Text'));
+ const deps=pageStateDependencies(components);
+ let state=applyPageSelection({},{kind:'collection',key:'SubTabs',value:{Id:'s1'}},deps);
+ state=applyPageSelection(state,{kind:'collection',key:'CategoryTabs',value:{Id:'c2'}},deps);
+ assert.deepEqual(Object.keys(state.collectionSelections as object),['CategoryTabs'],'sub-tab choice cleared');
+});
+
+test('compiled data sources reload when a filter formula reads @Name.state.*',()=>{
+ const objects=[{apiName:'Product',label:'Product',pluralLabel:'Products',fields:[
+  {apiName:'Id',label:'Id',dataType:'Id'},{apiName:'Category',label:'Category',dataType:'Lookup(Category)'}]}] as never;
+ const compiled=compilePage({apiName:'Till',label:'Till',components:[
+  {id:'grid',type:'Custom:smart_card_grid',label:'Grid',visible:true,properties:{objectApiName:'Product',
+   filterFormula:'=IF(ISBLANK(@CategoryTabs.state.Id), TRUE, @Product.Category = @CategoryTabs.state.Id)'}}]} as never,objects);
+ const source=compiled.dataSources.find(item=>item.components.includes('grid'));
+ assert.ok(source?.stateInputs.map(key=>key.toLowerCase()).includes('categorytabs'));
 });

@@ -976,7 +976,7 @@ export class RecordEngine {
     return rows[0].id;
   }
   async list(tenantId:string,userId:string,objectApi:string,limit=50,offset=0,
-    options:{sortField?:string;sortDirection?:'asc'|'desc';search?:string;filterField?:string;
+    options:{sortField?:string;sortDirection?:'asc'|'desc';search?:string;prefixSearch?:boolean;filterField?:string;
       filterValue?:string;filterOperator?:'Equals'|'Includes'|'Excludes';
       relatedField?:string;relatedId?:string;filters?:RecordFilter[];filterLogic?:string;
       cursor?:RecordCursor;scope?:'my'|'all'|'my_team'|'queue'}={}) {
@@ -1002,6 +1002,11 @@ export class RecordEngine {
       !uuid.test(options.relatedId??'')))
       throw new Error('Invalid related-list relationship');
     const search=options.search?.trim().slice(0,256)??'';
+    // Only Smart Lookup opts into prefix matching; other searches are unchanged.
+    const searchTerm=options.prefixSearch&&search
+      ?(search.match(/[\p{L}\p{N}]+/gu)??[]).slice(0,12).map(part=>part+':*').join(' & ')
+      :search;
+    const searchFunction=options.prefixSearch?'to_tsquery':'websearch_to_tsquery';
     const filterValue=options.filterValue;
     const filterOperator=options.filterOperator??'Equals';
     if(!['Equals','Includes','Excludes'].includes(filterOperator)
@@ -1137,14 +1142,14 @@ export class RecordEngine {
     if(search){
       conditionParams.push(searchFields);
       const fieldsParam='$'+(3+conditionParams.length);
-      conditionParams.push(search);
+      conditionParams.push(searchTerm);
       const searchParam='$'+(3+conditionParams.length);
       searchFieldParameter=fieldsParam;
       searchTermParameter=searchParam;
       predicates.push(`EXISTS(SELECT 1 FROM md_record_search_values qv
         WHERE qv.tenant_id=r.tenant_id AND qv.record_id=r.id AND qv.object_api=r.object_api
           AND qv.field_api=ANY(${fieldsParam}::text[])
-          AND qv.search_vector @@ websearch_to_tsquery('simple',${searchParam}))`);
+          AND qv.search_vector @@ ${searchFunction}('simple',${searchParam}))`);
     }
     const where=predicates.length?' AND '+predicates.join(' AND '):'';
     let pageCursorPredicate:string|undefined;
@@ -1157,16 +1162,16 @@ export class RecordEngine {
     let cursorValueType=search?'numeric':'timestamptz';
     let cursorExpression=search?'search_rank.score':'r.created_at';
     if(search&&!sortField&&searchFieldParameter&&searchTermParameter){
-      params.push(searchFields,search);
+      params.push(searchFields,searchTerm);
       const rankFieldsParam=`$${params.length-1}`;
       const rankTermParam=`$${params.length}`;
       sortJoin=`CROSS JOIN LATERAL (
         SELECT max(ts_rank_cd(setweight(qv.search_vector,qv.weight::"char"),
-          websearch_to_tsquery('simple',${rankTermParam}))) AS score
+          ${searchFunction}('simple',${rankTermParam}))) AS score
         FROM md_record_search_values qv
         WHERE qv.tenant_id=r.tenant_id AND qv.record_id=r.id AND qv.object_api=r.object_api
           AND qv.field_api=ANY(${rankFieldsParam}::text[])
-          AND qv.search_vector @@ websearch_to_tsquery('simple',${rankTermParam})
+          AND qv.search_vector @@ ${searchFunction}('simple',${rankTermParam})
       ) search_rank`;
       orderBy='search_rank.score DESC,r.id ASC';
       resultOrder='r.sort_value DESC,r.id ASC,v.field_api';

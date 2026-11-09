@@ -3,11 +3,13 @@ import type {FlowDefinitionMetadata} from '../../metadata/Definitions/metadata';
 type Binding=Record<string,unknown>;
 type Actions=Record<string,unknown>;
 const clickComponents=new Set(['smart_button','smart_toggle','smart_calendar','smart_cart','smart_card_grid','smart_numpad']);
+const selectComponents=new Set(['smart_lookup']);
 const changeComponents=new Set(['smart_calendar','smart_lookup','smart_selector','smart_tabs','smart_toggle','smart_text','smart_card_grid','smart_numpad']);
 /** Component event applicability is shared by the old property contract and unified catalog. */
 export const supportsSmartActionEvent=(api:string,event:string):boolean=>
  event==='click'?clickComponents.has(api):
  event==='change'?changeComponents.has(api):
+ event==='select'?selectComponents.has(api):
  event==='start'?api.startsWith('smart_'):
  ['qtyIcon','qtyIncrease','qtyDecrease'].includes(event)?api==='smart_cart':
  ['customButton1','customButton2'].includes(event)?['smart_cart','smart_card_grid','smart_numpad'].includes(api):
@@ -25,6 +27,7 @@ export default function SmartEventActionsRibbon({api,actions,flows,onChange,sele
  const slots=[
   {key:'click',label:'On Click',enabled:members.every(member=>clickComponents.has(member))},
   {key:'change',label:'On Change',enabled:members.every(member=>changeComponents.has(member))},
+  {key:'select',label:'On Select',enabled:members.every(member=>selectComponents.has(member))},
   // Page Runtime invokes the metadata start action once per page session.
   // It is not a Smart JSX event and remains disabled in read-only Builder previews.
   {key:'start',label:'On Session Start',enabled:members.every(member=>member.startsWith('smart_'))}

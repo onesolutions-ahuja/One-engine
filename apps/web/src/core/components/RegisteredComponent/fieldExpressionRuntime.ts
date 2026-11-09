@@ -134,15 +134,14 @@ export function resolveRegisteredTextProperties(
       {fields?:Array<{apiName:string}>}|undefined;
     if(boundObject&&Array.isArray(object?.fields)){
       try{
-        const allowed=new Set(['Id','CreatedDate','LastModifiedDate','CreatedBy','LastModifiedBy',
-          ...object.fields.map(field=>field.apiName)]);
-        const named=formulaContext.namedCollections??{};
+        const selectedObjectNames=new Set(objects.map(entry=>
+          entry&&typeof entry==='object'?(entry as {apiName?:unknown}).apiName:undefined));
         for(const token of tokenize(value)){
           if(token.kind!=='reference'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(token.value))continue;
-          if(allowed.has(token.value)||Object.hasOwn(named,token.value)
-            ||['Record','state','session','event'].includes(token.value))continue;
+          if(selectedObjectNames.has(token.value)||
+            ['Record','state','session','event'].includes(token.value))continue;
           throw new FieldExpressionEvaluationError(
-            'Field '+token.value+' is not available on Object '+boundObject);
+            'Bare @Field and named collection references are unsupported: @'+token.value+'; use @Object.Field');
         }
       }catch(error){
         if(error instanceof FieldExpressionEvaluationError)throw error;
@@ -150,6 +149,10 @@ export function resolveRegisteredTextProperties(
       }
     }
     if(!hasRecord&&rows&&rows.length>1&&value.includes('$component.')&&localRefs.length)continue;
+    // A Grid/Card/Cart has MANY rows. The renderer, not the enclosing
+    // RegisteredComponent, evaluates @Object.Field separately for each row.
+    if(!hasRecord&&/@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(value)
+      &&!/\b(?:COLLECTION|TABLE|SUM|SUMIFS|COUNTIFS|AVERAGEIFS|MINIFS|MAXIFS)\s*\(/i.test(value))continue;
     // SUM may be nested in a text expression (e.g. "£ " & SUM(@LineTotal)).
     // Do not pre-evaluate a partial record page and show a misleading total.
     const localSum=/\bSUM\s*\(/i.test(value)&&rows?.some(row=>

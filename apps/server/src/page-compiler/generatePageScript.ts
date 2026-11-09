@@ -45,11 +45,14 @@ export function expressionToJs(node:Expression,table:Expression[]):string{
   }
  }
 }
-function formulaFunction(id:string,formula:CompiledFormula,table:Expression[],ts:boolean):string{
+function formulaFunction(id:string,formula:CompiledFormula,table:Expression[],ts:boolean,objectApiName:string):string{
  const header='  /** '+comment(formula.property)+': '+comment(formula.source)+' */\n';
  const signature=q(id)+': (ctx'+(ts?': FormulaContext':'')+')'+(ts?': unknown':'')+' => ';
  if(!formula.ast)return header+'  '+signature+'{ throw new Error('+q('Formula error: '+(formula.error??'invalid formula'))+'); },\n';
- return header+'  '+signature+expressionToJs(formula.ast,table)+',\n';
+ // Generated JS/TS binds the actual component Object, just like the Page
+ // renderer. @Product.Name must not depend on a caller manually supplying it.
+ const body=expressionToJs(formula.ast,table);
+ return header+'  '+signature+'((ctx) => '+body+')({...ctx,objectApiName:'+q(objectApiName)+'}),\n';
 }
 /** Scalar functions that compile to plain JavaScript for action values. Anything
  * else (SUMIFS, COLLECTION, TABLE, date/time zone functions…) asks the platform. */
@@ -123,7 +126,7 @@ export function generatePageScript(compiled:CompiledPage,language:ScriptLanguage
  const ts=language==='ts';
  const table:Expression[]=[];
  const formulas=compiled.components.flatMap(component=>component.formulas.map(formula=>
-  formulaFunction(component.id+':'+formula.property,formula,table,ts))).join('');
+  formulaFunction(component.id+':'+formula.property,formula,table,ts,component.objectApiName))).join('');
  const actions=compiled.components.flatMap(component=>component.actions.map(action=>
   actionFunction(component.id+':'+action.event,action,table,ts))).join('');
  const plans=Object.fromEntries(compiled.components.flatMap(component=>component.actions
@@ -155,6 +158,8 @@ export interface FormulaContext {
   record: Row;
   state: Readonly<Record<string, unknown>>;
   sessionId: string;
+  /** Object context is inserted by the saved-page compiler for each component. */
+  objectApiName?: string;
 }
 export interface ActionContext {
   sessionId: string;

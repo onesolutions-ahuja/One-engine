@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { compilePageCached } from '../../../../pages/PageCompiler/compilePage';
+import CompiledPreviewBar from '../../../../pages/PageCompiler/CompiledPreviewBar';
 import { canvasScaleToFitWidth } from '../../../../pages/PageRuntime/pageCanvas';
 import { standaloneTemplateCanvasStyle } from '../../standaloneTemplateCanvasStyle';
 import BuilderTemplatePreviewLayout from '../../../TemplatePreview/BuilderTemplatePreviewLayout';
@@ -45,6 +47,9 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   } = canvasGestures;
   const { renderPageComponent, renderRegion } = canvasRenderer;
   const { selectedGroupBounds, selectedGroupMembers } = componentProperties;
+  // Preview runs the compiled page: compiled once per opened draft, not per component.
+  const compiledPreview = useMemo(() => previewMode && page.pageType !== 'Record Page'
+    ? compilePageCached(page, objects) : null, [previewMode, page, objects]);
   useEffect(() => {
     const previewArea = pagePreviewAreaRef.current;
     if (!fitCanvas || page.layoutMode !== 'free-canvas' || !previewArea) {
@@ -106,8 +111,9 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
             setSelectedRegion(null);setRibbonTab('Add Block');setPageSettingsOpen(false);setActivePanel(null);
           }} onDragOver={previewMode ? undefined : (event) => event.preventDefault()}
              onDrop={previewMode ? undefined : (event) => handleDrop(event)}>
-            {previewMode && page.pageType !== 'Record Page' ? <div className="page-builder-live-runtime" aria-label="Published runtime preview of current draft">
-              <LightningAppRuntime
+            {previewMode && page.pageType !== 'Record Page' ? <div className="page-builder-live-runtime" aria-label="Compiled runtime preview of current draft">
+              {compiledPreview && <CompiledPreviewBar compiled={compiledPreview} />}
+              <LightningAppRuntime compiledPage={compiledPreview ?? undefined}
                 appId={builderAppApiName || apps[0]?.apiName || 'Records'}
                 pageApiName={page.apiName} previewPage={page}
                 inScreenPage={page.pageType === 'In-Screen Page'}

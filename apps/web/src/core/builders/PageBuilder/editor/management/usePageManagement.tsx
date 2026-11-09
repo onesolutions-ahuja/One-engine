@@ -8,6 +8,8 @@ import { remapComponentInteractionTargets } from '../../pageComponentTree';
 import { findRegisteredComponent } from '../../../../components/Registry/componentRegistryLookup';
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary';
+import { compilePage } from '../../../../pages/PageCompiler/compilePage';
+import { downloadPageScript } from '../../../../pages/PageCompiler/downloadPageScript';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -314,6 +316,22 @@ export function usePageManagement(
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download page inventory');}
     finally{setInventoryDownloading('');}
   };
+  /** Download the page's converted (compiled) TypeScript, from the same layout the inventory uses. */
+  const downloadCompiledPageScript = async (item:LightningPageMetadata) => {
+    if(inventoryDownloading)return;
+    const variant=inventoryExportVariant==='Auto'
+      ?primaryPageLayout(layoutSummaries[item.apiName]):inventoryExportVariant;
+    setInventoryDownloading(item.apiName);
+    try{
+      const {page:layout}=await request<{page:LightningPageMetadata}>(
+        `/metadata/pages/${encodeURIComponent(item.apiName)}/layouts/${variant}/editor`);
+      const compiled=compilePage(layout,objects);
+      downloadPageScript(compiled,'ts',item.apiName+'_'+variant);
+      const errors=compiled.diagnostics.filter(entry=>entry.level==='error').length;
+      if(errors)onNotify('Script downloaded. '+errors+' formula error'+(errors===1?'':'s')+' found: open Preview → View code for details.');
+    }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the page script');}
+    finally{setInventoryDownloading('');}
+  };
   const openCreatePage = () => { setNewPageAppId(pageListAppTab!=='all'&&pageListAppTab!=='other'?pageListAppTab:''); setNewPageTargetObject(recordPageContext || ''); setNewPageLayoutMode('free-canvas'); setNewPageType(recordPageContext ? 'Record Page' : 'Home Page'); setNewPageDeviceChoice('Desktop'); setNewPageDevices(['Desktop']); setNewPageCanvasWidth(1440); setNewPageCanvasHeight(900); setCreatePageOpen(true); };
   const createPage = async () => {
     if (saving) return;
@@ -383,6 +401,6 @@ export function usePageManagement(
   return {
     savePage, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
     showRelatedObjectColumn, pageListPageCount, safePageListPage, paginatedPages, openPageDesign,
-    layoutBadges, copyLayoutFrom, downloadPageInventory, openCreatePage, createPage,
+    layoutBadges, copyLayoutFrom, downloadPageInventory, downloadCompiledPageScript, openCreatePage, createPage,
   };
 }

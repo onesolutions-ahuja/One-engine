@@ -1,6 +1,6 @@
 import ResponsiveDataList from '../../../../records/ResponsiveDataList/ResponsiveDataList';
 import PageManagerTabs from '../../PageManagerTabs';
-import { Download, Upload, Pencil, Power, Plus, Trash2 } from 'lucide-react';
+import { Download, FileCode, Upload, Pencil, Power, Plus, Trash2 } from 'lucide-react';
 import { canvasOrientation } from '../../../../pages/PageRuntime/pageCanvas';
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 import PageDetailsDialog from '../../PageDetailsDialog';
@@ -33,7 +33,7 @@ export default function PageManagerView({ props, editorState, management, layout
   } = editorState;
   const {
     openCreatePage, pageAppTabs, paginatedPages, openPageDesign, pageDeviceLabel, layoutBadges,
-    downloadPageInventory, savePage, showRelatedObjectColumn, visiblePages, safePageListPage,
+    downloadPageInventory, downloadCompiledPageScript, savePage, showRelatedObjectColumn, visiblePages, safePageListPage,
     pageListPageCount,
   } = management;
   const { openPageDesignLayout } = layoutActions;
@@ -86,6 +86,8 @@ export default function PageManagerView({ props, editorState, management, layout
               <button type="button" className="btn" aria-label={"Page properties for "+item.label} disabled={saving} onClick={()=>setPageDetailsApi(item.apiName)}>Page properties</button>
               <button type="button" className="btn" aria-label={"Download component inventory for "+item.label}
                 disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadPageInventory(item)}>Download inventory</button>
+              <button type="button" className="btn" aria-label={"Download compiled script for "+item.label}
+                disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadCompiledPageScript(item)}>Download script</button>
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}
                 onOpenLayout={variant=>void openPageDesignLayout(item.apiName,variant)}/>
@@ -117,6 +119,9 @@ export default function PageManagerView({ props, editorState, management, layout
               <button className="page-manager-icon-action" type="button" disabled={Boolean(inventoryDownloading)}
                 aria-label={'Download component inventory for '+item.label} title="Download component inventory CSV"
                 onClick={()=>void downloadPageInventory(item)}><Download size={16}/></button>
+              <button className="page-manager-icon-action" type="button" disabled={Boolean(inventoryDownloading)}
+                aria-label={'Download compiled script for '+item.label} title="Download compiled page script (.ts)"
+                onClick={()=>void downloadCompiledPageScript(item)}><FileCode size={16}/></button>
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}
                 onOpenLayout={variant=>void openPageDesignLayout(item.apiName,variant)}/>

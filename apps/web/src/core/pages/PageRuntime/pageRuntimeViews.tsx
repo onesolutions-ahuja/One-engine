@@ -118,6 +118,8 @@ const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));
 const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
 import { inspectPageDependencies } from './pageDependencies';
+import {CompiledPageProvider,MemoizedCompiledComponentNode} from '../PageCompiler/CompiledPageRuntime';
+import type {CompiledPage} from '../PageCompiler/compilePage';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1100,7 +1102,8 @@ function LightningAppRuntime({
   inScreenPage=false,
   inScreenContext,
   previewPage,
-  previewLayoutDevice
+  previewLayoutDevice,
+  compiledPage
 }: {
   appId: string;
   pageApiName?: string;
@@ -1122,9 +1125,13 @@ function LightningAppRuntime({
   previewPage?: LightningPageMetadata;
   /** Match the device selected in the builder instead of the admin window width. */
   previewLayoutDevice?: 'Desktop' | 'Tablet' | 'Phone';
+  /** Compiled plan of this page: its components run on the compiled runtime
+   * (one store, shared data loads). Omitted: the previous runtime runs. */
+  compiledPage?: CompiledPage;
 }) {
   const detectedLayoutDevice = usePageLayoutDevice();
   const layoutDevice = previewLayoutDevice ?? detectedLayoutDevice;
+  const compiledById=useMemo(()=>new Map((compiledPage?.components??[]).map(item=>[item.id,item])),[compiledPage]);
   const viewportWidth=useViewportWidth();
   const requestedLayout = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('pageLayout') === 'Custom'
@@ -1263,7 +1270,13 @@ function LightningAppRuntime({
       if (!definition) return <div className="records-message" role="status" key={component.id}>
         Component is no longer registered: {component.label}
       </div>;
-      const content = needsMetadataComponentRuntime(component.properties)
+      const compiledComponent=compiledPage?.apiName===page.apiName?compiledById.get(component.id):undefined;
+      const content = needsMetadataComponentRuntime(component.properties)&&compiledComponent?.mode==='compiled'
+        ? <MemoizedCompiledComponentNode definition={definition} component={component}
+            objectApiName={compiledComponent.objectApiName} formFactor={formFactor} apps={apps} pages={pages}
+            currentAppId={appId} availableFlows={availableFlows} reports={reports}
+            onNavigate={onNavigate as never} onLaunchFlow={onLaunchFlow} children={nestedChildren}/>
+        : needsMetadataComponentRuntime(component.properties)
         ? <MemoizedMetadataBoundPageComponent definition={definition} component={component} defaultObjectApiName={page.targetObject}
             objects={objects} apps={apps} pages={pages} currentAppId={appId} pageSessionKey={appId + ':' + page.apiName} pageComponents={page.components} reports={reports} availableFlows={availableFlows} formFactor={formFactor}
             initialPageState={inScreenPage?inScreenContext?.values:undefined}
@@ -1409,9 +1422,13 @@ function LightningAppRuntime({
     ?<React.Suspense fallback={null}><InScreenFlowHost flows={availableFlows}
       appApiName={appId} pageApiName={page.apiName} onLaunchFlow={onLaunchFlow}
       pageRecordId={typeof layoutState.recordId==='string'?layoutState.recordId:undefined}/></React.Suspense>:null;
-  if(page.layoutMode==='free-canvas')return <><ResponsivePageCanvas page={page}>
+  const withCompiledRuntime=(content:React.ReactElement)=>compiledPage?.apiName===page.apiName
+    ?<CompiledPageProvider compiled={compiledPage} objects={objects} request={apiRequest}
+      pageSessionKey={appId+':'+page.apiName} initialState={inScreenPage?inScreenContext?.values:undefined}>{content}</CompiledPageProvider>
+    :content;
+  if(page.layoutMode==='free-canvas')return withCompiledRuntime(<><ResponsivePageCanvas page={page}>
     {childrenOf(page.components,null).map(component=>renderCanvasComponent(component))}
-  </ResponsivePageCanvas>{inScreenHost}</>;
+  </ResponsivePageCanvas>{inScreenHost}</>);
   const renderRegion = (region: 'header' | 'main' | 'sidebar') =>
     childrenOf(page.components, null).filter((component) => isAppComponentVisible(component) && (component.region ?? 'main') === region).map(component => {
       const content = renderComponent(component);
@@ -1420,11 +1437,11 @@ function LightningAppRuntime({
         ? <div key={component.id} data-page-appearance={pageAppearanceTarget(component.type)} data-page-style={pageAppearanceStyleKeys(resolvePageComponentStyle(component.properties, component.type, layoutDevice))} style={{...resolvePageComponentStyle(component.properties, component.type, layoutDevice),...behaviorAppearance(component.properties,appVisibilityContext)}}>{content}</div>
         : content;
     });
-  return <><TemplatePageRuntimeLayout apiName={page.apiName} label={page.label}
+  return withCompiledRuntime(<><TemplatePageRuntimeLayout apiName={page.apiName} label={page.label}
     pageType={page.pageType} template={page.template} canvasFillColor={page.canvasFillColor}
     fullscreen={isStandaloneRuntime && page.layoutMode === 'template'} phone={formFactor === 'Phone'} layoutVariant={page.components.find(component => component.properties?.standalonePresentation === true)?.properties?.presentationLayout as string | undefined}
     overlayOpen={layoutState.basketOpen===true}
-    header={renderRegion('header')} main={renderRegion('main')} sidebar={renderRegion('sidebar')} />{inScreenHost}</>;
+    header={renderRegion('header')} main={renderRegion('main')} sidebar={renderRegion('sidebar')} />{inScreenHost}</>);
 }
 
 

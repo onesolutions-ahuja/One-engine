@@ -19,6 +19,7 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
+import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import type {LoadedPageScript} from './serverPageScript';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
@@ -248,9 +249,26 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   const bound=bindPageStateProperties(resolveMentionProperties(properties,mentionContext.records,mentionContext.fields,
    runtime.objects,mentionRoot),state);
   // Row-level @Object.Field formulas stay as written: list renderers resolve them per row.
-  return {...bound,...Object.fromEntries(Object.entries(properties).filter(([,value])=>
+  const withRows={...bound,...Object.fromEntries(Object.entries(properties).filter(([,value])=>
    typeof value==='string'&&/@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(value)))};
- },[properties,mentionContext,runtime.objects,mentionRoot,state]);
+  // Page-level display formulas (page state, session, plain functions) run from the
+  // converted page file. Row, Object, collection and database formulas stay with the
+  // component, which resolves them per record with the same formula library.
+  const script=runtime.script;
+  if(!script)return withRows;
+  const textKinds=['TEXT','LONG_TEXT','TEXTAREA','STRING'];
+  const fromFile:Record<string,unknown>={};
+  for(const formula of compiled.formulas){
+   const run=script.formulas[component.id+':'+formula.property];
+   if(!run||formula.error||formula.property.includes('.')||withRows[formula.property]!==formula.source)continue;
+   if(!definition.propertyDefinitions?.some(item=>item.propertyKey===formula.property&&textKinds.includes(item.kind)))continue;
+   if(!formula.references.every(ref=>/^\$state\.[A-Za-z][A-Za-z0-9_.]*$|^\$session$/.test(ref)))continue;
+   if(!formula.functions.every(name=>PURE_ACTION_FUNCTIONS.has(name)))continue;
+   try{fromFile[formula.property]=run({record:{},state,sessionId:runtime.sessionId()});}
+   catch{/* The component shows the formula's own error. */}
+  }
+  return Object.keys(fromFile).length?{...withRows,...fromFile}:withRows;
+ },[properties,mentionContext,runtime.objects,mentionRoot,state,runtime.script,compiled,definition]);
  // COLLECTION()/TABLE(): users author collections; the shared rows feed them.
  const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,runtime.objects,objectApiName,
   source.records,source.total,source.version,state,sessionId,runtime.pageSessionKey,component.id);
@@ -473,7 +491,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     :resolveActionFormulaValue(expression,event,runtime.store.get(),session),
    save:(key:string,plan:{formula:string},event:Record<string,unknown>)=>runSave(
     {...binding,actionType:'Formula',formula:plan.formula},event,
-    script?{pageApiName:runtime.compiled.apiName,variant:script.variant,revision:script.revision,key}:undefined),
+    script?{pageApiName:runtime.compiled.apiName,variant:script.variant,revision:script.revision,key,
+     ...(script.previewId?{previewId:script.previewId}:{})}:undefined),
    runFormula:(settings:Record<string,unknown>,event:Record<string,unknown>)=>runBinding(settings,event),
    navigate:(settings:Record<string,unknown>)=>runBinding(settings),
    navigateTo:async(kind:string,target:unknown)=>navigateTo(kind,target),

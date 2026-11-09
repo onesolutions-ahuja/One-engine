@@ -39,7 +39,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     previewPageDefinitionCache, device, fitCanvas, fitScale, canvasZoom, canvasSnap,
     marqueeOverlayRef, selected, openAddBlocks, canvasGuideXRef, canvasGuideYRef, targetObject,
     previewRecordId, previewRecord, setPreviewRecordId, previewRecords, fields, previewFieldValue,
-    stringList, template, undoStack,
+    stringList, template,
   } = editorState;
   const { handleDrop } = placement;
   const { page, apps, objects, pages, reports, libraryComponents, flows, onLaunchFlow } = props;
@@ -52,17 +52,14 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   const { selectedGroupBounds, selectedGroupMembers } = componentProperties;
   // Preview runs the compiled page: compiled once per opened draft, not per component.
   const compiledPreview = useMemo(() => previewMode ? compilePageCached(page, objects, {strictLegacy:true}) : null, [previewMode, page, objects]);
-  // Saved (nothing to undo) → run the server-built page file; unsaved edits → the browser plan.
+  // Preview: the server converts the page exactly as shown (no Save needed) and Preview runs that file.
   const layoutVariant = page.layoutVariant ?? 'Desktop';
-  const savedRevision = typeof page.draftRevision === 'number' && page.draftRevision > 0 ? page.draftRevision : null;
-  const serverScript = useServerPageScript(props.request, page.apiName, layoutVariant, savedRevision,
-    previewMode && undoStack.length === 0);
+  const serverScript = useServerPageScript(props.request, page, layoutVariant, previewMode);
   const script = serverScript.status === 'ready' ? serverScript.script : null;
   const scriptPending = serverScript.status === 'loading';
   const previewBar = compiledPreview && <CompiledPreviewBar compiled={script?.plan ?? compiledPreview}
-    request={props.request} variant={layoutVariant} script={script}
-    note={serverScript.status === 'failed' ? 'Running the browser plan: ' + serverScript.error
-      : undoStack.length > 0 ? 'Unsaved changes: running the browser plan. Save to run the server-built file.' : ''} />;
+    request={props.request} variant={layoutVariant} script={script} page={page}
+    note={serverScript.status === 'failed' ? 'The server could not convert this page (' + serverScript.error + '): running the browser plan' : ''} />;
   // Record pages preview on the builder canvas: run it on the compiled runtime too.
   const withRecordPreviewRuntime = (content: React.ReactElement) => compiledPreview && page.pageType === 'Record Page'
     ? scriptPending ? <div className="records-message" role="status">Loading the server-built page…</div>

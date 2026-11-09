@@ -53,7 +53,7 @@ function formulaFunction(id:string,formula:CompiledFormula,table:Expression[],ts
 }
 /** Scalar functions that compile to plain JavaScript for action values. Anything
  * else (SUMIFS, COLLECTION, TABLE, date/time zone functions…) asks the platform. */
-const PURE_ACTION_FUNCTIONS=new Set(['IF','AND','OR','NOT','ROUND','ROUNDUP','ROUNDDOWN','ABS','MIN','MAX',
+export const PURE_ACTION_FUNCTIONS:ReadonlySet<string>=new Set(['IF','AND','OR','NOT','ROUND','ROUNDUP','ROUNDDOWN','ABS','MIN','MAX',
  'TEXT','VALUE','LEN','UPPER','LOWER','TRIM','CONCAT','CONCATENATE','LEFT','RIGHT','MID','ISBLANK',
  'BLANKVALUE','NULLVALUE','IFERROR','MOD','INT','FLOOR','CEILING','SUBSTITUTE','FIND','CONTAINS','BEGINS']);
 const pureActionValue=(assignment:NonNullable<CompiledAction['assignment']>)=>Boolean(assignment.ast

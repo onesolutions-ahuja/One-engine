@@ -5,6 +5,7 @@ import {tokenize} from '../../../../../server/src/expression-engine/FormulaToken
 import {evaluateCollectionFormula,evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
 import {loadFlowScreenRecordPage} from '../../authentication/Client/authClient';
 import {loadBoundedCollectionSource} from './loadBoundedCollectionSource';
+import {sharedAggregate} from '../../../component-libraries/shared/PageFormulaShare.js';
 import type {ObjectMetadata} from '../../metadata/Definitions/metadata';
 import {isCollectionSourceExpression,namedCollectionNames,registerSessionCollection,useSessionCollectionSnapshot} from './pageCollectionSession';
 import {formulaCollectionReferenceKey} from '../../../../../server/src/expression-engine/FormulaCollection.js';
@@ -139,7 +140,10 @@ export function usePageCollectionFormula(
   void Promise.all(secondary.map(async name=>{
    if(!selected.includes(name)||!objects.some(o=>o.apiName===name))
     throw Error('COLLECTION source Object is not selected: '+name);
-   const records=await loadBoundedCollectionSource(name,loadFlowScreenRecordPage);
+   // One read per collection Object per page, shared by every component; a save of
+   // that Object clears it, so the next read is fresh.
+   const records=await sharedAggregate(sessionId,loadFlowScreenRecordPage,JSON.stringify(['collection-source',name]),[name],
+    ()=>loadBoundedCollectionSource(name,loadFlowScreenRecordPage));
    return [name,records] as const;
   })).then(results=>{if(active)setRemote({key:sourceKey,records:Object.fromEntries(results)});})
    .catch((error:unknown)=>{if(active)setRemote({key:sourceKey,records:{},

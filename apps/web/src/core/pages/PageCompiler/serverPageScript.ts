@@ -17,6 +17,8 @@ export type PageScriptModule={
  createFormulas(host:unknown):Record<string,(ctx:unknown)=>unknown>;
 };
 export type LoadedPageScript={apiName:string;variant:string;revision:number;plan:CompiledPage;
+ /** Set when the file was converted from the Builder's current (unsaved) page. */
+ previewId?:string;
  actions:Record<string,CompiledActionFn>;formulas:Record<string,(ctx:unknown)=>unknown>};
 
 const ticketPattern=/^[A-Za-z0-9_-]{43}$/;
@@ -36,6 +38,30 @@ export async function loadServerPageScript(request:Request,apiName:string,varian
  if(!plan||plan.apiName!==apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function'
    ||typeof plan.revision!=='number')throw Error('The server page script is not valid for this page');
  return {apiName,variant,revision:plan.revision,plan,actions:module.createActions(host),formulas:module.createFormulas(host)};
+}
+/** Convert the page exactly as the Builder shows it now (no Save needed) and load it. */
+async function previewTicket(request:Request,page:unknown,apiName:string,variant:string):Promise<{url:string;previewId:string}>{
+ const answer=await request<{ticket?:string;previewId?:string}>('/pages/'+encodeURIComponent(apiName)+'/preview-script',
+  {method:'POST',body:JSON.stringify({variant,page})});
+ if(typeof answer.ticket!=='string'||!ticketPattern.test(answer.ticket)||typeof answer.previewId!=='string')
+  throw Error('The server did not convert this page');
+ return {url:apiBase+'/page-scripts/'+answer.ticket+'.js',previewId:answer.previewId};
+}
+export async function loadPreviewPageScript(request:Request,page:{apiName:string},variant:string):Promise<LoadedPageScript>{
+ const {url,previewId}=await previewTicket(request,page,page.apiName,variant);
+ const module=await import(/* @vite-ignore */ url) as Partial<PageScriptModule>;
+ const plan=module.plan;
+ if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')
+  throw Error('The server page script is not valid for this page');
+ return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,previewId,
+  actions:module.createActions(host),formulas:module.createFormulas(host)};
+}
+/** The exact bytes of the Preview file (same draft → same file). */
+export async function fetchPreviewPageScriptSource(request:Request,page:{apiName:string},variant:string):Promise<string>{
+ const {url}=await previewTicket(request,page,page.apiName,variant);
+ const response=await fetch(url,{credentials:'omit'});
+ if(!response.ok)throw Error('Unable to download the page script ('+response.status+')');
+ return response.text();
 }
 /** The exact bytes Preview runs, for Download. */
 export async function fetchServerPageScriptSource(request:Request,apiName:string,variant:string):Promise<string>{

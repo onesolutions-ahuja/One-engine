@@ -1,5 +1,5 @@
-import {useEffect,useState} from 'react';
-import {loadServerPageScript,type LoadedPageScript} from './serverPageScript';
+import {useEffect,useMemo,useState} from 'react';
+import {loadPreviewPageScript,type LoadedPageScript} from './serverPageScript';
 
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 export type ServerPageScriptState=
@@ -8,24 +8,28 @@ export type ServerPageScriptState=
  |{status:'ready';script:LoadedPageScript}
  |{status:'failed';error:string};
 
-/** Load the server-built file for a saved page revision (Preview). */
-export function useServerPageScript(request:Request,apiName:string,variant:string,revision:number|null,
- enabled:boolean):ServerPageScriptState{
- const key=enabled&&revision!==null?[apiName,variant,revision].join('|'):'';
+/** Preview: the server converts the page exactly as the Builder shows it (no Save
+ * needed) and Preview runs that converted file. Re-converts when the page changes. */
+export function useServerPageScript(request:Request,page:{apiName:string},variant:string,enabled:boolean):ServerPageScriptState{
+ const draft=useMemo(()=>enabled?JSON.stringify(page):'',[enabled,page]);
+ const key=draft?variant+'|'+draft.length+'|'+hash(draft):'';
  const [state,setState]=useState<{key:string;value:ServerPageScriptState}>({key:'',value:{status:'off'}});
  useEffect(()=>{
   if(!key)return;
   let active=true;
   setState({key,value:{status:'loading'}});
-  loadServerPageScript(request,apiName,variant).then(script=>{
-   if(!active)return;
-   setState({key,value:script.revision===revision?{status:'ready',script}
-    :{status:'failed',error:'The server has a different saved version of this page. Save again.'}});
+  loadPreviewPageScript(request,JSON.parse(draft) as {apiName:string},variant).then(script=>{
+   if(active)setState({key,value:{status:'ready',script}});
   },error=>{
-   if(active)setState({key,value:{status:'failed',error:error instanceof Error?error.message:'Unable to load the page script'}});
+   if(active)setState({key,value:{status:'failed',error:error instanceof Error?error.message:'Unable to convert the page'}});
   });
   return ()=>{active=false;};
  },[key,request]);
  if(!key)return {status:'off'};
  return state.key===key?state.value:{status:'loading'};
+}
+function hash(text:string):string{
+ let h=2166136261;
+ for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
+ return (h>>>0).toString(36);
 }

@@ -69,6 +69,14 @@ export function noteSharedMutation(scopeKey,detail){
  }
 }
 export function clearSharedAggregates(){scopes.clear();}
+// Any page save (compiled runtime, Flows, components) clears what it wrote, once per save.
+if(typeof window!=='undefined'&&!window.__metadriveSharedMutationListener){
+ window.__metadriveSharedMutationListener=true;
+ window.addEventListener('metadrive:page-flow-mutated',event=>{
+  const detail=event&&event.detail;
+  if(detail&&typeof detail.sessionId==='string')noteSharedMutation(detail.sessionId,detail);
+ });
+}
 
 /** Counts for diagnostics: real requests sent vs. asks answered from a shared one. */
 export const localShareStats=typeof window!=='undefined'

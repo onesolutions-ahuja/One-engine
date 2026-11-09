@@ -96,3 +96,43 @@ test('server builds once per saved revision and runs actions only from its own c
  assert.notEqual(changed,first,'an Object change rebuilds');
  assert.match(first.code,/THIS FILE RUNS THE PAGE/);
 });
+
+test('Preview converts unsaved edits on the server; only that user can run its saves',()=>{
+ const scripts=new PageScriptService();
+ const edited={...page,draftRevision:7,components:[...page.components,button('extra',{actionType:'Formula',
+  formula:'ACTIONS(UPDATERECORD(Cart, $state.activeCartId, Name, "x"))'})]};
+ const {previewId,built}=scripts.buildPreview('t1','u1','till','Desktop',edited as never,objects as never);
+ assert.match(built.code,/"extra:click"/,'the unsaved button is in the converted file');
+ assert.equal(scripts.buildPreview('t1','u1','till','Desktop',edited as never,objects as never).previewId,previewId,'same draft, same id');
+ assert.equal(scripts.previewAction('t1','u1','till',previewId,'extra:click')?.serverDataSteps,1);
+ assert.equal(scripts.previewAction('t1','u2','till',previewId,'extra:click'),null,'another user cannot use it');
+ assert.equal(scripts.previewAction('t2','u1','till',previewId,'extra:click'),null,'another tenant cannot use it');
+ assert.equal(scripts.action({tenantId:'t1',apiName:'till',variant:'Desktop'},7,'extra:click'),null,'never mixed with the saved page');
+ const ticket=scripts.issueTicket('t1','u1','till','Desktop',previewId);
+ assert.equal(scripts.consumeTicket(ticket)?.previewId,previewId);
+ assert.throws(()=>scripts.buildPreview('t1','u1','other','Desktop',edited as never,objects as never),/does not match/);
+});
+
+test('page-level display formulas from the file equal the component result',async()=>{
+ const {evaluateFieldExpression}=await import('../src/component-libraries/shared/FieldExpression.js');
+ const labelled={...page,components:[{id:'t',type:'Custom:smart_text',label:'T',visible:true,
+  properties:{textSource:'=ROUND($state.price * 1.2, 2) & " GBP " & UPPER($session)'}}]};
+ const module=await load(generatePageScript(compilePage(labelled as never,objects),'js'));
+ const formulas=module.createFormulas(host);
+ const state={price:4.25};
+ assert.equal(formulas['t:textSource']({record:{},state,sessionId:'abc'}),
+  evaluateFieldExpression('=ROUND($state.price * 1.2, 2) & " GBP " & UPPER($session)',{},{pageState:state,sessionId:'abc'}));
+});
+
+test('one collection Object is loaded once for many components, and a save clears it',async()=>{
+ const {sharedAggregate,clearSharedAggregates,noteSharedMutation}=await import('../src/component-libraries/shared/PageFormulaShare.js');
+ clearSharedAggregates();
+ let loads=0;
+ const reader=async()=>({records:[],total:0});
+ const ask=()=>sharedAggregate('s-1',reader,'["collection-source","Category"]',['Category'],async()=>{loads++;return [{Id:'c1'}];});
+ await Promise.all([ask(),ask(),ask()]);
+ assert.equal(loads,1);
+ noteSharedMutation('s-1',{objectApiNames:['Category']});
+ await ask();
+ assert.equal(loads,2);
+});

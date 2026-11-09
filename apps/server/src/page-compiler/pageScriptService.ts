@@ -16,7 +16,9 @@ import {generatePageScript} from './generatePageScript.js';
  * Record saves from that script name only "component:event"; the server runs the
  * action from ITS compiled copy of the same page revision.
  */
-export type PageScriptTicket={tenantId:string;userId:string;apiName:string;variant:string;expires:number};
+export type PageScriptTicket={tenantId:string;userId:string;apiName:string;variant:string;expires:number;
+ /** Preview of unsaved edits: serve this user's draft build instead of the saved page. */
+ previewId?:string};
 export type PageScriptKey={tenantId:string;apiName:string;variant:string};
 export type CompiledServerAction={formula:string;serverDataSteps:number;totalSteps:number};
 type Built={revision:number|null;code:string;etag:string;objectStamp:string;compiled:CompiledPage;
@@ -33,15 +35,17 @@ export const compiledActionKeyPattern=/^[A-Za-z0-9_.-]{1,160}:[A-Za-z][A-Za-z0-9
 export class PageScriptService{
  private readonly tickets=new Map<string,PageScriptTicket>();
  private readonly built=new Map<string,Built>();
+ /** Preview builds of unsaved edits, per tenant + user (never shared, never published). */
+ private readonly previews=new Map<string,Built&{tenantId:string;userId:string;apiName:string;variant:string}>();
  constructor(private readonly now:()=>number=()=>Date.now()){}
 
- issueTicket(tenantId:string,userId:string,apiName:string,variant:string):string{
+ issueTicket(tenantId:string,userId:string,apiName:string,variant:string,previewId?:string):string{
   if(!apiNamePattern.test(apiName))throw new Error('Invalid page API name');
   const now=this.now();
   for(const [id,entry] of this.tickets)if(entry.expires<=now)this.tickets.delete(id);
   if(this.tickets.size>=MAX_TICKETS)this.tickets.delete(this.tickets.keys().next().value!);
   const id=randomBytes(32).toString('base64url');
-  this.tickets.set(id,{tenantId,userId,apiName,variant,expires:now+TICKET_MS});
+  this.tickets.set(id,{tenantId,userId,apiName,variant,expires:now+TICKET_MS,...(previewId?{previewId}:{})});
   return id;
  }
  /** Single use: a ticket works once, then is gone. */
@@ -76,6 +80,39 @@ export class PageScriptService{
   if(this.built.size>=MAX_BUILT)this.built.delete(this.built.keys().next().value!);
   this.built.set(cacheKey,entry);
   return entry;
+ }
+ /** Compile what the Builder shows right now (unsaved edits) for Preview. The page
+  * metadata is compiled by the server exactly like a saved page; nothing is stored
+  * or published. Returns an id the same user's ticket and saves refer to. */
+ buildPreview(tenantId:string,userId:string,apiName:string,variant:string,page:CompilerPage,
+  objects:readonly CompilerObject[]):{previewId:string;built:Built}{
+  if(!apiNamePattern.test(apiName)||page.apiName!==apiName)throw new Error('Preview page does not match');
+  const compiled=compilePage(page,objects,{strictLegacy:true});
+  const code=generatePageScript(compiled,'js');
+  const actions=new Map<string,CompiledServerAction>();
+  for(const component of compiled.components)for(const action of component.actions)
+   if(action.kind==='ActionPlan'&&!action.error&&action.formula)
+    actions.set(component.id+':'+action.event,{formula:action.formula,
+     serverDataSteps:action.serverDataSteps,totalSteps:action.totalSteps});
+  const hash=createHash('sha256').update(code).digest('base64url');
+  // Same user + same draft → same id (repeat Previews reuse it).
+  const previewId=createHash('sha256').update([tenantId,userId,apiName,variant,hash].join('\u0000')).digest('base64url').slice(0,32);
+  const built={revision:compiled.revision,code,etag:'"p.'+hash.slice(0,24)+'"',objectStamp:'',compiled,actions,
+   tenantId,userId,apiName,variant};
+  this.previews.delete(previewId);
+  if(this.previews.size>=MAX_BUILT)this.previews.delete(this.previews.keys().next().value!);
+  this.previews.set(previewId,built);
+  return {previewId,built};
+ }
+ /** A preview build, only for the user who made it. */
+ preview(tenantId:string,userId:string,previewId:string):(Built&{apiName:string;variant:string})|null{
+  const entry=this.previews.get(previewId);
+  return entry&&entry.tenantId===tenantId&&entry.userId===userId?entry:null;
+ }
+ previewAction(tenantId:string,userId:string,apiName:string,previewId:string,actionKey:string):CompiledServerAction|null{
+  if(!compiledActionKeyPattern.test(actionKey))return null;
+  const entry=this.preview(tenantId,userId,previewId);
+  return entry&&entry.apiName===apiName?entry.actions.get(actionKey)??null:null;
  }
  /** The server's own compiled action for a saved revision, if that revision is built. */
  action(key:PageScriptKey,revision:number,actionKey:string):CompiledServerAction|null{

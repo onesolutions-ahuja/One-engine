@@ -13,7 +13,8 @@ import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js'
 /**
  * Compiled page scripts (Page Builder Preview).
  *
- *  POST /api/pages/:apiName/script-ticket            signed-in: one-time 60 s ticket
+ *  POST /api/pages/:apiName/script-ticket            signed-in: one-time 60 s ticket (saved page)
+ *  POST /api/pages/:apiName/preview-script           Builder: convert the draft on screen (not saved)
  *  GET  /api/page-scripts/:ticket.js                 the server-built module (ticket = login)
  *  POST /api/pages/:apiName/compiled-actions/execute a save, run from the server's compiled copy
  *
@@ -41,6 +42,15 @@ export function registerPageScriptPublicRoute(app:Express,deps:PageScriptDeps){
   const ticket=deps.scripts.consumeTicket(String(req.params.ticket??'').replace(/\.js$/,''));
   if(!ticket){res.status(404).type('text/plain').send('Not found');return;}
   await deps.rbac.require(ticket.tenantId,ticket.userId,'PageDefinition','read');
+  if(ticket.previewId){
+   // The user's own Preview build of unsaved edits.
+   const preview=deps.scripts.preview(ticket.tenantId,ticket.userId,ticket.previewId);
+   if(!preview){res.status(404).type('text/plain').send('Not found');return;}
+   res.setHeader('Content-Type','text/javascript; charset=utf-8');
+   res.setHeader('ETag',preview.etag);
+   res.send(preview.code);
+   return;
+  }
   await deps.rbac.require(ticket.tenantId,ticket.userId,'ObjectDefinition','read');
   const variant=pageLayoutVariant(ticket.variant);
   const page=await deps.pages.editor(ticket.tenantId,ticket.apiName,variant);
@@ -63,6 +73,22 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const ticket=deps.scripts.issueTicket(actor.tenant_id,actor.user_id,req.params.apiName,variant);
   res.json({ticket,url:'/api/page-scripts/'+ticket+'.js'});
  }));
+ app.post('/api/pages/:apiName/preview-script',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  if(!api.test(req.params.apiName))throw new Error('Invalid page API name');
+  // Converting a draft needs the same right as saving one; nothing is stored or published.
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'ObjectDefinition','read');
+  const variant=pageLayoutVariant(req.body?.variant??'Desktop');
+  const page=req.body?.page;
+  if(!page||typeof page!=='object'||Array.isArray(page)||!Array.isArray((page as {components?:unknown}).components)
+    ||(page as {components:unknown[]}).components.length>500)throw new Error('Invalid preview page');
+  const {previewId}=deps.scripts.buildPreview(actor.tenant_id,actor.user_id,req.params.apiName,variant,
+   asCompilerPage(page),asCompilerObjects(await deps.definitions.list(actor.tenant_id)));
+  res.setHeader('Cache-Control','private, no-store');
+  const ticket=deps.scripts.issueTicket(actor.tenant_id,actor.user_id,req.params.apiName,variant,previewId);
+  res.json({ticket,previewId,url:'/api/page-scripts/'+ticket+'.js'});
+ }));
  app.post('/api/pages/:apiName/compiled-actions/execute',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
@@ -73,10 +99,15 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const body=(req.body??{}) as Record<string,unknown>;
   const variant=pageLayoutVariant(body.variant??'Desktop');
   const key=String(body.key??''),revision=Number(body.revision),steps=body.dataSteps;
-  if(!compiledActionKeyPattern.test(key)||!Number.isSafeInteger(revision)||!Number.isSafeInteger(steps)
+  if(!compiledActionKeyPattern.test(key)||(!Number.isSafeInteger(revision)&&typeof body.previewId!=='string')||!Number.isSafeInteger(steps)
     ||(steps as number)<1||!validActionScope(body.scope)){unsupported(res);return;}
   const target={tenantId:actor.tenant_id,apiName:req.params.apiName,variant};
-  let plan=deps.scripts.action(target,revision,key);
+  const previewId=typeof body.previewId==='string'?body.previewId:'';
+  let plan=previewId
+   // Preview of unsaved edits: only this user's own server-built draft.
+   ?deps.scripts.previewAction(actor.tenant_id,actor.user_id,req.params.apiName,previewId,key)
+   :deps.scripts.action(target,revision,key);
+  if(!plan&&previewId){unsupported(res);return;}
   if(!plan){
    // Not built yet on this server: build from the saved page, but only for that exact revision.
    const page=asCompilerPage(await deps.pages.editor(actor.tenant_id,req.params.apiName,variant));

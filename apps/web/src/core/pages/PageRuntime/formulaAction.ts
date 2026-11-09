@@ -74,7 +74,7 @@ export async function executePageFormulaAction(
  onPredicted?:(prediction:Prediction)=>void,
  /** A compiled page action: the server runs ITS compiled copy (by component:event of
   * that saved revision) instead of formula text sent from the browser. */
- compiledAction?:{pageApiName:string;variant:string;revision:number;key:string}
+ compiledAction?:{pageApiName:string;variant:string;revision:number;key:string;previewId?:string}
 ):Promise<{changes:Change[];recordChanged:boolean;mutatedObjectApiNames?:string[];
  recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>;
  predictionBatch?:string}>{
@@ -123,7 +123,8 @@ export async function executePageFormulaAction(
      // The server's compiled copy of this saved action; only "which action" + values are sent.
      const compiled=await request<DataAnswer>('/pages/'+encodeURIComponent(compiledAction.pageApiName)
       +'/compiled-actions/execute',{method:'POST',body:JSON.stringify({variant:compiledAction.variant,
-       revision:compiledAction.revision,key:compiledAction.key,scope,dataSteps:split.dataSteps})});
+       revision:compiledAction.revision,key:compiledAction.key,
+       ...(compiledAction.previewId?{previewId:compiledAction.previewId}:{}),scope,dataSteps:split.dataSteps})});
      // Not this revision on the server (or server formulas off): the existing route answers.
      if(compiled.supported===true)return compiled;
     }

@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent} from 'react';
 import {Pencil,LayoutTemplate,History,LockKeyhole} from 'lucide-react';
 import type {LightningPageMetadata,LightningAppMetadata,PageActivationAssignmentMetadata,ProfileMetadata} from '../../metadata/Definitions/metadata';
+import { resolvePageActivationApp } from './pageAppMembership';
 import PageDetailsAssignmentEditor,{assignmentValidationError} from './PageDetailsAssignmentEditor';
 import './PageDetailsDialog.css';
 import {pageLayoutOptionLabel,primaryPageLayout,type PageLayoutSummary} from './pageLayoutSummary';
@@ -73,8 +74,7 @@ export default function PageDetailsDialog({page,apps,profiles,recordTypes,disabl
  const [label,setLabel]=useState(page.label);
  const [apiName,setApiName]=useState(page.apiName);
  const apiNameValid=apiName===page.apiName||/^[a-z][a-z0-9_]{0,127}$/.test(apiName);
- const existing=(page.activationAssignments??[]).find(a=>a.scope==='App Default'&&a.appId)?.appId
-   ??apps.find(app=>app.navigationPageApiNames.includes(page.apiName))?.apiName??'';
+ const existing=resolvePageActivationApp(apps,page)??'';
  const [appApiName,setAppApiName]=useState(existing);
  const [devices,setDevices]=useState<LightningPageMetadata['devices']>([...page.devices]);
  const deviceOptions=[{value:'Desktop',label:'Desktop enabled'},

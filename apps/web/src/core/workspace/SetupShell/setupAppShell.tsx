@@ -1070,7 +1070,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
             });
           savedPage=published.page;
         }catch(error){
-          setPage(payload.page);
+          setPage(current=>current.apiName===previousApiName?payload.page:current);
           pageDefinitionCache.current.clear();
           notify('Page draft saved, but the live update failed: '+
             (error instanceof Error?error.message:'Unable to publish page layout'));
@@ -1078,7 +1078,9 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
         }
         setPages(current=>current.map(item=>item.apiName===previousApiName?savedPage:item));
       }
-      setPage(savedPage);
+      // A list-row activation must not silently select a different page in the open editor.
+      setPage(current=>current.apiName===previousApiName?savedPage:current);
+      setPages(current=>current.map(item=>item.apiName===previousApiName?savedPage:item));
       pageDefinitionCache.current.clear();
       notify(wasActive && nextPage.status!=='Draft'
         ? 'Page saved and live'
@@ -1095,7 +1097,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
         `/metadata/pages/${encodeURIComponent(apiName)}/layouts/${variant}/publish`,{
           method:'POST',body:JSON.stringify({draftRevision})
         });
-      setPage(payload.page);
+      setPage(current=>current.apiName===apiName?payload.page:current);
       setPages(current=>[...current.filter(item=>item.apiName!==apiName),payload.page]);
       pageDefinitionCache.current.clear();
       notify('Page layout published');
@@ -1123,7 +1125,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
       const listing=await apiRequest<{pages:LightningPageMetadata[]}>('/metadata/pages');
       setPages(listing.pages);
       const selected=listing.pages.find(item=>item.apiName===apiName);
-      if(selected)setPage(selected);
+      if(selected)setPage(current=>current.apiName===apiName?selected:current);
       pageDefinitionCache.current.clear();
       notify('Published page deactivated. Draft and version history retained.');
       return true;

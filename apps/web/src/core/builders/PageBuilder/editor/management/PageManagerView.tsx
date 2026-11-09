@@ -33,7 +33,7 @@ export default function PageManagerView({ props, editorState, management, layout
   } = editorState;
   const {
     openCreatePage, pageAppTabs, paginatedPages, openPageDesign, pageDeviceLabel, layoutBadges,
-    downloadPageInventory, downloadCompiledPageScript, savePage, showRelatedObjectColumn, visiblePages, safePageListPage,
+    downloadPageInventory, downloadCompiledPageScript, activateListedPage, pageAppIds, showRelatedObjectColumn, visiblePages, safePageListPage,
     pageListPageCount,
   } = management;
   const { openPageDesignLayout } = layoutActions;
@@ -91,7 +91,7 @@ export default function PageManagerView({ props, editorState, management, layout
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}
                 onOpenLayout={variant=>void openPageDesignLayout(item.apiName,variant)}/>
-              <button type="button" className="btn" aria-label={(item.status==="Active"?"Deactivate ":"Activate ")+item.label} disabled={saving} onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):savePage('Active',item,true))}>{item.status==='Active'?'Deactivate':'Activate'}</button>
+              <button type="button" className="btn" aria-label={(item.status==="Active"?"Deactivate ":"Activate ")+item.label} disabled={saving} onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):activateListedPage(item))}>{item.status==='Active'?'Deactivate':'Activate'}</button>
               <button type="button" className="btn" aria-label={"Delete "+item.label} disabled={saving||Boolean(archivingPageApiName)} onClick={()=>setPendingArchivePageApiName(item.apiName)}>Delete</button>
             </div>}
           ]}/>
@@ -129,7 +129,7 @@ export default function PageManagerView({ props, editorState, management, layout
                 disabled={saving}
                 aria-label={(item.status==='Active'?'Deactivate ':'Activate ')+item.label}
                 title={item.status==='Active'?'Deactivate page':'Activate page'}
-                onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):savePage('Active',item,true))}><Power size={16}/></button>
+                onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):activateListedPage(item))}><Power size={16}/></button>
               <button className="page-manager-icon-action page-manager-delete" type="button"
                 disabled={saving||Boolean(archivingPageApiName)}
                 aria-label={(archivingPageApiName===item.apiName?'Deleting ':'Delete ')+item.label}
@@ -138,8 +138,7 @@ export default function PageManagerView({ props, editorState, management, layout
             </div>
           </td>
           <td><button type="button" className="page-manager-page-link" onClick={()=>void openPageDesign(item.apiName)}>{item.label}</button></td><td title={item.apiName}><code>{item.apiName}</code></td>
-          <td>{apps.find(app=>app.navigationPageApiNames.includes(item.apiName)
-            ||(item.activationAssignments??[]).some(a=>a.appId===app.apiName))?.label??'—'}</td>
+          <td>{pageAppIds(item).map(id=>apps.find(app=>app.apiName===id)?.label??id).join(', ')||'—'}</td>
           <td>{item.publishedRevision?'v'+item.publishedRevision:'—'}</td>
           {showRelatedObjectColumn&&<td>{item.targetObject ? objects.find(object=>object.apiName===item.targetObject)?.label ?? item.targetObject : '—'}</td>}
           <td title={item.pageType+' · '+pageDeviceLabel(item)+' · '+item.canvasWidth+' × '+item.canvasHeight+' · '+canvasOrientation(item.canvasWidth,item.canvasHeight)}>

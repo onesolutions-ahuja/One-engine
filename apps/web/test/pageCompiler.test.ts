@@ -203,9 +203,13 @@ test('category filters still use complete sources, but scalar field formulas do 
   {id:'plain',type:'Custom:smart_table',label:'T',visible:true,properties:{objectApiName:'Cart',titleFieldApiName:'Name'}}]} as unknown as LightningPageMetadata;
  const compiled=compilePage(listPage,objects);
  assert.equal(compiled.dataSources.find(s=>s.components.includes('grid'))!.complete,true);
- assert.equal(compiled.dataSources.find(s=>s.components.includes('row-fields'))!.complete,false,'card fields evaluate per row');
- assert.equal(compiled.dataSources.find(s=>s.components.includes('dataset'))!.complete,false,'full Object array keeps native pagination');
- assert.equal(compiled.dataSources.find(s=>s.components.includes('plain'))!.complete,false,'other lists still page by 50');
+ // Complete collections are shared between components with identical Object/filter
+ // keys; test the scalar-only source independently of that shared category filter.
+ const standard=compilePage({...listPage,components:listPage.components.filter(
+  (item:any)=>item.id!=='grid')} as LightningPageMetadata,objects);
+ assert.equal(standard.dataSources.find(s=>s.components.includes('row-fields'))!.complete,false,'card fields evaluate per row');
+ assert.equal(standard.dataSources.find(s=>s.components.includes('dataset'))!.complete,false,'full Object array keeps native pagination');
+ assert.equal(standard.dataSources.find(s=>s.components.includes('plain'))!.complete,false,'other lists still page by 50');
 });
 
 test('qualified scalar fields and COLLECTION datasets have different contexts',()=>{

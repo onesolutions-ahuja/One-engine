@@ -134,6 +134,7 @@ const selectedCard=(selection,record)=>{
 };
 function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=false}){
  const image=boundImage(p,record);
+ const imageError=image==='FORMULAERROR';
  // Distinguish an unset tenant brand from an unbound image in Builder previews.
  const tenantLogoReference=/^=?\s*(?:\$session\.tenant\.logo|\$tenant\.logo)$/i.test(String(p.imageSource??p.src??"").trim());
  const missingImageLabel=tenantLogoReference
@@ -235,7 +236,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     ...(single?{display:"flex"}:{}),
     ...(grid?{overflow:"hidden",maxHeight:horizontal?undefined:imageHeight,
       backgroundColor:p.imageBackgroundColor||undefined}:{} )}}>
-   {single&&p.builderPreview&&!image
+   {imageError?<span role="alert" style={{color:formulaDisplayErrorColor,padding:8}}>FORMULAERROR</span>
+    :single&&p.builderPreview&&!image
      ?<div className="smart-image-empty smart-editor-image-placeholder" aria-label={missingImageLabel}
         style={{height:"100%",width:"100%",border:nativeImageBorder,
           borderRadius:number(p.radius,12),boxSizing:"border-box",overflow:"hidden"}}>
@@ -284,7 +286,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   {grid&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
    style={cardPadding===null?undefined:{padding:cardPadding+"px"}}>
    {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
-     style={{color:focusedText||p.supportingTextColor||undefined,
+     style={{color:description==='FORMULAERROR'?formulaDisplayErrorColor:
+      focusedText||p.supportingTextColor||undefined,
       backgroundColor:p.supportingBackgroundColor||undefined,
       border:p.supportingBorderColor?"1px solid "+p.supportingBorderColor:undefined,
       fontWeight:focusedWeight??(typeof p.supportingBold==="boolean"?(p.supportingBold?700:400):undefined),
@@ -299,7 +302,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      justifyContent:p.footerAlignment==="center"?"center":p.footerAlignment==="right"?"flex-end":
       p.footerAlignment==="left"?"flex-start":undefined}}>
     {value&&<strong data-md-bind={p.builderPreview?"cardValue":undefined} data-md-bind-titles={p.builderPreview?"Card value":undefined} className="smart-card-value"
-      style={{color:focusedText||p.footerTextColor||undefined,
+      style={{color:value==='FORMULAERROR'?formulaDisplayErrorColor:
+       focusedText||p.footerTextColor||undefined,
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
         ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}

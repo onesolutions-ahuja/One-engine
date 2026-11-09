@@ -417,13 +417,43 @@ function SmartLookup({p,style,fire}){
  React.useEffect(()=>setQuery(querySource),[querySource]);
  const placeholder=scopedExpression(p,"label",p.placeholder??p.label??"Search records…",recordOf(p));
  const [opened,setOpened]=React.useState(false);
- const candidates=recordsOf(p).slice(0,200).filter(item=>item&&typeof item==="object");
- const display=row=>scopedExpression(p,"textSource",p.textSource??row.Name??row.name??row.label??row.title??row.id??"",row);
- const matches=candidates.filter(row=>display(row).toLowerCase().includes(query.toLowerCase())).slice(0,20);
+ const [results,setResults]=React.useState([]);
+ const [busy,setBusy]=React.useState(false);
+ const [searchError,setSearchError]=React.useState("");
+ const listId=React.useId();
+ const search=typeof p.searchRecords==="function"?p.searchRecords:null;
+ // Search a full authorised Object, not the grid's currently loaded rows.
+ // Debounce and cancel obsolete responses so typing cannot show stale matches.
+ React.useEffect(()=>{
+  let active=true;
+  const term=query.trim();
+  setResults([]);
+  setSearchError("");
+  setBusy(false);
+  if(!term||p.builderPreview||p.previewOnly)return()=>{active=false};
+  if(!search){
+   setSearchError("Search Box requires an Object search source");
+   return()=>{active=false};
+  }
+  setBusy(true);
+  const timer=setTimeout(()=>{
+   Promise.resolve().then(()=>search(term)).then(rows=>{
+    if(active)setResults(Array.isArray(rows)?rows.slice(0,20):[]);
+   }).catch(error=>{
+    if(active)setSearchError(error instanceof Error?error.message:"Record search failed");
+   }).finally(()=>{if(active)setBusy(false)});
+  },300);
+  return()=>{active=false;clearTimeout(timer)};
+ },[query,search,p.objectApiName,p.previewOnly,p.builderPreview]);
+ const candidates=p.builderPreview||p.previewOnly
+  ?recordsOf(p).slice(0,200).filter(row=>row&&typeof row==="object"):[...results];
+ const display=row=>text(scopedExpression(p,"textSource",p.textSource??row.Name??row.name??row.label??row.title??row.Id??row.id??"",row));
+ const matches=p.builderPreview||p.previewOnly
+  ?candidates.filter(row=>display(row).toLowerCase().includes(query.toLowerCase())).slice(0,20):candidates;
  return <div data-md-bind={p.builderPreview&&p.collectionFormula?"collectionFormula":undefined} className="smart-lookup" style={{...style,"--smart-placeholder-color":p.labelColor||"#64748b"}}>
   <input data-md-bind={p.builderPreview?"label lookupValueFormula":undefined} data-md-bind-titles={p.builderPreview?"Search placeholder|Search value":undefined} className="smart-search" type="search" role="combobox"
    aria-label={text(placeholder||"Search records")}
-   aria-expanded={opened&&matches.length>0} aria-controls="smart-lookup-suggestions"
+   aria-expanded={opened&&matches.length>0} aria-controls={listId}
    placeholder={text(placeholder||"Search records…")}
    style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16),color:p.labelColor||undefined,
     boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
@@ -431,13 +461,19 @@ function SmartLookup({p,style,fire}){
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}
    value={query} onFocus={()=>setOpened(true)}
    onChange={event=>{setQuery(event.target.value);setOpened(true);fire("change",event.target.value)}}/>
-  {opened&&query&&matches.length>0&&<div id="smart-lookup-suggestions" className="smart-lookup-menu" role="listbox" style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16)}}>
-   {matches.map((record,i)=><button type="button" key={text(record.id??i)} role="option"
+  {opened&&query.trim()&&matches.length>0&&<div id={listId} className="smart-lookup-menu" role="listbox" style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16)}}>
+   {matches.map((record,i)=><button type="button" key={text(record.Id??record.id??i)} role="option"
     aria-selected={false} style={{textAlign:"inherit",fontSize:"inherit"}} onMouseDown={event=>event.preventDefault()}
-    onClick={()=>{setQuery(display(record));setOpened(false);fire("select",{record,value:record.id??null})}}>
+    onClick={()=>{setQuery(display(record));setOpened(false);fire("select",{record,value:record.Id??record.id??null})}}>
      {display(record)}
    </button>)}
   </div>}
+  {opened&&query.trim()&&!p.builderPreview&&!p.previewOnly&&
+   (busy||searchError||!matches.length)&&
+   <div role={searchError?"alert":"status"} className="smart-lookup-feedback"
+    style={{color:searchError?"#dc2626":undefined}}>{
+      searchError?searchError:busy?"Searching…":"No matches found"
+    }</div>}
  </div>;
 }
 function SmartTabs({p,record,fire}){

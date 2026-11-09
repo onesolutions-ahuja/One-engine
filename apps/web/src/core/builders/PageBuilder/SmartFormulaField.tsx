@@ -91,10 +91,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const sourceRoots=selectedSourceObjects!==undefined
   ?selectedSourceObjects.map(source=>source.apiName)
   :rootObjectApiName?[rootObjectApiName]:[];
- const collectionMentions=stateOptions.filter(entry=>entry.source==='CollectionState')
-  .map(entry=>({reference:'@'+entry.key,label:entry.label}));
- const collectionNames=[...new Set(stateOptions.filter(entry=>entry.source==='CollectionState')
-  .map(entry=>entry.key.split('.')[0]))].map(name=>({reference:'@'+name,label:name+' Collection'}));
+
  const dollarMentions=matches?.prefix==='$'
   ?[...formulaDollarSuggestions(stateOptions,matches.query,flowReferences),...componentMentions()]:[];
  function componentMentions(){
@@ -121,14 +118,14 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   ?relationshipFormulaFields(objects,sourceRoots,matches?.query??'',mentionKind,singleFieldOnly)
     .map(({reference,label})=>({reference,label}))
   :fields.filter(field=>(!singleFieldOnly||/^(Checkbox|Boolean)$/i.test(field.dataType)))
-    .map(field=>({reference:'@'+field.apiName,label:field.label}));
+    .map(field=>({reference:'@'+(rootObjectApiName||sourceRoots[0]||'Object')+'.'+field.apiName,label:field.label}));
  // TABLE's first argument is an @Object. Subsequent arguments are bare
  // field API names: TABLE(@Product,Name,Price). Do not show unrelated mentions.
  const tableArg=Boolean(tableSourcePrompt||tableObject);
  const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials):null;
  const availableMentions=actionArgs&&matches?.prefix===''?actionArgs.choices.map(item=>({reference:item.apiName,label:item.label})):matches?.prefix==='$'
   ?tableArg?[]:dollarMentions
-  :tableArg?recordMentions:[...recordMentions,...collectionMentions,...collectionNames];
+  :tableArg?recordMentions:recordMentions;
  const filtered=matches?availableMentions
     .filter(item=>item.reference.toLowerCase().includes(
        (matches.prefix==='$'?'$':(tableArg||actionArgs)?'':'@')+matches.query.toLowerCase())||
@@ -259,7 +256,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   }
   if(event.key==='Enter')finishEdit();
  };
- return <div className="smart-formula" title={singleFieldOnly?'Select a Boolean field, e.g. @IsActive':'Formula: @Field, + - * / and &; quoted symbols are text'}>
+ return <div className="smart-formula" title={singleFieldOnly?'Select a Boolean field, e.g. @Product.IsActive':'Formula: @Object.Field, + - * / and &; quoted symbols are text'}>
   <div className="smart-formula-highlight" aria-hidden="true">{splitSmartFormula(draft).map((part,i)=>
     <span key={i} className={'smart-formula-'+part.kind}>{part.value}</span>)}</div>
   <input ref={input} type="text" role="combobox" aria-label={label} aria-autocomplete="list"
@@ -267,7 +264,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
    aria-controls={suggestionListId}
    aria-activedescendant={popup&&((functionMatch&&functionSuggestions.length)||(matches&&filtered.length))?suggestionListId+'-option-'+activeSuggestion:undefined}
    value={draft} spellCheck={false} autoComplete="off"
-   placeholder={singleFieldOnly?'@BooleanField':'@Field & "text"'} disabled={disabled} onKeyDown={keyDown}
+   placeholder={singleFieldOnly?'@Object.BooleanField':'@Object.Field & "text"'} disabled={disabled} onKeyDown={keyDown}
    onFocus={e=>{setFocused(true);setCaret(e.currentTarget.selectionStart??draft.length)}}
    onClick={e=>setCaret(e.currentTarget.selectionStart??draft.length)}
    onKeyUp={e=>setCaret(e.currentTarget.selectionStart??draft.length)}

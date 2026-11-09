@@ -120,6 +120,7 @@ const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
 import { inspectPageDependencies } from './pageDependencies';
 import {CompiledPageProvider,MemoizedCompiledComponentNode} from '../PageCompiler/CompiledPageRuntime';
 import type {CompiledPage} from '../PageCompiler/compilePage';
+import type {LoadedPageScript} from '../PageCompiler/serverPageScript';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1107,7 +1108,8 @@ function LightningAppRuntime({
   inScreenContext,
   previewPage,
   previewLayoutDevice,
-  compiledPage
+  compiledPage,
+  compiledScript
 }: {
   appId: string;
   pageApiName?: string;
@@ -1132,6 +1134,8 @@ function LightningAppRuntime({
   /** Compiled plan of this page: its components run on the compiled runtime
    * (one store, shared data loads). Omitted: the previous runtime runs. */
   compiledPage?: CompiledPage;
+  /** The server-built page file (Preview of a saved page): its plan and actions run. */
+  compiledScript?: LoadedPageScript | null;
 }) {
   const detectedLayoutDevice = usePageLayoutDevice();
   const layoutDevice = previewLayoutDevice ?? detectedLayoutDevice;
@@ -1427,7 +1431,7 @@ function LightningAppRuntime({
       appApiName={appId} pageApiName={page.apiName} onLaunchFlow={onLaunchFlow}
       pageRecordId={typeof layoutState.recordId==='string'?layoutState.recordId:undefined}/></React.Suspense>:null;
   const withCompiledRuntime=(content:React.ReactElement)=>compiledPage?.apiName===page.apiName
-    ?<CompiledPageProvider compiled={compiledPage} components={page.components} objects={objects} request={apiRequest}
+    ?<CompiledPageProvider compiled={compiledPage} script={compiledScript??null} components={page.components} objects={objects} request={apiRequest}
       pageSessionKey={appId+':'+page.apiName} initialState={inScreenPage?inScreenContext?.values:undefined}
       sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}>{content}</CompiledPageProvider>
     :content;

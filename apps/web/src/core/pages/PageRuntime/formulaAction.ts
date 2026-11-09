@@ -41,16 +41,11 @@ type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 type Change={key:string;value:unknown};
 /** Simple assignment target; RHS uses the existing shared expression engine.
  * The page runtime still owns navigation, filters, and the guarded Record API. */
-export type ActionFormulaAssignment={kind:'state'|'filter'|'navigate';key:string;value:string};
+export type {ActionFormulaAssignment} from '../../../../../server/src/page-compiler/pageCompilerSupport.js';
 const fieldIdentifier=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
-export function parseActionFormulaAssignment(formula:string):ActionFormulaAssignment|null{
- const parts=/^@(state|filter|navigate)\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/.exec(formula.trim());
- if(!parts)return null;
- if(formula.length>300||!parts[3].trim())throw Error('Invalid action assignment formula.');
- if(parts[1]==='navigate'&&!['page','list','home'].includes(parts[2]))
-  throw Error('Navigation targets are page, list or home.');
- return {kind:parts[1] as ActionFormulaAssignment['kind'],key:parts[2],value:parts[3].trim()};
-}
+/** Shared with the server-side page compiler. */
+import {parseActionFormulaAssignment} from '../../../../../server/src/page-compiler/pageCompilerSupport.js';
+export {parseActionFormulaAssignment};
 export function resolveActionFormulaValue(expression:string,payload:Record<string,unknown>,
  pageState:Readonly<Record<string,unknown>>,sessionId=''):unknown{
  if(expression.length>300)throw Error('Action formula expression is too long.');
@@ -76,7 +71,10 @@ export async function executePageFormulaAction(
  /** Page data the action may read: TABLE()/COLLECTION() sources and $component values. */
  formulaContext:Pick<FormulaBindingContext,'namedCollections'|'collectionSources'|'readComponent'> & {timingName?:string}={},
  /** Show-first: receives the predicted saved records before the server answers. */
- onPredicted?:(prediction:Prediction)=>void
+ onPredicted?:(prediction:Prediction)=>void,
+ /** A compiled page action: the server runs ITS compiled copy (by component:event of
+  * that saved revision) instead of formula text sent from the browser. */
+ compiledAction?:{pageApiName:string;variant:string;revision:number;key:string}
 ):Promise<{changes:Change[];recordChanged:boolean;mutatedObjectApiNames?:string[];
  recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>;
  predictionBatch?:string}>{
@@ -115,13 +113,23 @@ export async function executePageFormulaAction(
       return null;
      },()=>null)
     :Promise.resolve(null);
-   const first=await queuedSave(()=>request<{
+   type DataAnswer={
     supported:boolean;error?:string;changes?:Change[];recordChanged?:boolean;
     mutatedObjectApiNames?:string[];variables?:Record<string,unknown>;completedActionCount?:number;
     recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>
-   }>('/action-formulas/execute-data',{
-    method:'POST',body:JSON.stringify({formula,scope,dataSteps:split.dataSteps})
-   })).finally(()=>{answered=true;});
+   };
+   const first=await queuedSave(async()=>{
+    if(compiledAction){
+     // The server's compiled copy of this saved action; only "which action" + values are sent.
+     const compiled=await request<DataAnswer>('/pages/'+encodeURIComponent(compiledAction.pageApiName)
+      +'/compiled-actions/execute',{method:'POST',body:JSON.stringify({variant:compiledAction.variant,
+       revision:compiledAction.revision,key:compiledAction.key,scope,dataSteps:split.dataSteps})});
+     // Not this revision on the server (or server formulas off): the existing route answers.
+     if(compiled.supported===true)return compiled;
+    }
+    return request<DataAnswer>('/action-formulas/execute-data',{
+     method:'POST',body:JSON.stringify({formula,scope,dataSteps:split.dataSteps})});
+   }).finally(()=>{answered=true;});
    const shown=await prediction;
    if(first.supported===true){
     if(first.error){

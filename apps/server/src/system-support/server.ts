@@ -92,6 +92,8 @@ import {sendActionCommunication} from './action-formula-communication-service.js
 import {tenantServerFormulaEnabled,executeServerDataAction} from './formula-data-action-runtime.js';
 import {evaluateFormulaSql,evaluateFormulaSqlMany} from './formula-sql-runtime.js';
 import {splitServerDataActionPlan} from '../expression-engine/ActionFormulas.js';
+import {registerPageScriptPublicRoute,registerPageScriptRoutes} from '../api/PageScriptController.js';
+import {PageScriptService} from '../page-compiler/pageScriptService.js';
 import {registerSeederManagerRoutes} from './seeder-manager-routes.js';
 import {registerPlatformDeploymentRoutes} from './platform-deployment-routes.js';
 import {assertMetadataPackageEditable,MetadataPackageService} from './metadata-package-service.js';
@@ -510,7 +512,11 @@ export function createSystemServer(db:SqlPersistence) {
   registerMcpRoutes(app,{db,rbac,records,definitions,flows,pages,platform:platformTenants},authorize);
   registerConnectedPublicRoutes(app,connected);
   registerInboundWebhookPublicRoutes(app,db,namedCredentials,flows,rbac,records,integrationActivityWriter);
+  // Compiled page scripts: the script fetch carries a one-time ticket instead of a bearer token.
+  const pageScriptDeps={db,rbac,records,pages,definitions,scripts:new PageScriptService()};
+  registerPageScriptPublicRoute(app,pageScriptDeps);
   app.use('/api',authorize);
+  registerPageScriptRoutes(app,pageScriptDeps);
   registerGovernanceRoutes(app,db,rbac,auth,connected,securityMonitor);
   registerIdentityAdminRoutes(app,{sessions:sessionPolicies,federation,passkeys,backups});
   app.use('/api',countTenantApiRequests(db));

@@ -9,7 +9,8 @@ import { findRegisteredComponent } from '../../../../components/Registry/compone
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
-import { downloadPageScript } from '../../../../pages/PageCompiler/downloadPageScript';
+import { downloadCode } from '../../../../pages/PageCompiler/downloadPageScript';
+import { fetchServerPageScriptSource } from '../../../../pages/PageCompiler/serverPageScript';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -331,12 +332,9 @@ export function usePageManagement(
       ?primaryPageLayout(layoutSummaries[item.apiName]):inventoryExportVariant;
     setInventoryDownloading(item.apiName);
     try{
-      const {page:layout}=await request<{page:LightningPageMetadata}>(
-        `/metadata/pages/${encodeURIComponent(item.apiName)}/layouts/${variant}/editor`);
-      const compiled=compilePage(layout,objects,{strictLegacy:true});
-      downloadPageScript(compiled,'ts',item.apiName+'_'+variant);
-      const errors=compiled.diagnostics.filter(entry=>entry.level==='error').length;
-      if(errors)onNotify('Readable copy downloaded. '+errors+' issue'+(errors===1?'':'s')+' found (formula errors or components on the slow previous runtime): open Preview → View code for details.');
+      // The exact file the server builds from the saved layout (the same file Preview runs).
+      const code=await fetchServerPageScriptSource(request,item.apiName,variant);
+      downloadCode(code,item.apiName+'_'+variant+'.page.js');
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the page script');}
     finally{setInventoryDownloading('');}
   };

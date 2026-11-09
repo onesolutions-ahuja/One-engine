@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { compilePageCached } from '../../../../pages/PageCompiler/compilePage';
 import CompiledPreviewBar from '../../../../pages/PageCompiler/CompiledPreviewBar';
 import { CompiledPageProvider } from '../../../../pages/PageCompiler/CompiledPageRuntime';
+import { useServerPageScript } from '../../../../pages/PageCompiler/useServerPageScript';
 import { canvasScaleToFitWidth } from '../../../../pages/PageRuntime/pageCanvas';
 import { standaloneTemplateCanvasStyle } from '../../standaloneTemplateCanvasStyle';
 import BuilderTemplatePreviewLayout from '../../../TemplatePreview/BuilderTemplatePreviewLayout';
@@ -38,7 +39,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     previewPageDefinitionCache, device, fitCanvas, fitScale, canvasZoom, canvasSnap,
     marqueeOverlayRef, selected, openAddBlocks, canvasGuideXRef, canvasGuideYRef, targetObject,
     previewRecordId, previewRecord, setPreviewRecordId, previewRecords, fields, previewFieldValue,
-    stringList, template,
+    stringList, template, undoStack,
   } = editorState;
   const { handleDrop } = placement;
   const { page, apps, objects, pages, reports, libraryComponents, flows, onLaunchFlow } = props;
@@ -51,10 +52,22 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   const { selectedGroupBounds, selectedGroupMembers } = componentProperties;
   // Preview runs the compiled page: compiled once per opened draft, not per component.
   const compiledPreview = useMemo(() => previewMode ? compilePageCached(page, objects, {strictLegacy:true}) : null, [previewMode, page, objects]);
+  // Saved (nothing to undo) → run the server-built page file; unsaved edits → the browser plan.
+  const layoutVariant = page.layoutVariant ?? 'Desktop';
+  const savedRevision = typeof page.draftRevision === 'number' && page.draftRevision > 0 ? page.draftRevision : null;
+  const serverScript = useServerPageScript(props.request, page.apiName, layoutVariant, savedRevision,
+    previewMode && undoStack.length === 0);
+  const script = serverScript.status === 'ready' ? serverScript.script : null;
+  const scriptPending = serverScript.status === 'loading';
+  const previewBar = compiledPreview && <CompiledPreviewBar compiled={script?.plan ?? compiledPreview}
+    request={props.request} variant={layoutVariant} script={script}
+    note={serverScript.status === 'failed' ? 'Running the browser plan: ' + serverScript.error
+      : undoStack.length > 0 ? 'Unsaved changes: running the browser plan. Save to run the server-built file.' : ''} />;
   // Record pages preview on the builder canvas: run it on the compiled runtime too.
   const withRecordPreviewRuntime = (content: React.ReactElement) => compiledPreview && page.pageType === 'Record Page'
-    ? <><CompiledPreviewBar compiled={compiledPreview} />
-        <CompiledPageProvider compiled={compiledPreview} components={page.components} objects={objects} request={props.request}
+    ? scriptPending ? <div className="records-message" role="status">Loading the server-built page…</div>
+      : <>{previewBar}
+        <CompiledPageProvider compiled={compiledPreview} script={script} components={page.components} objects={objects} request={props.request}
           pageSessionKey={(builderAppApiName || apps[0]?.apiName || 'Records') + ':' + page.apiName}
           recordId={previewRecordId || String(previewRecord?.Id ?? '')}>{content}</CompiledPageProvider></>
     : content;
@@ -120,8 +133,9 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
           }} onDragOver={previewMode ? undefined : (event) => event.preventDefault()}
              onDrop={previewMode ? undefined : (event) => handleDrop(event)}>
             {previewMode && page.pageType !== 'Record Page' ? <div className="page-builder-live-runtime" aria-label="Compiled runtime preview of current draft">
-              {compiledPreview && <CompiledPreviewBar compiled={compiledPreview} />}
-              <LightningAppRuntime compiledPage={compiledPreview ?? undefined}
+              {previewBar}
+              {scriptPending ? <div className="records-message" role="status">Loading the server-built page…</div> :
+              <LightningAppRuntime compiledPage={script?.plan ?? compiledPreview ?? undefined} compiledScript={script}
                 appId={builderAppApiName || apps[0]?.apiName || 'Records'}
                 pageApiName={page.apiName} previewPage={page}
                 inScreenPage={page.pageType === 'In-Screen Page'}
@@ -130,7 +144,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
                 libraryComponents={libraryComponents} availableFlows={flows}
                 formFactor={device} previewLayoutDevice={device}
                 onNavigate={(route:AppRoute) => { window.open(appRoutePath(route),'_blank','noopener,noreferrer'); }}
-                onLaunchFlow={onLaunchFlow} onStandaloneModeChange={() => {}} />
+                onLaunchFlow={onLaunchFlow} onStandaloneModeChange={() => {}} />}
             </div> : withRecordPreviewRuntime(<div
               className={`record-preview ${page.layoutMode === 'free-canvas' ? 'free-canvas-preview' : page.pageType === 'Record Page' ? 'record-page-preview' : page.pageType === 'App Page' ? 'app-page-preview' : 'home-page-preview'} ${device === 'Phone' ? 'phone-preview' : device === 'Tablet' ? 'tablet-preview' : ''}`}
               style={{...(page.layoutMode === 'free-canvas' ? {

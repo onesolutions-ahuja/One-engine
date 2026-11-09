@@ -120,7 +120,7 @@ export default function PageManagerView({ props, editorState, management, layout
                 aria-label={'Download component inventory for '+item.label} title="Download component inventory CSV"
                 onClick={()=>void downloadPageInventory(item)}><Download size={16}/></button>
               <button className="page-manager-icon-action" type="button" disabled={Boolean(inventoryDownloading)}
-                aria-label={'Download compiled script for '+item.label} title="Download compiled page script (.ts)"
+                aria-label={'Download compiled script for '+item.label} title="Download the compiled page file (.js) the server builds"
                 onClick={()=>void downloadCompiledPageScript(item)}><FileCode size={16}/></button>
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}

@@ -19,63 +19,9 @@ export type PageMutationDetail={
 };
 
 
-/** Inspect metadata formulas (not selector lists) for actual Object reads.
- * Unparseable expressions return null: a conservative invalidate-all fallback.
- */
-export function pageComponentReadObjectNames(
- primaryObject:string,properties:Readonly<Record<string,unknown>>,
- knownObjects:readonly {apiName:string;fields?:readonly {apiName:string;dataType?:string}[]}[]
-):string[]|null{
- const known=new Set(knownObjects.map(object=>object.apiName));
- const selected=new Set(Object.entries(properties).filter(([key])=>
-  /^objectApiName(?:[2-9]|[1-9][0-9]+)?$/.test(key))
-  .map(([,value])=>String(value??'')).filter(name=>known.has(name)));
- const reads=new Set<string>();
- if(primaryObject)reads.add(primaryObject);
- for(const [property,value] of Object.entries(properties)){
-  if(typeof value!=='string'||/^objectApiName/.test(property))continue;
-  const expression=value.trim();
-  if(!expression||(!expression.startsWith('=')&&!expression.startsWith('@')
-    &&!/(?:TABLE|COLLECTION)\s*\(/i.test(expression)))continue;
-  // A click/change Action Formula (ACTIONS, CREATERECORD, UPDATERECORD, ...) runs only when the
-  // user acts; it is not data this component DISPLAYS. Counting it made a Product grid look like
-  // a reader of CartLine/Cart, so every add-to-cart reloaded the whole catalogue.
-  if(isActionPlan(expression))continue;
-  let node:Expression;
-  try{node=new Parser(tokenize(expression.replace(/^=\s*/,''))).parse();}
-  catch{return null;}
-  const visit=(ast:Expression):void=>{
-   if(ast.kind==='reference'){
-    const parts=ast.value.replace(/^@/,'').split('.');
-    const first=parts[0];
-    if(known.has(first)&&(first===primaryObject||selected.has(first)))reads.add(first);
-    const field=knownObjects.find(object=>object.apiName===primaryObject)
-     ?.fields?.find(item=>item.apiName===first);
-    const lookup=field?.dataType?.match(/^Lookup\(([^)]+)\)$/i)?.[1];
-    if(parts.length>1&&lookup&&known.has(lookup))reads.add(lookup);
-   }else if(ast.kind==='call'){
-    // Aggregate reads are dependencies even when the Object was not selected as
-    // a component's primary/secondary record source. A CartLine write must
-    // refresh =COUNTIFS(CartLine, ...) and =SUMIFS(CartLine, ...).
-    if(['COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS'].includes(ast.name)){
-     const source=ast.args[0];
-     if(source&&(source.kind==='reference'||source.kind==='literal')
-       &&typeof source.value==='string'&&known.has(source.value))
-      reads.add(source.value);
-    }
-    if((ast.name==='TABLE'||ast.name==='COLLECTION')&&ast.args[0]?.kind==='reference'){
-     const name=ast.args[0].value.replace(/^@/,'').split('.')[0];
-     // Conservative: a missed read leaves stale data, an extra read only costs a refresh.
-     if(known.has(name))reads.add(name);
-    }
-    ast.args.forEach(visit);
-   }else if(ast.kind==='unary')visit(ast.value);
-   else if(ast.kind==='binary'){visit(ast.left);visit(ast.right);}
-  };
-  visit(node);
- }
- return [...reads];
-}
+/** Shared with the server-side page compiler. */
+import {pageComponentReadObjectNames} from '../../../../../server/src/page-compiler/pageCompilerSupport.js';
+export {pageComponentReadObjectNames};
 
 export function shouldInvalidatePageComponent(detail:PageMutationDetail|undefined,
  pageSessionKey:string,sessionId:string,readObjectApiNames:readonly string[]|null):boolean{

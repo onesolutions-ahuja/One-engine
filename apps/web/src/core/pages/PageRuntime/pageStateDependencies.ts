@@ -138,21 +138,9 @@ export function applyPageSelection(
  return next;
 }
 
-/** Page-state keys a component reads without naming them in its properties:
- * active record scoping uses <field>Id, active<Name>Id and current<Name>Id. */
-export function implicitPageStateKeys(
- fields:ReadonlyArray<{apiName:string;relationship?:{targetObject?:string}|null}>
-):string[]{
- const keys:string[]=[];
- for(const field of fields){
-  if(!field.relationship)continue;
-  for(const name of [field.apiName,field.relationship.targetObject]){
-   if(typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(name))continue;
-   keys.push(name.charAt(0).toLowerCase()+name.slice(1)+'Id','active'+name+'Id','current'+name+'Id');
-  }
- }
- return keys;
-}
+/** Shared with the server-side page compiler. */
+import {implicitPageStateKeys} from '../../../../../server/src/page-compiler/pageCompilerSupport.js';
+export {implicitPageStateKeys};
 
 /** Names whose value differs between two page states (top-level keys and
  * named collection selections). */

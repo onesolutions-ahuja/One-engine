@@ -5,36 +5,9 @@ import { compareMetadataValue } from '../../metadata/Definitions/metadataValueCo
 import type { FieldMetadata } from '../../metadata/Definitions/metadata';
 import { examineRecordFilter, isNumericFilterField } from '../../records/RecordWorkspace/recordFilterMetadata';
 
-/**
- * The Page Builder supplies event bindings to the existing platform Flow/Action
- * runtime. A component need not select an Object merely to emit an action.
- * Never execute user-supplied expressions or attach business logic to JSX.
- */
-export function needsMetadataComponentRuntime(properties: Record<string, unknown>): boolean {
-  // Any registered component can bind to an Object, not just a named business
-  // vertical. Keep legacy *ObjectApiName properties working without per-app code.
-  if (Object.entries(properties).some(([key, value]) =>
-    /objectApiName$/i.test(key) && typeof value === 'string' && value.trim().length > 0)) return true;
-  // Explicit record-field bindings also need the data runtime even while the
-  // Object binding is missing, so the editor exposes a configuration error
-  // instead of silently rendering an empty static grid.
-  if (Object.entries(properties).some(([key, value]) =>
-    /(?:name|title|price|image|category|vatApplicable|ageRestricted)FieldApiName$/i.test(key) &&
-    typeof value === 'string' && value.trim().length > 0)) return true;
-  // Field mentions require the same permission-gated data runtime as Object bindings.
-  if (Object.values(properties).some(value => typeof value === 'string'
-    && /(^|[^A-Za-z0-9_@])@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(value))) return true;
-  // Flow outputs may bind to sibling components without each component querying an Object.
-  // These instances must still enter the metadata-aware runtime to receive page state.
-  const state = properties.stateBindings;
-  if(state && typeof state==='object' && !Array.isArray(state)
-     && Object.keys(state).length>0)return true;
-  if(properties.filterMode!=='Field'&&typeof properties.filterFormula==='string'&&properties.filterFormula.trim())return true;
-  if(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim())return true;
-  const bindings = properties.actionFlows;
-  return Boolean(bindings && typeof bindings === 'object' && !Array.isArray(bindings)
-    && Object.keys(bindings).length > 0);
-}
+/** Shared with the server-side page compiler. */
+import {needsMetadataComponentRuntime} from '../../../../../server/src/page-compiler/pageCompilerSupport.js';
+export {needsMetadataComponentRuntime};
 
 /**
  * Evaluate the Page Builder's existing record-filter contract against
@@ -94,13 +67,9 @@ export function bindPageStateProperties<T extends Record<string,unknown>>(
   }
   return next as T;
 }
-/** An explicit editor mode determines which saved rules are active.
- * Legacy pages without a mode retain their existing combined semantics. */
-export function activePageRecordFilters(properties:Readonly<Record<string,unknown>>):{filters:unknown;formula:unknown}{
- if(properties.filterMode==='Formula')return {filters:[],formula:properties.filterFormula};
- if(properties.filterMode==='Field')return {filters:properties.filters,formula:undefined};
- return {filters:properties.filters,formula:properties.filterFormula};
-}
+/** Shared with the server-side page compiler. */
+import {activePageRecordFilters} from '../../../../../server/src/page-compiler/pageCompilerSupport.js';
+export {activePageRecordFilters};
 export type PageFilterContext={
   pageState?:Readonly<Record<string,unknown>>;
   recordId?:string;

@@ -19,6 +19,7 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
+import type {LoadedPageScript} from './serverPageScript';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
 import {resolveMentionProperties} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
@@ -37,6 +38,8 @@ import {resolveSmartToggleFieldBinding,updateSmartToggleField} from '../PageRunt
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 type Flows=Array<Pick<FlowDefinitionMetadata,'id'|'apiName'|'label'|'flowType'|'status'>>;
 type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;store:CompiledPageStore;
+ /** The server-built page file this page runs from (null: the browser-compiled plan). */
+ script:LoadedPageScript|null;
  data:CompiledDataLayer;request:Request;objects:ObjectMetadata[];pageSessionKey:string;recordId:string;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
@@ -58,10 +61,12 @@ function pageSessionId(pageSessionKey:string,override?:string):string{
  }catch{return crypto.randomUUID();}
 }
 
-export function CompiledPageProvider({compiled,components,objects,request,pageSessionKey,initialState,sessionIdOverride,recordId='',children}:{
- compiled:CompiledPage;components:readonly PageComponentMetadata[];objects:ObjectMetadata[];request:Request;pageSessionKey:string;
+export function CompiledPageProvider({compiled:browserPlan,script=null,components,objects,request,pageSessionKey,initialState,sessionIdOverride,recordId='',children}:{
+ compiled:CompiledPage;script?:LoadedPageScript|null;components:readonly PageComponentMetadata[];objects:ObjectMetadata[];request:Request;pageSessionKey:string;
  initialState?:Record<string,unknown>;sessionIdOverride?:string;recordId?:string;children:ReactNode;
 }){
+ // A server-built file carries its own plan: the page runs exactly that.
+ const compiled=script?.plan??browserPlan;
  const runtime=useMemo<Runtime>(()=>{
   let sessionId=pageSessionId(pageSessionKey,sessionIdOverride);
   const sessionListeners=new Set<()=>void>();
@@ -69,7 +74,7 @@ export function CompiledPageProvider({compiled,components,objects,request,pageSe
   const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
   const data=createCompiledDataLayer(compiled,
    compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage),store.get);
-  return {compiled,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
+  return {compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
    pageSessionKey,recordId,
    sessionId:()=>sessionId,
    subscribeSession(listener){sessionListeners.add(listener);return ()=>{sessionListeners.delete(listener);};},
@@ -89,7 +94,7 @@ export function CompiledPageProvider({compiled,components,objects,request,pageSe
      detail:{...detail,pageSessionKey,sessionId,origin:compiledOrigin}}));
    }};
  // One runtime per compiled page version; metadata edits recompile.
- },[compiled,components,objects,request,pageSessionKey,sessionIdOverride,recordId]);
+ },[compiled,script,components,objects,request,pageSessionKey,sessionIdOverride,recordId]);
  useEffect(()=>{
   void runtime.data.start();
   // Flows and screens speak window events: fold them into the one store.
@@ -298,7 +303,6 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   };
  },[runtime]);
  const onAction=async(action:{event:string;value?:unknown})=>{
-  const pageState=runtime.store.get();
   const session=runtime.sessionId();
   if(behaviorAction(properties,action.event,{formFactor})!=='enabled')
    throw Error('This action is unavailable under the published Page rules.');
@@ -331,93 +335,98 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   }
   const payload=eventPayload(action.value);
   const record=source.records.length===1?source.records[0]:mentionContext.records[mentionRoot];
-  const input=(value:unknown)=>resolveInput(value,payload,pageState,session,record);
+  const input=(value:unknown,event:Record<string,unknown>=payload)=>resolveInput(value,event,runtime.store.get(),session,record);
   const navigationContext={objects:runtime.objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName};
   const selectFilter=(filterKey:string,value:string,label:string)=>{
+   if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(filterKey))throw Error('Invalid filter key');
    window.dispatchEvent(new CustomEvent('metadrive:page-filter-selected',{detail:{
     pageSessionKey:runtime.pageSessionKey,filterKey,value,label,
     recordId:String(payload.recordId??''),sourceObjectApiName:String(payload.sourceObjectApiName??'')}}));
    return {selected:value};
   };
-  setActionError('');
-  try{
-   if(binding.actionType==='SetFilter'){
-    const key=String(binding.filterKey||'category');
-    if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(key))throw Error('Invalid filter key');
-    const value=String(payload.value??payload.label??'');
-    return selectFilter(key,value,String(payload.label??value));
+  const navigateTo=(kind:string,name:unknown)=>{
+   if(typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_]*(?:\/[A-Za-z][A-Za-z0-9_]*)?$/.test(name))
+    throw Error('Formula navigation requires a declared destination name.');
+   const [first,second]=name.split('/');
+   const next=kind==='page'
+    ?{actionType:'Navigate',navigationTargetType:'App Page',navigationAppId:first,navigationPageApiName:second??''}
+    :kind==='home'?{actionType:'Navigate',navigationTargetType:'App Home',navigationAppId:first}
+    :{actionType:'Navigate',navigationTargetType:'Record List',navigationAppId:'Records',navigationObjectApiName:first};
+   return executeOpenPageActionNode({binding:next,context:navigationContext,onNavigate:onNavigate as never});
+  };
+  // Record saves: one request, one SQL transaction. The saved rows are shown
+  // first (prediction) and replaced by the real save.
+  const runSave=async(settings:Record<string,unknown>,event:Record<string,unknown>,
+   compiledAction?:{pageApiName:string;variant:string;revision:number;key:string})=>{
+   let predicted=false;
+   let result:Awaited<ReturnType<typeof executePageFormulaAction>>;
+   try{
+    result=await executePageFormulaAction(runtime.request,settings,event,runtime.store.get(),runtime.objects,objectApiName,
+     session,undefined,undefined,undefined,{},prediction=>{
+      predicted=true;
+      saved({objectApiNames:prediction.objectApiNames,recordChanges:prediction.recordChanges,optimistic:prediction.batch});
+     },compiledAction);
+   }catch(error){
+    if(predicted)saved({});
+    throw error;
    }
-   if(binding.actionType==='PageState'){
-    const key=String(binding.stateKey??'');
+   if(result.changes.length)applyState(result.changes);
+   if(result.recordChanged)saved({objectApiNames:result.mutatedObjectApiNames?.length?result.mutatedObjectApiNames:undefined,
+    recordChanges:result.recordChanges,replacesOptimistic:result.predictionBatch});
+   else if(predicted)saved({});
+   return {updated:true};
+  };
+  const runBinding=async(settings:Record<string,unknown>,event:Record<string,unknown>=payload):Promise<unknown>=>{
+   const pageState=runtime.store.get();
+   if(settings.actionType==='SetFilter'){
+    const key=String(settings.filterKey||'category');
+    const value=String(event.value??event.label??'');
+    return selectFilter(key,value,String(event.label??value));
+   }
+   if(settings.actionType==='PageState'){
+    const key=String(settings.stateKey??'');
     if(!identifier.test(key))throw Error('Page state action requires a valid metadata state key');
-    applyState([{key,value:input(binding.value)}]);
+    applyState([{key,value:input(settings.value,event)}]);
     return {updated:true};
    }
-   if(binding.actionType==='Navigate')
-    return executeOpenPageActionNode({binding,context:navigationContext,onNavigate:onNavigate as never});
-   if(binding.actionType==='AdjustNumber'){
-    const changes=await adjustNumberRecord(runtime.request,binding as unknown as AdjustNumberBinding,payload,pageState,runtime.objects,objectApiName);
+   if(settings.actionType==='Navigate')
+    return executeOpenPageActionNode({binding:settings,context:navigationContext,onNavigate:onNavigate as never});
+   if(settings.actionType==='AdjustNumber'){
+    const changes=await adjustNumberRecord(runtime.request,settings as unknown as AdjustNumberBinding,event,pageState,runtime.objects,objectApiName);
     applyState(changes);
     saved({objectApiNames:[objectApiName]});
     return {updated:true};
    }
-   if(binding.actionType==='Formula'){
-    const assignment=parseActionFormulaAssignment(String(binding.formula??''));
+   if(settings.actionType==='Formula'){
+    const assignment=parseActionFormulaAssignment(String(settings.formula??''));
     if(assignment?.kind==='filter'){
-     const value=String(resolveActionFormulaValue(assignment.value,payload,pageState,session)??'');
+     const value=String(resolveActionFormulaValue(assignment.value,event,pageState,session)??'');
      return selectFilter(assignment.key,value,value);
     }
-    if(assignment?.kind==='navigate'){
-     const name=resolveActionFormulaValue(assignment.value,payload,pageState,session);
-     if(typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_]*(?:\/[A-Za-z][A-Za-z0-9_]*)?$/.test(name))
-      throw Error('Formula navigation requires a declared destination name.');
-     const [first,second]=name.split('/');
-     const next=assignment.key==='page'
-      ?{actionType:'Navigate',navigationTargetType:'App Page',navigationAppId:first,navigationPageApiName:second??''}
-      :assignment.key==='home'?{actionType:'Navigate',navigationTargetType:'App Home',navigationAppId:first}
-      :{actionType:'Navigate',navigationTargetType:'Record List',navigationAppId:'Records',navigationObjectApiName:first};
-     return executeOpenPageActionNode({binding:next,context:navigationContext,onNavigate:onNavigate as never});
-    }
-    // Record saves: the one-request, one-transaction server path. The saved
-    // rows are shown first (prediction) and replaced by the real save.
-    let predicted=false;
-    let result:Awaited<ReturnType<typeof executePageFormulaAction>>;
-    try{
-     result=await executePageFormulaAction(runtime.request,binding,payload,pageState,runtime.objects,objectApiName,
-      session,undefined,undefined,undefined,{},prediction=>{
-       predicted=true;
-       saved({objectApiNames:prediction.objectApiNames,recordChanges:prediction.recordChanges,optimistic:prediction.batch});
-      });
-    }catch(error){
-     if(predicted)saved({});
-     throw error;
-    }
-    if(result.changes.length)applyState(result.changes);
-    if(result.recordChanged)saved({objectApiNames:result.mutatedObjectApiNames?.length?result.mutatedObjectApiNames:undefined,
-     recordChanges:result.recordChanges,replacesOptimistic:result.predictionBatch});
-    else if(predicted)saved({});
-    return {updated:true};
+    if(assignment?.kind==='navigate')
+     return navigateTo(assignment.key,resolveActionFormulaValue(assignment.value,event,pageState,session));
+    return runSave(settings,event);
    }
    // Flow actions: Screen Flows open their screen; Autolaunched Flows run on the server.
-   const flowApiName=String(binding.flowApiName??'');
+   const flowApiName=String(settings.flowApiName??'');
    const selected=availableFlows.find(flow=>flow.apiName===flowApiName);
-   const flowType=selected?.flowType??binding.flowType;
+   const flowType=selected?.flowType??settings.flowType;
    if(selected&&selected.status!=='Active')throw Error('Choose an active Flow for the "'+action.event+'" action in Page Builder.');
    if(flowType!=='Screen Flow'&&flowType!=='In-Screen Flow'&&flowType!=='Autolaunched Flow')
     throw Error('Configure an Autolaunched Flow for this standalone app action.');
-   const inputs=Object.fromEntries(Object.entries(binding.inputs&&typeof binding.inputs==='object'&&!Array.isArray(binding.inputs)
-    ?binding.inputs as Record<string,unknown>:{}).map(([key,value])=>[key,input(value)]));
-   if(binding.inputRules&&typeof binding.inputRules==='object'&&!Array.isArray(binding.inputRules))
-    for(const [name,rule] of Object.entries(binding.inputRules as Record<string,unknown>)){
+   const inputs=Object.fromEntries(Object.entries(settings.inputs&&typeof settings.inputs==='object'&&!Array.isArray(settings.inputs)
+    ?settings.inputs as Record<string,unknown>:{}).map(([key,value])=>[key,input(value,event)]));
+   if(settings.inputRules&&typeof settings.inputRules==='object'&&!Array.isArray(settings.inputRules))
+    for(const [name,rule] of Object.entries(settings.inputRules as Record<string,unknown>)){
      if(!identifier.test(name))throw Error('Invalid input rule');
      const value=inputs[name];
      if(rule==='NonEmpty'&&(typeof value!=='string'||!value.trim()))throw Error('Please provide '+name+'.');
      if(rule==='E164'&&(typeof value!=='string'||!/^[1-9][0-9]{6,14}$/.test(value)))
       throw Error('Enter a valid international phone number, including country code.');
     }
-   if(binding.outputs!==undefined&&(!binding.outputs||typeof binding.outputs!=='object'||Array.isArray(binding.outputs)))
+   if(settings.outputs!==undefined&&(!settings.outputs||typeof settings.outputs!=='object'||Array.isArray(settings.outputs)))
     throw Error('Flow output mappings must be an object.');
-   const mappings:Record<string,unknown>={...(binding.outputs as Record<string,unknown>|undefined)};
+   const mappings:Record<string,unknown>={...(settings.outputs as Record<string,unknown>|undefined)};
    resolveFlowOutputBindings({},mappings);
    if(flowType==='Screen Flow'||flowType==='In-Screen Flow'){
     if(!selected)throw Error('Screen Flow metadata is unavailable for this action.');
@@ -432,14 +441,49 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    if(response.interviewId)throw Error('This action was paused by a Flow Wait element.');
    const outputs=response.outputs&&typeof response.outputs==='object'&&!Array.isArray(response.outputs)?response.outputs:{};
    applyState(resolveFlowOutputBindings(outputs,mappings));
-   if(binding.successState&&typeof binding.successState==='object'&&!Array.isArray(binding.successState))
-    applyState(Object.entries(binding.successState as Record<string,unknown>)
+   if(settings.successState&&typeof settings.successState==='object'&&!Array.isArray(settings.successState))
+    applyState(Object.entries(settings.successState as Record<string,unknown>)
      .filter(([key,value])=>identifier.test(key)&&(value===null||['string','number','boolean'].includes(typeof value)))
      .map(([key,value])=>({key,value})));
-   if(binding.resetSessionOnSuccess===true)runtime.resetSession();
-   else if(binding.mutatesData!==false)saved({});
-   return {...response,completed:typeof binding.successOutput==='string'
-    &&response.outputs?.[binding.successOutput]===binding.successValue};
+   if(settings.resetSessionOnSuccess===true)runtime.resetSession();
+   else if(settings.mutatesData!==false)saved({});
+   return {...response,completed:typeof settings.successOutput==='string'
+    &&response.outputs?.[settings.successOutput]===settings.successValue};
+  };
+  // The server-built page file's compiled action, when the page runs from it (fix 2 + 4).
+  const script=runtime.script;
+  const compiledAction=script?.actions[component.id+':'+action.event];
+  const compiledContext={
+   sessionId:session,
+   setState:(key:string,value:unknown)=>{
+    if(!identifier.test(key))throw Error('Page state action requires a valid metadata state key');
+    applyState([{key,value}]);
+   },
+   pick:(event:unknown,path:readonly string[])=>path.reduce<unknown>((current,key)=>
+    current&&typeof current==='object'&&!['__proto__','prototype','constructor'].includes(key)
+     ?(current as Record<string,unknown>)[key]:undefined,event),
+   statePath:(path:string)=>resolvePageStatePath(runtime.store.get(),path),
+   recordField:(field:string)=>/^[A-Za-z][A-Za-z0-9_]*$/.test(field)?record?.[field]:undefined,
+   input:(value:unknown,event:Record<string,unknown>)=>input(value,event),
+   formulaScope:(event:Record<string,unknown>)=>({record:{state:runtime.store.get(),event,session:{id:session}},
+    state:runtime.store.get(),sessionId:session}),
+   platformValue:async(kind:string,expression:string,event:Record<string,unknown>)=>kind==='state'
+    ?(await executePageFormulaAction(runtime.request,{actionType:'Formula',formula:'@state.value := '+expression},
+      event,runtime.store.get(),runtime.objects,objectApiName,session)).changes[0]?.value
+    :resolveActionFormulaValue(expression,event,runtime.store.get(),session),
+   save:(key:string,plan:{formula:string},event:Record<string,unknown>)=>runSave(
+    {...binding,actionType:'Formula',formula:plan.formula},event,
+    script?{pageApiName:runtime.compiled.apiName,variant:script.variant,revision:script.revision,key}:undefined),
+   runFormula:(settings:Record<string,unknown>,event:Record<string,unknown>)=>runBinding(settings,event),
+   navigate:(settings:Record<string,unknown>)=>runBinding(settings),
+   navigateTo:async(kind:string,target:unknown)=>navigateTo(kind,target),
+   selectFilter:async(key:string,value:unknown)=>selectFilter(key,String(value??''),String(value??'')),
+   adjustNumber:(settings:Record<string,unknown>,event:Record<string,unknown>)=>runBinding(settings,event),
+   runFlow:(settings:Record<string,unknown>,event:Record<string,unknown>)=>runBinding(settings,event)
+  };
+  setActionError('');
+  try{
+   return compiledAction?await compiledAction(compiledContext,payload):await runBinding(binding);
   }catch(error){
    setActionError(error instanceof Error?error.message:'Action failed');
    throw error;

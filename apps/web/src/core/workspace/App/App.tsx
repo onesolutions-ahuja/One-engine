@@ -223,7 +223,7 @@ function App() {
       prefetchPageEditorDraft(earlyPageName,earlyPageVariant);
   },[authState,earlyPageName,earlyPageVariant]);
   const isMailboxAdminRoute=window.location.pathname==='/mail-admin'||window.location.pathname==='/mail-admin/';
-  const entryIsHome=!isMailboxAdminRoute&&(window.location.pathname==='/login'
+  const entryIsHome=!isMailboxAdminRoute&&entryPath!=='/formula-lab'&&entryPath!=='/formula-lab/'&&(window.location.pathname==='/login'
     ||(route.kind==='setup'&&route.workspace==='home'));
   const landingApp=entryTiming?.landingAppApi??entryTiming?.landing?.user?.landingAppApi??'Setup';
   const needsLandingRedirect=authState==='authenticated'&&!standaloneEntry&&entryIsHome

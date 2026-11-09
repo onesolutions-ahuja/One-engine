@@ -1,6 +1,6 @@
 import { availableComponentSettings, resolveComponentSettings, validateComponentSettings } from '../../../../components/Properties/componentSettingDefinitions';
 import { pagePropertyIssues } from '../../../../components/Properties/pagePropertyContract';
-import { generateMetadataApiName, suggestMetadataApiName } from '../../../../metadata/Definitions/metadataApiNames';
+import { generateMetadataApiName, metadataNameConflictExcept, suggestMetadataApiName } from '../../../../metadata/Definitions/metadataApiNames';
 import { reconcileNavigationOrder } from '../../../../workspace/Navigation/appNavigation';
 import { useEffect } from 'react';
 import { duplicatePageComponentId } from '../../componentIdentity';
@@ -56,8 +56,9 @@ export function usePageManagement(
       onNotify('API Name must start with a letter and contain only letters, numbers, and underscores');
       return;
     }
-    if (pages.some((item) => item.apiName.toLowerCase() === candidate.apiName.toLowerCase()
-      && item.apiName !== savedPageApiName.current)) {
+    // When activating a list row, its persisted identity is that row, not the open editor page.
+    const previousApiName = candidate === page ? savedPageApiName.current : candidate.apiName;
+    if (metadataNameConflictExcept(candidate.apiName, pages.map(item => item.apiName), previousApiName)) {
       onNotify('A Lightning page with this API name already exists');
       return;
     }
@@ -89,7 +90,7 @@ export function usePageManagement(
     }
     setSaving(true);
     try {
-      const saved = await onSave(nextPage, candidate === page ? savedPageApiName.current : candidate.apiName);
+      const saved = await onSave(nextPage, previousApiName);
       if (saved) {
         // Save = compile: formulas, data loads and actions are rebuilt from the saved metadata.
         const compiled=compilePage(nextPage,objects);
@@ -123,7 +124,8 @@ export function usePageManagement(
             }
           } else if (destinationApp) onAppLinked(nextPage.apiName);
         }
-        savedPageApiName.current = nextPage.apiName;
+        // Saving a different list row must not change the editor's persisted page identity.
+        if (candidate === page) savedPageApiName.current = nextPage.apiName;
         setSavedFeedback(true);
         setUndoStack([]);
         setSelectionUndoStack([]);

@@ -8,6 +8,10 @@ export const generateMetadataApiName=(label:string,maxLength=80):string=>{
 export const apiNameIsValid=(name:string):boolean=>/^[A-Za-z][A-Za-z0-9_]*$/.test(name);
 export const metadataNameConflict=(name:string,existing:readonly string[]):boolean=>
   existing.some(value=>value.toLowerCase()===name.toLowerCase());
+/** An existing page may keep or edit its own API name without colliding with itself. */
+export const metadataNameConflictExcept=(
+  name:string,existing:readonly string[],persistedName:string
+):boolean=>existing.some(value=>value!==persistedName&&value.toLowerCase()===name.toLowerCase());
 export const suggestMetadataApiName=(base:string,existing:readonly string[],maxLength=80):string=>{
   const normalized=base.toLowerCase();
   if(!apiNameIsValid(normalized))return '';

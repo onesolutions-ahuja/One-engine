@@ -508,3 +508,50 @@ test('Page Builder activates existing list rows without false API-name duplicate
  assert.match(management,/onSave\(nextPage, previousApiName\)/);
  assert.match(management,/if \(candidate === page\) savedPageApiName\.current = nextPage\.apiName/);
 });
+
+test('Page Builder activation resolves the selected page app from persisted membership',async()=>{
+ const {pageActivationAppCandidates,resolvePageActivationApp}=
+  await import('../src/core/builders/PageBuilder/pageAppMembership.ts');
+ const apps=[
+  {apiName:'smartassist',navigationPageApiNames:['serviceflowhome','serviceflowworkinghours'],
+   navigationOrder:[{type:'App Page',apiName:'serviceflownewappointment'}]},
+  {apiName:'smartkiosk',navigationPageApiNames:['sharedpage'],navigationOrder:[]},
+  {apiName:'smarttill',navigationPageApiNames:['sharedpage'],navigationOrder:[]}
+ ];
+ const page=(apiName,fields={})=>({apiName,activationAssignments:[],...fields});
+ // A page only listed in app navigation is already associated: no editor selection needed.
+ assert.equal(resolvePageActivationApp(apps,page('serviceflowworkinghours')),'smartassist');
+ assert.deepEqual(pageActivationAppCandidates(apps,page('serviceflownewappointment')),['smartassist']);
+ // An existing App Default is authoritative even when the app tab points elsewhere.
+ const assigned=page('sharedpage',{activationAssignments:[
+  {id:'assigned',scope:'App Default',appId:'smartkiosk',profileId:null,recordTypeId:null,formFactors:['Phone']}
+ ]});
+ assert.equal(resolvePageActivationApp(apps,assigned,'smarttill'),'smartkiosk');
+ // Explicit app tabs disambiguate a page already associated with multiple apps.
+ const shared=page('sharedpage');
+ assert.equal(resolvePageActivationApp(apps,shared),null);
+ assert.equal(resolvePageActivationApp(apps,shared,'smarttill'),'smarttill');
+ assert.equal(resolvePageActivationApp(apps,shared,'smartassist'),null);
+ assert.equal(resolvePageActivationApp(apps,page('unassigned')),null);
+ // The editor can explicitly assign an otherwise-unassigned page to an installed app.
+ assert.equal(resolvePageActivationApp(apps,page('unassigned'),'smartassist',true),'smartassist');
+ // Ownership is preferred over accidental duplicate navigation affiliations.
+ assert.equal(resolvePageActivationApp(apps,page('sharedpage',{ownerNamespace:'smarttill'})),'smarttill');
+});
+
+test('Page Builder activation uses the selected authored device layout and preserves editor state',async()=>{
+ const {primaryPageLayout}=await import('../src/core/builders/PageBuilder/pageLayoutSummary.ts');
+ assert.equal(primaryPageLayout({apiName:'phonepage',primary:'Mobile',layouts:[]}), 'Mobile');
+ assert.equal(primaryPageLayout({apiName:'desktoppage',primary:'Desktop',layouts:[]}), 'Desktop');
+ const management=fs.readFileSync(new URL('../src/core/builders/PageBuilder/editor/management/usePageManagement.tsx',import.meta.url),'utf8');
+ const view=fs.readFileSync(new URL('../src/core/builders/PageBuilder/editor/management/PageManagerView.tsx',import.meta.url),'utf8');
+ const shell=fs.readFileSync(new URL('../src/core/workspace/SetupShell/setupAppShell.tsx',import.meta.url),'utf8');
+ assert.match(management,/const variant=primaryPageLayout\(summary\)/);
+ assert.match(management,/\/metadata\/pages\/\$\{encodeURIComponent\(item\.apiName\)\}\/layouts\/\$\{variant\}\/editor/);
+ assert.match(management,/await savePage\('Active',current,false,true\)/);
+ assert.match(management,/resolvePageActivationApp\(apps, nextPage, preferredAppId, !listActivation\)/);
+ assert.equal((view.match(/activateListedPage\(item\)/g)||[]).length,2,'desktop and responsive activation must use the same flow');
+ assert.doesNotMatch(view,/savePage\('Active',item,true\)/);
+ assert.match(shell,/setPage\(current=>current\.apiName===apiName\?payload\.page:current\)/);
+ assert.match(shell,/setPages\(current=>current\.map\(item=>item\.apiName===previousApiName\?savedPage:item\)\)/);
+});

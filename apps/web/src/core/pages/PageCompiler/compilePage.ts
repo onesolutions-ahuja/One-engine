@@ -57,12 +57,15 @@ export type CompiledComponent={
 };
 export type CompiledDataSource={
  id:string;objectApiName:string;components:string[];
+ /** Load every row (bounded): a COLLECTION/TABLE over these rows needs all of them.
+  * Otherwise rows load 50 at a time as the user scrolls. */
+ complete:boolean;
  filters:unknown;filterLogic:'AND'|'OR';filterFormula?:string;
  /** Page state keys the filter reads: the source reloads only when one changes. */
  stateInputs:string[];
 };
 export type CompiledPage={
- compilerVersion:number;apiName:string;label:string;pageType:string;layoutMode:string;
+ compilerVersion:number;apiName:string;label:string;pageType:string;layoutMode:string;targetObject:string;
  revision:number|null;
  components:CompiledComponent[];
  dataSources:CompiledDataSource[];
@@ -182,19 +185,14 @@ function legacyReasons(component:PageComponentMetadata,formulas:readonly Compile
  const p=component.properties??{};
  const reasons:string[]=[];
  const add=(when:unknown,reason:string)=>{if(when)reasons.push(reason);};
- add(typeof p.collectionFormula==='string'&&p.collectionFormula.trim()
-  ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')),'named collection formula');
  add(p.relatedFilterKey,'related list scope');
  add(p.recordPresenterApiName,'record presenter');
  add(p.liveRefreshEnabled||p.liveFlowRefreshEnabled,'live refresh');
  add(p.channelAccessPath,'channel access');
  add(p.contactsObjectApiName,'contact choices');
  add(p.dataFieldFilters,'field-scoped filters');
- add(component.type==='Custom:smart_toggle'&&typeof p.textSource==='string'&&p.textSource.trim().startsWith('@'),'two-way toggle field');
  add(p.recordId,'fixed record id');
  add(Array.isArray(pageBehaviors(p)?.interactions)&&(pageBehaviors(p)!.interactions as unknown[]).length,'page interactions');
- // @Object.Field mentions need the relationship mention loader.
- add(formulas.some(f=>/^@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(f.source)),'relationship mentions');
  for(const action of actions){
   if(action.kind==='Flow')reasons.push('Flow action ('+action.event+')');
   else if(action.kind==='SetFilter')reasons.push('filter action ('+action.event+')');
@@ -205,6 +203,10 @@ function legacyReasons(component:PageComponentMetadata,formulas:readonly Compile
    reasons.push('Flow call in action ('+action.event+')');
  }
  return unique(reasons);
+}
+export function usesCollections(properties:Readonly<Record<string,unknown>>,formulas:readonly CompiledFormula[]):boolean{
+ return Boolean(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim()
+  ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')||f.functions.includes('SUM')));
 }
 function wordIn(text:string,word:string):boolean{
  const needle=word.toLowerCase();
@@ -223,7 +225,10 @@ function filterStateInputs(filters:unknown,formula:unknown):string[]{
   if(!value||typeof value!=='object'||Array.isArray(value))continue;
   const source=value as {source?:unknown;key?:unknown};
   if(source.source==='PageState'&&typeof source.key==='string'&&identifier.test(source.key))keys.add(source.key);
-  if(source.source==='CollectionState'&&typeof source.key==='string')keys.add('collectionSelections');
+  // A collection selection is published under the collection's own name.
+  const named=source.source==='CollectionState'&&typeof source.key==='string'
+   ?/^([A-Za-z][A-Za-z0-9_]{0,79})\.state\./.exec(source.key):null;
+  if(named)keys.add(named[1]);
  }
  if(typeof formula==='string')
   for(const match of formula.matchAll(/(?:\$state\.|@state\.)([A-Za-z][A-Za-z0-9_]{0,63})\b/g))keys.add(match[1]);
@@ -272,8 +277,9 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
    const id=objectApiName+'#'+stableHash(key);
    dataSourceId=id;
    const existing=sources.get(id);
-   if(existing)existing.components.push(component.id);
-   else sources.set(id,{id,objectApiName,components:[component.id],filters:active.filters??null,
+   const complete=usesCollections(properties,formulas);
+   if(existing){existing.components.push(component.id);existing.complete||=complete;}
+   else sources.set(id,{id,objectApiName,components:[component.id],complete,filters:active.filters??null,
     filterLogic,...(filterFormula?{filterFormula}:{}),stateInputs:filterStateInputs(active.filters,filterFormula)});
   }
   components.push({id:component.id,type:component.type,label:component.label,
@@ -303,7 +309,7 @@ export function compilePage(page:LightningPageMetadata,objects:readonly ObjectMe
  }
  const dataSources=[...sources.values()];
  const count=(mode:CompiledComponentMode)=>components.filter(item=>item.mode===mode).length;
- return {compilerVersion:PAGE_COMPILER_VERSION,apiName:page.apiName,label:page.label,
+ return {compilerVersion:PAGE_COMPILER_VERSION,apiName:page.apiName,label:page.label,targetObject:page.targetObject??'',
   pageType:page.pageType,layoutMode:page.layoutMode,
   revision:page.draftRevision??page.revision??page.publishedRevision??null,
   components,dataSources,stateReaders,objectReaders,anyObjectReaders,stateKeys,diagnostics,

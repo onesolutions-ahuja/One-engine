@@ -15,6 +15,11 @@ import {loadFlowScreenRecordPage,getAccessToken} from '../../authentication/Clie
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
+import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
+import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
+import {resolveMentionProperties} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import {explicitMentionRecordId,useRelationshipMentionContext} from '../../records/RecordFormDialog/useRelationshipMentionContext';
+import {resolveSmartToggleFieldBinding,updateSmartToggleField} from '../PageRuntime/smartToggleFieldBinding';
 
 /**
  * Compiled page runtime. One provider per page owns the ONLY page store, the
@@ -43,13 +48,14 @@ function pageSessionId(pageSessionKey:string):string{
  }catch{return crypto.randomUUID();}
 }
 
-export function CompiledPageProvider({compiled,objects,request,pageSessionKey,initialState,children}:{
- compiled:CompiledPage;objects:ObjectMetadata[];request:Request;pageSessionKey:string;
+export function CompiledPageProvider({compiled,components,objects,request,pageSessionKey,initialState,children}:{
+ compiled:CompiledPage;components:readonly PageComponentMetadata[];objects:ObjectMetadata[];request:Request;pageSessionKey:string;
  initialState?:Record<string,unknown>;children:ReactNode;
 }){
  const [sessionId]=useState(()=>pageSessionId(pageSessionKey));
  const runtime=useMemo<Runtime>(()=>{
-  const store=createCompiledPageStore(compiled,initialState);
+  // Which selections clear which (Category → Product): computed once for the page.
+  const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
   const data=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>sessionId,loadFlowScreenRecordPage),store.get);
   return {compiled,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,pageSessionKey,sessionId,
    broadcastState(changes){
@@ -61,7 +67,7 @@ export function CompiledPageProvider({compiled,objects,request,pageSessionKey,in
      detail:{...detail,pageSessionKey,sessionId,origin:compiledOrigin}}));
    }};
  // One runtime per compiled page version; metadata edits recompile.
- },[compiled,objects,request,pageSessionKey,sessionId]);
+ },[compiled,components,objects,request,pageSessionKey,sessionId]);
  useEffect(()=>{
   void runtime.data.start();
   // Legacy components (and Flows) still speak window events: fold them into the one store.
@@ -77,11 +83,21 @@ export function CompiledPageProvider({compiled,objects,request,pageSessionKey,in
    if(detail?.origin===compiledOrigin||detail?.pageSessionKey!==pageSessionKey)return;
    void runtime.data.saved(detail);
   };
+  // Collection selections (any component, compiled or not) go through the same store.
+  const onSelected=(event:Event)=>{
+   const detail=(event as CustomEvent<{pageSessionKey?:string;name?:string;value?:unknown}>).detail;
+   if(detail?.pageSessionKey!==pageSessionKey||typeof detail.name!=='string'
+     ||!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(detail.name))return;
+   const changed=runtime.store.select('collection',detail.name,detail.value);
+   if(changed.length)void runtime.data.stateChanged(changed);
+  };
   window.addEventListener('metadrive:page-local-state',onState);
   window.addEventListener('metadrive:page-flow-mutated',onSaved);
+  window.addEventListener('metadrive:page-collection-selected',onSelected);
   return ()=>{
    window.removeEventListener('metadrive:page-local-state',onState);
    window.removeEventListener('metadrive:page-flow-mutated',onSaved);
+   window.removeEventListener('metadrive:page-collection-selected',onSelected);
   };
  },[runtime,pageSessionKey]);
  return <CompiledRuntimeContext.Provider value={runtime}>{children}</CompiledRuntimeContext.Provider>;
@@ -91,7 +107,7 @@ export function CompiledPageProvider({compiled,objects,request,pageSessionKey,in
 function useComponentState(runtime:Runtime,id:string){
  return useSyncExternalStore(listener=>runtime.store.subscribeComponent(id,listener),runtime.store.get,runtime.store.get);
 }
-const emptySource={records:[] as Record<string,unknown>[],total:0,loading:false,error:'',predictable:false,version:0};
+const emptySource={records:[] as Record<string,unknown>[],total:0,loading:false,error:'',hasMore:false,loadingMore:false,predictable:false,version:0};
 function useSourceSnapshot(runtime:Runtime,sourceId:string|undefined){
  return useSyncExternalStore(
   listener=>sourceId?runtime.data.subscribe(sourceId,listener):()=>{},
@@ -125,7 +141,26 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const [actionError,setActionError]=useState('');
  const properties=useMemo(()=>resolveMetadataProperties({...component.properties,objectApiName},runtime.objects,availableFlows),
   [component.properties,objectApiName,runtime.objects,availableFlows]);
- const resolved=useMemo(()=>bindPageStateProperties(properties,state),[properties,state]);
+ // @Object.Field mentions: same authorised loader as before; it reads only when a record id is bound.
+ const mentionRoot=runtime.compiled.targetObject||objectApiName;
+ const mentionContext=useRelationshipMentionContext(runtime.objects,mentionRoot,explicitMentionRecordId(properties),
+  properties,runtime.request,source.version);
+ const resolved=useMemo(()=>{
+  const bound=bindPageStateProperties(resolveMentionProperties(properties,mentionContext.records,mentionContext.fields,
+   runtime.objects,mentionRoot),state);
+  // Row-level @Object.Field formulas stay as written: list renderers resolve them per row.
+  return {...bound,...Object.fromEntries(Object.entries(properties).filter(([,value])=>
+   typeof value==='string'&&/@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(value)))};
+ },[properties,mentionContext,runtime.objects,mentionRoot,state]);
+ // COLLECTION()/TABLE(): users author collections; the shared rows feed them.
+ const fields=runtime.objects.find(item=>item.apiName===objectApiName)?.fields??[];
+ const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,runtime.objects,objectApiName,
+  source.records,source.total,source.version,state,runtime.sessionId,runtime.pageSessionKey,component.id);
+ const dataCollectionRows=namedSource.collection?namedCollectionRows(namedSource.collection):null;
+ // Two-way toggle bound to one Boolean field of one authorised record.
+ const toggleBinding=resolveSmartToggleFieldBinding(definition.apiName,properties,objectApiName,fields,
+  source.records,source.total,explicitMentionRecordId(properties));
+ const toggleCanWrite=Boolean(toggleBinding?.ready&&behaviorAction(properties,'change',{formFactor})==='enabled');
  const actionFlows=(properties.actionFlows&&typeof properties.actionFlows==='object'&&!Array.isArray(properties.actionFlows)
   ?properties.actionFlows:{}) as Record<string,unknown>;
  const onAction=async(action:{event:string;value?:unknown})=>{
@@ -137,8 +172,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   window.dispatchEvent(new CustomEvent('metadrive:in-screen-action',{
    detail:{pageSessionKey:runtime.pageSessionKey,componentId:component.id,event:action.event,value:action.value}}));
   const raw=actionFlows[action.event];
-  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('No metadata event action is configured for "'+action.event+'".');
-  const binding=raw as Record<string,unknown>;
+  const binding=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw as Record<string,unknown>:null;
   const payload=eventPayload(action.value);
   setActionError('');
   const applyState=(changes:ReadonlyArray<{key:string;value:unknown}>)=>{
@@ -147,7 +181,20 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    if(changed.length)void runtime.data.stateChanged(changed);
   };
   const saved=(detail:PageMutationDetail)=>{void runtime.data.saved(detail);runtime.broadcastSaved(detail);};
+  // Selecting a collection item publishes it for every reader (no Flow needed).
+  const selection=action.value&&typeof action.value==='object'&&!Array.isArray(action.value)?action.value as Record<string,unknown>:null;
+  const collectionName=selection?.collectionName;
+  if(action.event==='change'&&typeof collectionName==='string'&&/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(collectionName)){
+   const record=selection?.record&&typeof selection.record==='object'&&!Array.isArray(selection.record)
+    ?selection.record as Record<string,unknown>:{};
+   window.dispatchEvent(new CustomEvent('metadrive:page-collection-selected',{detail:{
+    pageSessionKey:runtime.pageSessionKey,name:collectionName,
+    value:{Id:String(record.Id??selection?.value??''),Name:String(record.Name??''),Value:selection?.value??null,
+     Field:typeof record.Field==='string'?record.Field:'',Criteria:typeof record.Criteria==='string'?record.Criteria:''}}}));
+   if(!binding)return {updated:true};
+  }
   const navigationContext={objects:runtime.objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName};
+  if(!binding)throw Error('No metadata event action is configured for "'+action.event+'".');
   try{
    if(binding.actionType==='PageState'){
     const key=String(binding.stateKey??'');
@@ -206,19 +253,33 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   void onAction({event:'start',value:{}}).catch(()=>{started.current=false;});
  // Run the page's start action once per page session.
  },[runtime]);
- const records=source.records;
- const loading=source.loading&&source.version===0;
+ const records=dataCollectionRows??source.records;
+ const loading=source.loading&&source.version===0||namedSource.loading;
+ // Scroll near the end of any list inside this component → load the next 50.
+ const onScrollCapture=(event:React.UIEvent<HTMLElement>)=>{
+  if(!compiled.dataSourceId||!source.hasMore||source.loadingMore||dataCollectionRows)return;
+  const target=event.target as HTMLElement;
+  if(target.scrollHeight-target.scrollTop-target.clientHeight<240)void runtime.data.loadMore(compiled.dataSourceId);
+ };
+ const changeBoundToggle=async(next:boolean)=>{
+  if(!toggleBinding||!toggleCanWrite)throw Error('Toggle field is not editable.');
+  await updateSmartToggleField(runtime.request,objectApiName,toggleBinding,next);
+  const detail={objectApiNames:[objectApiName]};
+  void runtime.data.saved(detail);runtime.broadcastSaved(detail);
+ };
  return <div style={definition.apiName==='smart_toggle'||(definition.apiName.startsWith('smart_')&&Boolean(component.position))||(definition.apiName==='ui_image'&&Boolean(component.position))
    ?{width:'100%',height:'100%',minHeight:0,minWidth:0}
    :properties.fillRegion===true?{height:'100%',minHeight:0,minWidth:0,display:'flex',flexDirection:'column'}:undefined}
-   data-compiled-component={component.id}>
+   data-compiled-component={component.id} onScrollCapture={onScrollCapture}>
   {source.error&&<div className="records-message" role="alert">{source.error}</div>}
+  {namedSource.error&&<div className="records-message" role="alert">{namedSource.error}</div>}
   {actionError&&<div className="records-message" role="alert">{actionError}</div>}
   <RegisteredComponent definition={definition} layoutTransparent props={{
    ...resolved,...componentLayoutProps(properties,formFactor),
    ...(definition.apiName.startsWith('smart_')&&component.position?{canvasFrameSized:true}:{}),
    label:component.type.startsWith('Custom:smart_')&&typeof resolved.label==='string'?resolved.label:component.label,
    properties:resolved,objects:runtime.objects,reports:reports??[],flows:availableFlows,pageState:state,children,
+   dataCollection:namedSource.collection,formulaCollectionSources:namedSource.formulaSources,namedCollections:namedSource.namedCollections,
    pageSessionKey:runtime.pageSessionKey,componentId:component.id,device:formFactor,onNavigate,onLaunchFlow,onAction,actionError,
    disabled:behaviorAction(properties,'click',{formFactor})!=='enabled',
    loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(runtime.request,id,getAccessToken()??''),
@@ -227,9 +288,14 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    onChange:(value:unknown)=>{if(actionFlows.change)void onAction({event:'change',value}).catch(()=>{});},
    loading,sessionId:runtime.sessionId,
    ...(records.length===1?{record:records[0]}:{}),
-   ...(objectApiName?{records,recordPagination:{limit:SOURCE_PAGE_SIZE,offset:0,total:source.total,
-    hasPrevious:false,hasNext:source.total>SOURCE_PAGE_SIZE,available:source.predictable}}:{})
+   ...(objectApiName||dataCollectionRows?{records}:{}),
+   ...(objectApiName&&!dataCollectionRows?{recordPagination:{limit:SOURCE_PAGE_SIZE,offset:0,total:source.total,
+    hasPrevious:false,hasNext:false,available:false,loadedRows:source.records.length,hasMore:source.hasMore,
+    loadingMore:source.loadingMore,loadMore:()=>compiled.dataSourceId&&runtime.data.loadMore(compiled.dataSourceId)}}:{}),
+   ...(toggleBinding?{toggleFieldBound:true,toggleFieldReady:toggleCanWrite,toggleFieldError:toggleBinding.error??'',
+    value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{})
   }}/>
+  {source.loadingMore&&<div className="records-loading" role="status">Loading more…</div>}
  </div>;
 }
 export const MemoizedCompiledComponentNode=React.memo(CompiledComponentNode);

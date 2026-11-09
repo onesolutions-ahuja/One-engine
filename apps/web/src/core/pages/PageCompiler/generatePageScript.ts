@@ -93,7 +93,7 @@ export function generatePageScript(compiled:CompiledPage,language:ScriptLanguage
   ...(component.legacyReasons.length?{legacyReasons:component.legacyReasons}:{})
  })+',\n').join('');
  const sources=compiled.dataSources.map(source=>'  '+q({id:source.id,object:source.objectApiName,
-  usedBy:source.components,filters:source.filters,filterLogic:source.filterLogic,
+  usedBy:source.components,loads:source.complete?'all rows (collection)':'50 rows, next 50 on scroll',filters:source.filters,filterLogic:source.filterLogic,
   filterFormula:source.filterFormula,reloadWhenStateChanges:source.stateInputs})+',\n').join('');
  const s=compiled.stats;
  const types=ts?`
@@ -139,7 +139,8 @@ export interface PageRuntimeApi {
  * the page metadata is the source of truth and is recompiled on every save.
  *
  * What this page does at run time:
- *  - ${s.dataSources} data load(s) for ${s.componentsWithData} data component(s): each Object + filter is read once and shared.
+ *  - ${s.dataSources} data load(s) for ${s.componentsWithData} data component(s): each Object + filter is read once and shared;
+ *    lists load 50 rows, then the next 50 as the user scrolls.
  *  - ${s.formulas} formula(s), parsed once at compile time.
  *  - ${s.actions} action(s); record saves go to the server as one request per tap.
  *  - A state change or saved record redraws only the components listed as readers.

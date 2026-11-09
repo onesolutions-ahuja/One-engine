@@ -31,13 +31,18 @@ const page={apiName:'till',label:'Till',targetObject:'',pageType:'App Page',layo
    properties:{textSource:'=IF(1 > 0, "a" & '+i+', "b")'}})),
   {id:'menu',type:'Custom:smart_tabs',label:'Menu',visible:true,properties:{objectApiName:'Product',
    collectionFormula:'=COLLECTION("Menu", Product.Category)'}},
-  {id:'broken',type:'Custom:smart_text',label:'Broken',visible:true,properties:{textSource:'=IF(1,'}}
+  {id:'broken',type:'Custom:smart_text',label:'Broken',visible:true,properties:{textSource:'=IF(1,'}},
+  {id:'mention',type:'Custom:smart_text',label:'Mention',visible:true,properties:{objectApiName:'Product',
+   textSource:'@Product.Name',label:'=$session.user.email & " / " & $session.cartId'}},
+  {id:'related',type:'Custom:smart_table',label:'Related',visible:true,properties:{objectApiName:'CartLine',relatedFilterKey:'activeCartId'}}
  ]} as unknown as LightningPageMetadata;
 
 test('identical Object + filter reads share one data source',()=>{
  const compiled=compilePage(page,objects);
- const product=compiled.dataSources.filter(source=>source.objectApiName==='Product');
+ const product=compiled.dataSources.filter(source=>source.objectApiName==='Product'&&Array.isArray(source.filters));
  assert.equal(product.length,1);
+ const unfiltered=compiled.dataSources.filter(source=>source.objectApiName==='Product'&&!source.filters);
+ assert.deepEqual(unfiltered.map(source=>source.components),[['menu','mention']]);
  assert.deepEqual(product[0].components,['grid1','grid2','grid3']);
  const cart=compiled.dataSources.find(source=>source.objectApiName==='CartLine');
  assert.deepEqual(cart?.stateInputs,['activeCartId']);
@@ -60,11 +65,15 @@ test('actions are compiled once and their server part split off',()=>{
  assert.deepEqual(click.writesObjects,['Cart','CartLine']);
 });
 
-test('unsupported features fall back per component and errors are reported at compile time',()=>{
+test('collections, mentions and session references compile; rare features fall back per component',()=>{
  const compiled=compilePage(page,objects);
  const menu=compiled.components.find(item=>item.id==='menu')!;
- assert.equal(menu.mode,'legacy');
- assert.ok(menu.legacyReasons.includes('named collection formula'));
+ assert.equal(menu.mode,'compiled');
+ assert.equal(compiled.dataSources.find(source=>source.id===menu.dataSourceId)!.complete,true,'a collection loads all its rows');
+ assert.equal(compiled.components.find(item=>item.id==='mention')!.mode,'compiled');
+ const related=compiled.components.find(item=>item.id==='related')!;
+ assert.equal(related.mode,'legacy');
+ assert.deepEqual(related.legacyReasons,['related list scope']);
  assert.equal(compiled.components.find(item=>item.id==='grid1')!.mode,'compiled');
  assert.ok(compiled.diagnostics.some(d=>d.componentId==='broken'&&d.level==='error'));
 });
@@ -94,14 +103,14 @@ test('one store: a state write wakes only its readers; one load per shared sourc
  const woken:string[]=[];
  for(const item of compiled.components)store.subscribeComponent(item.id,()=>woken.push(item.id));
  store.set('activeCartId','c-1');
- assert.deepEqual(woken,['cart']);
+ assert.deepEqual(woken,['cart','related'],'only the two components that show cart data wake up');
  const calls:string[]=[];
  const layer=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>'s',async(object)=>{
   calls.push(object);
   return object==='Product'?{records:[{Id:'p1',Name:'Tea',Category:'Drinks'}],total:1}:{records:[],total:0};
  }),store.get);
  await layer.start();
- assert.deepEqual(calls.sort(),['CartLine','Product'],'3 grids + 1 cart = 2 reads, not 4');
+ assert.deepEqual(calls.sort(),['CartLine','Product','Product'],'6 data components, 3 distinct queries = 3 reads');
  // Changing the selected cart reloads only the cart lines.
  calls.length=0;
  await layer.stateChanged(['activeCartId']);
@@ -113,6 +122,33 @@ test('one store: a state write wakes only its readers; one load per shared sourc
  const cartSource=compiled.dataSources.find(source=>source.objectApiName==='CartLine')!;
  assert.equal(layer.get(cartSource.id).records.length,1);
  assert.deepEqual(calls,[],'saved row shown with no extra request');
- const productSource=compiled.dataSources.find(source=>source.objectApiName==='Product')!;
+ const productSource=compiled.dataSources.find(source=>source.objectApiName==='Product'&&Array.isArray(source.filters))!;
  assert.equal(layer.get(productSource.id).records.length,1,'catalogue untouched');
+});
+
+test('lists load 50 rows, then the next 50 on scroll; a refresh keeps scrolled rows',async()=>{
+ const {createCompiledDataLayer}=await import('../src/core/pages/PageCompiler/compiledPageStore');
+ const {compiledSourceLoader}=await import('../src/core/pages/PageCompiler/compiledSourceLoader');
+ const list={...page,components:[{id:'list',type:'Custom:smart_card_grid',label:'L',visible:true,
+  properties:{objectApiName:'Product',titleFieldApiName:'Name'}}]} as unknown as LightningPageMetadata;
+ const compiled=compilePage(list,objects);
+ const all=Array.from({length:120},(_,i)=>({Id:'p'+i,Name:'P'+i}));
+ const windows:string[]=[];
+ const layer=createCompiledDataLayer(compiled,compiledSourceLoader(objects,()=>'s',async(_o,{limit,offset})=>{
+  windows.push(offset+'+'+limit);
+  return {records:all.slice(offset,offset+limit),total:all.length};
+ }),()=>({}));
+ const id=compiled.dataSources[0].id;
+ await layer.start();
+ assert.equal(layer.get(id).records.length,50);
+ assert.equal(layer.get(id).hasMore,true);
+ await layer.loadMore(id);
+ assert.equal(layer.get(id).records.length,100);
+ await layer.loadMore(id);
+ assert.equal(layer.get(id).records.length,120);
+ assert.equal(layer.get(id).hasMore,false);
+ windows.length=0;
+ await layer.reload(id);
+ assert.equal(layer.get(id).records.length,120,'refresh keeps what the user scrolled through');
+ assert.deepEqual(windows,['0+100','100+20']);
 });

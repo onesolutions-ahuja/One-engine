@@ -1423,7 +1423,7 @@ function LightningAppRuntime({
       appApiName={appId} pageApiName={page.apiName} onLaunchFlow={onLaunchFlow}
       pageRecordId={typeof layoutState.recordId==='string'?layoutState.recordId:undefined}/></React.Suspense>:null;
   const withCompiledRuntime=(content:React.ReactElement)=>compiledPage?.apiName===page.apiName
-    ?<CompiledPageProvider compiled={compiledPage} objects={objects} request={apiRequest}
+    ?<CompiledPageProvider compiled={compiledPage} components={page.components} objects={objects} request={apiRequest}
       pageSessionKey={appId+':'+page.apiName} initialState={inScreenPage?inScreenContext?.values:undefined}>{content}</CompiledPageProvider>
     :content;
   if(page.layoutMode==='free-canvas')return withCompiledRuntime(<><ResponsivePageCanvas page={page}>

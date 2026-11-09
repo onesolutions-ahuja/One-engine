@@ -89,7 +89,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|FOREACH|CLOSESCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source)).parse();
@@ -144,6 +144,14 @@ export function compileActionPlan(source:string):ActionStep[] {
    if(args.length!==2)throw Error('WAIT requires minutes and seconds');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
    steps.push({name:'WAIT',object:'',values:args,fields:new Map(),guards});
+   return;
+  }
+  if(node.name==='LOCATION'){
+   // LOCATION(AS(loc)): the device's current GPS position for later steps,
+   // read as loc.Latitude, loc.Longitude, loc.Accuracy (metres) and loc.CapturedAt.
+   if(args.length!==1)throw Error('LOCATION requires AS(variable) for the captured position');
+   const alias=takeAlias(args[0],'LOCATION requires AS(variable) for the captured position');
+   steps.push({name:'LOCATION',object:'',fields:new Map(),alias,guards});
    return;
   }
   if(node.name==='STATE'){
@@ -309,6 +317,19 @@ export class PartialActionError extends Error {
  }
 }
 
+/** Browser GPS reading for LOCATION(AS(loc)). The browser asks the user for
+ * permission; nothing is stored unless a later step saves the values. */
+export function readDeviceLocation(timeoutMs=15000):Promise<{Latitude:number;Longitude:number;Accuracy:number;CapturedAt:string}>{
+ const geo=(globalThis as {navigator?:{geolocation?:{getCurrentPosition:(ok:(p:{coords:{latitude:number;longitude:number;accuracy:number};timestamp:number})=>void,
+  fail:(e:{code:number})=>void,options:Record<string,unknown>)=>void}}}).navigator?.geolocation;
+ if(!geo)return Promise.reject(Error('LOCATION is not available on this device or browser'));
+ return new Promise((resolve,reject)=>geo.getCurrentPosition(
+  position=>resolve({Latitude:position.coords.latitude,Longitude:position.coords.longitude,
+   Accuracy:Math.round(position.coords.accuracy),CapturedAt:new Date(position.timestamp||Date.now()).toISOString()}),
+  error=>reject(Error(error.code===1?'Location permission was denied':
+   error.code===3?'Location request timed out':'Location is unavailable')),
+  {enableHighAccuracy:true,timeout:timeoutMs,maximumAge:30000}));
+}
 export type ActionServices={
  request:<T>(path:string,init?:{method:string;body?:string})=>Promise<T>;
  print?:(template:string,id:string)=>Promise<void>;
@@ -663,6 +684,11 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
        const inner:Record<string,unknown>=Object.assign(Object.create(null),variables,{[step.alias!]:item});
        await run(step.body!,inner,false);
       }
+      completed++;
+      continue;
+     }
+     if(step.name==='LOCATION'){
+      variables[step.alias!]=await readDeviceLocation();
       completed++;
       continue;
      }

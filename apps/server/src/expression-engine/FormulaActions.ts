@@ -14,6 +14,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'WAIT',parameters:['Minutes','Seconds']},
  {name:'GETRECORD',parameters:['Object','Field1','Value1','AS(variable)']},
  {name:'STATE',parameters:['Key','Value']},
+ {name:'LOCATION',parameters:['AS(variable)']},
  {name:'FOREACH',parameters:['Object','Field1','Value1','AS(item)','Action']},
  {name:'CLOSESCREEN',parameters:[]},
  {name:'AS',parameters:['variable']}

@@ -132,7 +132,7 @@ export async function executePageFormulaAction(
     return {changes:[...data.changes,...rest.changes],
      recordChanged:data.recordChanged||rest.recordChanged,
      mutatedObjectApiNames:[...new Set([...data.mutatedObjectApiNames,...rest.mutatedObjectApiNames])],
-     recordChanges:data.recordChanges};
+     recordChanges:data.recordChanges,predictionBatch:data.predictionBatch};
    }
   }
   // Unsupported SQL paths retain their existing authorised Record API execution.

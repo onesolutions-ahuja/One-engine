@@ -61,6 +61,46 @@ function RegisteredComponentBody({ definition, props, appearanceProps, layoutTra
   </div>;
 }
 
+const emptyDefinitions:NonNullable<LibraryComponentMetadata['propertyDefinitions']>=[];
+const schemaIssueCache=new WeakMap<object,ReturnType<typeof validateComponentDefinitions>>();
+function cachedSchemaIssues(definitions:NonNullable<LibraryComponentMetadata['propertyDefinitions']>){
+  let issues=schemaIssueCache.get(definitions);
+  if(!issues){issues=validateComponentDefinitions(definitions);schemaIssueCache.set(definitions,issues);}
+  return issues;
+}
+const availableSettingsCache=new WeakMap<object,Map<string,ReturnType<typeof availableComponentSettings>>>();
+function cachedAvailableSettings(definitions:NonNullable<LibraryComponentMetadata['propertyDefinitions']>,
+  device:PropertyDevice|undefined,version:number|undefined){
+  let byKey=availableSettingsCache.get(definitions);
+  if(!byKey){byKey=new Map();availableSettingsCache.set(definitions,byKey);}
+  const key=String(device)+'|'+String(version);
+  let result=byKey.get(key);
+  if(!result){result=availableComponentSettings(definitions,device,version);byKey.set(key,result);}
+  return result;
+}
+type ConfiguredSettings={configuredProps:ReturnType<typeof resolveComponentSettings>;
+  issues:Array<ReturnType<typeof validateComponentSettings>[number]|ReturnType<typeof pagePropertyIssues>[number]>};
+const configuredCache=new WeakMap<object,{definitions:object;appDefaults:object;preview:boolean;apiName:string;result:ConfiguredSettings}>();
+function cachedConfiguredSettings(props:Record<string,unknown>,definitions:ReturnType<typeof availableComponentSettings>,
+  appDefaults:Record<string,unknown>,preview:boolean,apiName:string):ConfiguredSettings{
+  const cached=configuredCache.get(props);
+  if(cached&&cached.definitions===definitions&&cached.appDefaults===appDefaults&&cached.preview===preview&&cached.apiName===apiName)
+    return cached.result;
+  const configuredProps=resolveComponentSettings(definitions,{...appDefaults,...props,builderPreview:preview});
+  const issues=[...validateComponentSettings(definitions.filter(d=>d.schemaVersion===1),configuredProps),
+    ...pagePropertyIssues('Custom:'+apiName,configuredProps)];
+  const result={configuredProps,issues};
+  configuredCache.set(props,{definitions,appDefaults,preview,apiName,result});
+  return result;
+}
+const primitiveCheckCache=new WeakMap<object,ReturnType<typeof validatePrimitiveMetadata>>();
+function cachedPrimitiveCheck(primitive:Parameters<typeof validatePrimitiveMetadata>[0]){
+  let result=primitiveCheckCache.get(primitive as object);
+  if(!result){result=validatePrimitiveMetadata(primitive);primitiveCheckCache.set(primitive as object,result);}
+  return result;
+}
+const noAppDefaults:Record<string,unknown>={};
+
 export default function RegisteredComponent({ definition, props, formulaInstanceId, layoutTransparent=false, editorPreview=false }: { definition: LibraryComponentMetadata; props: Record<string, unknown>; layoutTransparent?:boolean; editorPreview?:boolean;formulaInstanceId?:string }) {
   const [rendered,setRendered]=useState<Readonly<Record<string,string>>>({});
   const sqlLookup=useSqlFormulaDisplay(props,React);
@@ -163,17 +203,19 @@ export default function RegisteredComponent({ definition, props, formulaInstance
     return <div role="alert" className="registered-component-error">{assetError}</div>;
   if (definition.trustedBundled && !definition.compiledJs && (!asset || asset.apiName!==assetApiName || asset.version!==definition.version))
     return <div role="status">Loading component…</div>;
-  const schemaIssues=validateComponentDefinitions(definition.propertyDefinitions??[]);
+  // Pure checks below are cached by their (stable) inputs: a formula value
+  // change redraws this component, and re-validating the whole schema and
+  // settings each time cost ~5 ms per component on a 50-box till page.
+  const schemaIssues=cachedSchemaIssues(definition.propertyDefinitions??emptyDefinitions);
   if(schemaIssues.length)return <div role="alert" className="registered-component-error">Invalid component schema: {schemaIssues.map(i=>i.path+' '+i.message).join('; ')}</div>;
   const device = props.device==='Phone'?'Mobile':props.device as PropertyDevice|undefined;
-  const definitions=availableComponentSettings(definition.propertyDefinitions??[],device,definition.version);
+  const definitions=cachedAvailableSettings(definition.propertyDefinitions??emptyDefinitions,device,definition.version);
   // Preserve existing page-authored values over source-controlled app defaults.
   // Smart component rendering uses manifest metadata, not legacy UI aliases.
-  const appDefaults=definition.trustedBundled&&definition.apiName.startsWith('smart_')?(asset?.defaultProps??{}):{};
+  const appDefaults=definition.trustedBundled&&definition.apiName.startsWith('smart_')?(asset?.defaultProps??noAppDefaults):noAppDefaults;
   // This flag comes from the builder host, never from saved component metadata.
-  const configuredProps = resolveComponentSettings(definitions,{...appDefaults,...props,builderPreview:editorPreview===true});
-  const issues=[...validateComponentSettings(definitions.filter(d=>d.schemaVersion===1),configuredProps),
-    ...pagePropertyIssues('Custom:'+definition.apiName,configuredProps)];
+  const {configuredProps,issues}=cachedConfiguredSettings(props,definitions,appDefaults,editorPreview===true,
+    definition.apiName);
   if(issues.length)return <div role="alert" className="registered-component-error">Invalid component settings: {issues.map(i=>i.path+' '+i.message).join('; ')}</div>;
   const sqlProps:Record<string,unknown>={...configuredProps};
   const sqlRecord=props.record&&typeof props.record==='object'&&!Array.isArray(props.record)
@@ -197,7 +239,7 @@ export default function RegisteredComponent({ definition, props, formulaInstance
   }
   const published=<PublishedFormulaProperties id={formulaInstanceId} rendered={rendered} values={{...effectiveProps,kind:definition.apiName}}/>;
   const primitive = definition.primitiveMetadata;
-  const primitiveCheck = primitive ? validatePrimitiveMetadata(primitive) : null;
+  const primitiveCheck = primitive ? cachedPrimitiveCheck(primitive) : null;
   if (primitiveCheck && !primitiveCheck.valid) return <div className="registered-component-error" role="alert">Invalid primitive metadata: {primitiveCheck.errors.join('; ')}</div>;
   const accessibility = primitive ? primitiveAccessibilityProps(primitive) : {};
   if (definition.trustedBundled !== true) return <div {...accessibility}

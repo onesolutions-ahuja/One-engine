@@ -209,6 +209,13 @@ export function useSqlFormulaDisplay(properties,hooks){
  const mutatedObjects=hooks.useRef(null);
  const loadedSignature=hooks.useRef('');
  const inFlight=hooks.useRef(false);
+ const runJobs=hooks.useRef(null);
+ // Runs started by a save use the newest page state and session, not the
+ // ones from the render that created the run function.
+ const latestProperties=hooks.useRef(properties);
+ latestProperties.current=properties;
+ const runCounter=hooks.useRef(0);
+ const latestRun=hooks.useRef({});
  // Last answer per job, kept across re-asks so totals never blank while loading.
  // Cleared when the session changes so a new sale never shows the old cart's total.
  const lastValues=hooks.useRef({sessionId:properties.sessionId??'',values:{}});
@@ -223,7 +230,10 @@ export function useSqlFormulaDisplay(properties,hooks){
    const previous=mutatedObjects.current;
    mutatedObjects.current=!written.length||previous===null
     ?null:new Set([...previous,...written]);
-   setMutationTick(value=>value+1);
+   // Re-run the affected formulas without redrawing the component first: a
+   // save used to redraw every formula component twice per tap even when no
+   // value changed. Only a changed value redraws (see setResults below).
+   if(runJobs.current)runJobs.current();else setMutationTick(value=>value+1);
   };
   window.addEventListener('metadrive:page-flow-mutated',listener);
   return()=>window.removeEventListener('metadrive:page-flow-mutated',listener);
@@ -231,6 +241,7 @@ export function useSqlFormulaDisplay(properties,hooks){
  hooks.useEffect(()=>{
   if(!config.jobs.length){setResults({signature:config.signature,values:{}});return;}
   let active=true;
+  const run=()=>{
   // A write re-asks only the jobs that aggregate over a written Object; a
   // CartLine write must not re-run a Product formula on the same component.
   // A cancelled earlier load never delivered its answers: ask every job again.
@@ -242,40 +253,51 @@ export function useSqlFormulaDisplay(properties,hooks){
    formulaAggregateObjects(job.source).some(name=>written.has(name))):config.jobs;
   if(!jobs.length)return;
   if(Object.keys(lastValues.current.values).length>2000)lastValues.current.values={};
+  // Overlapping runs (prediction, then the real save): only the newest run
+  // for a job may deliver its answer.
+  const runId=++runCounter.current;
+  for(const job of jobs)latestRun.current[job.key]=runId;
   inFlight.current=true;
   const load=async()=>{
-   const request=properties.sqlRequest??getSqlFormulaRequest();
+   const current=latestProperties.current;
+   const request=current.sqlRequest??getSqlFormulaRequest();
    if(!request)throw Error('Authenticated SQL Formula request is unavailable');
    await Promise.all(jobs.map(async job=>{
     let result;
     try{
-     const id=job.row.Id??job.row.id??properties.recordId;
+     const id=job.row.Id??job.row.id??current.recordId;
      const value=await evaluatePageActionSql(request,job.source,job.row,
-      properties.pageState??{},properties.objectApiName??'',id,config.fields,
-      properties.sessionId??'',config.pageContext);
+      current.pageState??{},current.objectApiName??'',id,config.fields,
+      current.sessionId??'',config.pageContext);
      result={value};
     }catch(error){
      result={value:'',error:error instanceof Error?error.message:'SQL Formula failed'};
      // The visible placeholder is only FORMULAERROR; keep the cause debuggable.
      if(typeof console!=='undefined')console.warn('[SQL Formula] '+result.error,{formula:job.source});
     }
-    if(!active)return;
+    if(!active||latestRun.current[job.key]!==runId)return;
     lastValues.current.values[job.key]=result;
-    setResults(previous=>({
-     signature:config.signature,
-     values:{...(previous.signature===config.signature?previous.values:{}),[job.key]:result}
-    }));
+    setResults(previous=>{
+     const current=previous.signature===config.signature?previous.values:{};
+     // Same answer: keep the same state object, so React skips the redraw.
+     if(previous.signature===config.signature&&current[job.key]
+       &&JSON.stringify(current[job.key])===JSON.stringify(result))return previous;
+     return {signature:config.signature,values:{...current,[job.key]:result}};
+    });
    }));
   };
-  void load().then(()=>{if(active)inFlight.current=false;},error=>{
+  void load().then(()=>{if(active&&runCounter.current===runId)inFlight.current=false;},error=>{
    if(!active)return;
-   inFlight.current=false;
+   if(runCounter.current===runId)inFlight.current=false;
    setResults(previous=>({signature:config.signature,
     values:{...(previous.signature===config.signature?previous.values:{}),
-     ...Object.fromEntries(jobs.map(job=>[job.key,{value:'',
+     ...Object.fromEntries(jobs.filter(job=>latestRun.current[job.key]===runId).map(job=>[job.key,{value:'',
      error:error instanceof Error?error.message:'SQL Formula unavailable'}]))}}));
   });
-  return()=>{active=false;};
+  };
+  runJobs.current=run;
+  run();
+  return()=>{active=false;if(runJobs.current===run)runJobs.current=null;};
  },[config.signature,mutationTick]);
  return (source,record)=>{
   if(!isSelectedSqlFormula(source))return undefined;

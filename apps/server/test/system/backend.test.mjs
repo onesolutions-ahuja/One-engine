@@ -111,3 +111,11 @@ test('tenant form uses verified domain, retains mailbox failures, and blocks dup
  assert.match(ui,/disabled=\{!canCreateTenant\}/);
  assert.match(fields,/key:'tenantId'[^\n]*maxLength:54/);
 });
+
+test('publishing standalone Page Builder templates does not demand navigation assignments',async()=>{
+ const {pageRequiresActivationAssignment}=await import('../../src/system-files/page-layout-version-runtime.ts');
+ for(const type of ['Home Page','Record Page'])
+  assert.equal(pageRequiresActivationAssignment(type),true,type);
+ for(const type of ['App Page','In-Screen Page','Print Template'])
+  assert.equal(pageRequiresActivationAssignment(type),false,type);
+});

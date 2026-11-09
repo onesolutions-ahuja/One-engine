@@ -25,7 +25,8 @@ export function relationshipFormulaFields(
     if(directBooleanOnly&&(index!==0||!group.primary||
       !/^(checkbox|boolean)$/i.test(field.dataType)))continue;
     if(!isCompatibleField(field.dataType,kind))continue;
-    const reference=group.primary&&index===0?'@'+field.fieldApiName:field.reference;
+    // All field suggestions are qualified, including the primary Object.
+    const reference=field.reference;
     const path=group.primary?root:group.path;
     const label=path+' → '+field.fieldLabel;
     const option={reference,label,path,dataType:field.dataType,root};

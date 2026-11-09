@@ -275,6 +275,11 @@ export function usePageEditorState(
   const [canvasBinding,setCanvasBinding]=useState<CanvasBindingTarget|null>(null);
   const [ribbonTab, setRibbonTab] = useState<'Add Block' | 'Component Content' | 'Component Design 2' | 'Component Style' | 'Component Data' | 'Component Action' | 'Component Layout' | 'Component Responsive' | 'Preview' | 'Filters' | 'Source' | 'Arrange' | 'Advanced'>('Add Block');
   const [inspectorSection,setInspectorSection]=useState<string|null>('Body');
+  // One open section at a time, independently from the canvas-selected design area.
+  const [openDesignSection,setOpenDesignSection]=useState<string|null>(null);
+  const toggleDesignSection=useCallback((section:string)=>
+    setOpenDesignSection(current=>current===section?null:section),[]);
+  useEffect(()=>setOpenDesignSection(null),[selectedId,ribbonTab]);
   // A canvas click may choose a Design area (Header, Row...) in the same click
   // that selects the component; that area survives the selection reset.
   const nextDesignAreaRef=useRef<string|null>(null);
@@ -447,7 +452,7 @@ export function usePageEditorState(
     pageSettingsDialogOpen, setPageSettingsDialogOpen, advancedEditor, setAdvancedEditor,
     inlineActionEvent, setInlineActionEvent, setFocusedCardMapping, ribbonStripRef,
     canvasBinding, ribbonTab, setRibbonTab, inspectorSection,
-    setInspectorSection, chooseCanvasDesignArea, componentNeedsData, selectCanvasDataBinding, selectRibbonTab,
+    setInspectorSection, openDesignSection, toggleDesignSection, chooseCanvasDesignArea, componentNeedsData, selectCanvasDataBinding, selectRibbonTab,
     componentClipboard, setComponentClipboard, recordScope, setRecordScope, recordAppId, setRecordAppId,
     recordProfileId, setRecordProfileId, recordTypeId, setRecordTypeId, recordFormFactors,
     setRecordFormFactors, homeAppId, setHomeAppId, homeScope, setHomeScope, homeProfileId,

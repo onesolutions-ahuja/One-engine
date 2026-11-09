@@ -703,3 +703,177 @@
   border-right:0!important;border-bottom:1px solid #ccd2dd!important;
   padding:8px 0!important;margin:0!important;
 }
+
+
+/* Follow-up to Page Builder UI review: compact selector, one accordion, no overlaps. */
+.page-builder-design-dock .page-builder-design-dock-header{
+  gap:4px!important;padding:6px 8px 0!important;
+}
+.page-builder-design-dock .page-builder-global-selector,
+.page-builder-design-dock .page-builder-global-selector .page-component-navigator,
+.page-builder-design-dock .page-builder-global-selector .ribbon-view-find{
+  display:flex!important;box-sizing:border-box!important;flex-direction:column!important;
+  align-items:stretch!important;width:100%!important;min-width:0!important;
+  max-width:100%!important;height:32px!important;min-height:32px!important;
+  max-height:32px!important;gap:0!important;margin:0!important;padding:0!important;
+}
+.page-builder-design-dock .page-builder-global-selector .ribbon-view-search{
+  display:flex!important;align-items:center!important;gap:5px!important;
+  width:100%!important;height:32px!important;min-height:32px!important;
+  max-height:32px!important;padding:0 7px!important;
+}
+.page-builder-design-dock .page-builder-global-selector .ribbon-view-search input{
+  box-sizing:border-box!important;flex:1 1 0!important;
+  width:0!important;min-width:0!important;max-width:none!important;
+}
+.page-builder-design-dock .page-builder-global-selector .page-navigator-toggle{
+  position:static!important;box-sizing:border-box!important;
+  flex:0 0 24px!important;width:24px!important;min-width:24px!important;
+  height:26px!important;margin:0 0 0 auto!important;align-self:center!important;
+  display:grid!important;place-items:center!important;
+}
+.page-builder-design-dock .page-builder-design-dock-header .office-ribbon-tabs{
+  height:38px!important;min-height:38px!important;max-height:38px!important;
+}
+/* Each inspector section owns one bottom border; no decorative double lines. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-list>.smart-design2-area-section + .smart-design2-area-section{
+  border-top:0!important;box-shadow:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-area-list>.smart-design2-area-section + .smart-design2-area-section
+ >.smart-inspector-section-toggle{padding-top:5px!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-supplemental{border-top:0!important;}
+/* Focused and Others: rows may grow vertically, but never squeeze two editors
+   into overlapping half-width cells. Labels remain visible next to their editor. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;width:100%!important;
+  max-width:100%!important;padding:5px 6px!important;gap:5px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental-setting{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:108px minmax(0,1fr)!important;align-items:center!important;
+  gap:8px!important;min-width:0!important;max-width:100%!important;
+  width:100%!important;min-height:30px!important;height:auto!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental-setting>.smart-design2-supplemental-label{
+  box-sizing:border-box!important;min-width:0!important;max-width:100%!important;
+  overflow:visible!important;text-overflow:clip!important;white-space:normal!important;
+  overflow-wrap:break-word!important;font:11px/15px "Segoe UI",Arial,sans-serif!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental-setting>.smart-property{
+  box-sizing:border-box!important;display:flex!important;flex:1 1 auto!important;
+  align-items:center!important;min-width:0!important;max-width:100%!important;
+  width:100%!important;margin:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental-setting>.smart-property>.smart-label{display:none!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental-setting :is(.smart-select,.smart-formula,.smart-numeric,input,select){
+  box-sizing:border-box!important;min-width:0!important;max-width:100%!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-focused-section,.smart-design2-others-section)
+ .smart-design2-supplemental-setting .smart-formula{
+  flex:1 1 0!important;width:100%!important;
+}
+/* All Other properties remain inside one accordion; headings are NOT accordions. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-others-property-group{box-sizing:border-box;width:100%;min-width:0;padding:2px 0 7px;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-others-property-heading{
+  box-sizing:border-box;width:100%;padding:6px 7px 3px;
+  font:600 11px/17px "Segoe UI",Arial,sans-serif;color:#344d6c;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-others-extra-heading{padding-top:8px;}
+/* Canvas Width/Height use the existing embedded-icon numeric field pattern. */
+.page-builder-design-dock .page-builder-canvas-fields{
+  display:flex!important;flex-wrap:nowrap!important;align-items:center!important;
+  gap:7px!important;margin:0 0 12px!important;
+}
+.page-builder-design-dock .page-builder-canvas-fields>.une-ribbon-size-with-icon{
+  box-sizing:border-box!important;display:flex!important;align-items:center!important;
+  flex:0 0 105px!important;width:105px!important;min-width:105px!important;
+  max-width:105px!important;height:28px!important;min-height:28px!important;
+  max-height:28px!important;gap:0!important;margin:0!important;padding:0!important;
+  border:1px solid #b7c9df!important;border-radius:4px!important;
+  background:#fff!important;overflow:hidden!important;
+}
+.page-builder-design-dock .page-builder-canvas-fields .une-ribbon-embedded-icon{
+  position:static!important;box-sizing:border-box!important;display:flex!important;
+  align-items:center!important;justify-content:center!important;
+  flex:0 0 22px!important;width:22px!important;min-width:22px!important;
+  height:26px!important;margin:0!important;padding:0!important;
+  pointer-events:none!important;
+}
+.page-builder-design-dock .page-builder-canvas-fields>.une-ribbon-size-with-icon input{
+  box-sizing:border-box!important;display:block!important;flex:1 1 0!important;
+  min-width:0!important;width:0!important;max-width:none!important;
+  height:26px!important;min-height:26px!important;max-height:26px!important;
+  padding:2px 3px!important;margin:0!important;border:0!important;
+  outline:0!important;box-shadow:none!important;background:transparent!important;
+}
+.page-builder-design-dock .page-builder-canvas-fields>.une-ribbon-size-with-icon:focus-within{
+  outline:2px solid #176ce5!important;outline-offset:0!important;
+}
+.page-builder-design-dock .page-builder-canvas-fields>.une-ribbon-canvas-colour{
+  box-sizing:border-box!important;display:flex!important;align-items:center!important;
+  flex:0 0 34px!important;width:34px!important;min-width:34px!important;
+  max-width:34px!important;height:28px!important;min-height:28px!important;
+  max-height:28px!important;margin:0!important;padding:0!important;
+}
+.page-builder-design-dock .page-builder-canvas-fields>.une-ribbon-canvas-colour
+ .office-ribbon-colour-property{
+  box-sizing:border-box!important;display:inline-flex!important;
+  align-items:center!important;justify-content:center!important;
+  width:34px!important;min-width:34px!important;max-width:34px!important;
+  height:28px!important;min-height:28px!important;max-height:28px!important;
+  padding:1px 2px!important;margin:0!important;
+  border:1px solid #b7c9df!important;border-radius:4px!important;background:#fff!important;
+}
+/* Preserve the native up/down arrows inside the compact Zoom percentage box. */
+.page-builder-design-dock .page-builder-canvas-zoom .ribbon-view-zoom-number input[type=number]{
+  appearance:auto!important;-moz-appearance:auto!important;
+  padding:0 1px!important;text-align:left!important;
+}
+.page-builder-design-dock .page-builder-canvas-zoom
+ .ribbon-view-zoom-number input[type=number]::-webkit-inner-spin-button,
+.page-builder-design-dock .page-builder-canvas-zoom
+ .ribbon-view-zoom-number input[type=number]::-webkit-outer-spin-button{
+  -webkit-appearance:auto!important;display:block!important;opacity:1!important;margin:0!important;
+}
+/* Canvas and Conditional Visibility now use the exact Design section button. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.page-builder-dock-section{
+  border-bottom:1px solid #ccd2dd!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.page-builder-dock-section>.smart-inspector-section-toggle{
+  box-sizing:border-box!important;display:flex!important;align-items:center!important;
+  width:100%!important;min-height:32px!important;gap:7px!important;
+  padding:5px 6px!important;margin:0!important;
+  border:0!important;background:transparent!important;color:#183b68!important;
+  font:600 12px/18px "Segoe UI",Arial,sans-serif!important;
+  text-align:left!important;cursor:pointer!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.page-builder-dock-section>.smart-inspector-section-toggle svg{
+  flex:0 0 15px!important;transition:transform .12s ease;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ >.page-builder-dock-section>.smart-inspector-section-toggle[aria-expanded=false] svg{
+  transform:rotate(-90deg);
+}

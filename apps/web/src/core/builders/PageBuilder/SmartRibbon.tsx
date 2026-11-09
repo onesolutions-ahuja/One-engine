@@ -41,6 +41,7 @@ type Props={tab:BuilderTab;api:string;definitions:readonly BuilderRibbonProperty
  design2Arrange?:ArrangeRibbonProps;
  inspectorSection?:string|null;
  onInspectorSectionChange?:(section:string|null)=>void;
+ openDesignSection?:string|null;onToggleDesignSection?:(section:string)=>void;
  /** Data only: 'formulaBar' renders just the Formula Bar (topbar); 'source' just the
   * Source object selectors (end of Design). Both reuse this single Data engine. */
  part?:'formulaBar'|'source';};
@@ -52,7 +53,7 @@ const cartSummaryLabels:Record<string,{key:string;slot:string}>={
  taxValue:{key:'taxLabel',slot:'Summary 3'},
  discountValue:{key:'discountLabel',slot:'Summary 4'}
 };
-export default function SmartRibbon({tab,api,definitions,properties,onChange,objects,pageObjectApiName='',position,onPositionChange,layoutMode,sharedPropertyIds,mixedPropertyIds,selectedApis,pageComponents=[],componentId='',canvasBinding=null,design2Slots=[],design2SlotRules=[],componentVisible=true,onVisibleChange,design2Arrange,inspectorSection,onInspectorSectionChange,part}:Props){
+export default function SmartRibbon({tab,api,definitions,properties,onChange,objects,pageObjectApiName='',position,onPositionChange,layoutMode,sharedPropertyIds,mixedPropertyIds,selectedApis,pageComponents=[],componentId='',canvasBinding=null,design2Slots=[],design2SlotRules=[],componentVisible=true,onVisibleChange,design2Arrange,inspectorSection,onInspectorSectionChange,openDesignSection,onToggleDesignSection,part}:Props){
  const uploadInput=useRef<HTMLInputElement>(null);
  const [uploadBusy,setUploadBusy]=useState(false);
  const [uploadError,setUploadError]=useState('');
@@ -95,12 +96,10 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
 
  const expandedInspector=inspectorSection===undefined?'Body':inspectorSection;
  const chooseInspectorSection=(section:string)=>onInspectorSectionChange?.(expandedInspector===section?null:section);
- // Design 2 has three fixed sections. Their open/closed state is local; the
- // active Design area comes from the canvas click (inspectorSection).
- const [closedDesignSections,setClosedDesignSections]=useState<readonly string[]>(['Dimensions & Alignment']);
- const designSectionOpen=(section:string)=>!closedDesignSections.includes(section);
- const toggleDesignSection=(section:string)=>setClosedDesignSections(current=>
-   current.includes(section)?current.filter(item=>item!==section):[...current,section]);
+ // The Page Builder owns a single initially closed accordion. Canvas area
+ // selection (inspectorSection) remains independent of this open-section state.
+ const designSectionOpen=(section:string)=>openDesignSection===section;
+ const toggleDesignSection=(section:string)=>onToggleDesignSection?.(section);
  const [countKey,setCountKey]=useState('cardsPerRow');
  const [filtersOpen,setFiltersOpen]=useState(false);
  const [filterTarget,setFilterTarget]=useState('Record');
@@ -773,13 +772,32 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             const list=[...design2AreaExtraProperties,...design2SupplementalProperties]
               .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
               .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
-            return list.length>0&&<div className="smart-design2-supplemental" role="group" aria-label="Other settings">
-              {list.map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
-                <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
-                {controls(property)}
-              </div>)}
+            // Every existing property stays within Others, grouped for readability.
+            // Each retains its SQL binding and existing control/disabled behaviour.
+            const category=(id:string)=>{
+              if(['numpadPadding','numpadGap','gap'].includes(id))return 'Spacing';
+              if(id.startsWith('calendar')||id==='showDays'||id==='firstDay')return 'Calendar';
+              if(id==='inputRows')return 'Text';
+              if(id==='selectionMode')return 'Selection';
+              if(id.startsWith('numpad'))return 'Input Settings';
+              return 'Additional';
+            };
+            return <div className="smart-others-groups">
+              {['Spacing','Calendar','Input Settings','Text','Selection','Additional'].map(group=>{
+                const members=list.filter(property=>category(property.id)===group);
+                return members.length>0&&<div className="smart-others-property-group" key={group} role="group" aria-label={group}>
+                  <div className="smart-others-property-heading">{group}</div>
+                  <div className="smart-design2-supplemental">
+                    {members.map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
+                      <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
+                      {controls(property)}
+                    </div>)}
+                  </div>
+                </div>;
+              })}
             </div>;
           })()}
+        <div className="smart-others-property-heading smart-others-extra-heading">Additional controls</div>
         <div className="smart-design2-extras-fixed" role="group" aria-label="Additional appearance and spacing controls">
           {/* Both editors occupy fixed positions, preserving component-aware availability. */}
           <div className="smart-design2-extras-cell">
@@ -884,11 +902,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
       <section className="smart-inspector-section smart-source-section" key={section} aria-label="Object Source">
         <div className="smart-source-heading">
           <button type="button" className="smart-inspector-section-toggle"
-            aria-expanded={expandedInspector==='Object Source'} onClick={()=>chooseInspectorSection('Object Source')}>
-            <ChevronDown size={15} aria-hidden="true"/>Object Source ({sourceCount})
+            aria-expanded={designSectionOpen('Object Source')} onClick={()=>toggleDesignSection('Object Source')}>
+            <ChevronDown size={15} aria-hidden="true"/>Object Source ({sourceObjects.length})
           </button>
         </div>
-        {expandedInspector==='Object Source'&&<div className="smart-inspector-section-content">
+        {designSectionOpen('Object Source')&&<div className="smart-inspector-section-content">
           <div className="smart-source-entries">
             {sourceBaseProperty&&Array.from({length:sourceCount},(_,i)=>{
               const index=i+1;

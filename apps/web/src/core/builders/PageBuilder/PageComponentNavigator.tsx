@@ -55,6 +55,8 @@ export default function PageComponentNavigator({
     setOpen(false);setQuery('');setTypeFilter('');setRenamingId('');setActiveIndex(0);
   },[pageKey]);
   React.useEffect(()=>setActiveIndex(0),[query,typeFilter]);
+  // A canvas click and a navigator choice must display the same selected component.
+  React.useEffect(()=>{setOpen(false);setQuery('');setActiveIndex(0);},[selectedId]);
   React.useEffect(()=>{
     if (!open) return;
     const update=()=>{
@@ -121,9 +123,9 @@ export default function PageComponentNavigator({
         aria-label="Find a component" aria-haspopup="listbox" aria-expanded={open}
         aria-controls={open?'page-component-navigator-results':undefined}
         aria-activedescendant={open&&active?'page-nav-option-'+active.id:undefined}
-        placeholder="Find a component" value={query}
-        onFocus={()=>setOpen(true)}
-        onClick={()=>setOpen(true)}
+        placeholder="Find a component" value={open?query:(selected?.name??'')}
+        onFocus={()=>{setQuery('');setOpen(true);}}
+        onClick={()=>{if(!open){setQuery('');setOpen(true);}}}
         onKeyDown={onSearchKeyDown}
         onChange={event=>{setQuery(event.target.value);setOpen(true);}}/>
       {query && <button type="button" className="page-navigator-clear"
@@ -133,7 +135,6 @@ export default function PageComponentNavigator({
         <ChevronDown size={14} aria-hidden="true"/>
       </button>
     </div>
-    <small className="page-navigator-help">{selectionIds.length?selectionIds.length+' selected · ':''}{components.length} on page · Layers</small>
     {open && createPortal(<div ref={panelRef} className="ribbon-view-find-results page-navigator-popup"
       style={{position:'fixed',top:position.top,left:position.left,width:position.width}}
       role="dialog" aria-label="Components on this page">

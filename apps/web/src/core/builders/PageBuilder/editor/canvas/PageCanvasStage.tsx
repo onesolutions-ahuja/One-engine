@@ -31,7 +31,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   canvasRenderer: ReturnType<typeof createPageCanvasRenderer>;
   componentProperties: ReturnType<typeof usePageComponentProperties>;
 }) {
-  const { designInPanel, ribbonNavigation, renderRibbonPanel } = ribbon;
+  const { designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel } = ribbon;
   const {
     fitFullPage, setFitScale, pagePreviewAreaRef, canvasRefreshKey, previewMode,
     suppressCanvasClickRef, setSelectedId, setSelectionIds, setGroupEditId, setSelectedRegion,
@@ -100,6 +100,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   return <>
 {designInPanel && <aside className="page-builder-design-dock" aria-label="Page Builder panel">
           <div className="page-builder-design-dock-header">
+            {ribbonComponentSelector}
             {ribbonNavigation}
           </div>
           {/* Reuse the shared ribbon editor and SQL-backed Design 2 slot matrix in the left dock. */}

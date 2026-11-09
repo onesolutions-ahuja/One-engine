@@ -87,7 +87,7 @@ export function createPageRibbon(
     if(!window.confirm('Interactive preview can execute configured Flows and update records. Continue?'))return;
     setAdvancedEditor(null);setRibbonTab('Preview');setPreviewMode(true);
   };
-  const exitInteractivePreview=()=>setPreviewMode(false);
+  const exitInteractivePreview=()=>{setPreviewMode(false);setRibbonTab('Component Design 2');};
   // Page-level controls remain SQL-owned; present them on the top bar or Layout,
   // without changing their saved values, action callbacks or the global Smart inventory.
   const homeValue=(key:string):React.ReactNode=>{
@@ -167,7 +167,7 @@ export function createPageRibbon(
     if(feature==='recordPage'&&page.pageType!=='Record Page')return;
     if(feature==='properties'){setInspectorTab('Data & Actions');setActivePanel('properties');}
     // Arrange → Nesting and other deep links must activate the inline Advanced tab.
-    setRibbonTab('Advanced');
+    setRibbonTab('Component Action');
     setAdvancedEditor(feature);
   };
   // One callback/availability contract serves Arrange and the Design 2 fixed
@@ -209,9 +209,8 @@ export function createPageRibbon(
     }
   };
   const quickAccessOrder=['save','activate','preview','exitPreview','resetIcon','undo','redo','cut','copy','paste','delete'] as const;
-  const journeyTabs: Array<typeof ribbonTab> = // The legacy Design tab is retired; Design 2 is the only Design ribbon.
-  ['Add Block',
-    'Component Design 2','Component Action','Advanced','Preview'];
+  const journeyTabs: Array<typeof ribbonTab> = // Advanced and View controls live in Actions and Design.
+  ['Add Block','Component Design 2','Component Action'];
   const ribbonTabsVisible: Array<typeof ribbonTab> = [...journeyTabs];
 
   const addPaletteComponent = (type: string) => {
@@ -304,6 +303,31 @@ export function createPageRibbon(
             items={paletteComponents}
             onInsert={addPaletteComponent}
             renderIcon={renderPaletteIcon}/>);
+  const ribbonComponentSelector = (!previewMode && <div className="office-builder-ribbon page-builder-global-selector" aria-label="Selected page component">
+    <PageComponentNavigator components={page.components} libraryComponents={libraryComponents}
+              pageKey={page.apiName+':'+(page.layoutVariant??'Desktop')}
+              selectedId={selectedId} selectionIds={selectionIds}
+              onSelect={(id,mode)=>{
+                const next=selectCanvasIds(page.components,selectionIds,id,mode,selectedId);
+                setGroupEditId(mode==='member'?id:'');
+                setSelectionIds(next);
+                setSelectedId(next.includes(id)?id:(next[0]??''));
+                setSelectedRegion(null);setPageSettingsOpen(false);
+                if(next.includes(id))window.requestAnimationFrame(()=>{
+                  const nodes=pagePreviewAreaRef.current?.querySelectorAll<HTMLElement>('[data-component-id]');
+                  Array.from(nodes??[]).find(node=>node.dataset.componentId===id)
+                    ?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
+                });
+              }}
+              onRename={(id,name)=>{
+                const component=page.components.find(item=>item.id===id);
+                if(!component)return;
+                const proposed=name.trim();
+                const error=validateInstanceName(id,proposed);
+                if(error){onNotify(error);return;}
+                updateComponent(id,{properties:{...component.properties,navigatorName:proposed}});
+              }}/>
+  </div>);
   const designInPanel = !previewMode;
   const ribbonNavigation = (<nav className="office-ribbon-tabs" role="tablist" aria-label="Page Builder tabs">
               {ribbonTabsVisible.map((tab,index) => {
@@ -344,70 +368,31 @@ export function createPageRibbon(
   const renderRibbonPanel = () => (<div id="page-builder-tab-content" ref={ribbonStripRef}
           className="office-ribbon-content" role="tabpanel" aria-hidden={previewMode} aria-label={ribbonTab}
           aria-labelledby={`page-builder-tab-${Math.max(0,ribbonTabsVisible.indexOf(ribbonTab))}`}>
-          {!previewMode && <div className="office-ribbon-group canvas-preview-selector-group" aria-label="Layers">
-            <PageComponentNavigator components={page.components} libraryComponents={libraryComponents}
-              pageKey={page.apiName+':'+(page.layoutVariant??'Desktop')}
-              selectedId={selectedId} selectionIds={selectionIds}
-              onSelect={(id,mode)=>{
-                const next=selectCanvasIds(page.components,selectionIds,id,mode,selectedId);
-                setGroupEditId(mode==='member'?id:'');
-                setSelectionIds(next);
-                setSelectedId(next.includes(id)?id:(next[0]??''));
-                setSelectedRegion(null);setPageSettingsOpen(false);
-                if(next.includes(id))window.requestAnimationFrame(()=>{
-                  const nodes=pagePreviewAreaRef.current?.querySelectorAll<HTMLElement>('[data-component-id]');
-                  Array.from(nodes??[]).find(node=>node.dataset.componentId===id)
-                    ?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
-                });
+          {ribbonTab==='Add Block' && insertRibbon}
+          {page.pageType==='Print Template'&&page.layoutMode==='template'&&selected&&ribbonTab==='Component Layout'&&
+            <label><input type="checkbox" checked={selected.properties.printBreakBefore===true} onChange={event=>
+              updateComponent(selected.id,{properties:{...selected.properties,printBreakBefore:event.target.checked}})}/>Page break before component</label>}
+          {ribbonTab==='Component Action' &&
+            <PageBuilderActionRibbon objects={objects} pages={pages} request={request}
+              api={selected?.type.startsWith('Custom:')?selected.type.slice(7):selected?.type??''}
+              selectedApis={actionMembers.map(item=>item.type.startsWith('Custom:')?item.type.slice(7):item.type)}
+              actions={selectedActions} mixedEventIds={mixedActionEventIds}
+              mixedButtonVisibilityKeys={mixedActionButtonVisibilityKeys} eventDefinitions={actionOptions} flows={flows}
+              stateOptions={pageStateChoices(page.components)}
+              dataFields={objects.find(item=>item.apiName===
+                String(selected?.properties.objectApiName||page.targetObject||''))?.fields??[]}
+              selectedEvent={activeActionEvent} disabled={!selected||actionSelectionDisabled}
+              onSelectEvent={setInlineActionEvent}
+              onChange={applyActionFlows}
+              buttonVisibility={{
+                qtyIncrease:selected?.properties.qtyIncreaseVisible!==false,
+                qtyDecrease:selected?.properties.qtyDecreaseVisible!==false,
+                customButton1:selected?.properties.customButton1Visible!==false,
+                customButton2:selected?.properties.customButton2Visible!==false,
+                customButton3:selected?.properties.customButton3Visible!==false
               }}
-              onRename={(id,name)=>{
-                const component=page.components.find(item=>item.id===id);
-                if(!component)return;
-                const proposed=name.trim();
-                const error=validateInstanceName(id,proposed);
-                if(error){onNotify(error);return;}
-                updateComponent(id,{properties:{...component.properties,navigatorName:proposed}});
-              }}/>
-            <span>Layers</span>
-          </div>}
-          {ribbonTab==='Preview' && <div className="office-ribbon-group canvas-preview-tools ribbon-view-zoom" aria-label="Zoom">
-            <div className="office-ribbon-stack">
-              <div className="ribbon-view-zoom-buttons">
-                <button type="button" onClick={()=>{setFitCanvas(true);setFitFullPage(true);}}
-                  aria-pressed={fitCanvas&&fitFullPage}>Fit to Screen</button>
-                <button type="button" onClick={()=>{setFitCanvas(true);setFitFullPage(false);}}
-                  aria-pressed={fitCanvas&&!fitFullPage}>Fit Width</button>
-                <button type="button" onClick={()=>{setFitCanvas(false);setCanvasZoom(100);}}
-                  aria-pressed={!fitCanvas&&canvasZoom===100}>100%</button>
-              </div>
-              <label className="ribbon-view-zoom-number"><MoveHorizontal size={16} aria-hidden="true"/>
-                <input type="number" min={20} max={200} step={5} aria-label="Canvas zoom percentage"
-                  value={fitCanvas?Math.round(fitScale*100):canvasZoom}
-                  onChange={event=>{const value=Number(event.target.value);
-                    if(Number.isFinite(value)){setFitCanvas(false);setCanvasZoom(Math.min(200,Math.max(20,value)));}}}/>%
-              </label>
-            </div><span>Zoom</span>
-          </div>}
-          {ribbonTab==='Preview' && <div className="office-ribbon-group ribbon-view-canvas" aria-label="Canvas">
-            <div className="office-ribbon-stack"><span aria-live="polite">
-              {page.canvasWidth} × {page.canvasHeight}</span>
-            </div><span>Canvas</span>
-          </div>}
-          {ribbonTab==='Preview' && <div className="office-ribbon-group preview-visibility-group" aria-label="Conditional visibility">
-            <div className="preview-visibility-controls">
-              <label className="ribbon-small-checkbox"><input type="checkbox"
-                checked={selected?.visible??false} disabled={!selected}
-                onChange={event=>{if(selected)updateComponent(selected.id,{visible:event.target.checked});}}/>
-                Visible on this page</label>
-              <button type="button" className="office-ribbon-icon-button" aria-label="Edit conditional visibility"
-                title="Edit conditional visibility" disabled={!selected} onClick={openVisibilityEditor}>
-                <Filter size={17} aria-hidden="true"/></button>
-              <button type="button" disabled={!selected} onClick={openVisibilityEditor}>Conditions</button>
-            </div>
-            <span>Conditional visibility</span>
-          </div>}
-
-          {ribbonTab==='Advanced' && <PageBuilderAdvancedSections
+              onButtonVisibilityChange={applyCartButtonVisibility}/>}
+          {ribbonTab==='Component Action' && <PageBuilderAdvancedSections
             section={advancedEditor} onInspectorHost={setRibbonPropertyHost}
             layout={{
               current:page.layoutVariant??'Desktop',
@@ -462,31 +447,6 @@ export function createPageRibbon(
                 updateComponent(selected.id,{properties:{...selected.properties,layoutContainer:value}});
               }
             }}/>}
-
-          {ribbonTab==='Add Block' && insertRibbon}
-          {page.pageType==='Print Template'&&page.layoutMode==='template'&&selected&&ribbonTab==='Component Layout'&&
-            <label><input type="checkbox" checked={selected.properties.printBreakBefore===true} onChange={event=>
-              updateComponent(selected.id,{properties:{...selected.properties,printBreakBefore:event.target.checked}})}/>Page break before component</label>}
-          {ribbonTab==='Component Action' &&
-            <PageBuilderActionRibbon objects={objects} pages={pages} request={request}
-              api={selected?.type.startsWith('Custom:')?selected.type.slice(7):selected?.type??''}
-              selectedApis={actionMembers.map(item=>item.type.startsWith('Custom:')?item.type.slice(7):item.type)}
-              actions={selectedActions} mixedEventIds={mixedActionEventIds}
-              mixedButtonVisibilityKeys={mixedActionButtonVisibilityKeys} eventDefinitions={actionOptions} flows={flows}
-              stateOptions={pageStateChoices(page.components)}
-              dataFields={objects.find(item=>item.apiName===
-                String(selected?.properties.objectApiName||page.targetObject||''))?.fields??[]}
-              selectedEvent={activeActionEvent} disabled={!selected||actionSelectionDisabled}
-              onSelectEvent={setInlineActionEvent}
-              onChange={applyActionFlows}
-              buttonVisibility={{
-                qtyIncrease:selected?.properties.qtyIncreaseVisible!==false,
-                qtyDecrease:selected?.properties.qtyDecreaseVisible!==false,
-                customButton1:selected?.properties.customButton1Visible!==false,
-                customButton2:selected?.properties.customButton2Visible!==false,
-                customButton3:selected?.properties.customButton3Visible!==false
-              }}
-              onButtonVisibilityChange={applyCartButtonVisibility}/>}
           {selected?.type==='Custom:smart_icon' && ribbonTab==='Component Design 2' &&
             <SmartIconGallery value={String(selected.properties.iconId??'house')}
               disabled={ribbonSelectedMembers.some(item=>item.type!=='Custom:smart_icon'||isCanvasLocked(item))}
@@ -498,26 +458,57 @@ export function createPageRibbon(
                 }else updateComponent(selected.id,{properties:{...selected.properties,iconId}});
               }}/>}
           {smartRibbonElement}
-          {ribbonTab==='Component Design 2' && <div className="office-ribbon-group une-sql-home-group design-canvas-settings"
-            aria-label="Canvas" data-shared-group="Canvas">
-            <div className="office-ribbon-stack">
-              <label data-ribbon-property="canvasWidth" className="une-sql-home-control une-ribbon-size-with-icon"
-                title="Canvas Width"><span className="une-ribbon-embedded-icon"><MoveHorizontal size={17}/></span>
-                {homeValue('canvasWidth')}</label>
-              <label data-ribbon-property="canvasHeight" className="une-sql-home-control une-ribbon-size-with-icon"
-                title="Canvas Height"><span className="une-ribbon-embedded-icon"><MoveVertical size={17}/></span>
-                {homeValue('canvasHeight')}</label>
-              <div data-ribbon-property="canvasFillColor" className="une-sql-home-control une-ribbon-canvas-colour">
-                <RibbonColorPalette variant="property" kind="fill" label="Canvas Fill Color"
-                  value={page.canvasFillColor??'#ffffff'}
-                  onChange={colour=>applyPage({...page,canvasFillColor:colour})}/>
+          {ribbonTab==='Component Design 2' && <details className="page-builder-dock-section page-builder-canvas-section" open>
+            <summary>Canvas</summary>
+            <div className="page-builder-dock-section-body">
+              <div className="page-builder-canvas-fields">
+                <label data-ribbon-property="canvasWidth" className="une-sql-home-control une-ribbon-size-with-icon" title="Canvas Width">
+                  <span className="une-ribbon-embedded-icon"><MoveHorizontal size={17}/></span>
+                  {homeValue('canvasWidth')}
+                </label>
+                <label data-ribbon-property="canvasHeight" className="une-sql-home-control une-ribbon-size-with-icon" title="Canvas Height">
+                  <span className="une-ribbon-embedded-icon"><MoveVertical size={17}/></span>
+                  {homeValue('canvasHeight')}
+                </label>
+                <div data-ribbon-property="canvasFillColor" className="une-sql-home-control une-ribbon-canvas-colour">
+                  <RibbonColorPalette variant="property" kind="fill" label="Canvas Fill Color"
+                    value={page.canvasFillColor??'#ffffff'}
+                    onChange={colour=>applyPage({...page,canvasFillColor:colour})}/>
+                </div>
               </div>
-            </div><span>Canvas</span>
-          </div>}
+              <div className="page-builder-canvas-zoom" role="group" aria-label="Zoom">
+                <button type="button" onClick={()=>{setFitCanvas(true);setFitFullPage(true);}}
+                  aria-pressed={fitCanvas&&fitFullPage}>Fit to Screen</button>
+                <button type="button" onClick={()=>{setFitCanvas(true);setFitFullPage(false);}}
+                  aria-pressed={fitCanvas&&!fitFullPage}>Fit Width</button>
+                <label className="ribbon-view-zoom-number" title="Canvas zoom percentage">
+                  <input type="number" min={20} max={200} step={5} aria-label="Canvas zoom percentage"
+                    value={fitCanvas?Math.round(fitScale*100):canvasZoom}
+                    onChange={event=>{const value=Number(event.target.value);
+                      if(Number.isFinite(value)){setFitCanvas(false);setCanvasZoom(Math.min(200,Math.max(20,value)));}}}/>%
+                </label>
+              </div>
+            </div>
+          </details>}
+          {ribbonTab==='Component Design 2' && <details className="page-builder-dock-section page-builder-conditional-section" open>
+            <summary>Conditional Visibility</summary>
+            <div className="page-builder-dock-section-body">
+              <div className="page-builder-visibility-controls">
+                <label className="ribbon-small-checkbox"><input type="checkbox"
+                  checked={selected?.visible??false} disabled={!selected}
+                  onChange={event=>{if(selected)updateComponent(selected.id,{visible:event.target.checked});}}/>
+                  Visible on this page</label>
+                <button type="button" className="office-ribbon-icon-button" aria-label="Edit conditional visibility"
+                  title="Edit conditional visibility" disabled={!selected} onClick={openVisibilityEditor}>
+                  <Filter size={17} aria-hidden="true"/></button>
+                <button type="button" disabled={!selected} onClick={openVisibilityEditor}>Conditions</button>
+              </div>
+            </div>
+          </details>}
         </div>);
 
   return {
     selectedRelatedLists, componentRelatedListOptions, homeValue, quickAccessOrder, dataRibbon,
-    designInPanel, ribbonNavigation, renderRibbonPanel,
+    designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel,
   };
 }

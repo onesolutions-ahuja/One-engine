@@ -739,25 +739,39 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           </div>
         </div>}
       </section>
+      {design2Areas.includes('Focused')&&<section className="smart-inspector-section smart-design2-area-section smart-design2-focused-section" data-design-area="Focused">
+        <button type="button" className="smart-inspector-section-toggle"
+          aria-expanded={designSectionOpen('Focused')} onClick={()=>toggleDesignSection('Focused')}>
+          <ChevronDown size={15} aria-hidden="true"/>Focused
+        </button>
+        {designSectionOpen('Focused')&&<div className="smart-inspector-section-content">
+          <div className="smart-ribbon-items">
+            {[1,2,3].map(row=><div key={row} className="smart-ribbon-row"
+              data-design-row={row} style={{gridTemplateColumns:design2GridColumns(row)}}>
+              {sectionRow('Focused',row).map(controls)}
+            </div>)}
+          </div>
+          {design2AreaExtraProperties.some(property=>property.group==='Focused')&&
+            <div className="smart-design2-supplemental" role="group" aria-label="Focused settings">
+              {design2AreaExtraProperties.filter(property=>property.group==='Focused').map(property=>
+                <div className="smart-design2-supplemental-setting" key={property.id}>
+                  <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
+                  {controls(property)}
+                </div>)}
+            </div>}
+        </div>}
+      </section>}
       <section className="smart-inspector-section smart-design2-area-section smart-design2-others-section" data-design-area="Others">
         <button type="button" className="smart-inspector-section-toggle"
           aria-expanded={designSectionOpen('Others')} onClick={()=>toggleDesignSection('Others')}>
           <ChevronDown size={15} aria-hidden="true"/>Others
         </button>
         {designSectionOpen('Others')&&<div className="smart-inspector-section-content">
-          {design2Areas.includes('Focused')&&<div className="smart-design2-others-group" role="group" aria-label="Focused">
-            <span className="smart-design2-supplemental-label">Focused</span>
-            <div className="smart-ribbon-items">
-              {[1,2,3].map(row=><div key={row} className="smart-ribbon-row"
-                data-design-row={row} style={{gridTemplateColumns:design2GridColumns(row)}}>
-                {sectionRow('Focused',row).map(controls)}
-              </div>)}
-            </div>
-          </div>}
           {(()=>{
             // One fixed list for every selection: same properties, same order.
             const seen=new Set<string>();
             const list=[...design2AreaExtraProperties,...design2SupplementalProperties]
+              .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
               .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
             return list.length>0&&<div className="smart-design2-supplemental" role="group" aria-label="Other settings">
               {list.map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
@@ -872,11 +886,6 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           <button type="button" className="smart-inspector-section-toggle"
             aria-expanded={expandedInspector==='Object Source'} onClick={()=>chooseInspectorSection('Object Source')}>
             <ChevronDown size={15} aria-hidden="true"/>Object Source ({sourceCount})
-          </button>
-          <button type="button" className="smart-source-add" aria-label="Add Object"
-            title="Add another source Object" disabled={!canAddSources||sourceCount>=100}
-            onClick={()=>{updateSourceCount(sourceCount+1);onInspectorSectionChange?.('Object Source');}}>
-            <Plus size={15} aria-hidden="true"/>
           </button>
         </div>
         {expandedInspector==='Object Source'&&<div className="smart-inspector-section-content">

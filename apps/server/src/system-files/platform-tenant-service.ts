@@ -269,18 +269,21 @@ export class PlatformTenantService {
   const x=body as Record<string,unknown>;
   if(typeof x.tenantId!=='string'||typeof x.tenantName!=='string'
     ||typeof x.adminName!=='string'||typeof x.email!=='string'
-    ||typeof x.password!=='string'||typeof x.developerDomain!=='string'||!x.developerDomain.trim())
-    throw new Error('Invalid tenant provisioning request: a developer domain is required');
+    ||typeof x.password!=='string')
+    throw new Error('Invalid tenant provisioning request');
+  // The login domain is owned and assigned by the platform, not the customer.
   const expectedDomain=tenantDeveloperDomain(x.tenantId);
-  if(x.developerDomain.trim().toLowerCase()!==expectedDomain)
-    throw new Error('Invalid tenant domain: use the configured platform-owned tenant subdomain');
+  // Validate older clients that still send a domain; never trust or provision it.
+  if(x.developerDomain!==undefined&&
+    (typeof x.developerDomain!=='string'||x.developerDomain.trim().toLowerCase()!==expectedDomain))
+    throw new Error('Invalid tenant domain: use the platform-owned tenant subdomain');
   const mail=new TenantDeveloperMailbox(this.db);
   if(typeof x.tenantDeveloperEmail!=='string'||!/^([a-z0-9][a-z0-9._+-]{0,62})@unesolutions\.co\.uk$/.test(x.tenantDeveloperEmail))
     throw new Error('Tenant developer email is required');
   const chosen=x.tenantDeveloperEmail.toLowerCase();
   // Do not reject an idempotent retry before reading its original reservation.
   const result=await new TenantProvisioning(this.db).provision({
-    slug:x.tenantId.toLowerCase(),name:x.tenantName,domain:x.developerDomain.toLowerCase(),
+    slug:x.tenantId.toLowerCase(),name:x.tenantName,domain:expectedDomain,
     developerEmail:x.email,developerPassword:x.password,developerName:x.adminName,tenantDeveloperEmail:chosen
   },{actorTenantId:tenantId,actorUserId:userId,idempotencyKey});
   const target=await this.db.query<{id:string}>("SELECT id FROM md_tenants WHERE slug=$1",[result.slug]);

@@ -16,6 +16,8 @@ jobs:
       - run: npm ci
       - name: Page components and formula regression tests
         run: node scripts/check-test-components.mjs
+      - name: Tenant onboarding backend regression tests
+        run: npm run test:system --workspace apps/server
       - name: Compile server exactly as OCI
         run: npm run build --workspace apps/server
       - name: Compile frontend

@@ -7,7 +7,6 @@ export const tenantCreateFieldDefinitions=[
  {key:'adminName',label:'Initial administrator name',inputType:'text',required:true,maxLength:120},
  {key:'email',label:'Initial administrator email',inputType:'email',required:true,maxLength:254,autoComplete:'off'},
  {key:'password',label:'Initial administrator password',inputType:'password',required:true,minLength:12,maxLength:256,autoComplete:'new-password'},
- {key:'tenantDeveloperEmail',label:'Tenant developer email',inputType:'email',required:true,maxLength:254,autoComplete:'off'},
- {key:'developerDomain',label:'Developer login domain',inputType:'text',required:true,maxLength:253,placeholder:'tenant-domain.com'}
+ {key:'tenantDeveloperEmail',label:'Tenant developer email',inputType:'email',required:true,maxLength:254,autoComplete:'off'}
 ] as const;
 export type TenantCreateFieldKey=typeof tenantCreateFieldDefinitions[number]['key'];

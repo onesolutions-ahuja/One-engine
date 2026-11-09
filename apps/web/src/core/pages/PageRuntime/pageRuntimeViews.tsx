@@ -200,22 +200,41 @@ import {
 } from '../../metadata/Definitions/metadata';
 
 
-// Text and label boxes whose formulas never read a row field (e.g. till totals
-// built from SUMIFS) do not need their Object's rows: loading 100 rows into
-// each of 50 boxes and redrawing them on every save cost ~0.5 s per tap.
-// Their formulas still refresh on writes through useSqlFormulaDisplay.
-const rowFreeDisplayTypes=new Set(['Custom:smart_text','Custom:smart_label']);
-function displaysRowFields(type:string,properties:Readonly<Record<string,unknown>>):boolean{
-  if(!rowFreeDisplayTypes.has(type))return true;
+// How many of its Object's rows a component needs, decided from its library
+// definition (component.json "rows") and its authored properties, so any
+// current or future component gets it without per-page work:
+// - 'list'  : renders many records (grids, carts, tables, selectors...) or is
+//             undeclared, which is the safe default.
+// - 'first' : renders at most its first record and reads a row field.
+// - 'none'  : renders at most its first record and reads no row field (e.g.
+//             till totals built from SUMIFS). Loading 100 rows into each of 50
+//             such boxes and redrawing them on every save cost ~0.5 s per tap.
+// Formulas still refresh on writes through useSqlFormulaDisplay.
+type RowNeed='none'|'first'|'list';
+function componentRowNeed(rows:string|undefined,properties:Readonly<Record<string,unknown>>):RowNeed{
+  if(rows!=='first')return 'list';
   if(properties.recordId||properties.collectionFormula||properties.recordPresenterApiName
-    ||properties.filterFormula||properties.relatedFilterKey)return true;
-  for(const value of Object.values(properties)){
-    if(typeof value!=='string')continue;
-    const text=value.trim();
-    if(text.startsWith('=')){if(!isRowIndependentFormula(text))return true;continue;}
-    if(/@[A-Za-z]|\{!/.test(text))return true;
+    ||properties.filterFormula||properties.relatedFilterKey)return 'list';
+  // Look inside nested settings too: an action formula (actionFlows.click.formula)
+  // may use @recordId or a row field of the first record.
+  const seen=new WeakSet<object>();
+  const readsRow=(value:unknown,depth:number):boolean=>{
+    if(depth>6||value===null||value===undefined)return false;
+    if(typeof value==='string'){
+      const text=value.trim();
+      if(text.startsWith('='))return !isRowIndependentFormula(text);
+      return /@[A-Za-z]|\{!/.test(text);
+    }
+    if(typeof value!=='object'||seen.has(value))return false;
+    seen.add(value);
+    return (Array.isArray(value)?value:Object.values(value)).some(child=>readsRow(child,depth+1));
+  };
+  for(const [key,value] of Object.entries(properties)){
+    // Metadata the runtime merges in is not authored row usage.
+    if(['objects','records','items','pageState'].includes(key))continue;
+    if(readsRow(value,0))return 'first';
   }
-  return false;
+  return 'none';
 }
 export function createPageRuntimeViews(apiRequest: <T>(path:string, init?:RequestInit) => Promise<T>) {
 function RuntimeReportChart({ report, objects, recordContext }: {
@@ -409,7 +428,7 @@ function MetadataBoundPageComponent({
   const [recordsForQueryKey, setRecordsForQueryKey] = useState('');
   const [recordTotal,setRecordTotal]=useState(0);
   const [recordOffset,setRecordOffset]=useState(0);
-  const recordPageSize=100;
+  const recordPageSize=rowNeed==='first'?1:100;
   const [contactRecords, setContactRecords] = useState<Record<string, unknown>[]>([]);
   const [dataError, setDataError] = useState('');
   const [dataErrorForQueryKey, setDataErrorForQueryKey] = useState('');
@@ -424,7 +443,8 @@ function MetadataBoundPageComponent({
   // Product catalogue or categories. Unknown writes and session changes still refresh everything.
   const readObjectApiNames=useMemo(()=>pageComponentReadObjectNames(objectApiName,properties,objects),
     [objectApiName,properties,objects]);
-  const readsRows=useMemo(()=>displaysRowFields(component.type,properties),[component.type,properties]);
+  const rowNeed=useMemo(()=>componentRowNeed(definition?.rows,properties),[definition?.rows,properties]);
+  const readsRows=rowNeed!=='none';
   const readObjectKey=JSON.stringify(readObjectApiNames);
   const loadedListRef=useRef<{rows:Record<string,unknown>[];scope:LoadedRecordListScope}|null>(null);
   useEffect(() => {
@@ -1021,7 +1041,7 @@ function MetadataBoundPageComponent({
         value:toggleBinding.ready?toggleBinding.value:false,
         onBoundToggleChange:changeBoundToggle}:{})
     }} />
-    {objectApiName&&recordQuery.serverFilterable&&recordTotal>recordPageSize&&<nav
+    {objectApiName&&rowNeed==='list'&&recordQuery.serverFilterable&&recordTotal>recordPageSize&&<nav
       className="records-pagination" aria-label={component.label+' record pages'}>
       <button type="button" className="btn" disabled={dataLoading||recordOffset===0}
         onClick={()=>setRecordOffset(offset=>Math.max(0,offset-recordPageSize))}>Previous</button>

@@ -2,6 +2,7 @@
   "apiName": "smart_text",
   "label": "Smart Input Box",
   "category": "Inputs",
+  "rows": "first",
   "description": "Reusable Smart Input Box for metadata-driven pages.",
   "surfaces": [
     "page",

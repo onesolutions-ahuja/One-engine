@@ -113,7 +113,11 @@ export async function predictActionPlan(formula:string,scope:Row,
   return no('Unsupported request');
  };
  try{
-  const result=await executeActionFormula(formula,scope,context,{request,useSqlAggregates:false}) as {
+  // PRINT returns nothing and changes no record: skipped in the prediction (the
+  // real run prints). SCREEN/NAVIGATE can return user input, CREATEPDF writes a
+  // file, Flows and HTTP run server logic: those are not predicted.
+  const result=await executeActionFormula(formula,scope,context,{request,useSqlAggregates:false,
+   print:async()=>{}}) as {
    changes?:{key:string;value:unknown}[];mutatedObjectApiNames?:string[]};
   if(!recordChanges.length)return null;
   if(typeof window!=='undefined'){

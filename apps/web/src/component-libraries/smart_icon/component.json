@@ -2,6 +2,7 @@
   "apiName": "smart_icon",
   "label": "Smart Icon",
   "category": "Display",
+  "rows": "first",
   "description": "Reusable monochrome SaaS icon with independent background and glyph colours.",
   "surfaces": [
     "page",

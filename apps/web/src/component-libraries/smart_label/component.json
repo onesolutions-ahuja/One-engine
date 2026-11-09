@@ -2,6 +2,7 @@
   "apiName": "smart_label",
   "label": "Smart Label",
   "category": "Display",
+  "rows": "first",
   "description": "Read-only Smart text. Same data binding and styling as the Smart Input Box, but it never accepts input.",
   "surfaces": [
     "page",

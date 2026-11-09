@@ -2,6 +2,7 @@
   "apiName": "smart_button",
   "label": "Smart Button",
   "category": "Inputs",
+  "rows": "first",
   "description": "Reusable Smart Button for metadata-driven pages.",
   "surfaces": [
     "page",

@@ -74,6 +74,9 @@ for (const component of catalog.components) {
     label: component.label,
     description: component.description ?? '',
     category: component.category ?? '',
+    // "first": shows at most its first record, so the runtime loads 0 or 1 row
+    // instead of a page. Undeclared components load rows as a list (safe).
+    ...(component.rows === 'first' ? { rows: 'first' } : {}),
     surfaces: component.surfaces,
     resize: component.resize,
     version: component.version,

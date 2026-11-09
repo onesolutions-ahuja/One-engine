@@ -791,7 +791,7 @@ export type ReportRunMetadata = {
 
 export type ComponentEventPayloadField={apiName:string;label:string;kind:'TEXT'|'NUMBER'|'BOOLEAN'|'OBJECT';fields?:ComponentEventPayloadField[]};
 export type ComponentEventDefinition={apiName:string;label:string;payloadFields?:ComponentEventPayloadField[]};
-export type LibraryComponentMetadata = { category?: string; eventDefinitions?: ComponentEventDefinition[]; propertyDefinitions?: import('../../components/Properties/componentSettingDefinitions').ComponentSettingDefinition[]; primitiveMetadata?: import('../../components/RegisteredComponent/sharedPrimitiveMetadata').PrimitiveMetadata;
+export type LibraryComponentMetadata = { category?: string; /** 'first': renders at most its first record. Absent: a list. */ rows?: 'first'|'list'; eventDefinitions?: ComponentEventDefinition[]; propertyDefinitions?: import('../../components/Properties/componentSettingDefinitions').ComponentSettingDefinition[]; primitiveMetadata?: import('../../components/RegisteredComponent/sharedPrimitiveMetadata').PrimitiveMetadata;
   tenantId?: string;
   apiName: string;
   label: string;

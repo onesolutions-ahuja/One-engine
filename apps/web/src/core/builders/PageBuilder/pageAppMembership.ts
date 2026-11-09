@@ -41,13 +41,15 @@ export const resolvePageActivationApp=(
  allowExplicitAssignment=false
 ):string|null=>{
  const candidates=pageActivationAppCandidates(apps,page);
- if(preferredAppApiName&&apps.some(app=>app.apiName===preferredAppApiName)
-   &&(allowExplicitAssignment||candidates.includes(preferredAppApiName)))return preferredAppApiName;
  const assigned=[...new Set((page.activationAssignments??[])
   .filter(a=>a.scope==='App Default'&&a.appId&&candidates.includes(a.appId))
   .map(a=>a.appId as string))];
+ // Persisted App Default assignment is authoritative: never switch app by accident.
  if(assigned.length===1)return assigned[0];
- if(assigned.length>1)return null;
+ if(assigned.length>1)return preferredAppApiName&&assigned.includes(preferredAppApiName)
+   ?preferredAppApiName:null;
+ if(preferredAppApiName&&apps.some(app=>app.apiName===preferredAppApiName)
+   &&(allowExplicitAssignment||candidates.includes(preferredAppApiName)))return preferredAppApiName;
  if(page.ownerNamespace&&candidates.includes(page.ownerNamespace))return page.ownerNamespace;
  return candidates.length===1?candidates[0]:null;
 };

@@ -434,7 +434,7 @@ function SmartLookup({p,style,fire}){
   setResults([]);
   setSearchError("");
   setBusy(false);
-  if(!term||p.builderPreview||p.previewOnly)return()=>{active=false};
+  if(!opened||!term||p.builderPreview||p.previewOnly)return()=>{active=false};
   if(!search){
    setSearchError("Search Box requires an Object search source");
    return()=>{active=false};
@@ -448,7 +448,7 @@ function SmartLookup({p,style,fire}){
    }).finally(()=>{if(active)setBusy(false)});
   },300);
   return()=>{active=false;clearTimeout(timer)};
- },[query,search,p.objectApiName,p.previewOnly,p.builderPreview]);
+ },[query,search,opened,p.objectApiName,p.previewOnly,p.builderPreview]);
  const candidates=p.builderPreview||p.previewOnly
   ?recordsOf(p).slice(0,200).filter(row=>row&&typeof row==="object"):[...results];
  const display=row=>text(scopedExpression(p,"textSource",p.textSource??row.Name??row.name??row.label??row.title??row.Id??row.id??"",row));

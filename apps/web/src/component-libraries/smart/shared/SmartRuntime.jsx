@@ -37,7 +37,7 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
 const expression=(...args)=>{
  const result=expressionResult(...args);
  // Non-display formula consumers retain their existing empty-value error contract.
- return result.error?"":text(result.value);
+ return result.error?"FORMULAERROR":text(result.value);
 };
 const formulaDisplayErrorColor="#dc2626";
 function SmartPicture({src,alt,loadAsset,style}){
@@ -58,7 +58,7 @@ const fieldAllows=(p,key,record)=>{
 const scopedExpression=(p,key,source,record)=>fieldAllows(p,key,record)
  ?(key==="textSource"&&p.dataCollection&&record&&
     (/(?:^|[=(,])\s*COLLECTION\s*\(/i.test(String(source??""))
-     ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_.]*(?:\s*(?:=|==|<>|!=|>=|<=|>|<)\s*.+)?\s*$/i.test(String(source??"")))
+     ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??"")))
     ?text(p.kind==="smart_card_grid"&&record.__collectionManual===false
       &&typeof record.Name==="string"&&record.Name.trim()
       ?record.Name:record.__collectionLabel??record.Name??"")
@@ -68,7 +68,7 @@ const scopedDisplayExpression=(p,key,source,record)=>{
  // A selected collection row already provides its authorised caption.
  if(key==="textSource"&&p.dataCollection&&record&&
    (/(?:^|[=(,])\s*COLLECTION\s*\(/i.test(String(source??""))
-    ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_.]*(?:\s*(?:=|==|<>|!=|>=|<=|>|<)\s*.+)?\s*$/i.test(String(source??""))))
+    ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??""))))
   return {value:scopedExpression(p,key,source,record)};
  const result=expressionResult(source,record,p.pageState,p.objectApiName,
   p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup);
@@ -140,8 +140,10 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ?"Tenant logo unavailable — Company Settings › Branding":"Image Here";
  const preview=p.previewOnly===true||p.builderPreview===true||p.preview===true;
  const sample=Boolean(p.builderPreview===true&&record?.__builderSample===true);
- const header=scopedExpression(p,"textSource",p.textSource??p.title??p.label??"",record)||(sample?"Product Name":p.kind==="smart_card_grid"&&preview?"Text here":"");
- const badge=scopedExpression(p,"badgeText",p.badgeText??"",record);
+ const headerResult=scopedDisplayExpression(p,"textSource",p.textSource??p.title??p.label??"",record);
+ const header=text(headerResult.value)||(sample?"Product Name":p.kind==="smart_card_grid"&&preview?"Text here":"");
+ const badgeResult=scopedDisplayExpression(p,"badgeText",p.badgeText??"",record);
+ const badge=text(badgeResult.value);
  // Card Grid uses the same record-scoped, permission-aware formula evaluation as other Data fields.
  React.useEffect(()=>{
   if(p.kind==='smart_image')p.onFormulaDisplay?.({textSource:header,imageSource:image,badgeText:badge});
@@ -271,7 +273,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
     border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,
     backgroundColor:p.headerBodyColor||undefined,
-    color:focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
+    color:headerResult.error?formulaDisplayErrorColor:
+     focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
     whiteSpace:p.wrapText===false?"nowrap":"normal",
     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
     padding:fixedGridHeader
@@ -335,9 +338,10 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     })}
    </div>}
   </div>}
-  {Boolean(badge)&&<span data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
+  {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
-   color:p.badgeTextColor||"#fff",background:p.badgeBodyColor||"#2563eb",
+   color:badgeResult.error?formulaDisplayErrorColor:p.badgeTextColor||"#fff",
+   background:badgeResult.error?"#fff":p.badgeBodyColor||"#2563eb",
    border:p.badgeBorderColor?"1px solid "+p.badgeBorderColor:undefined,
    borderRadius:p.badgeRadius!==undefined&&p.badgeRadius!==null&&p.badgeRadius!==""
     ?number(p.badgeRadius,0,0,200):undefined,

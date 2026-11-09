@@ -428,7 +428,6 @@ function MetadataBoundPageComponent({
   const [recordsForQueryKey, setRecordsForQueryKey] = useState('');
   const [recordTotal,setRecordTotal]=useState(0);
   const [recordOffset,setRecordOffset]=useState(0);
-  const recordPageSize=rowNeed==='first'?1:100;
   const [contactRecords, setContactRecords] = useState<Record<string, unknown>[]>([]);
   const [dataError, setDataError] = useState('');
   const [dataErrorForQueryKey, setDataErrorForQueryKey] = useState('');
@@ -445,6 +444,7 @@ function MetadataBoundPageComponent({
     [objectApiName,properties,objects]);
   const rowNeed=useMemo(()=>componentRowNeed(definition?.rows,properties),[definition?.rows,properties]);
   const readsRows=rowNeed!=='none';
+  const recordPageSize=rowNeed==='first'?1:100;
   const readObjectKey=JSON.stringify(readObjectApiNames);
   const loadedListRef=useRef<{rows:Record<string,unknown>[];scope:LoadedRecordListScope}|null>(null);
   useEffect(() => {

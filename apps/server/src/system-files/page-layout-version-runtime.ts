@@ -7,6 +7,9 @@ import {encodeMetadataValue,decodeMetadataValues,type MetadataValueRow} from './
 import type {SqlPersistence} from './sql-persistence.js';
 
 export const PAGE_LAYOUT_VARIANTS=['Mobile','Desktop','Tablet','Custom'] as const;
+/** Only pages replacing app/record navigation surfaces require an activation assignment. */
+export const pageRequiresActivationAssignment=(pageType:string):boolean=>
+ pageType==='Home Page'||pageType==='Record Page';
 export type PageLayoutVariant=typeof PAGE_LAYOUT_VARIANTS[number];
 type PageSnapshot={
  desktopDraftRevision?:number;
@@ -364,7 +367,7 @@ export class PageLayoutVersionRuntime{
    ]);
    const activeAssignments=type.rows[0]?.page_type==='App Page'&&existing.rows.length
     ?existing.rows:mergePublishedPageActivation(existing.rows,incoming.rows,variant);
-   if(['Home Page','Record Page'].includes(type.rows[0]?.page_type??'')&&!activeAssignments.length)
+   if(pageRequiresActivationAssignment(type.rows[0]?.page_type??'')&&!activeAssignments.length)
     throw new Error('Add a page activation assignment before publishing');
    // Page name is edited separately via Page Details and remains authoritative.
    // Immutable page_label snapshots document the historical draft, not the

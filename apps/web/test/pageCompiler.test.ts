@@ -4,7 +4,8 @@ import ts from 'typescript';
 import {compilePage} from '../src/core/pages/PageCompiler/compilePage';
 import {generatePageScript} from '../src/core/pages/PageCompiler/generatePageScript';
 import {scriptFormulaOperators,scriptFormulaLibrary} from '../src/core/pages/PageCompiler/pageScriptHost';
-import {evaluateFieldExpression} from '../src/component-libraries/shared/FieldExpression.js';
+import {evaluateFieldExpression,evaluateFieldExpressionDetailed,evaluateCollectionFormula} from '../src/component-libraries/shared/FieldExpression.js';
+import {relationshipFormulaFields} from '../src/core/builders/PageBuilder/relationshipFormulaFields';
 import type {LightningPageMetadata,ObjectMetadata} from '../src/core/metadata/Definitions/metadata';
 
 const field=(apiName:string,dataType='Text')=>({apiName,label:apiName,dataType,required:false,unique:false});
@@ -192,11 +193,64 @@ test('a cart shows only its own cart: active cart first, else the session cart (
  assert.deepEqual(reads,['CartLine:Cart='+cartId],'active cart from page state, no lookup');
 });
 
-test('lists bound with @Field, search boxes and category filters load every row (not 50)',()=>{
+test('category filters still use complete sources, but scalar field formulas do not force an array',()=>{
  const listPage={...page,components:[
-  {id:'grid',type:'Custom:smart_card_grid',label:'G',visible:true,properties:{objectApiName:'Product',textSource:'@Name',filterKey:'category'}},
+  {id:'grid',type:'Custom:smart_card_grid',label:'G',visible:true,properties:{objectApiName:'Product',textSource:'@Product.Name',filterKey:'category'}},
+  {id:'row-fields',type:'Custom:smart_card_grid',label:'Row fields',visible:true,
+   properties:{objectApiName:'Product',textSource:'@Product.Name',badgeText:'=@Product.Price * 2'}},
+  {id:'dataset',type:'Custom:smart_card_grid',label:'Products',visible:true,
+   properties:{objectApiName:'Product',textSource:'@Product'}},
   {id:'plain',type:'Custom:smart_table',label:'T',visible:true,properties:{objectApiName:'Cart',titleFieldApiName:'Name'}}]} as unknown as LightningPageMetadata;
  const compiled=compilePage(listPage,objects);
  assert.equal(compiled.dataSources.find(s=>s.components.includes('grid'))!.complete,true);
+ assert.equal(compiled.dataSources.find(s=>s.components.includes('row-fields'))!.complete,false,'card fields evaluate per row');
+ assert.equal(compiled.dataSources.find(s=>s.components.includes('dataset'))!.complete,false,'full Object array keeps native pagination');
  assert.equal(compiled.dataSources.find(s=>s.components.includes('plain'))!.complete,false,'other lists still page by 50');
+});
+
+test('qualified scalar fields and COLLECTION datasets have different contexts',()=>{
+ const products=[{Id:'p1',Name:'Tea',Price:4},{Id:'p2',Name:'Coffee',Price:6}];
+ const options={rootObjectApiName:'Product',collectionSources:{Product:products},
+  collectionSourceFields:{Product:['Id','Name','Price']}};
+ assert.equal(evaluateFieldExpressionDetailed('@Product.Name',products[0],options).value,'Tea');
+ assert.equal(evaluateFieldExpressionDetailed('=@Product.Price * 2',products[1],options).value,'12');
+ assert.equal(evaluateFieldExpressionDetailed('=SUM(@Product.Price)',products[0],options).value,'10');
+ assert.match(evaluateFieldExpressionDetailed('@Name',products[0],options).error??'',/Bare @Field/);
+ assert.match(evaluateFieldExpressionDetailed('@Menu',products[0],{
+  ...options,namedCollections:{Menu:{name:'Menu',items:['Tea']}}}).error??'',/named collection/);
+ assert.match(evaluateFieldExpressionDetailed('@Menu.state.Value',products[0],{
+  ...options,namedCollectionSelections:{Menu:{Value:'Tea'}}}).error??'',/Collection selection/);
+ const result=evaluateCollectionFormula('=COLLECTION("Menu", 2, 3)',{Product:products},{
+  primaryObject:'Product',collectionSourceFields:{Product:['Id','Name','Price']}});
+ assert.equal(result.error??null,null);
+ assert.deepEqual(result.value?.items,[2,3]);
+});
+
+test('relationship suggestions use the actual Object.Relationship.Field path',()=>{
+ const customer={apiName:'Customer',label:'Customer',pluralLabel:'Customers',
+  fields:[field('Name')]} as unknown as ObjectMetadata;
+ const product={...objects[0],fields:[...objects[0].fields,{
+  ...field('CustomerId','Lookup(Customer)'),
+  relationship:{relationshipName:'Customer',targetObject:'Customer'}}]} as ObjectMetadata;
+ const refs=relationshipFormulaFields([product,customer],['Product'],'','formula');
+ assert.ok(refs.some(item=>item.reference==='@Product.Name'));
+ assert.ok(refs.some(item=>item.reference==='@Product.Customer.Name'));
+});
+
+test('Smart Lookup searches its Object with 20 guarded prefix matches independently of pagination',async()=>{
+ const {compiledSourceLoader}=await import('../src/core/pages/PageCompiler/compiledSourceLoader');
+ const compiled=compilePage({...page,components:[{id:'lookup',type:'Custom:smart_lookup',
+  label:'Search Products',visible:true,
+  properties:{objectApiName:'Product',filters:[{field:'Category',operator:'Equals',value:'Drinks'}]}}]} as unknown as LightningPageMetadata,objects);
+ const source=compiled.dataSources[0];
+ const calls:Record<string,unknown>[]=[];
+ const loader=compiledSourceLoader(objects,()=>({sessionId:'s'}),async(object,options)=>{
+  calls.push({object,...options});
+  return {records:[{Id:'p1',Name:'Coca-Cola'}],total:1};
+ });
+ const found=await loader.search(source,{},'coc');
+ assert.equal(found[0].Name,'Coca-Cola');
+ assert.deepEqual(calls[0],{object:'Product',limit:20,offset:0,search:'coc',searchPrefix:true,
+  forceRefresh:true,filter:undefined,
+  filters:[{field:'Category',operator:'eq',value:'Drinks'}],filterLogic:'(1)'});
 });

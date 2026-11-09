@@ -3,7 +3,9 @@ export function tenantDeveloperDomain(slug:string,baseDomain:string|undefined=pr
  const tenant=slug.toLowerCase();
  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tenant)||tenant.length>54)
    throw new Error('Invalid tenant identifier');
- const base=baseDomain?.trim().toLowerCase();
+ // Tenants without a custom domain use our reserved platform namespace.
+ // An explicitly configured base is still checked; malformed hostnames fail closed.
+ const base=(baseDomain?.trim()||'tenants.unesolutions.co.uk').toLowerCase();
  if(!base||!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(base))
    throw new Error('Tenant login base domain is not configured');
  return tenant+'.'+base;

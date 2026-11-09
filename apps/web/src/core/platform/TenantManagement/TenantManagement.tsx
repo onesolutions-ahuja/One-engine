@@ -25,11 +25,11 @@ export type TenantSummary = {
 };
 
 type TenantCreate = {
-  tenantId: string; tenantName: string; adminName: string; email: string; password: string; developerDomain?: string; tenantDeveloperEmail: string;
+  tenantId: string; tenantName: string; adminName: string; email: string; password: string; tenantDeveloperEmail: string;
 };
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
 type TenantDeveloperAvailability = { email: string; available: boolean; alternatives: string[]; developerDomain: string };
-const emptyCreate: TenantCreate = { tenantId: '', tenantName: '', adminName: '', email: '', password: '', developerDomain: '', tenantDeveloperEmail: '' };
+const emptyCreate: TenantCreate = { tenantId: '', tenantName: '', adminName: '', email: '', password: '', tenantDeveloperEmail: '' };
 const shortDate = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? '—' : date.toLocaleDateString();
@@ -146,12 +146,12 @@ export default function TenantManagement({ request, permitted }: { request: Requ
     event.preventDefault();
     if (!permitted || busy) return;
     if(administratorEmailMatchesDeveloper){setError('Initial administrator and tenant developer emails must be different.');return;}
-    if(!developerEmailAvailable||!emailCheck?.developerDomain){setError('Verify an available developer email and login domain.');return;}
+    if(!developerEmailAvailable||!emailCheck?.developerDomain){setError('Verify an available developer mailbox.');return;}
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await request<{ tenant: TenantSummary; replayed: boolean }>('/platform/tenants', {
         method: 'POST', headers: { 'Idempotency-Key': createKey },
-        body: JSON.stringify({ ...create, developerDomain: emailCheck.developerDomain })
+        body: JSON.stringify(create)
       });
       setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID());
       setSelected(result.tenant);
@@ -325,9 +325,8 @@ export default function TenantManagement({ request, permitted }: { request: Requ
           <div className="tenant-detail-heading"><h2 id="tenant-create-title">New tenant</h2><button type="button" className="tenant-button" disabled={busy} onClick={() => { setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID()); }}>Close</button></div>
           {tenantCreateFieldDefinitions.map(field=><AdminPropertyControl
             key={field.key} definition={{...field,propertyKey:field.key,kind:'TEXT'}}
-            value={field.key==='developerDomain'?emailCheck?.developerDomain??'':create[field.key]??''}
-            readOnly={field.key==='developerDomain'}
-            onChange={value=>{if(field.key==='developerDomain')return;setCreateKey(crypto.randomUUID());setCreate(old=>({...old,[field.key]:value,...(field.key==='tenantId'?{tenantDeveloperEmail:value+'@unesolutions.co.uk'}:{})}));}}/>)}
+            value={create[field.key]??''}
+            onChange={value=>{setCreateKey(crypto.randomUUID());setCreate(old=>({...old,[field.key]:value,...(field.key==='tenantId'?{tenantDeveloperEmail:value+'@unesolutions.co.uk'}:{})}));}}/>)}
           <div className="tenant-help" aria-live="polite">
             {emailCheckError?<span role="alert">Developer mailbox check failed: {emailCheckError}</span>:
               emailChecking?'Checking mailbox availability…':emailCheck?
@@ -338,7 +337,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
               </>:create.tenantId?'Tenant ID must contain lowercase letters, numbers or hyphens (maximum 54 characters).':'Enter a tenant ID to verify developer mailbox availability.'}
           </div>
           {administratorEmailMatchesDeveloper&&<p className="tenant-help tenant-validation-error" role="alert">Initial administrator email must differ from the tenant developer email.</p>}
-          <p className="tenant-help">Developer login domain is assigned by the platform. External website URLs can be configured under Domains after tenant creation.</p>
+          <p className="tenant-help">Platform login domain: <strong>{emailCheck?.developerDomain??'assigned automatically'}</strong>. Your organisation does not need its own domain. The administrator can use any valid email address; custom website domains can be added later under Domains.</p>
           <p className="tenant-help">Creates an initial administrator and a disabled developer account with full starting tenant permissions. The new developer identity uses the selected @unesolutions.co.uk mailbox. The tenant administrator activates the developer account from Company Settings; no password is shared with platform operators.</p>
           <div className="setup-draft-footer"><span>Unsaved tenant draft</span><button type="button" className="tenant-button" disabled={busy} onClick={() => { setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID()); }}>Discard</button><button type="submit" className="tenant-button tenant-button-primary" disabled={!canCreateTenant}>{busy ? 'Creating…' : 'Create tenant'}</button></div>
         </form>

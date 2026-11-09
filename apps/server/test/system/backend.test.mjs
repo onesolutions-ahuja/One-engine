@@ -83,12 +83,13 @@ test('OCI live telemetry reports collector health and stages without GitHub quer
 });
 
 
-test('tenant developer login host is derived only from the configured platform base domain',()=>{
+test('tenant developer login host uses a configured or default platform-owned base domain',()=>{
  assert.equal(tenantDeveloperDomain('kingstonexterior','tenants.unesolutions.co.uk'),
    'kingstonexterior.tenants.unesolutions.co.uk');
  assert.equal(tenantDeveloperDomain('New-Tenant',' TENANTS.EXAMPLE.COM '),
    'new-tenant.tenants.example.com');
- assert.throws(()=>tenantDeveloperDomain('mytenant',''),/base domain is not configured/);
+ assert.equal(tenantDeveloperDomain('mytenant',''),'mytenant.tenants.unesolutions.co.uk');
+ assert.equal(tenantDeveloperDomain('mytenant','  '),'mytenant.tenants.unesolutions.co.uk');
  assert.throws(()=>tenantDeveloperDomain('mytenant','https://example.com/'),/base domain is not configured/);
  assert.throws(()=>tenantDeveloperDomain('tenant.name','tenants.example.com'),/Invalid tenant identifier/);
  assert.throws(()=>tenantDeveloperDomain('x'.repeat(55),'tenants.example.com'),/Invalid tenant identifier/);
@@ -104,10 +105,17 @@ test('mailbox availability endpoint is registered before the dynamic tenant slug
 test('tenant form uses verified domain, retains mailbox failures, and blocks duplicate identities',()=>{
  const ui=readFileSync(new URL('../../../web/src/core/platform/TenantManagement/TenantManagement.tsx',import.meta.url),'utf8');
  const fields=readFileSync(new URL('../../../web/src/core/platform/TenantManagement/adminTenantFieldMetadata.ts',import.meta.url),'utf8');
- assert.match(ui,/developerDomain: emailCheck\.developerDomain/);
- assert.match(ui,/readOnly=\{field\.key==='developerDomain'\}/);
+ assert.match(ui,/body: JSON\.stringify\(create\)/);
+ assert.doesNotMatch(ui,/readOnly=\{field\.key==='developerDomain'\}/);
+ assert.doesNotMatch(fields,/key:'developerDomain'/);
+ assert.match(ui,/emailCheck\?\.developerDomain/);
  assert.match(ui,/setEmailCheckError\(cause instanceof Error/);
  assert.match(ui,/administratorEmailMatchesDeveloper/);
  assert.match(ui,/disabled=\{!canCreateTenant\}/);
  assert.match(fields,/key:'tenantId'[^\n]*maxLength:54/);
+ const service=readFileSync(new URL('../../src/system-files/platform-tenant-service.ts',import.meta.url),'utf8');
+ const inspection=readFileSync(new URL('../../src/system-support/tenant-inspection-routes.ts',import.meta.url),'utf8');
+ assert.match(service,/domain:expectedDomain/);
+ assert.match(service,/x\.developerDomain!==undefined/);
+ assert.match(inspection,/domain===tenantDeveloperDomain\(name\)/);
 });

@@ -29,6 +29,7 @@ export function tableFormulaObject(formula:string):string|null{
 }
 
 export function collectionFormulaReferences(formula:string,primaryObject='',knownCollections:readonly string[]=[],primaryFields?:readonly string[]):Array<{object:string;field:string}>{
+ void primaryObject;void knownCollections;void primaryFields;
  if(!/\bCOLLECTION\s*\(/i.test(formula))return [];
  const found=new Map<string,{object:string;field:string}>();
  const visit=(node:Expression):void=>{
@@ -104,8 +105,8 @@ export function usePageCollectionFormula(
    &&(declared===source||declared==='='+source)
   ?{object:directObject,field:directField,criterion:'*',operator:'='}:null;
  const listBinding=parseCollectionListBinding(source,primaryObject)??directBinding;
- const namedListSource=listBinding&&listBinding.object===primaryObject
-  ?Object.entries(registry.collections).find(([key])=>key.toLowerCase()===listBinding.field.toLowerCase())?.[1]:undefined;
+ // Named Collection lookup as a Data Source was retired.
+ const namedListSource:PageNamedCollection|undefined=undefined;
  const primaryField=Boolean(listBinding&&objects.find(o=>o.apiName===listBinding.object)
    ?.fields.some(field=>field.apiName===listBinding.field));
  const unresolvedNamedList=Boolean(listBinding&&!namedListSource&&!primaryField
@@ -152,12 +153,10 @@ export function usePageCollectionFormula(
  const result=(()=>{
  if(!source)return {collection:null,error:null,loading:false};
  const saved=/^@([A-Za-z][A-Za-z0-9_]{0,79})$/.exec(source);
- if(saved){
-  const named=Object.entries(registry.collections).find(([name])=>name.toLowerCase()===saved[1].toLowerCase())?.[1];
-  if(named)return {collection:named,error:null,loading:false};
-  if(!directBinding&&!fullObject)return {collection:null,error:null,loading:false};
- }
- if(unresolvedNamedList)return {collection:null,error:null,loading:false};
+ if(saved&&!fullObject&&!directBinding)return {collection:null,
+   error:'FORMULAERROR: bare @Field and @NamedCollection are unsupported; use @Object.Field',loading:false};
+ if(unresolvedNamedList)return {collection:null,
+   error:'FORMULAERROR: unknown Object field: '+source,loading:false};
  if(!listBinding&&!isTableProjection&&!referencesNamed&&!isCollectionSourceExpression(source,existingCollections))
   return {collection:null,error:null,loading:false};
  const notSelected=refs.find(ref=>!selected.includes(ref.object))

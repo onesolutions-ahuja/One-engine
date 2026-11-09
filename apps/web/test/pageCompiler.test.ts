@@ -191,3 +191,12 @@ test('a cart shows only its own cart: active cart first, else the session cart (
  await layer.stateChanged(['activeCartId']);
  assert.deepEqual(reads,['CartLine:Cart='+cartId],'active cart from page state, no lookup');
 });
+
+test('lists bound with @Field, search boxes and category filters load every row (not 50)',()=>{
+ const listPage={...page,components:[
+  {id:'grid',type:'Custom:smart_card_grid',label:'G',visible:true,properties:{objectApiName:'Product',textSource:'@Name',filterKey:'category'}},
+  {id:'plain',type:'Custom:smart_table',label:'T',visible:true,properties:{objectApiName:'Cart',titleFieldApiName:'Name'}}]} as unknown as LightningPageMetadata;
+ const compiled=compilePage(listPage,objects);
+ assert.equal(compiled.dataSources.find(s=>s.components.includes('grid'))!.complete,true);
+ assert.equal(compiled.dataSources.find(s=>s.components.includes('plain'))!.complete,false,'other lists still page by 50');
+});

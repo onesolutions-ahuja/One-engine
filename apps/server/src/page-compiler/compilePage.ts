@@ -235,7 +235,12 @@ export function recordScope(type:string,properties:Readonly<Record<string,unknow
 }
 export function usesCollections(properties:Readonly<Record<string,unknown>>,formulas:readonly CompiledFormula[]):boolean{
  return Boolean(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim()
-  ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')||f.functions.includes('SUM')));
+  ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')||f.functions.includes('SUM')
+   // A bare @Field binding (e.g. text = @Name) turns the rows into a list collection,
+   // which must hold every row; so do search boxes and client-side category filters.
+   ||/^=?\s*@[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)?$/.test(f.source))
+  ||typeof properties.filterKey==='string'&&properties.filterKey.trim()
+  ||typeof properties.categoryFieldApiName==='string'&&properties.categoryFieldApiName.trim());
 }
 function wordIn(text:string,word:string):boolean{
  const needle=word.toLowerCase();

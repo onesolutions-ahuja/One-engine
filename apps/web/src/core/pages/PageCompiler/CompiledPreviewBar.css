@@ -1,6 +1,7 @@
 .compiled-preview-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;
- padding:6px 10px;margin:0 0 6px;border:1px solid var(--md-border,#cbd5e1);border-radius:6px;
- background:var(--md-surface-subtle,#f1f5f9);font-size:13px;color:var(--md-text,#1e293b)}
+ padding:6px 10px;margin:0 0 6px;border:1px solid #cbd5e1;border-radius:6px;
+ /* Fixed light colours: theme variables made the bar dark with dark text. */
+ background:#eef4ff;font-size:13px;color:#172033}
 .compiled-preview-actions{display:flex;gap:6px}
 .compiled-preview-errors{color:#b91c1c;font-weight:600}
 .compiled-preview-dialog{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:rgba(15,23,42,.45)}

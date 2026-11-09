@@ -152,6 +152,10 @@ export function usePageCollectionFormula(
  },[key]);
  const result=(()=>{
  if(!source)return {collection:null,error:null,loading:false};
+ // A full @Object Data Source is the page's native paginated record array,
+ // not a synthetic COLLECTION() with a 200-row limit. Card/Grid/Cart use
+ // their existing row loaders and evaluate field properties per row.
+ if(fullObject)return {collection:null,error:null,loading:false};
  const saved=/^@([A-Za-z][A-Za-z0-9_]{0,79})$/.exec(source);
  if(saved&&!fullObject&&!directBinding)return {collection:null,
    error:'FORMULAERROR: bare @Field and @NamedCollection are unsupported; use @Object.Field',loading:false};

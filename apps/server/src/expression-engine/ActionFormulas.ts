@@ -89,7 +89,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source)).parse();
@@ -144,6 +144,17 @@ export function compileActionPlan(source:string):ActionStep[] {
    if(args.length!==2)throw Error('WAIT requires minutes and seconds');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
    steps.push({name:'WAIT',object:'',values:args,fields:new Map(),guards});
+   return;
+  }
+  if(node.name==='RECORDPAYMENT'){
+   // RECORDPAYMENT(InvoiceId, Amount, Method, [Note], [AS(pay)]): one server transaction
+   // posts a CashLedger receipt and updates Invoice AmountPaid/Status. No Flow needed.
+   let alias:string|undefined;
+   const last=args.at(-1);
+   if(last?.kind==='call'&&last.name==='AS'){alias=takeAlias(last,'AS requires one variable');args.pop();}
+   if(args.length<3||args.length>4)throw Error('RECORDPAYMENT requires Invoice ID, Amount, Method and an optional Note');
+   args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
+   steps.push({name:'RECORDPAYMENT',object:'',values:args,fields:new Map(),alias,guards});
    return;
   }
   if(node.name==='LOCATION'){
@@ -684,6 +695,18 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
        const inner:Record<string,unknown>=Object.assign(Object.create(null),variables,{[step.alias!]:item});
        await run(step.body!,inner,false);
       }
+      completed++;
+      continue;
+     }
+     if(step.name==='RECORDPAYMENT'){
+      const [invoiceId,amount,method,note]=(step.values??[]).map(evaluate);
+      // One idempotency key per run: a retried request can never post the payment twice.
+      const reference='pay-'+(globalThis.crypto?.randomUUID?.()??(Date.now().toString(36)+Math.random().toString(36).slice(2)));
+      const result=await tracedRequest<Record<string,unknown>>('/action-formulas/record-payment',{method:'POST',
+       body:JSON.stringify({invoiceId,amount,method,note:note??'',reference})});
+      recordChanged=true;
+      mutatedObjectApiNames.add('Invoice');mutatedObjectApiNames.add('CashLedger');
+      if(step.alias)variables[step.alias]=result;
       completed++;
       continue;
      }

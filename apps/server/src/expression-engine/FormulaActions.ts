@@ -15,6 +15,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'GETRECORD',parameters:['Object','Field1','Value1','AS(variable)']},
  {name:'STATE',parameters:['Key','Value']},
  {name:'LOCATION',parameters:['AS(variable)']},
+ {name:'RECORDPAYMENT',parameters:['InvoiceId','Amount','Method','Note','AS(variable)']},
  {name:'FOREACH',parameters:['Object','Field1','Value1','AS(item)','Action']},
  {name:'CLOSESCREEN',parameters:[]},
  {name:'AS',parameters:['variable']}

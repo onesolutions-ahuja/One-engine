@@ -1,3 +1,5 @@
+import {recordInvoicePayment} from './record-payment-service.js';
+import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
 import {withAuditContext,auditContext,setAuditActor} from './audit-context.js';
@@ -1942,6 +1944,15 @@ export function createSystemServer(db:SqlPersistence) {
     const valid=await new TillPinService(db).verify(actor.tenant_id,userId??actor.user_id,pin,actor.user_id);
     res.setHeader('Cache-Control','private, no-store');
     res.json({valid});
+  }));
+  app.post('/api/action-formulas/record-payment',route(async(req,res)=>{
+    const actor=req.actor!;
+    const {invoiceId,amount,method,note,reference}=req.body??{};
+    // Normal Invoice edit + CashLedger create permissions apply inside the service.
+    const result=await recordInvoicePayment({db,records,query:new FlowRecordQuery(db,rbac)},
+      actor.tenant_id,actor.user_id,{invoiceId,amount,method,note,reference});
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(result);
   }));
   app.post('/api/action-formulas/communication',route(async(req,res)=>{
     const actor=req.actor!;

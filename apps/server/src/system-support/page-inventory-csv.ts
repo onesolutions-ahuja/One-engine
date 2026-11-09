@@ -63,7 +63,10 @@ const sharedPageSettings:ComponentSettingDefinition[]=[
   fields:conditionSettings,section:'View'},
  {propertyKey:'actionFlows',label:'Configured Actions',kind:'GROUP',section:'Actions'},
  {propertyKey:'editorLocked',label:'Lock component in designer',kind:'BOOLEAN',
-  defaultValue:false,section:'Arrange'}
+  defaultValue:false,section:'Arrange'},
+ // Data ribbon "Record filter formula": which rows a list shows, e.g.
+ // =IF(ISBLANK(@Tabs.state.Id), TRUE, @Product.Category = @Tabs.state.Id)
+ {propertyKey:'filterFormula',label:'Record filter formula',kind:'TEXT',maxLength:2000,section:'Data'}
 ];
 const pageSettingsFor=(type:string):ComponentSettingDefinition[]=>[
  ...sharedPageSettings,

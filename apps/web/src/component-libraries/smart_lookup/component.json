@@ -23,6 +23,10 @@
     {
       "apiName": "change",
       "label": "Change"
+    },
+    {
+      "apiName": "select",
+      "label": "Select record"
     }
   ]
 }

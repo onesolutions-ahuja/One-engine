@@ -12,8 +12,8 @@ export function pageStateChoices(components:readonly SourceComponent[]):PageStat
   const authored=Object.entries(props).filter(([key])=>key!=='collectionFormula')
     .flatMap(([,value])=>namedCollectionNames(value));
   const names=[...new Set(authored.length?authored:namedCollectionNames(props.collectionFormula))];
-  for(const name of names)for(const field of ['Id','Name','Value','Field','Criteria'])
-   add({source:'CollectionState',key:formulaCollectionReferenceKey(name)+'.state.'+field,label:name+'.state.'+field});
+  // COLLECTION() still creates a dataset; it no longer creates @Collection.state values.
+  void names;
   const actions=props.actionFlows;
   if(actions&&typeof actions==='object'&&!Array.isArray(actions)){
    for(const config of Object.values(actions)){

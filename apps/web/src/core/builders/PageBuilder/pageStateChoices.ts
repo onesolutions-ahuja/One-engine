@@ -1,5 +1,3 @@
-import {namedCollectionNames} from '../../pages/PageRuntime/pageCollectionSession';
-import {formulaCollectionReferenceKey} from '../../../../../server/src/expression-engine/FormulaCollection.js';
 type SourceComponent={id:string;properties:Record<string,unknown>};
 export type PageStateChoice={source:'PageState'|'CollectionState';key:string;label:string};
 /** List metadata-declared state channels, not arbitrary strings or object data.
@@ -9,11 +7,6 @@ export function pageStateChoices(components:readonly SourceComponent[]):PageStat
  const add=(item:PageStateChoice)=>entries.set(item.source+':'+item.key,item);
  for(const component of components){
   const props=component.properties;
-  const authored=Object.entries(props).filter(([key])=>key!=='collectionFormula')
-    .flatMap(([,value])=>namedCollectionNames(value));
-  const names=[...new Set(authored.length?authored:namedCollectionNames(props.collectionFormula))];
-  // COLLECTION() still creates a dataset; it no longer creates @Collection.state values.
-  void names;
   const actions=props.actionFlows;
   if(actions&&typeof actions==='object'&&!Array.isArray(actions)){
    for(const config of Object.values(actions)){

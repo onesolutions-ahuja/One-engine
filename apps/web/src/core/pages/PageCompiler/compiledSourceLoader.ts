@@ -8,7 +8,8 @@ import type {SourceLoad} from './compiledPageStore';
 
 type RecordPageLoader=(objectApiName:string,options:{limit:number;offset:number;
  filter?:{field:string;value:string;related:boolean};
- filters?:Array<{field:string;operator:string;value:string}>;filterLogic?:string})=>
+ filters?:Array<{field:string;operator:string;value:string}>;filterLogic?:string;
+ search?:string;searchPrefix?:boolean;forceRefresh?:boolean})=>
  Promise<{records:Record<string,unknown>[];total:number}>;
 type Scope={blocked:boolean;filter?:PageQueryFilter;field:string;parentId:unknown};
 type State=Readonly<Record<string,unknown>>;
@@ -18,7 +19,8 @@ type State=Readonly<Record<string,unknown>>;
  * component. Session parents (the cart of this page session) are discovered
  * once and remembered until that parent Object is written. */
 export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:()=>{sessionId:string;recordId?:string},
- loadPage:RecordPageLoader):SourceLoad&{invalidate(objectApiNames?:readonly string[]):void}{
+ loadPage:RecordPageLoader):SourceLoad&{invalidate(objectApiNames?:readonly string[]):void;
+ search(source:CompiledDataSource,state:State,term:string):Promise<Record<string,unknown>[]>}{
  const sessionParents=new Map<string,{parents:string[];scope:Scope}>();
  const scopeFor=async(source:CompiledDataSource,fields:ReadonlyArray<FieldMetadata>,state:State,sessionId:string):Promise<Scope>=>{
   const scope=source.scope;
@@ -70,7 +72,21 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
    predictable:Boolean(query.serverFilterable&&!source.filterFormula
     &&(!query.filterLogic||/^\(?1\)?$/.test(query.filterLogic)))};
  };
- return Object.assign(load,{invalidate(objectApiNames?:readonly string[]){
+ // Search follows the exact same metadata filter and parent-scope rules as the
+ // list loader. Never show broader results when a filter cannot run on the server.
+ const search=async(source:CompiledDataSource,state:State,term:string)=>{
+  const {sessionId,recordId}=context();
+  const fields=objects.find(object=>object.apiName===source.objectApiName)?.fields??[];
+  const query=pageComponentRecordQuery(source.filters,fields,{pageState:state,sessionId,recordId},
+   source.filterLogic,source.filterFormula);
+  if(query.blocked||!query.serverFilterable)throw Error('Search requires server-compatible filters');
+  const related=await scopeFor(source,fields,state,sessionId);
+  if(related.blocked)throw Error('Search is unavailable without the parent record');
+  const page=await loadPage(source.objectApiName,{limit:20,offset:0,search:term,searchPrefix:true,forceRefresh:true,
+   filter:related.filter??query.filter,filters:query.filters,filterLogic:query.filterLogic});
+  return page.records;
+ };
+ return Object.assign(load,{search,invalidate(objectApiNames?:readonly string[]){
   for(const [key,entry] of sessionParents)
    if(!objectApiNames||entry.parents.some(name=>objectApiNames.includes(name)))sessionParents.delete(key);
  }});

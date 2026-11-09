@@ -18,7 +18,9 @@ import {generatePageScript} from './generatePageScript.js';
  */
 export type PageScriptTicket={tenantId:string;userId:string;apiName:string;variant:string;expires:number;
  /** Preview of unsaved edits: serve this user's draft build instead of the saved page. */
- previewId?:string};
+ previewId?:string;
+ /** Published app page: a tenant-shared build, opened by anyone who can open the App. */
+ buildId?:string;appId?:string};
 export type PageScriptKey={tenantId:string;apiName:string;variant:string};
 export type CompiledServerAction={formula:string;serverDataSteps:number;totalSteps:number};
 type Built={revision:number|null;code:string;etag:string;objectStamp:string;compiled:CompiledPage;
@@ -39,13 +41,15 @@ export class PageScriptService{
  private readonly previews=new Map<string,Built&{tenantId:string;userId:string;apiName:string;variant:string}>();
  constructor(private readonly now:()=>number=()=>Date.now()){}
 
- issueTicket(tenantId:string,userId:string,apiName:string,variant:string,previewId?:string):string{
+ issueTicket(tenantId:string,userId:string,apiName:string,variant:string,previewId?:string,
+  published?:{buildId:string;appId:string}):string{
   if(!apiNamePattern.test(apiName))throw new Error('Invalid page API name');
   const now=this.now();
   for(const [id,entry] of this.tickets)if(entry.expires<=now)this.tickets.delete(id);
   if(this.tickets.size>=MAX_TICKETS)this.tickets.delete(this.tickets.keys().next().value!);
   const id=randomBytes(32).toString('base64url');
-  this.tickets.set(id,{tenantId,userId,apiName,variant,expires:now+TICKET_MS,...(previewId?{previewId}:{})});
+  this.tickets.set(id,{tenantId,userId,apiName,variant,expires:now+TICKET_MS,...(previewId?{previewId}:{}),
+   ...(published?{buildId:published.buildId,appId:published.appId}:{})});
   return id;
  }
  /** Single use: a ticket works once, then is gone. */
@@ -103,6 +107,35 @@ export class PageScriptService{
   if(this.previews.size>=MAX_BUILT)this.previews.delete(this.previews.keys().next().value!);
   this.previews.set(previewId,built);
   return {previewId,built};
+ }
+ /** Published app pages: one build per tenant + app + page content, shared by its users. */
+ private readonly appBuilds=new Map<string,Built&{tenantId:string;appId:string;apiName:string}>();
+ buildAppPage(tenantId:string,appId:string,page:CompilerPage,objects:readonly CompilerObject[]):{buildId:string;built:Built}{
+  if(!apiNamePattern.test(page.apiName??''))throw new Error('Invalid page API name');
+  const compiled=compilePage(page,objects,{strictLegacy:true});
+  const code=generatePageScript(compiled,'js');
+  const hash=createHash('sha256').update(code).digest('base64url');
+  const buildId=createHash('sha256').update([tenantId,appId,hash].join('\u0000')).digest('base64url').slice(0,32);
+  const hit=this.appBuilds.get(buildId);
+  if(hit){this.appBuilds.delete(buildId);this.appBuilds.set(buildId,hit);return {buildId,built:hit};}
+  const actions=new Map<string,CompiledServerAction>();
+  for(const component of compiled.components)for(const action of component.actions)
+   if(action.kind==='ActionPlan'&&!action.error&&action.formula)
+    actions.set(component.id+':'+action.event,{formula:action.formula,
+     serverDataSteps:action.serverDataSteps,totalSteps:action.totalSteps});
+  const built={revision:compiled.revision,code,etag:'"a.'+hash.slice(0,24)+'"',objectStamp:'',compiled,actions,
+   tenantId,appId,apiName:page.apiName};
+  if(this.appBuilds.size>=MAX_BUILT)this.appBuilds.delete(this.appBuilds.keys().next().value!);
+  this.appBuilds.set(buildId,built);
+  return {buildId,built};
+ }
+ appBuild(tenantId:string,appId:string,buildId:string):(Built&{apiName:string})|null{
+  const entry=this.appBuilds.get(buildId);
+  return entry&&entry.tenantId===tenantId&&entry.appId===appId?entry:null;
+ }
+ appAction(tenantId:string,appId:string,buildId:string,actionKey:string):CompiledServerAction|null{
+  if(!compiledActionKeyPattern.test(actionKey))return null;
+  return this.appBuild(tenantId,appId,buildId)?.actions.get(actionKey)??null;
  }
  /** A preview build, only for the user who made it. */
  preview(tenantId:string,userId:string,previewId:string):(Built&{apiName:string;variant:string})|null{

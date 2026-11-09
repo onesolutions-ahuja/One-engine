@@ -121,6 +121,7 @@ import { inspectPageDependencies } from './pageDependencies';
 import {CompiledPageProvider,MemoizedCompiledComponentNode} from '../PageCompiler/CompiledPageRuntime';
 import type {CompiledPage} from '../PageCompiler/compilePage';
 import type {LoadedPageScript} from '../PageCompiler/serverPageScript';
+import {useAppPageScript} from '../PageCompiler/useAppPageScript';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1111,8 +1112,8 @@ function LightningAppRuntime({
   inScreenContext,
   previewPage,
   previewLayoutDevice,
-  compiledPage,
-  compiledScript
+  compiledPage:compiledPageProp,
+  compiledScript:compiledScriptProp
 }: {
   appId: string;
   pageApiName?: string;
@@ -1142,7 +1143,6 @@ function LightningAppRuntime({
 }) {
   const detectedLayoutDevice = usePageLayoutDevice();
   const layoutDevice = previewLayoutDevice ?? detectedLayoutDevice;
-  const compiledById=useMemo(()=>new Map((compiledPage?.components??[]).map(item=>[item.id,item])),[compiledPage]);
   const viewportWidth=useViewportWidth();
   const requestedLayout = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('pageLayout') === 'Custom'
@@ -1161,6 +1161,11 @@ function LightningAppRuntime({
   // Never run components from the previous route while navigating. Cached
   // definitions render immediately; uncached routes show the loading state.
   const page=previewPage??(routePending?cached:pageLoad.page);
+  // Published pages run their server-converted file (classic engine if that fails).
+  const appScript=useAppPageScript(apiRequest,appId,previewPage?null:page,!previewPage&&!compiledPageProp);
+  const compiledScript=compiledScriptProp??(appScript.status==='ready'?appScript.script:null);
+  const compiledPage=compiledPageProp??(appScript.status==='ready'?appScript.script.plan:undefined);
+  const compiledById=useMemo(()=>new Map((compiledPage?.components??[]).map(item=>[item.id,item])),[compiledPage]);
   const error=previewPage?'':routePending?'':pageLoad.error;
   const loading=previewPage?false:routePending?!cached:pageLoad.loading;
   const [activeTabs, setActiveTabs] = useState<Record<string,string>>({});
@@ -1244,6 +1249,7 @@ function LightningAppRuntime({
   }, [page?.layoutMode, onStandaloneModeChange]);
   if(error&&!page)return <div className="records-page"><div className="records-message" role="alert">{error}</div></div>;
   if(loading&&!page)return <div className="records-page"><div className="records-loading">Loading Lightning page…</div></div>;
+  if(page&&appScript.status==='loading')return <div className="records-page"><div className="records-loading">Loading Lightning page…</div></div>;
   if (!page) return <main className="records-page"><section className="records-empty records-home-unassigned" aria-labelledby="records-home-empty-heading"><h1 id="records-home-empty-heading">Home page is not configured</h1><p>This app has no active Home Page assigned for your current profile and device.</p><p>Ask an administrator to activate and assign a Home Page in the Lightning App Builder. Existing app pages and records remain available from navigation.</p></section></main>;
   const isStandaloneRuntime = isStandalonePagePresentation(page);
   const regions: Array<'header' | 'main' | 'sidebar'> = ['header', 'main', 'sidebar'];

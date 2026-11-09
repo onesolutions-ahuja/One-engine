@@ -19,6 +19,8 @@ export type PageScriptModule={
 export type LoadedPageScript={apiName:string;variant:string;revision:number;plan:CompiledPage;
  /** Set when the file was converted from the Builder's current (unsaved) page. */
  previewId?:string;
+ /** Published app page: the tenant-shared build and its app. */
+ app?:{appId:string;buildId:string};
  actions:Record<string,CompiledActionFn>;formulas:Record<string,(ctx:unknown)=>unknown>};
 
 const ticketPattern=/^[A-Za-z0-9_-]{43}$/;
@@ -55,6 +57,19 @@ export async function loadPreviewPageScript(request:Request,page:{apiName:string
   throw Error('The server page script is not valid for this page');
  return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,previewId,
   actions:module.createActions(host),formulas:module.createFormulas(host)};
+}
+/** Published app page: convert the page this user was served, then run it. */
+export async function loadAppPageScript(request:Request,appId:string,page:{apiName:string},variant:string):Promise<LoadedPageScript>{
+ const answer=await request<{ticket?:string;buildId?:string}>('/apps/'+encodeURIComponent(appId)+'/page-script',
+  {method:'POST',body:JSON.stringify({variant,page})});
+ if(typeof answer.ticket!=='string'||!ticketPattern.test(answer.ticket)||typeof answer.buildId!=='string')
+  throw Error('The server did not convert this page');
+ const module=await import(/* @vite-ignore */ apiBase+'/page-scripts/'+answer.ticket+'.js') as Partial<PageScriptModule>;
+ const plan=module.plan;
+ if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')
+  throw Error('The server page script is not valid for this page');
+ return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,
+  app:{appId,buildId:answer.buildId},actions:module.createActions(host),formulas:module.createFormulas(host)};
 }
 /** The exact bytes of the Preview file (same draft → same file). */
 export async function fetchPreviewPageScriptSource(request:Request,page:{apiName:string},variant:string):Promise<string>{

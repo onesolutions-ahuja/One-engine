@@ -41,6 +41,16 @@ export function registerPageScriptPublicRoute(app:Express,deps:PageScriptDeps){
   res.setHeader('X-Content-Type-Options','nosniff');
   const ticket=deps.scripts.consumeTicket(String(req.params.ticket??'').replace(/\.js$/,''));
   if(!ticket){res.status(404).type('text/plain').send('Not found');return;}
+  if(ticket.buildId&&ticket.appId){
+   // Published app page: anyone who can open the App (same check as loading the page).
+   await deps.rbac.require(ticket.tenantId,ticket.userId,'App:'+ticket.appId,'read');
+   const build=deps.scripts.appBuild(ticket.tenantId,ticket.appId,ticket.buildId);
+   if(!build){res.status(404).type('text/plain').send('Not found');return;}
+   res.setHeader('Content-Type','text/javascript; charset=utf-8');
+   res.setHeader('ETag',build.etag);
+   res.send(build.code);
+   return;
+  }
   await deps.rbac.require(ticket.tenantId,ticket.userId,'PageDefinition','read');
   if(ticket.previewId){
    // The user's own Preview build of unsaved edits.
@@ -72,6 +82,41 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   res.setHeader('Cache-Control','private, no-store');
   const ticket=deps.scripts.issueTicket(actor.tenant_id,actor.user_id,req.params.apiName,variant);
   res.json({ticket,url:'/api/page-scripts/'+ticket+'.js'});
+ }));
+ // Published app pages (end users): convert the page this user was served by
+ // /api/apps/:appId/pages|home-page|in-screen-pages. Needs only App access.
+ app.post('/api/apps/:appId/page-script',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  if(!api.test(req.params.appId))throw new Error('Invalid app');
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+req.params.appId,'read');
+  const page=req.body?.page;
+  if(!page||typeof page!=='object'||Array.isArray(page)||!Array.isArray((page as {components?:unknown}).components)
+    ||(page as {components:unknown[]}).components.length>500)throw new Error('Invalid page');
+  const variant=pageLayoutVariant(req.body?.variant??'Desktop');
+  const {buildId,built}=deps.scripts.buildAppPage(actor.tenant_id,req.params.appId,asCompilerPage(page),
+   asCompilerObjects(await deps.definitions.list(actor.tenant_id)));
+  res.setHeader('Cache-Control','private, no-store');
+  const ticket=deps.scripts.issueTicket(actor.tenant_id,actor.user_id,built.compiled.apiName,variant,undefined,
+   {buildId,appId:req.params.appId});
+  res.json({ticket,buildId,url:'/api/page-scripts/'+ticket+'.js'});
+ }));
+ app.post('/api/apps/:appId/compiled-actions/execute',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  if(!api.test(req.params.appId))throw new Error('Invalid app');
+  if(!await tenantServerFormulaEnabled(deps.db,actor.tenant_id)){res.json({supported:false});return;}
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+req.params.appId,'read');
+  const body=(req.body??{}) as Record<string,unknown>;
+  const key=String(body.key??''),buildId=String(body.buildId??''),steps=body.dataSteps;
+  const plan=deps.scripts.appAction(actor.tenant_id,req.params.appId,buildId,key);
+  if(!plan||plan.serverDataSteps!==steps||!validActionScope(body.scope)){res.json({supported:false});return;}
+  const started=performance.now();
+  const stats={operations:0,reusedReads:0,steps:[] as string[]};
+  // Record and field permissions are enforced inside, as for every save.
+  const result=await executeServerDataAction(deps.db,deps.records,actor,plan.formula,body.scope,plan.serverDataSteps,deps.rbac,stats);
+  res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1)
+   +',ops;desc="'+stats.operations+' operations, '+stats.reusedReads+' reused reads"');
+  res.json(result);
  }));
  app.post('/api/pages/:apiName/preview-script',wrap(async(req,res)=>{
   const actor=authenticated(req);

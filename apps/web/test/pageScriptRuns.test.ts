@@ -136,3 +136,15 @@ test('one collection Object is loaded once for many components, and a save clear
  await ask();
  assert.equal(loads,2);
 });
+
+test('published pages: one shared build per tenant + app, usable only inside that tenant and app',()=>{
+ const scripts=new PageScriptService();
+ const one=scripts.buildAppPage('t1','Till',page as never,objects as never);
+ assert.equal(scripts.buildAppPage('t1','Till',page as never,objects as never).buildId,one.buildId,'every user shares it');
+ assert.equal(scripts.appAction('t1','Till',one.buildId,'grid:click')?.serverDataSteps,1);
+ assert.equal(scripts.appAction('t2','Till',one.buildId,'grid:click'),null,'other tenant');
+ assert.equal(scripts.appAction('t1','Other',one.buildId,'grid:click'),null,'other app');
+ assert.notEqual(scripts.buildAppPage('t2','Till',page as never,objects as never).buildId,one.buildId);
+ const ticket=scripts.issueTicket('t1','u9','till','Desktop',undefined,{buildId:one.buildId,appId:'Till'});
+ assert.deepEqual([scripts.consumeTicket(ticket)?.buildId,],[one.buildId]);
+});

@@ -492,7 +492,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    save:(key:string,plan:{formula:string},event:Record<string,unknown>)=>runSave(
     {...binding,actionType:'Formula',formula:plan.formula},event,
     script?{pageApiName:runtime.compiled.apiName,variant:script.variant,revision:script.revision,key,
-     ...(script.previewId?{previewId:script.previewId}:{})}:undefined),
+     ...(script.previewId?{previewId:script.previewId}:{}),...(script.app?{app:script.app}:{})}:undefined),
    runFormula:(settings:Record<string,unknown>,event:Record<string,unknown>)=>runBinding(settings,event),
    navigate:(settings:Record<string,unknown>)=>runBinding(settings),
    navigateTo:async(kind:string,target:unknown)=>navigateTo(kind,target),

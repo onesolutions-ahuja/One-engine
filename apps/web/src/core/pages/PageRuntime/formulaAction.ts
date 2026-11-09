@@ -74,7 +74,8 @@ export async function executePageFormulaAction(
  onPredicted?:(prediction:Prediction)=>void,
  /** A compiled page action: the server runs ITS compiled copy (by component:event of
   * that saved revision) instead of formula text sent from the browser. */
- compiledAction?:{pageApiName:string;variant:string;revision:number;key:string;previewId?:string}
+ compiledAction?:{pageApiName:string;variant:string;revision:number;key:string;previewId?:string;
+  app?:{appId:string;buildId:string}}
 ):Promise<{changes:Change[];recordChanged:boolean;mutatedObjectApiNames?:string[];
  recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>;
  predictionBatch?:string}>{
@@ -121,7 +122,11 @@ export async function executePageFormulaAction(
    const first=await queuedSave(async()=>{
     if(compiledAction){
      // The server's compiled copy of this saved action; only "which action" + values are sent.
-     const compiled=await request<DataAnswer>('/pages/'+encodeURIComponent(compiledAction.pageApiName)
+     const compiled=compiledAction.app
+      // Published page: the tenant's server-built copy of this page.
+      ?await request<DataAnswer>('/apps/'+encodeURIComponent(compiledAction.app.appId)+'/compiled-actions/execute',
+       {method:'POST',body:JSON.stringify({buildId:compiledAction.app.buildId,key:compiledAction.key,scope,dataSteps:split.dataSteps})})
+      :await request<DataAnswer>('/pages/'+encodeURIComponent(compiledAction.pageApiName)
       +'/compiled-actions/execute',{method:'POST',body:JSON.stringify({variant:compiledAction.variant,
        revision:compiledAction.revision,key:compiledAction.key,
        ...(compiledAction.previewId?{previewId:compiledAction.previewId}:{}),scope,dataSteps:split.dataSteps})});

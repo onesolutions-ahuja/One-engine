@@ -7,7 +7,7 @@ const shadow=value=>value==="large"?"0 8px 20px #0003":
  value==="medium"?"0 3px 9px #0003":value==="small"?"0 1px 4px #0002":"none";
 const colour=(value,fallback)=>typeof value==="string"&&value?value:fallback;
 const plain=value=>value===undefined||value===null?"":String(value);
-const fieldKey=source=>/^@([A-Za-z][A-Za-z0-9_]*)$/.exec(plain(source).trim())?.[1];
+const fieldKey=source=>/^=?\s*@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(plain(source).trim())?.[1];
 const own=(row,key)=>row&&Object.prototype.hasOwnProperty.call(row,key);
 export default function SmartTable({p,records,expression,fieldAllowed,fire}){
  const realRows=Array.isArray(records)?records:[];

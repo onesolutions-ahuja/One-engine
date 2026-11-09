@@ -550,8 +550,9 @@ export function evaluateParsedExpression(expression,record,formulaContext){
      formulaContext.collectionSources);
    }else if(Array.isArray(direct)||(direct&&typeof direct==='object'&&Array.isArray(direct.items))){
     result=sumFormulaCollection(direct,formulaContext.collectionSources);
-   }else if(Array.isArray(rows)&&rows.length===0
-    &&operand.kind==='reference'&&/^[A-Za-z][A-Za-z0-9_]*$/.test(operand.value)){
+   }else if(Array.isArray(rows)&&rows.length===0&&operand.kind==='reference'
+    &&(/^[A-Za-z][A-Za-z0-9_]*$/.test(operand.value)
+     ||operand.value.split('.').length===2&&operand.value.split('.')[0]===formulaContext.rootObjectApiName)){
     // A complete empty row set has a zero sum. A missing row set must still
     // fail instead of presenting an unloaded or partially loaded cart as zero.
     result=0;

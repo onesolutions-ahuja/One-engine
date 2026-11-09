@@ -108,7 +108,7 @@ const cardSelection=p=>{
  const stateKey=action?.actionType==="PageState"&&typeof action.stateKey==="string"
   ?action.stateKey:formula?.[1];
  const rhs=formula?.[2]?.trim();
- const source=rhs? /^@([A-Za-z][A-Za-z0-9_]*)$/.exec(rhs)?.[1]:null;
+ const source=rhs? /^@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(rhs)?.[1]:null;
  const pageValue=stateKey?p.pageState?.[stateKey]:undefined;
  if(pageValue!==undefined&&pageValue!==null&&pageValue!==""){
   const value=action?.actionType==="PageState"?String(action.value??""):"";

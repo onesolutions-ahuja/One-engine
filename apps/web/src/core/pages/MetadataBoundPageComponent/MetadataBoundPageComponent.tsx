@@ -33,6 +33,8 @@ import {behaviorValidation,behaviorAction,pageBehaviors,type BehaviorContext} fr
 import type {LibraryComponentMetadata,PageComponentMetadata,ObjectMetadata,FieldMetadata,LightningAppMetadata,LightningPageMetadata,ReportMetadata,FlowDefinitionMetadata} from '../../metadata/Definitions/metadata';
 import type {AppRoute} from '../../workspace/Navigation/appRouting';
 import {flowActionFormulaTarget} from '../PageRuntime/actionFlowFormula';
+import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
+import {componentStateFromEvent,componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState';
 
 export default function MetadataBoundPageComponent({
   apiRequest, definition, component, objects, apps, pages, currentAppId, pageSessionKey, pageComponents, reports, availableFlows, formFactor, onNavigate, onLaunchFlow, disableActions = false, builderPreview = false, defaultObjectApiName = '', recordId = '', behaviorContext, initialPageState, sessionIdOverride
@@ -82,6 +84,19 @@ export default function MetadataBoundPageComponent({
   const [storedPageState,setPageState]=useState<Record<string,unknown>>(initialPageState??{});
   const pageState=useComponentFormulaState(storedPageState,properties);
   const stateDependencies=useMemo(()=>pageStateDependencies(pageComponents??[component]),[pageComponents,component]);
+  // What the user picks/types/toggles here is published under this component's
+  // page name, so other components read @Name.state.Id / Value / Name / Text.
+  const componentStateKey=useMemo(()=>componentStateName(
+    componentInstanceNames(pageComponents??[component]).get(component.id)),[pageComponents,component]);
+  const typingTimer=useRef<number|undefined>(undefined);
+  const publishComponentState=(value:unknown)=>{
+    const next=componentStateKey&&!disableActions?componentStateFromEvent(value):null;
+    if(!componentStateKey||!next)return;
+    const send=()=>window.dispatchEvent(new CustomEvent('metadrive:page-collection-selected',
+      {detail:{pageSessionKey,name:componentStateKey,value:next}}));
+    window.clearTimeout(typingTimer.current);
+    if(typeof value==='string')typingTimer.current=window.setTimeout(send,250);else send();
+  };
   const [revision, setRevision] = useState(0);
   const contextApiName=typeof properties.contextApiName==='string'?properties.contextApiName:'';
   const [currentContextRecord,setCurrentContextRecord]=useState<Record<string,unknown>|null>(null);
@@ -615,6 +630,7 @@ export default function MetadataBoundPageComponent({
     }
   };
   const onAction = async (action: {event:string;value?:unknown}) => {
+    if(['change','select','click'].includes(action.event))publishComponentState(action.value);
     // Opt-in action trace includes queue wait, execution time and outcome, but
     // never an authored formula, record values, request URLs or user inputs.
     let trace=false;
@@ -740,6 +756,7 @@ export default function MetadataBoundPageComponent({
       },
       onChange: (value: unknown, dispatch?:{actionHandled?:boolean}) => {
         publishComponentInput(component.id,value);
+        publishComponentState(value);
         if (!dispatch?.actionHandled && (actionFlows.change || (Array.isArray(pageBehaviors(properties)?.interactions)
           &&(pageBehaviors(properties)!.interactions as Array<{event?:unknown}>).some(item=>item?.event==='change'))))
           void onAction({ event: 'change', value }).catch(() => {/* Error displayed by action boundary. */});

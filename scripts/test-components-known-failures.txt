@@ -1,0 +1,55 @@
+Acetill owns its renderer identity and a separate version-3 package
+All installed component definitions are independent of displayMode metadata
+Batch 2 grid runtime reads density, line-height, radius and image position
+Calendar selected value colour fills date and Shadow uses shared three presets
+Cart Data group reuses SQL property registry; only Smart Cart has the five new enabled controls
+Cart Header Body Color is a single Cart-only SQL-backed fill palette at Design Header R3/C2
+Cart selected-row colours appear only for Cart, at Design Row R2/C2 and R3/C2
+Data formulas display by default across shared UI component families
+Data ribbon merges cart expressions and columns, with numbered editable summary labels
+Default Check SQL uses globally unique order allocation
+Design source scopes @ fields to explicitly selected metadata objects and preserves SQL ownership
+Device layout moves to Page Details without losing version controls or SQL metadata
+Formula-only UI bindings resolve without Object records and respect field rules
+Image caption reuses shared Design controls, without duplicate property definitions
+Layout Image Background uses SQL fill palette for only Image and Container
+Layout hides exact Design 2 duplicates and retired ribbon-only colours
+OAuth scopes are grouped from the SQL catalogue, not hardcoded in the UI
+SQL Smart applicability is disabled without hiding global slots or erasing values
+SQL and ribbon retire the three first-tab properties without deleting saved metadata
+SQL cleanup removes UNE property inventory only, retaining component identities and page instances
+SQL-backed eight-tab ribbon retains existing controls and correct geometry
+Shape and Shape Fill occupy exact Design tracks and reuse effective surface colours
+Shared @ binding and canvas fill are metadata-driven for arbitrary objects
+Smart Badge and Image short names come only from forward-only SQL metadata
+Smart Cart Summary and Summary 2 use compact separate icon-first rows
+Smart Cart header keeps original blue when unset and uses authored colour in preview and runtime
+Smart Cart only renders amounts supplied by metadata/Flow and shows no fabricated totals
+Smart Cart quantity buttons take shape and colour from Button 2/3 properties
+Smart Cart ribbon is SQL-driven and visual preview defers cart data and actions
+Smart Icon SQL enables only approved appearance and layout properties
+Smart Label is a read-only Smart Input Box with the same binding and styling
+Smart SQL library matches approved table and retains Home
+Smart Textbox SQL enables only approved properties and User pilot requires explicit single-tenant opt-in
+Smart component catalog is independent, sixteen components and SQL-owned
+Smart registry remains enabled through Core bundled-component cleanup
+Smart ribbon keeps all shared properties and renders the approved compact Office layout
+Smart visual/property fixes are registered without changing historic SQL migrations
+UNE Input replaces public UNE Text and keeps shared styling and data binding
+UNE settings stay out of public catalog, ribbon and registration UI
+UNE wrapper provides metadata-driven help text tooltip
+additive SQL migration removes only non-Home shared entries and migrates Acetill Cart without deleting values
+all UNE component settings are owned by app source, not the Component Library manifest
+app-owned renderers and styles are code owned rather than UNE wrapper reexports
+apps/web/test/actionRibbonFrozenLayout.test.ts
+apps/web/test/componentLibraries.test.ts
+apps/web/test/componentPropertySchema.test.ts
+apps/web/test/pageBuilderLayoutRibbonDensity.test.mjs
+apps/web/test/pageBuilderUnifiedActions.test.ts
+apps/web/test/uneConversationCompositeSlots.test.mjs
+every installed UNE component keeps help text in app code, not SQL registration
+global Shape is SQL owned, enabled only for requested components, and icons only for Button
+named COLLECTION mixes manual items with authorised Object.Field values
+same UNE Input renders display-only text and an editable text box
+scope catalogue includes Core, Builders, Flows, Records and reserved diagnostics
+shared SQL ribbon moves Default Check into Data Values and shortens Header labels

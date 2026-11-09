@@ -14,6 +14,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Page formulas and Smart Lookup regression tests
+        run: node scripts/run-archived-tests.mjs apps/web/test/pageCompiler.test.ts
       - name: Compile server exactly as OCI
         run: npm run build --workspace apps/server
       - name: Compile frontend

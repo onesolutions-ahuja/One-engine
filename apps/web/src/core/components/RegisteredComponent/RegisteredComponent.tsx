@@ -101,7 +101,25 @@ function cachedPrimitiveCheck(primitive:Parameters<typeof validatePrimitiveMetad
 }
 const noAppDefaults:Record<string,unknown>={};
 
-export default function RegisteredComponent({ definition, props, formulaInstanceId, layoutTransparent=false, editorPreview=false }: { definition: LibraryComponentMetadata; props: Record<string, unknown>; layoutTransparent?:boolean; editorPreview?:boolean;formulaInstanceId?:string }) {
+type RegisteredComponentProps={ definition: LibraryComponentMetadata; props: Record<string, unknown>; layoutTransparent?:boolean; editorPreview?:boolean;formulaInstanceId?:string };
+// Page Builder canvas only: a click that selects one component must not re-render
+// every other component on the canvas. Builder previews rebuild their props object
+// (and its loadAsset helper) on every builder render, so compare values shallowly
+// and treat function props as unchanged. Published runtime pages are never memoised.
+function sameBuilderPreview(previous:RegisteredComponentProps,next:RegisteredComponentProps){
+  if(!previous.editorPreview||!next.editorPreview)return false;
+  if(previous.definition!==next.definition||previous.formulaInstanceId!==next.formulaInstanceId
+    ||previous.layoutTransparent!==next.layoutTransparent)return false;
+  const before=previous.props,after=next.props;
+  const keys=Object.keys(after);
+  if(keys.length!==Object.keys(before).length)return false;
+  return keys.every(key=>{
+    const a=before[key],b=after[key];
+    return a===b||(typeof a==='function'&&typeof b==='function');
+  });
+}
+export default React.memo(RegisteredComponent,sameBuilderPreview);
+function RegisteredComponent({ definition, props, formulaInstanceId, layoutTransparent=false, editorPreview=false }: RegisteredComponentProps) {
   const [rendered,setRendered]=useState<Readonly<Record<string,string>>>({});
   const sqlLookup=useSqlFormulaDisplay(props,React);
   const formulaScope=usePageFormulaScope();

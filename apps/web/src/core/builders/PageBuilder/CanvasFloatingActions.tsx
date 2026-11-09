@@ -50,6 +50,8 @@ export default function CanvasFloatingActions({componentId,viewportRef,children,
       if(frame)return;
       frame=window.requestAnimationFrame(reposition);
     };
+    // Hovering cannot move the anchor; only a pressed pointer (move/resize) can.
+    const whilePressed=(event:PointerEvent)=>{if(event.buttons)schedule();};
     reposition();
     const observer=new ResizeObserver(schedule);
     observer.observe(anchor);
@@ -59,13 +61,13 @@ export default function CanvasFloatingActions({componentId,viewportRef,children,
     // A capture listener sees scrolling in the page, nested panels, or document.
     window.addEventListener('scroll',schedule,true);
     // Keep the toolbar attached while a selected component is moved/resized.
-    window.addEventListener('pointermove',schedule,true);
+    window.addEventListener('pointermove',whilePressed,true);
     return()=>{
       if(frame)window.cancelAnimationFrame(frame);
       observer.disconnect();
       window.removeEventListener('resize',schedule);
       window.removeEventListener('scroll',schedule,true);
-      window.removeEventListener('pointermove',schedule,true);
+      window.removeEventListener('pointermove',whilePressed,true);
     };
   },[componentId,viewportRef,enabled]);
   if(!enabled)return <>{children}</>;

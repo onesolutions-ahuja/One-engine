@@ -275,7 +275,34 @@ export function usePageEditorState(
   const [canvasBinding,setCanvasBinding]=useState<CanvasBindingTarget|null>(null);
   const [ribbonTab, setRibbonTab] = useState<'Add Block' | 'Component Content' | 'Component Design 2' | 'Component Style' | 'Component Data' | 'Component Action' | 'Component Layout' | 'Component Responsive' | 'Preview' | 'Filters' | 'Source' | 'Arrange' | 'Advanced'>('Add Block');
   const [inspectorSection,setInspectorSection]=useState<string|null>('Body');
-  useEffect(()=>{setInspectorSection('Body');},[selectedId]);
+  // A canvas click may choose a Design area (Header, Row...) in the same click
+  // that selects the component; that area survives the selection reset.
+  const nextDesignAreaRef=useRef<string|null>(null);
+  useEffect(()=>{
+    setInspectorSection(nextDesignAreaRef.current??'Body');
+    nextDesignAreaRef.current=null;
+  },[selectedId]);
+  const chooseCanvasDesignArea=useCallback((area:string)=>{
+    nextDesignAreaRef.current=area;
+    setInspectorSection(area);
+    // Only for this click: a later selection from the layer list starts at Body.
+    window.setTimeout(()=>{if(nextDesignAreaRef.current===area)nextDesignAreaRef.current=null;},0);
+  },[]);
+  // Builder-only marker for the active Design area. DOM attribute only:
+  // never a component property, never a re-render of the component.
+  useEffect(()=>{
+    const viewport=pagePreviewAreaRef.current;
+    if(!viewport)return;
+    viewport.querySelectorAll('[data-design-area-active]')
+      .forEach(node=>node.removeAttribute('data-design-area-active'));
+    if(!selectedId||!inspectorSection||inspectorSection==='Body')return;
+    const host=Array.from(viewport.querySelectorAll<HTMLElement>('[data-component-id]'))
+      .find(node=>node.dataset.componentId===selectedId);
+    host?.querySelectorAll<HTMLElement>('[data-design-area]').forEach(node=>{
+      if(node.dataset.designArea===inspectorSection
+        &&node.closest('[data-component-id]')===host)node.setAttribute('data-design-area-active','true');
+    });
+  },[selectedId,inspectorSection,page]);
   const componentNeedsData = (type: string) => {
     const metadata = type.startsWith('Custom:') ? findRegisteredComponent(libraryComponents,type.slice('Custom:'.length),'page') : undefined;
     return Boolean(type.startsWith('Custom:')&&isBuilderApi(type.slice(7),ribbonCatalog?.components??[])
@@ -421,7 +448,7 @@ export function usePageEditorState(
     pageSettingsDialogOpen, setPageSettingsDialogOpen, advancedEditor, setAdvancedEditor,
     inlineActionEvent, setInlineActionEvent, setFocusedCardMapping, ribbonStripRef,
     canvasBinding, ribbonTab, setRibbonTab, inspectorSection,
-    setInspectorSection, componentNeedsData, selectCanvasDataBinding, selectRibbonTab,
+    setInspectorSection, chooseCanvasDesignArea, componentNeedsData, selectCanvasDataBinding, selectRibbonTab,
     componentClipboard, setComponentClipboard, recordScope, setRecordScope, recordAppId, setRecordAppId,
     recordProfileId, setRecordProfileId, recordTypeId, setRecordTypeId, recordFormFactors,
     setRecordFormFactors, homeAppId, setHomeAppId, homeScope, setHomeScope, homeProfileId,

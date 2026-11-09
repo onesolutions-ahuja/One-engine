@@ -50,7 +50,7 @@ export function createPageCanvasRenderer(
     selectRibbonTab, isPhoneBuilder, setDragOverId, canvasMoveStart, pagePreviewAreaRef,
     componentMenuId, componentClipboard, applyPage, fields, previewFieldValue, defaultRelatedLists,
     relatedListOptions, setOpenBuilderTabs, externalPreviewWindowRef, ribbonCatalog, canvasBinding,
-    selectCanvasDataBinding, selectedRegion, setActivePanel, openAddBlocks,
+    selectCanvasDataBinding, selectedRegion, setActivePanel, openAddBlocks, chooseCanvasDesignArea,
   } = editorState;
   const {
     page, libraryComponents, apps, request, dashboards, reports, objects, flows, pages,
@@ -136,6 +136,16 @@ export function createPageCanvasRenderer(
       setGroupEditId(mode==='member'?component.id:'');
       setSelectionIds(next);setSelectedRegion(null);
       setSelectedId(next.includes(component.id)?component.id:(next[0]??''));
+      // The selection shield covers the component, so look underneath it for
+      // the Design area the component declared (data-design-area). None → Body.
+      if(mode==='replace'){
+        const host=event.currentTarget;
+        const under=typeof document.elementsFromPoint==='function'
+          ?document.elementsFromPoint(event.clientX,event.clientY):[];
+        const areaNode=under.find(node=>node instanceof HTMLElement&&node.dataset.designArea
+          &&host.contains(node)&&node.closest('[data-component-id]')===host) as HTMLElement|undefined;
+        chooseCanvasDesignArea(areaNode?.dataset.designArea??'Body');
+      }
       if(component.type==='Custom:ui_item_grid'){
         const target=event.target as HTMLElement;
         const mapping=target.closest('.md-product-image')?'imageFieldApiName'

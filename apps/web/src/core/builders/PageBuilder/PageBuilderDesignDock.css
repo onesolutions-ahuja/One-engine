@@ -587,3 +587,14 @@
  .smart-design2-supplemental-setting .smart-formula {
  flex:1 1 auto!important;min-width:0!important;width:100%!important;
 }
+
+/* Design 2: one Properties section (the canvas-clicked area) and one Others
+ * section. The area name is a read-only label; the canvas chooses it. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-active-area{
+ margin-left:auto;padding:0 6px;border-radius:3px;
+ background:#e8f1ff;color:#1668be;font:400 11px/18px "Segoe UI",Arial,sans-serif;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-group{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}

@@ -23,7 +23,7 @@ import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import type {LoadedPageScript} from './serverPageScript';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
-import {resolveMentionProperties} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import {explicitMentionRecordId,useRelationshipMentionContext} from '../../records/RecordFormDialog/useRelationshipMentionContext';
 import {resolveSmartToggleFieldBinding,updateSmartToggleField} from '../PageRuntime/smartToggleFieldBinding';
 
@@ -246,6 +246,32 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const actionFlows=(properties.actionFlows&&typeof properties.actionFlows==='object'&&!Array.isArray(properties.actionFlows)
   ?properties.actionFlows:{}) as Record<string,unknown>;
  const fields=runtime.objects.find(item=>item.apiName===objectApiName)?.fields??[];
+ // Resolve metadata-validated parent lookups for each Card/Table row, not only
+ // for a single record page. Every read still goes through tenant/RBAC API.
+ const rowMentionKey=JSON.stringify([source.version,objectApiName,source.records.map(row=>row.Id),
+  Object.entries(properties).filter(([,value])=>typeof value==='string'&&value.includes('@'))]);
+ const [rowMentions,setRowMentions]=useState<{key:string;rows:Record<string,unknown>[]} |null>(null);
+ useEffect(()=>{
+  let active=true;
+  setRowMentions(null);
+  if(!objectApiName||!source.records.length||
+    !referencedMentionPaths(properties,runtime.objects,objectApiName).some(path=>path.steps.length))
+   return()=>{active=false};
+  const getRecord=async(target:string,id:string)=>{
+   const result=await runtime.request<{record:Record<string,unknown>}>(
+    '/records/'+encodeURIComponent(target)+'/'+encodeURIComponent(id));
+   return result.record?.Id===id?result.record:undefined;
+  };
+  const getRecords=async(target:string,ids:readonly string[])=>
+   (await loadFlowScreenRecordPage(target,{limit:100,filters:[{field:'Id',operator:'in',value:[...ids]}]})).records;
+  void Promise.all(Array.from({length:Math.ceil(source.records.length/100)},(_,i)=>
+   resolveCollectionMentionRows(runtime.objects,objectApiName,source.records.slice(i*100,(i+1)*100),
+    properties,getRecord,getRecords))).then(parts=>{
+    if(active)setRowMentions({key:rowMentionKey,rows:parts.flat()});
+   }).catch(()=>{if(active)setRowMentions(null)});
+  return()=>{active=false};
+ },[rowMentionKey,runtime,properties,source.records,objectApiName]);
+ const displayRows=rowMentions?.key===rowMentionKey?rowMentions.rows:source.records;
  // @Object.Field mentions: same authorised loader; it reads only when a record id is bound.
  const mentionRoot=runtime.compiled.targetObject||objectApiName;
  const boundRecordId=runtime.recordId||explicitMentionRecordId(properties);
@@ -554,7 +580,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   document.addEventListener('visibilitychange',onVisible);
   return ()=>{active=false;window.clearInterval(timer);document.removeEventListener('visibilitychange',onVisible);};
  },[properties.liveFlowRefreshEnabled,properties.liveFlowRefreshEvents,properties.liveFlowRefreshIntervalMs]);
- const records=dataCollectionRows??source.records;
+ const records=dataCollectionRows??displayRows;
  const loading=source.loading&&source.version===0||namedSource.loading;
  // Scroll near the end of any list inside this component → load the next 50.
  const onScrollCapture=(event:React.UIEvent<HTMLElement>)=>{
@@ -600,7 +626,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    },
    loading,sessionId,stateChannel,
    ...(records.length===1?{record:records[0]}:{}),
-   ...(objectApiName?{records:source.records}:{}),
+   ...(objectApiName?{records:displayRows}:{}),
    ...presented,
    ...(dataCollectionRows?{records:dataCollectionRows}:{}),
    ...(objectApiName&&!dataCollectionRows?{recordPagination:{limit:SOURCE_PAGE_SIZE,offset:0,total:source.total,

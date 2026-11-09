@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {planLegacyMigrationTransition} from '../../src/system-support/system-migrations.ts';
+import {tenantDeveloperDomain} from '../../src/system-support/tenant-developer-domain.ts';
 
 // The legacy backend archive has no entries; these tests run directly.
 // Keep its empty index for the existing repository reference verifier.
@@ -79,4 +80,34 @@ test('OCI live telemetry reports collector health and stages without GitHub quer
   if(socket===undefined)delete process.env.METADRIVE_MCP_BROKER_SOCKET;
   else process.env.METADRIVE_MCP_BROKER_SOCKET=socket;
  }
+});
+
+
+test('tenant developer login host is derived only from the configured platform base domain',()=>{
+ assert.equal(tenantDeveloperDomain('kingstonexterior','tenants.unesolutions.co.uk'),
+   'kingstonexterior.tenants.unesolutions.co.uk');
+ assert.equal(tenantDeveloperDomain('New-Tenant',' TENANTS.EXAMPLE.COM '),
+   'new-tenant.tenants.example.com');
+ assert.throws(()=>tenantDeveloperDomain('mytenant',''),/base domain is not configured/);
+ assert.throws(()=>tenantDeveloperDomain('mytenant','https://example.com/'),/base domain is not configured/);
+ assert.throws(()=>tenantDeveloperDomain('tenant.name','tenants.example.com'),/Invalid tenant identifier/);
+ assert.throws(()=>tenantDeveloperDomain('x'.repeat(55),'tenants.example.com'),/Invalid tenant identifier/);
+});
+
+test('mailbox availability endpoint is registered before the dynamic tenant slug route',()=>{
+ const routes=readFileSync(new URL('../../src/system-support/server.ts',import.meta.url),'utf8');
+ const exact=routes.indexOf("app.get('/api/platform/tenants/developer-email-availability'");
+ const dynamic=routes.indexOf("app.get('/api/platform/tenants/:slug'");
+ assert.ok(exact>=0&&dynamic>=0&&exact<dynamic,'specific availability route must not be shadowed');
+});
+
+test('tenant form uses verified domain, retains mailbox failures, and blocks duplicate identities',()=>{
+ const ui=readFileSync(new URL('../../../web/src/core/platform/TenantManagement/TenantManagement.tsx',import.meta.url),'utf8');
+ const fields=readFileSync(new URL('../../../web/src/core/platform/TenantManagement/adminTenantFieldMetadata.ts',import.meta.url),'utf8');
+ assert.match(ui,/developerDomain: emailCheck\.developerDomain/);
+ assert.match(ui,/readOnly=\{field\.key==='developerDomain'\}/);
+ assert.match(ui,/setEmailCheckError\(cause instanceof Error/);
+ assert.match(ui,/administratorEmailMatchesDeveloper/);
+ assert.match(ui,/disabled=\{!canCreateTenant\}/);
+ assert.match(fields,/key:'tenantId'[^\n]*maxLength:54/);
 });

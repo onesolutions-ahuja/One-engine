@@ -127,3 +127,7 @@
 }
 .tenant-columns>.tenant-panel,.tenant-columns>[data-platform-slot]{min-width:0}
 @media(max-width:700px){.tenant-detail-tabs{mask-image:none}}
+
+/* Tenant creation: managed domain cannot be edited; show security validation inline. */
+.tenant-create-dialog input[readonly]{background:var(--md-canvas,#f8fafc);cursor:default}
+.tenant-create-dialog .tenant-validation-error{color:#9b2533}

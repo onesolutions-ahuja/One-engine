@@ -28,6 +28,7 @@ type TenantCreate = {
   tenantId: string; tenantName: string; adminName: string; email: string; password: string; developerDomain?: string; tenantDeveloperEmail: string;
 };
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
+type TenantDeveloperAvailability = { email: string; available: boolean; alternatives: string[]; developerDomain: string };
 const emptyCreate: TenantCreate = { tenantId: '', tenantName: '', adminName: '', email: '', password: '', developerDomain: '', tenantDeveloperEmail: '' };
 const shortDate = (value: string) => {
   const date = new Date(value);
@@ -44,8 +45,9 @@ export default function TenantManagement({ request, permitted }: { request: Requ
   const [selected, setSelected] = useState<TenantSummary | null>(null);
   const [editing, setEditing] = useState({ name: '', description: '' });
   const [create, setCreate] = useState<TenantCreate>(emptyCreate);
-  const [emailCheck, setEmailCheck] = useState<{email:string;available:boolean;alternatives:string[]}|null>(null);
+  const [emailCheck, setEmailCheck] = useState<TenantDeveloperAvailability|null>(null);
   const [emailChecking,setEmailChecking] = useState(false);
+  const [emailCheckError,setEmailCheckError] = useState('');
   const [createKey, setCreateKey] = useState(() => crypto.randomUUID());
   const [showCreate, setShowCreate] = useState(false);
   const [detailTab, setDetailTab] = useState<'details' | 'usage' | 'domains' | 'recovery' | 'seeders'>('details');
@@ -92,17 +94,28 @@ export default function TenantManagement({ request, permitted }: { request: Requ
   }, [permitted, request, debouncedQuery, status, page, revision]);
 
   useEffect(()=>{
-    if(!showCreate||!create.tenantId||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(create.tenantId)) {
-      setEmailCheck(null);return;
+    if(!showCreate||!create.tenantId||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(create.tenantId)||create.tenantId.length>54) {
+      setEmailCheck(null);setEmailCheckError('');setEmailChecking(false);return;
     }
     let cancelled=false;
-    setEmailChecking(true);setEmailCheck(null);
+    setEmailChecking(true);setEmailCheck(null);setEmailCheckError('');
     const timeout=window.setTimeout(()=>{
-      request<{email:string;available:boolean;alternatives:string[]}>(
+      request<TenantDeveloperAvailability>(
         '/platform/tenants/developer-email-availability?slug='+encodeURIComponent(create.tenantId)
-      ).then(value=>{if(!cancelled)setEmailCheck(value);})
-       .catch(()=>{if(!cancelled)setEmailCheck(null);})
-       .finally(()=>{if(!cancelled)setEmailChecking(false);});
+      ).then(value=>{
+        if(cancelled)return;
+        if(!value.email||!value.developerDomain||!Array.isArray(value.alternatives)){
+          setEmailCheck(null);
+          setEmailCheckError('Mailbox availability service returned an incomplete response.');
+          return;
+        }
+        setEmailCheck(value);
+      }).catch(cause=>{
+        if(!cancelled){
+          setEmailCheck(null);
+          setEmailCheckError(cause instanceof Error?cause.message:'Unable to check developer mailbox availability.');
+        }
+      }).finally(()=>{if(!cancelled)setEmailChecking(false);});
     },250);
     return ()=>{cancelled=true;window.clearTimeout(timeout);};
   },[create.tenantId,showCreate,request]);
@@ -120,15 +133,25 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setError(cause instanceof Error ? cause.message : 'Unable to open tenant');
     }
   };
+  const administratorEmailMatchesDeveloper = create.email.trim().length>0
+    && create.email.trim().toLowerCase()===create.tenantDeveloperEmail.trim().toLowerCase();
+  const developerEmailAvailable = Boolean(emailCheck
+    && emailCheck.email===create.tenantId+'@unesolutions.co.uk'
+    && (create.tenantDeveloperEmail===emailCheck.email&&emailCheck.available
+      || emailCheck.alternatives.includes(create.tenantDeveloperEmail)));
+  const canCreateTenant = !busy&&!emailChecking&&developerEmailAvailable
+    && Boolean(emailCheck?.developerDomain)&&!administratorEmailMatchesDeveloper;
+
   const createTenant = async (event: FormEvent) => {
     event.preventDefault();
     if (!permitted || busy) return;
-    if(!emailCheck || !(create.tenantDeveloperEmail===emailCheck.email&&emailCheck.available || emailCheck.alternatives.includes(create.tenantDeveloperEmail))){setError('Select an available tenant developer email.');return;}
+    if(administratorEmailMatchesDeveloper){setError('Initial administrator and tenant developer emails must be different.');return;}
+    if(!developerEmailAvailable||!emailCheck?.developerDomain){setError('Verify an available developer email and login domain.');return;}
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await request<{ tenant: TenantSummary; replayed: boolean }>('/platform/tenants', {
         method: 'POST', headers: { 'Idempotency-Key': createKey },
-        body: JSON.stringify({ ...create, developerDomain: create.developerDomain?.trim() || undefined })
+        body: JSON.stringify({ ...create, developerDomain: emailCheck.developerDomain })
       });
       setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID());
       setSelected(result.tenant);
@@ -302,18 +325,22 @@ export default function TenantManagement({ request, permitted }: { request: Requ
           <div className="tenant-detail-heading"><h2 id="tenant-create-title">New tenant</h2><button type="button" className="tenant-button" disabled={busy} onClick={() => { setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID()); }}>Close</button></div>
           {tenantCreateFieldDefinitions.map(field=><AdminPropertyControl
             key={field.key} definition={{...field,propertyKey:field.key,kind:'TEXT'}}
-            value={create[field.key]??''}
-            onChange={value=>{setCreateKey(crypto.randomUUID());setCreate(old=>({...old,[field.key]:value,...(field.key==='tenantId'?{tenantDeveloperEmail:value+'@unesolutions.co.uk'}:{})}));}}/>)}
+            value={field.key==='developerDomain'?emailCheck?.developerDomain??'':create[field.key]??''}
+            readOnly={field.key==='developerDomain'}
+            onChange={value=>{if(field.key==='developerDomain')return;setCreateKey(crypto.randomUUID());setCreate(old=>({...old,[field.key]:value,...(field.key==='tenantId'?{tenantDeveloperEmail:value+'@unesolutions.co.uk'}:{})}));}}/>)}
           <div className="tenant-help" aria-live="polite">
-            {emailChecking?'Checking mailbox availability…':emailCheck?
+            {emailCheckError?<span role="alert">Developer mailbox check failed: {emailCheckError}</span>:
+              emailChecking?'Checking mailbox availability…':emailCheck?
               <><strong>{emailCheck.email}</strong> — {emailCheck.available?'Available':'Already in use'}
                 {!emailCheck.available&&<div>Choose a verified alternative: {emailCheck.alternatives.map(email=>
                   <button type="button" className="tenant-button" key={email}
                     onClick={()=>{setCreateKey(crypto.randomUUID());setCreate(old=>({...old,tenantDeveloperEmail:email}));}}>{email}</button>)}</div>}
-              </>:'Enter a valid tenant ID to verify developer mailbox availability.'}
+              </>:create.tenantId?'Tenant ID must contain lowercase letters, numbers or hyphens (maximum 54 characters).':'Enter a tenant ID to verify developer mailbox availability.'}
           </div>
+          {administratorEmailMatchesDeveloper&&<p className="tenant-help tenant-validation-error" role="alert">Initial administrator email must differ from the tenant developer email.</p>}
+          <p className="tenant-help">Developer login domain is assigned by the platform. External website URLs can be configured under Domains after tenant creation.</p>
           <p className="tenant-help">Creates an initial administrator and a disabled developer account with full starting tenant permissions. The new developer identity uses the selected @unesolutions.co.uk mailbox. The tenant administrator activates the developer account from Company Settings; no password is shared with platform operators.</p>
-          <div className="setup-draft-footer"><span>Unsaved tenant draft</span><button type="button" className="tenant-button" disabled={busy} onClick={() => { setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID()); }}>Discard</button><button type="submit" className="tenant-button tenant-button-primary" disabled={busy||emailChecking||!emailCheck||!(create.tenantDeveloperEmail===emailCheck.email&&emailCheck.available||emailCheck.alternatives.includes(create.tenantDeveloperEmail))}>{busy ? 'Creating…' : 'Create tenant'}</button></div>
+          <div className="setup-draft-footer"><span>Unsaved tenant draft</span><button type="button" className="tenant-button" disabled={busy} onClick={() => { setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID()); }}>Discard</button><button type="submit" className="tenant-button tenant-button-primary" disabled={!canCreateTenant}>{busy ? 'Creating…' : 'Create tenant'}</button></div>
         </form>
       </section>
     </div>}

@@ -87,7 +87,9 @@ export async function executePageFormulaAction(
   if(split){
    // Predict from held rows while the real save runs; never delay the save.
    let answered=false;
-   const prediction=onPredicted&&split.dataSteps===split.totalSteps
+   // Browser-only suffix steps (STATE) run harmlessly in the prediction;
+   // PRINT, SCREEN or Flows cannot be predicted and simply give no prediction.
+   const prediction=onPredicted
     ?predictActionPlan(formula,scope,context).then(predicted=>{
       if(predicted&&!answered){onPredicted(predicted);return predicted;}
       return null;

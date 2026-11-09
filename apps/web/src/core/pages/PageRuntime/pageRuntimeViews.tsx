@@ -329,9 +329,12 @@ function MetadataBoundPageComponent({
   },[]);
   const stateDependencies=useMemo(()=>pageStateDependencies(pageComponents??[component]),[pageComponents,component]);
   const pendingFlowOutputs=useRef(new Map<string,{flowApiName:string;mappings:Record<string,unknown>}>());
+  // Reset page state only when the page session changes, never on a redraw.
   useEffect(() => {
     setPageState(initialPageState??{});
     if(sessionIdOverride)setSessionId(sessionIdOverride);
+  },[pageSessionKey,sessionIdOverride]);
+  useEffect(() => {
     const sync = (event: Event) => {
       const detail=(event as CustomEvent<{pageSessionKey:string;key:string;value:unknown}>).detail;
       if(detail?.pageSessionKey !== pageSessionKey || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(detail.key))return;
@@ -421,6 +424,7 @@ function MetadataBoundPageComponent({
       const loaded=loadedListRef.current;
       const patched=loaded?applySavedRecordMutations(loaded.rows,objectApiName,detail,loaded.scope):null;
       if(patched){
+        lastRecordsJson.current='';
         setRecords(patched.records);
         setRecordTotal(patched.total);
         return;
@@ -455,6 +459,7 @@ function MetadataBoundPageComponent({
   }}:null;
   useEffect(()=>setRecordOffset(0),[objectApiName,recordQueryKey]);
   const lastRecordRequestKey=useRef('');
+  const lastRecordsJson=useRef('');
   useEffect(() => {
     let active = true;
     let requestId = 0;
@@ -466,13 +471,14 @@ function MetadataBoundPageComponent({
     if(lastRecordRequestKey.current!==requestKey){
       lastRecordRequestKey.current=requestKey;
       setRecords([]);
+      lastRecordsJson.current='';
       setRecordsForQueryKey('');
       setRecordTotal(0);
     }
     setDataError('');
     setDataErrorForQueryKey('');
     if (!objectApiName || recordQuery.blocked || relatedQuery.blocked) {
-      setRecords([]);
+      setRecords([]);lastRecordsJson.current='';
       setRecordsForQueryKey('');
       setRecordTotal(0);
       setDataLoading(false);
@@ -489,7 +495,9 @@ function MetadataBoundPageComponent({
           filters:recordQuery.filters,filterLogic:recordQuery.filterLogic
         });
         if (active && request === requestId) {
-          setRecords(page.records);
+          // An identical reload keeps the same rows object: no redraw.
+          const json=JSON.stringify(page.records);
+          if(json!==lastRecordsJson.current){lastRecordsJson.current=json;setRecords(page.records);}
           setRecordTotal(page.total);
           setRecordsForQueryKey(recordQueryKey);
           setDataError('');
@@ -1031,6 +1039,9 @@ function usePageLayoutDevice(): LayoutDevice {
   return useFormFactor();
 }
 
+// A host redraw (page-state or layout change) must not redraw every component:
+// each one redraws only when its own inputs or its own state change.
+const MemoizedMetadataBoundPageComponent=React.memo(MetadataBoundPageComponent);
 function LightningAppRuntime({
   appId,
   pageApiName,
@@ -1096,6 +1107,7 @@ function LightningAppRuntime({
   const loading=previewPage?false:routePending?!cached:pageLoad.loading;
   const [activeTabs, setActiveTabs] = useState<Record<string,string>>({});
   const [layoutState,setLayoutState]=useState<Record<string,unknown>>(inScreenPage?inScreenContext?.values??{}:{});
+  const overriddenComponents=useRef(new WeakMap<PageComponentMetadata,{overrides:unknown;component:PageComponentMetadata}>());
   const [interactionOverrides,setInteractionOverrides]=useState<Record<string,Record<string,unknown>>>({});
   useEffect(()=>setInteractionOverrides({}),[appId,page?.apiName]);
   useEffect(()=>{
@@ -1180,13 +1192,25 @@ function LightningAppRuntime({
   const appVisibilityContext = { formFactor,profileId } as const;
   const isAppComponentVisible = (component: PageComponentMetadata) =>
     isComponentVisible(component, appVisibilityContext, false);
+  // Same object for a component until its own overrides change. A fresh copy on
+  // every host render (each page-state change) redrew all components and made
+  // each one reset its page state (losing e.g. activeCartId between taps).
+  const withInteractionOverrides=(original:PageComponentMetadata):PageComponentMetadata=>{
+    const overrides=interactionOverrides[original.id];
+    if(!overrides)return original;
+    const cached=overriddenComponents.current.get(original);
+    if(cached&&cached.overrides===overrides)return cached.component;
+    const component={...original,properties:{...original.properties,...overrides}};
+    overriddenComponents.current.set(original,{overrides,component});
+    return component;
+  };
   const emitInteraction=(component:PageComponentMetadata,event:string,value:unknown)=>{
     window.dispatchEvent(new CustomEvent('metadrive:page-component-interaction',{
       detail:{pageSessionKey:appId+':'+page.apiName,componentId:component.id,event,value}
     }));
   };
   const renderComponent = (original: PageComponentMetadata): React.ReactNode => {
-    const component={...original,properties:{...original.properties,...interactionOverrides[original.id]}};
+    const component=withInteractionOverrides(original);
     if (!isAppComponentVisible(component)) return null;
     if(behaviorAction(component.properties,'click',appVisibilityContext)==='hidden')return null;
     if (isLayoutType(component.type)) return <div key={component.id} className="page-nested-layout" style={{...resolvePageComponentStyle(component.properties, component.type, layoutDevice),...behaviorAppearance(component.properties,appVisibilityContext)}}>{childrenOf(page.components, component.id).map((child) => renderComponent(child))}</div>;
@@ -1200,7 +1224,7 @@ function LightningAppRuntime({
         Component is no longer registered: {component.label}
       </div>;
       const content = needsMetadataComponentRuntime(component.properties)
-        ? <MetadataBoundPageComponent definition={definition} component={component} defaultObjectApiName={page.targetObject}
+        ? <MemoizedMetadataBoundPageComponent definition={definition} component={component} defaultObjectApiName={page.targetObject}
             objects={objects} apps={apps} pages={pages} currentAppId={appId} pageSessionKey={appId + ':' + page.apiName} pageComponents={page.components} reports={reports} availableFlows={availableFlows} formFactor={formFactor}
             initialPageState={inScreenPage?inScreenContext?.values:undefined}
             sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}

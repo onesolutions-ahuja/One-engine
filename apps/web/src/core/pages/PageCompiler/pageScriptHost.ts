@@ -5,8 +5,11 @@ import {evaluateParsedExpression,type FormulaBindingContext} from '../../../comp
  * Library functions run the shared Une catalogue, so a compiled formula gives
  * the same value as the interpreter. Nothing here evaluates JavaScript text. */
 export type ScriptFormulaContext={record:Record<string,unknown>;state:Readonly<Record<string,unknown>>;sessionId:string;
+ objectApiName?:string;
  binding?:Omit<FormulaBindingContext,'pageState'|'sessionId'>};
-const bindingOf=(ctx:ScriptFormulaContext):FormulaBindingContext=>({...(ctx.binding??{}),pageState:ctx.state,sessionId:ctx.sessionId});
+const bindingOf=(ctx:ScriptFormulaContext):FormulaBindingContext=>({...(ctx.binding??{}),
+ rootObjectApiName:ctx.binding?.rootObjectApiName??ctx.objectApiName,
+ pageState:ctx.state,sessionId:ctx.sessionId});
 
 export const scriptFormulaOperators={
  ref:(ctx:ScriptFormulaContext,path:string):unknown=>

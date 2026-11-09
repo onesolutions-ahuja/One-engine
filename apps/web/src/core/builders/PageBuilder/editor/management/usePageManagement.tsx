@@ -432,7 +432,7 @@ export function usePageManagement(
   };
 
   return {
-    savePage, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
+    savePage, activateListedPage, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
     showRelatedObjectColumn, pageListPageCount, safePageListPage, paginatedPages, openPageDesign,
     layoutBadges, copyLayoutFrom, downloadPageInventory, downloadCompiledPageScript, openCreatePage, createPage,
   };

@@ -2,7 +2,8 @@ import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjust
 import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
 import {nextAccessibleTabIndex} from '../PageRuntime/tabKeyboardNavigation';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
-import {pageStateDependencies,applyPageSelection} from './pageStateDependencies';
+import {pageStateDependencies,applyPageSelection,implicitPageStateKeys,changedPageStateNames,
+  pageStateChangeIsRelevant} from './pageStateDependencies';
 import { useFormFactor } from '../../workspace/Responsive/useFormFactor';
 import {resolveMetadataProperties} from '../../metadata/Definitions/metadataReferences';
 import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChannel';
@@ -298,7 +299,30 @@ function MetadataBoundPageComponent({
   });
   // Generic, page-scoped visual state for metadata-configured local actions.
   // Never grants data permissions or persists cross-tenant information.
-  const [pageState, setPageState] = useState<Record<string, unknown>>(()=>initialPageState??{});
+  const [pageState, setVisiblePageState] = useState<Record<string, unknown>>(()=>initialPageState??{});
+  // Every component keeps the full page state, but only redraws when a changed
+  // key is one it can read. One unrelated state write used to redraw all
+  // components on the page (about 2 s of browser work on a 56-component page).
+  const fullPageState=useRef<Record<string,unknown>>(pageState);
+  const setPageState=useCallback((next:Record<string,unknown>)=>{
+    fullPageState.current=next;setVisiblePageState(next);
+  },[]);
+  const stateReadText=useMemo(()=>JSON.stringify(component.properties??{}),[component.properties]);
+  const implicitStateKeys=useMemo(()=>new Set(implicitPageStateKeys(
+    objects.find(item=>item.apiName===String(component.properties.objectApiName||defaultObjectApiName||''))?.fields??[])),
+    [objects,component.properties.objectApiName,defaultObjectApiName]);
+  const stateRelevance=useRef({stateReadText,implicitStateKeys});
+  stateRelevance.current={stateReadText,implicitStateKeys};
+  const applyPageStateChange=useCallback((change:Parameters<typeof applyPageSelection>[1],
+    dependencies:Parameters<typeof applyPageSelection>[2])=>{
+    const previous=fullPageState.current;
+    const next=applyPageSelection(previous,change,dependencies);
+    if(next===previous)return;
+    fullPageState.current=next;
+    const {stateReadText:text,implicitStateKeys:implicit}=stateRelevance.current;
+    if(pageStateChangeIsRelevant(text,implicit,[change.key,...changedPageStateNames(previous,next)]))
+      setVisiblePageState(next);
+  },[]);
   const stateDependencies=useMemo(()=>pageStateDependencies(pageComponents??[component]),[pageComponents,component]);
   const pendingFlowOutputs=useRef(new Map<string,{flowApiName:string;mappings:Record<string,unknown>}>());
   useEffect(() => {
@@ -307,13 +331,13 @@ function MetadataBoundPageComponent({
     const sync = (event: Event) => {
       const detail=(event as CustomEvent<{pageSessionKey:string;key:string;value:unknown}>).detail;
       if(detail?.pageSessionKey !== pageSessionKey || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(detail.key))return;
-      setPageState(previous=>applyPageSelection(previous,{kind:'state',key:detail.key,value:detail.value},stateDependencies));
+      applyPageStateChange({kind:'state',key:detail.key,value:detail.value},stateDependencies);
     };
     const select=(event:Event)=>{
       const detail=(event as CustomEvent<{pageSessionKey:string;name:string;value:Record<string,unknown>}>).detail;
       if(detail?.pageSessionKey!==pageSessionKey||
         !/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(detail.name))return;
-      setPageState(previous=>applyPageSelection(previous,{kind:'collection',key:detail.name,value:detail.value},stateDependencies));
+      applyPageStateChange({kind:'collection',key:detail.name,value:detail.value},stateDependencies);
     };
     window.addEventListener('metadrive:page-local-state',sync);
     window.addEventListener('metadrive:page-collection-selected',select);
@@ -626,6 +650,9 @@ function MetadataBoundPageComponent({
     return source;
   };
   const onAction = async (action: { event: string; value?: unknown }) => {
+    // Actions always see the latest page state, including keys this component
+    // did not redraw for.
+    const pageState=fullPageState.current;
     if (disableActions) throw new Error('Page Builder preview is read-only. Open the assigned app to test actions.');
     if(behaviorAction(properties,action.event,{formFactor})!=='enabled')
       throw new Error('This action is unavailable under the published Page rules.');

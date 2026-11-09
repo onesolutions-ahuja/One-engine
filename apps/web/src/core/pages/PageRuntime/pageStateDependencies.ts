@@ -137,3 +137,58 @@ export function applyPageSelection(
  if(change.kind==='collection'||visited.size>1)next.collectionSelections=nextSelections;
  return next;
 }
+
+/** Page-state keys a component reads without naming them in its properties:
+ * active record scoping uses <field>Id, active<Name>Id and current<Name>Id. */
+export function implicitPageStateKeys(
+ fields:ReadonlyArray<{apiName:string;relationship?:{targetObject?:string}|null}>
+):string[]{
+ const keys:string[]=[];
+ for(const field of fields){
+  if(!field.relationship)continue;
+  for(const name of [field.apiName,field.relationship.targetObject]){
+   if(typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(name))continue;
+   keys.push(name.charAt(0).toLowerCase()+name.slice(1)+'Id','active'+name+'Id','current'+name+'Id');
+  }
+ }
+ return keys;
+}
+
+/** Names whose value differs between two page states (top-level keys and
+ * named collection selections). */
+export function changedPageStateNames(
+ previous:Readonly<Record<string,unknown>>,next:Readonly<Record<string,unknown>>
+):string[]{
+ const names=new Set<string>();
+ for(const key of new Set([...Object.keys(previous),...Object.keys(next)])){
+  if(key==='collectionSelections')continue;
+  if(!Object.is(previous[key],next[key]))names.add(key);
+ }
+ const sel=(value:unknown)=>value&&typeof value==='object'&&!Array.isArray(value)
+  ?value as Record<string,unknown>:{};
+ const a=sel(previous.collectionSelections),b=sel(next.collectionSelections);
+ for(const key of new Set([...Object.keys(a),...Object.keys(b)]))
+  if(JSON.stringify(a[key])!==JSON.stringify(b[key]))names.add(key);
+ return [...names];
+}
+
+/** True when a component's authored properties (formulas, filters, actions,
+ * bindings) or its implicit scoping keys could read one of the changed names.
+ * Conservative: any whole-word mention counts, case-insensitively. */
+export function pageStateChangeIsRelevant(
+ propertiesText:string,implicitKeys:ReadonlySet<string>,changed:readonly string[]
+):boolean{
+ const text=propertiesText.toLowerCase();
+ return changed.some(name=>{
+  if(implicitKeys.has(name))return true;
+  const needle=name.toLowerCase().replace(/ +/g,'_');
+  let at=text.indexOf(needle);
+  while(at>=0){
+   const before=text.charCodeAt(at-1),after=text.charCodeAt(at+needle.length);
+   const word=(c:number)=>(c>=48&&c<=57)||(c>=65&&c<=90)||(c>=97&&c<=122)||c===95;
+   if(!word(before)&&!word(after))return true;
+   at=text.indexOf(needle,at+1);
+  }
+  return false;
+ });
+}

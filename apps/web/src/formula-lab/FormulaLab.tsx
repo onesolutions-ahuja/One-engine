@@ -28,7 +28,7 @@ const loadAll = async (object:string):Promise<Row[]> => {
   }
   throw Error(object+' has more than 10,000 records; refusing partial totals');
 };
-function makeBoxes(lines:Row[],products:Row[]):FormulaBox[]{
+function makeBoxes(lines:Row[],products:Row[],cartId:string):FormulaBox[]{
   const byId=new Map(products.map(p=>[id(p.Id),p]));
   const enriched=lines.map(line=>{
     const product=byId.get(id(line.Product));
@@ -39,7 +39,7 @@ function makeBoxes(lines:Row[],products:Row[]):FormulaBox[]{
   const totals=enriched.map(x=>x.total),qty=enriched.map(x=>x.quantity),vat=enriched.map(x=>x.vat);
   const coke=enriched.filter(x=>x.coke),others=enriched.filter(x=>!x.coke);
   const total=round(totals.reduce((a,b)=>a+b,0)),units=qty.reduce((a,b)=>a+b,0);
-  const unique=new Set(enriched.map(x=>id(lines[enriched.indexOf(x)]?.Product))).size;
+  const unique=new Set(lines.map(x=>id(x.Product))).size;
   const s=(a:number[])=>round(a.reduce((n,v)=>n+v,0));
   const C=(name:string,a:number[])=>collection(name,a);
   const specs:FormulaBox[]=[
@@ -75,7 +75,17 @@ function makeBoxes(lines:Row[],products:Row[]):FormulaBox[]{
     const matched=enriched.filter(x=>x.total>=threshold&&x.quantity>=2);
     specs.push({label:'SUMIFS total ≥ £'+threshold+' & qty ≥ 2',formula:'IFERROR(ROUND(SUM('+C('Multi'+threshold,matched.map(x=>x.total))+'),2),0)',expected:s(matched.map(x=>x.total)),money:true});
   }
-  return specs.slice(0,50);
+  // These final checks exercise real database-backed SUMIFS/COUNTIFS, not a JS substitute.
+  // Aggregate filters use exact equality; cart isolation is explicit.
+  const quotedCart=escaped(cartId);
+  const sqlChecks:FormulaBox[]=cartId?[
+    {label:'SQL COUNTIFS cart lines',formula:'COUNTIFS(CartLine,Cart,'+quotedCart+')',expected:lines.length},
+    {label:'SQL SUMIFS cart subtotal',formula:'ROUND(SUMIFS(CartLine,LineTotal,Cart,'+quotedCart+'),2)',expected:total,money:true},
+    {label:'SQL SUMIFS qty',formula:'SUMIFS(CartLine,Quantity,Cart,'+quotedCart+')',expected:units},
+    {label:'SQL nested IFERROR SUMIFS',formula:'IFERROR(ROUND(SUMIFS(CartLine,LineTotal,Cart,'+quotedCart+')*1.2,2),0)',expected:round(total*1.2),money:true},
+    {label:'SQL SUMIFS quantity = 1',formula:'SUMIFS(CartLine,LineTotal,Cart,'+quotedCart+',Quantity,1)',expected:s(enriched.filter(x=>x.quantity===1).map(x=>x.total)),money:true}
+  ]:[];
+  return [...specs.slice(0,50-sqlChecks.length),...sqlChecks];
 }
 export default function FormulaLab(){
   const [products,setProducts]=React.useState<Row[]>([]);
@@ -122,7 +132,7 @@ export default function FormulaLab(){
     try{await apiRequest('/records/CartLine/'+encodeURIComponent(id(line.Id)),{method:'DELETE'});await refresh();}
     catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}
   };
-  const boxes=React.useMemo(()=>makeBoxes(lines,products),[lines,products]);
+  const boxes=React.useMemo(()=>makeBoxes(lines,products,id(cart?.Id)),[lines,products,cart?.Id]);
   React.useEffect(()=>{
     let alive=true;
     setResults({});

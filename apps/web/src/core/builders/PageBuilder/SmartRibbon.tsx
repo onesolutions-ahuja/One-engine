@@ -903,7 +903,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
         <div className="smart-source-heading">
           <button type="button" className="smart-inspector-section-toggle"
             aria-expanded={designSectionOpen('Object Source')} onClick={()=>toggleDesignSection('Object Source')}>
-            <ChevronDown size={15} aria-hidden="true"/>Object Source ({sourceObjects.length})
+            <ChevronDown size={15} aria-hidden="true"/>Object Source ({sourceObjectNames.length})
           </button>
         </div>
         {designSectionOpen('Object Source')&&<div className="smart-inspector-section-content">

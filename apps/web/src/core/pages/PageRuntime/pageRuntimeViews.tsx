@@ -279,7 +279,11 @@ function MetadataBoundPageComponent({
   sessionIdOverride?:string;
   children?: ReactNode;
 }) {
-  const properties = resolveMetadataProperties({...component.properties,objectApiName:component.properties.objectApiName||defaultObjectApiName},objects,availableFlows);
+  // Resolved once per metadata change, not on every redraw: downstream memos
+  // (formula parsing, mention context, formula jobs) key on this identity.
+  const properties = useMemo(()=>resolveMetadataProperties({...component.properties,
+    objectApiName:component.properties.objectApiName||defaultObjectApiName},objects,availableFlows),
+    [component.properties,defaultObjectApiName,objects,availableFlows]);
   const objectApiName = String(properties.objectApiName || defaultObjectApiName || '');
   const mentionRootObjectApiName = defaultObjectApiName || objectApiName;
   // An application-independent session can be referenced by configured Flows.
@@ -397,7 +401,8 @@ function MetadataBoundPageComponent({
   const initializedSessions = useRef<Set<string>>(new Set());
   // Only components that READ a changed Object reload. A write to CartLine must not reload the
   // Product catalogue or categories. Unknown writes and session changes still refresh everything.
-  const readObjectApiNames=pageComponentReadObjectNames(objectApiName,properties,objects);
+  const readObjectApiNames=useMemo(()=>pageComponentReadObjectNames(objectApiName,properties,objects),
+    [objectApiName,properties,objects]);
   const readObjectKey=JSON.stringify(readObjectApiNames);
   const loadedListRef=useRef<{rows:Record<string,unknown>[];scope:LoadedRecordListScope}|null>(null);
   useEffect(() => {
@@ -420,6 +425,9 @@ function MetadataBoundPageComponent({
         setRecordTotal(patched.total);
         return;
       }
+      // A prediction this list cannot show exactly is skipped: the real save
+      // follows within one round trip and refreshes it then.
+      if(detail?.optimistic)return;
       setRevision(value => value + 1);
     };
     window.addEventListener('metadrive:page-flow-mutated', sync);
@@ -742,8 +750,26 @@ function MetadataBoundPageComponent({
           objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName
         },onNavigate});
       }
-      const result=await executePageFormulaAction(apiRequest,binding,payload,
-        pageState,objects,objectApiName,sessionId);
+      // Show-first: the predicted rows appear at once; the real save replaces them.
+      let predicted=false;
+      let result:Awaited<ReturnType<typeof executePageFormulaAction>>;
+      try{
+        result=await executePageFormulaAction(apiRequest,binding,payload,
+          pageState,objects,objectApiName,sessionId,undefined,undefined,undefined,{},
+          prediction=>{
+            predicted=true;
+            window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
+              detail:{pageSessionKey,sessionId,objectApiNames:prediction.objectApiNames,
+                recordChanges:prediction.recordChanges,optimistic:prediction.batch}
+            }));
+          });
+      }catch(error){
+        // The save failed after a prediction was shown: drop it by reloading from SQL.
+        if(predicted)window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
+          detail:{pageSessionKey,sessionId}
+        }));
+        throw error;
+      }
       for(const change of result.changes)
         window.dispatchEvent(new CustomEvent('metadrive:page-local-state',{
           detail:{pageSessionKey,key:change.key,value:change.value}
@@ -754,9 +780,11 @@ function MetadataBoundPageComponent({
         window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
           detail:{pageSessionKey,sessionId,
             objectApiNames:result.mutatedObjectApiNames?.length?result.mutatedObjectApiNames:undefined,
-            recordChanges:result.recordChanges}
+            recordChanges:result.recordChanges,replacesOptimistic:result.predictionBatch}
         }));
-      }
+      }else if(predicted)window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
+        detail:{pageSessionKey,sessionId}
+      }));
       return {updated:true};
     }
     if (binding.actionType === 'AdjustNumber') {

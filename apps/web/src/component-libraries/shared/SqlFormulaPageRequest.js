@@ -3,6 +3,56 @@ import {tokenize} from '../../../../server/src/expression-engine/FormulaTokenize
 import {SQL_SCALAR_FORMULAS,SQL_RECORD_AGGREGATES,serializeFormulaSqlExpression}
  from '../../../../server/src/expression-engine/FormulaCategories.js';
 import {componentReaderKey,evaluateFieldExpressionDetailed,evaluateParsedExpression} from './FieldExpression.js';
+import {getLocalRecordSetProvider} from './localRecordSets.js';
+import {LocalSqlUnsupported,substituteLocalAggregates,evaluateLocalSql,localSqlResultValue,decFromNumber}
+ from './localSqlFormula.js';
+
+const hasRecordAggregate=node=>node.kind==='call'
+ ?SQL_RECORD_AGGREGATES.has(node.name)||node.args.some(hasRecordAggregate)
+ :node.kind==='unary'?hasRecordAggregate(node.value)
+ :node.kind==='binary'?hasRecordAggregate(node.left)||hasRecordAggregate(node.right):false;
+/** Counters for the speed test and diagnostics (no data, only counts and reasons). */
+const localStats=typeof window!=='undefined'
+ ?(window.__metadriveLocalSql??={local:0,server:0,reasons:{}}):{local:0,server:0,reasons:{}};
+const verifyLocal=()=>{
+ try{return typeof window!=='undefined'&&window.sessionStorage.getItem('metadrive:local-sql-verify')==='1';}
+ catch{return false;}
+};
+/** Same inputs the server path binds: $session, $session.cartId and $state values. */
+const localReference=(name,pageState,sessionId)=>{
+ if(name==='$session'||name==='$session.id')return sessionId;
+ if(name==='$session.cartId'){
+  const value=pageState.activeCartId;
+  return value===undefined?null:value;
+ }
+ if(name.startsWith('$state.')){
+  const key=name.slice(7);
+  if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)||!Object.prototype.hasOwnProperty.call(pageState,key))
+   throw new LocalSqlUnsupported('Unknown state');
+  return pageState[key];
+ }
+ throw new LocalSqlUnsupported('Reference not held locally');
+};
+const localTyped=value=>{
+ if(value===null||value===undefined)return null;
+ if(typeof value==='number')return decFromNumber(value);
+ if(typeof value==='string'||typeof value==='boolean')return value;
+ throw new LocalSqlUnsupported('Unsupported input');
+};
+/** Answer a record-aggregate display formula from rows the page already holds. */
+async function evaluateHeldAggregates(ast,pageState,sessionId){
+ const provider=getLocalRecordSetProvider();
+ if(!provider)throw new LocalSqlUnsupported('No record store');
+ const criterion=node=>{
+  if(node.kind==='literal')return node.value;
+  if(node.kind==='reference')return localReference(node.value,pageState,sessionId);
+  throw new LocalSqlUnsupported('Computed criterion');
+ };
+ const substituted=await substituteLocalAggregates(ast,criterion,
+  (object,filters)=>provider.rowsFor(object,filters));
+ return localSqlResultValue(evaluateLocalSql(substituted,
+  name=>localTyped(localReference(name,pageState,sessionId))));
+}
 
 // SQL-compatible expression trees stay in one existing server request.
 // Mixed trees are evaluated node-by-node without changing the formula language.
@@ -36,6 +86,34 @@ const scalarResult=value=>{
  * never object-field selectors or privilege claims. */
 export async function evaluatePageActionSql(request,expression,payload,pageState,objectApi,recordId,fields,sessionId='',formulaContext={}){
  const ast=new Parser(tokenize(expression)).parse();
+ // Till speed: totals over rows the page already holds are computed here with
+ // the server's exact SQL number rules; anything else uses the server.
+ let heldValue,held=false;
+ if(hasRecordAggregate(ast)&&sqlCompatible(ast,formulaContext)){
+  try{
+   heldValue=await evaluateHeldAggregates(ast,pageState??{},sessionId);
+   held=true;
+  }catch(error){
+   if(!(error instanceof LocalSqlUnsupported))throw error;
+   localStats.reasons[error.message]=(localStats.reasons[error.message]??0)+1;
+  }
+  if(held&&!verifyLocal()){localStats.local++;return heldValue;}
+ }
+ if(held){
+  // Verification mode: compute on the server too and report any difference.
+  const serverValue=await evaluatePageActionSqlOnServer(request,expression,ast,payload,pageState,
+   objectApi,recordId,fields,sessionId,formulaContext);
+  if(JSON.stringify(serverValue)!==JSON.stringify(heldValue))
+   console.warn('[LocalSql] mismatch',{expression,local:heldValue,server:serverValue});
+  else localStats.verified=(localStats.verified??0)+1;
+  return serverValue;
+ }
+ localStats.server++;
+ return evaluatePageActionSqlOnServer(request,expression,ast,payload,pageState,
+  objectApi,recordId,fields,sessionId,formulaContext);
+}
+
+async function evaluatePageActionSqlOnServer(request,expression,ast,payload,pageState,objectApi,recordId,fields,sessionId='',formulaContext={}){
  const authorisedCollections={...(formulaContext.namedCollections??{})};
  const local={...formulaContext,namedCollections:authorisedCollections,pageState,sessionId,
   rootObjectApiName:objectApi||formulaContext.rootObjectApiName};

@@ -2,6 +2,9 @@ import {createRecordPageCoalescer} from './recordPageCoalescer';
 import {invalidatePageMediaAssets} from '../../pages/PageRuntime/pageMediaAssetCoalescer';
 import {setAuthenticatedFormulaBindingContext} from '../../components/RegisteredComponent/fieldExpressionRuntime';
 import {setSqlFormulaRequest} from '../../../component-libraries/shared/SqlFormulaRequest.js';
+import {setLocalRecordSetProvider} from '../../../component-libraries/shared/localRecordSets.js';
+import {rememberCompleteRecordSet,recordSetGeneration,rowsForFilters,applyRecordSetMutation,heldRowById,
+  type SetFilter} from './recordSetStore';
 // Same-origin API for deployed builds and development's Vite /api proxy.
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? `${window.location.origin}/api`;
 let accessToken: string | undefined;
@@ -93,8 +96,13 @@ export function takePrefetchedPageEditorDraft<T>(
  return request<T>(path);
 }
 
-if(typeof window!=='undefined')
+if(typeof window!=='undefined'){
  window.addEventListener('metadrive:page-flow-mutated',invalidateRecordReadRequests);
+ // Registered at load, before any component: held record sets are patched from
+ // the save before components re-read them.
+ window.addEventListener('metadrive:page-flow-mutated',event=>
+  applyRecordSetMutation((event as CustomEvent).detail));
+}
 function invalidateAfterWrite(path:string,init?:RequestInit):void {
  const method=init?.method?.toUpperCase();
  if(!method||!['POST','PUT','PATCH','DELETE'].includes(method))return;
@@ -276,13 +284,39 @@ export async function loadFlowScreenRecordPage(
   // A short-lived successful page cache avoids remount refetches; a write
   // changes recordReadGeneration, so the old generation is never reused.
   const key=JSON.stringify([accessToken??null,recordReadGeneration,objectApiName,params.toString()]);
-  return pageCoalescer(key,limit,combinedLimit=>{
+  const setFilters=offset===0?recordSetFilters(options):null;
+  const readScope=accessToken,setGeneration=recordSetGeneration(accessToken);
+  const page=await pageCoalescer(key,limit,combinedLimit=>{
    const query=new URLSearchParams(params);
    query.set('limit',String(combinedLimit));
    return apiRequest<{records:Record<string,unknown>[];total:number}>(
     '/records/'+encodeURIComponent(objectApiName)+'?'+query.toString());
   },options.forceRefresh===true);
+  if(setFilters&&Array.isArray(page?.records)&&typeof page.total==='number')
+   rememberCompleteRecordSet(readScope,objectApiName,setFilters,page.records,page.total,setGeneration);
+  return page;
 }
+/** Equality-only, AND-only queries describe an exact record set the store can reuse. */
+function recordSetFilters(options:FlowScreenRecordPageOptions):SetFilter[]|null{
+  const out:SetFilter[]=[];
+  if(options.filter){
+    if(!options.filter.related)return null;
+    out.push({field:options.filter.field,operator:'eq',value:options.filter.value});
+  }
+  if(options.filters?.length){
+    if(options.filterLogic&&!/^\(?\s*1(\s+AND\s+\d+)*\s*\)?$/i.test(options.filterLogic))return null;
+    for(const filter of options.filters){
+      if(filter.operator!=='eq'||typeof filter.value!=='string'||!filter.value)return null;
+      out.push({field:filter.field,operator:'eq',value:filter.value});
+    }
+  }
+  return out;
+}
+setLocalRecordSetProvider({
+  rowsFor:(object:string,filters:SetFilter[])=>rowsForFilters(accessToken,object,filters,
+    (name,query)=>loadFlowScreenRecordPage(name,{limit:100,offset:0,filters:query})),
+  rowById:(object:string,id:string)=>heldRowById(accessToken,object,id)
+});
 export async function loadFlowScreenRecords(
   objectApiName:string,filter?:{field:string;value:string;related:boolean}
 ):Promise<Record<string,unknown>[]> {

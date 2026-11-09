@@ -40,6 +40,10 @@ export function registerSecurityWebHost(app:Express,db:SqlPersistence,folder:str
   }})(req,res,next));
  app.get('*',(req,res,next)=>{
   if(req.path.startsWith('/api/')||req.path.startsWith('/services/')){next();return;}
-  res.setHeader('Cache-Control','no-store');res.sendFile(resolve(root(),'index.html'));
+  res.setHeader('Cache-Control','no-store');
+  // Lets the page profile itself (JS Self-Profiling API) for the speed test;
+  // grants no access to other pages, data or permissions.
+  res.setHeader('Document-Policy','js-profiling');
+  res.sendFile(resolve(root(),'index.html'));
  });
 }

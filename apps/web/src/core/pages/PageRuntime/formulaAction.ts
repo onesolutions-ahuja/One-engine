@@ -3,7 +3,19 @@ import type {FieldMetadata} from '../../metadata/Definitions/metadata';
 import {executeActionFormula,evaluateFieldExpressionDetailed,type FormulaBindingContext} from '../../../component-libraries/shared/FieldExpression.js';
 import {adjustNumberRecord,type AdjustNumberBinding} from './adjustNumberRecord';
 import {evaluatePageActionSql} from '../../../component-libraries/shared/SqlFormulaPageRequest.js';
+import {predictActionPlan,type Prediction} from './predictActionPlan';
 export {evaluatePageActionSql};
+export type {Prediction};
+
+// Server saves from one browser run one at a time, in tap order: with instant
+// feedback a cashier taps faster than a save returns, and two concurrent
+// "quantity + 1" plans must not both read the same old quantity.
+let saveQueue:Promise<unknown>=Promise.resolve();
+function queuedSave<T>(run:()=>Promise<T>):Promise<T>{
+ const next=saveQueue.then(run,run);
+ saveQueue=next.catch(()=>undefined);
+ return next;
+}
 
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 type Change={key:string;value:unknown};
@@ -42,9 +54,12 @@ export async function executePageFormulaAction(
  runPageAction?:(name:string,target:string,mode?:string,recordId?:string)=>Promise<unknown>,
  createPdf?:(template:string,id:string)=>Promise<{FileId:string;AssetRef:string}>,
  /** Page data the action may read: TABLE()/COLLECTION() sources and $component values. */
- formulaContext:Pick<FormulaBindingContext,'namedCollections'|'collectionSources'|'readComponent'> & {timingName?:string}={}
+ formulaContext:Pick<FormulaBindingContext,'namedCollections'|'collectionSources'|'readComponent'> & {timingName?:string}={},
+ /** Show-first: receives the predicted saved records before the server answers. */
+ onPredicted?:(prediction:Prediction)=>void
 ):Promise<{changes:Change[];recordChanged:boolean;mutatedObjectApiNames?:string[];
- recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>}>{
+ recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>;
+ predictionBatch?:string}>{
  const formula=String(binding.formula??'');
  if(isActionPlan(formula)){
   // Production diagnostics are disabled by default and scoped to this browser session.
@@ -70,13 +85,22 @@ export async function executePageFormulaAction(
   // Always attempt safe server-side CRUD. FOREACH remains in its existing runtime.
   const split=keepForeach?null:splitServerDataActionPlan(formula);
   if(split){
-   const first=await request<{
+   // Predict from held rows while the real save runs; never delay the save.
+   let answered=false;
+   const prediction=onPredicted&&split.dataSteps===split.totalSteps
+    ?predictActionPlan(formula,scope,context).then(predicted=>{
+      if(predicted&&!answered){onPredicted(predicted);return predicted;}
+      return null;
+     },()=>null)
+    :Promise.resolve(null);
+   const first=await queuedSave(()=>request<{
     supported:boolean;error?:string;changes?:Change[];recordChanged?:boolean;
     mutatedObjectApiNames?:string[];variables?:Record<string,unknown>;completedActionCount?:number;
     recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>
    }>('/action-formulas/execute-data',{
     method:'POST',body:JSON.stringify({formula,scope,dataSteps:split.dataSteps})
-   });
+   })).finally(()=>{answered=true;});
+   const shown=await prediction;
    if(first.supported===true){
     if(first.error){
      // Earlier committed server writes must be reconciled, never replayed.
@@ -85,7 +109,8 @@ export async function executePageFormulaAction(
      throw Error(first.error);
     }
     const data={changes:first.changes??[],recordChanged:first.recordChanged===true,
-     mutatedObjectApiNames:first.mutatedObjectApiNames??[],recordChanges:first.recordChanges??[]};
+     mutatedObjectApiNames:first.mutatedObjectApiNames??[],recordChanges:first.recordChanges??[],
+     predictionBatch:shown?.batch};
     if(split.dataSteps===split.totalSteps)return data;
     // Browser-only steps run after server transaction, in their authored order.
     let rest:Awaited<ReturnType<typeof executeActionFormula>>;

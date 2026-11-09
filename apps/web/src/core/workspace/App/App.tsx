@@ -70,6 +70,7 @@ type NewFieldLookupFilterDraft = {
 
 
 
+const LazyFormulaLab=React.lazy(()=>import('../../../formula-lab/FormulaLab'));
 const LazyOAuthConsent=React.lazy(()=>import('../../authentication/Login/OAuthConsent'));
 const LazyMailboxAdmin=React.lazy(()=>import('../../mail/MailboxAdmin'));
 function MailboxAdminAccessGate({onLogout}:{onLogout:()=>void}){
@@ -278,6 +279,7 @@ function App() {
   };
   if(needsLandingRedirect)return <div className="auth-loading" role="status">Opening assigned application…</div>;
   if(isMailboxAdminRoute)return <MailboxAdminAccessGate onLogout={onLogout}/>;
+  if(window.location.pathname==='/formula-lab'||window.location.pathname==='/formula-lab/')return <React.Suspense fallback={<main role="status">Loading formula lab…</main>}><LazyFormulaLab /></React.Suspense>;
   return <SetupApp entryTiming={entryTiming} onLogout={onLogout} />;
 }
 

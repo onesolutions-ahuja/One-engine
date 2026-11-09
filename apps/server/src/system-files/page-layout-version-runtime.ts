@@ -364,7 +364,7 @@ export class PageLayoutVersionRuntime{
    ]);
    const activeAssignments=type.rows[0]?.page_type==='App Page'&&existing.rows.length
     ?existing.rows:mergePublishedPageActivation(existing.rows,incoming.rows,variant);
-   if(type.rows[0]?.page_type!=='App Page'&&!activeAssignments.length)
+   if(['Home Page','Record Page'].includes(type.rows[0]?.page_type??'')&&!activeAssignments.length)
     throw new Error('Add a page activation assignment before publishing');
    // Page name is edited separately via Page Details and remains authoritative.
    // Immutable page_label snapshots document the historical draft, not the

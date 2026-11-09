@@ -1,3 +1,4 @@
+import {parseComponentStateReference,readComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {compileRecordFilterFormula} from './recordFilterFormula';
 import {parseCollectionListBinding} from './pageCollectionListBinding';
 import {hasExcelWildcardCriteria,matchesExcelWildcard} from '../../../../../server/src/expression-engine/FormulaWildcard.js';
@@ -204,14 +205,11 @@ export function resolvePageFilterValue(value:unknown,context:PageFilterContext):
     return resolved===null||['string','number','boolean'].includes(typeof resolved)?resolved:undefined;
   }
   if(value.source==='CollectionState'&&typeof value.key==='string'){
-    const match=/^([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(Id|Name|Value|Field|Criteria)$/.exec(value.key);
-    const selections=context.pageState?.collectionSelections;
-    if(!match||!selections||typeof selections!=='object'||Array.isArray(selections))return undefined;
-    const record=Object.entries(selections as Record<string,unknown>).find(([key])=>key.toLowerCase()===match[1].toLowerCase())?.[1];
-    if(!record||typeof record!=='object'||Array.isArray(record)
-      ||!Object.prototype.hasOwnProperty.call(record,match[2]))return undefined;
-    const result=(record as Record<string,unknown>)[match[2]];
-    return result===null||['string','number','boolean'].includes(typeof result)?result:undefined;
+    const match=parseComponentStateReference(value.key);
+    if(!match)return undefined;
+    // Nothing picked yet reads as blank (Ignore-when-blank then skips the condition).
+    const result=readComponentState(context.pageState?.collectionSelections,match.name,match.field);
+    return result===''?undefined:result;
   }
   if(value.source==='CurrentRecord')return context.recordId||undefined;
   if(value.source==='Session')return context.sessionId||undefined;

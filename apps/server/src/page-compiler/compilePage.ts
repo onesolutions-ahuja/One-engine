@@ -263,6 +263,9 @@ function filterStateInputs(filters:unknown,formula:unknown):string[]{
  }
  if(typeof formula==='string')
   for(const match of formula.matchAll(/(?:\$state\.|@state\.)([A-Za-z][A-Za-z0-9_]{0,63})\b/g))keys.add(match[1]);
+ // @CategoryTabs.state.Id: the component's published value, under its name.
+ if(typeof formula==='string')
+  for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(?:Id|Name|Value|Text|Field|Criteria)\b/gi))keys.add(match[1]);
  return unique(keys);
 }
 function stableHash(text:string):string{

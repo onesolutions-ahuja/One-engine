@@ -91,7 +91,9 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const sourceRoots=selectedSourceObjects!==undefined
   ?selectedSourceObjects.map(source=>source.apiName)
   :rootObjectApiName?[rootObjectApiName]:[];
-
+ // What other components publish: @CategoryTabs.state.Id / Value / Name / Text.
+ const componentStateMentions=stateOptions.filter(entry=>entry.source==='CollectionState')
+  .map(entry=>({reference:'@'+entry.key,label:entry.label}));
  const dollarMentions=matches?.prefix==='$'
   ?[...formulaDollarSuggestions(stateOptions,matches.query,flowReferences),...componentMentions()]:[];
  function componentMentions(){
@@ -125,7 +127,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials):null;
  const availableMentions=actionArgs&&matches?.prefix===''?actionArgs.choices.map(item=>({reference:item.apiName,label:item.label})):matches?.prefix==='$'
   ?tableArg?[]:dollarMentions
-  :tableArg?recordMentions:recordMentions;
+  :tableArg?recordMentions:[...recordMentions,...componentStateMentions];
  const filtered=matches?availableMentions
     .filter(item=>item.reference.toLowerCase().includes(
        (matches.prefix==='$'?'$':(tableArg||actionArgs)?'':'@')+matches.query.toLowerCase())||

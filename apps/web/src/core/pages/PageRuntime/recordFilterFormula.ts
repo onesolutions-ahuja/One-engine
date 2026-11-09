@@ -1,3 +1,4 @@
+import {parseComponentStateReference,readComponentState,componentStateMentionPattern} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 /** Metadata-owned record filtering formulas compiled into permission-scoped
  * server filters before pagination. This intentionally accepts only expressions
  * that can be represented exactly by the existing Record API; there is NO
@@ -30,6 +31,9 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
   if(parts.length!==3||!reader)throw Error('Select a component and property on this page');
   return reader(parts[1],parts[2]);
  }
+ // @CategoryTabs.state.Id: what that component published (blank until picked).
+ const published=node.kind==='reference'?parseComponentStateReference(node.value):null;
+ if(published)return readComponentState(state.collectionSelections,published.name,published.field);
  const key=stateName(node);
  if(key!==null){const value=state[key];
   if(value===undefined||value===null||['string','number','boolean'].includes(typeof value))return value;
@@ -52,8 +56,11 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  throw Error('IF condition must use constants or $state values (e.g. ISBLANK($state.categoryId))');
 };
 const simpleField=(node:Expression,fields:ReadonlyArray<FieldMetadata>):FieldMetadata|null=>{
- if(node.kind!=='reference'||!/^[A-Za-z][A-Za-z0-9_]*$/.test(node.value))return null;
- return fields.find(f=>f.apiName===node.value)??null;
+ if(node.kind!=='reference')return null;
+ // @Field or @Object.Field (the component's own Object): both name one field.
+ const match=/^(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(node.value);
+ if(!match||/^(?:state|event|session)\./i.test(node.value))return null;
+ return fields.find(f=>f.apiName===match[1])??null;
 };
 const remap=(logic:string,offset:number):string=>
  logic.replace(/\b\d+\b/g,value=>String(Number(value)+offset));
@@ -99,6 +106,11 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    op=flip[node.operator];
    valueNode=node.left;
   }
+  // Neither side is a field: a pure state test such as @Tabs.state.Id = "*".
+  if(!field&&!simpleField(node.left,fields)){
+   const truth=asState(node,state,sessionId);
+   if(typeof truth==='boolean')return {truth,filters:[],logic:''};
+  }
   if(!field||!op)throw Error('Formula comparisons require a direct readable @Field and $state or literal');
   if(/^Formula\(/i.test(field.dataType)||/^(Geolocation|Address|EncryptedText)/i.test(field.dataType))
    throw Error('This field cannot be filtered reliably by the server');
@@ -139,9 +151,11 @@ export function compileRecordFilterFormula(formula:unknown,fields:ReadonlyArray<
 export function validateRecordFilterFormula(formula:string,fields:ReadonlyArray<FieldMetadata>):string|null{
  if(!formula.trim())return null;
  const keys=Array.from(new Set([...formula.matchAll(/\$state\.([A-Za-z][A-Za-z0-9_]{0,63})/g)].map(m=>m[1])));
- if(keys.length>12)return 'Too many Page State references';
+ const published=Array.from(new Set([...formula.matchAll(componentStateMentionPattern)].map(m=>m[1])));
+ if(keys.length+published.length>12)return 'Too many Page State references';
  for(const selected of [false,true]){
-  const state=selected?Object.fromEntries(keys.map(key=>[key,'test-id'])):{};
+  const picked=Object.fromEntries(published.map(name=>[name,{Id:'test-id',Name:'test',Value:'test-id',Text:'test',Field:'',Criteria:''}]));
+  const state:Record<string,unknown>=selected?{...Object.fromEntries(keys.map(key=>[key,'test-id'])),collectionSelections:picked}:{};
   const result=compileRecordFilterFormula(formula,fields,{...state,[componentReaderKey]:()=>selected?'test-id':''});
   if(result.error)return result.error;
  }

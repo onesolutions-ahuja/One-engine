@@ -6,6 +6,7 @@ import {parseRecordFilters,parseRecordCursor} from '../object-engine/QueryBuilde
 import {executeActionPlan,splitServerDataActionPlan,PartialActionError} from '../expression-engine/ActionFormulas.js';
 import {evaluateFlowFormulaNode} from '../system-files/flow-formula-runtime.js';
 import type {Expression} from '../expression-engine/FormulaParser.js';
+import {parseComponentStateReference,readComponentState} from '../expression-engine/FormulaComponentState.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Records=Pick<RecordEngine,'list'|'get'|'create'|'update'|'remove'|'aggregateFiltered'>;
@@ -69,6 +70,10 @@ function evaluateDataNode(node:Expression,scope:Record<string,unknown>,
    const key=path.slice(7);
    return own(state,key)??own(scope.state,key);
   }
+  // @CategoryTabs.state.Id: the value that component published in this page session.
+  const published=parseComponentStateReference(path);
+  if(published)return readComponentState(own(state,'collectionSelections')
+   ??own(scope.state,'collectionSelections'),published.name,published.field);
   if(path.startsWith('$component.')||path.startsWith('$flow.'))
    throw Error('Browser-only Formula reference');
   let current:unknown=scope;

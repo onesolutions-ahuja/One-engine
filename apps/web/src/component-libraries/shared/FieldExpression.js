@@ -11,6 +11,7 @@ import {createNamedFormulaCollection,createCriteriaFormulaCollection,deriveFormu
 import {isExcelWildcardDataReference,matchesExcelWildcard,hasExcelWildcardCriteria} from '../../../../server/src/expression-engine/FormulaWildcard.js';
 import {validateFormulaFunctions} from '../../../../server/src/expression-engine/FormulaFunctionRegistry.js';
 import {roundFormulaNumber} from '../../../../server/src/expression-engine/FormulaNumeric.js';
+import {parseComponentStateReference,readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
 import {
  evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
  formulaDateTimeParts,formulaIsoDateTime,formulaTimeText,
@@ -258,9 +259,11 @@ export function evaluateParsedExpression(expression,record,formulaContext){
     return '$flow.'+match;
    }
    // Named COLLECTION() results are no longer accessible via @CollectionName.
-   // Collection selection values come from the authorised page-session state.
-   const selected=/^([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(Id|Name|Value|Field|Criteria)$/.exec(reference);
-   if(selected)throw Error('Collection selection references are no longer supported: @'+reference);
+   // @ComponentName.state.Id/Value/Name/Text: what the user picked, typed or
+   // toggled in that component, from the authorised page-session state.
+   const selected=parseComponentStateReference(reference);
+   if(selected)return readComponentState(formulaContext.namedCollectionSelections
+     ??formulaContext.pageState?.collectionSelections,selected.name,selected.field);
    if(/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(reference)){
     if(Object.prototype.hasOwnProperty.call(formulaContext.collectionSources??{},reference))
      throw Error('Use @'+reference+' as a component Data Source, not a scalar field');

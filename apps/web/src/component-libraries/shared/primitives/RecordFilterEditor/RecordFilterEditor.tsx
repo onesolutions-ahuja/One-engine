@@ -378,7 +378,7 @@ export default function RecordFilterEditor({
                     }}>
                     <option value="">Choose state…</option>
                     {stateOptions.filter(option=>option.source==='CollectionState').length>0&&
-                      <optgroup label="Named Collections">
+                      <optgroup label="Component values (@Name.state.…)">
                         {stateOptions.filter(option=>option.source==='CollectionState').map(option=>
                           <option key={option.source+option.key} value={option.source+':'+option.key}>{option.label}</option>)}
                       </optgroup>}

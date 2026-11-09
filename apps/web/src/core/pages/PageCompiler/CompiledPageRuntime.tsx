@@ -22,6 +22,8 @@ import {compiledSourceLoader} from './compiledSourceLoader';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import type {LoadedPageScript} from './serverPageScript';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
+import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
+import {componentStateFromEvent,componentStateName,type ComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
 import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import {explicitMentionRecordId,useRelationshipMentionContext} from '../../records/RecordFormDialog/useRelationshipMentionContext';
@@ -43,6 +45,9 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  script:LoadedPageScript|null;
  data:CompiledDataLayer;request:Request;objects:ObjectMetadata[];pageSessionKey:string;recordId:string;
  searchRecords(sourceId:string,query:string):Promise<Record<string,unknown>[]>;
+ /** Remember what the user picked/typed/toggled in a component, under its page
+  * name, so any formula, filter or action reads @Name.state.Id / Value / Text. */
+ publishState(componentId:string,value:unknown):void;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
  resetSession(next?:string):void;
@@ -76,7 +81,22 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
   const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
   const data=createCompiledDataLayer(compiled,sourceLoader,store.get);
-  return {compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
+  const stateNames=new Map([...componentInstanceNames(components)].map(([id,name])=>[id,componentStateName(name)]));
+  const typing=new Map<string,number>();
+  const publish=(name:string,value:ComponentState)=>{
+   const changed=store.select('collection',name,value);
+   if(changed.length)void data.stateChanged(changed);
+  };
+  return {
+   publishState(componentId:string,value:unknown){
+    const name=stateNames.get(componentId);
+    const next=name?componentStateFromEvent(value):null;
+    if(!name||!next)return;
+    window.clearTimeout(typing.get(componentId));
+    // Typed text (Search Box) waits for a short pause, so lists reload once, not per key.
+    if(typeof value==='string')typing.set(componentId,window.setTimeout(()=>publish(name,next),250));
+    else publish(name,next);
+   },compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
    searchRecords:async(sourceId:string,query:string)=>{
     const source=compiled.dataSources.find(item=>item.id===sourceId);
     if(!source)throw Error('Search Box has no configured Object data source');
@@ -358,6 +378,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    throw Error('This action is unavailable under the published Page rules.');
   const validation=behaviorValidation(properties,action.event,{formFactor});
   if(validation)throw Error(validation);
+  // Tabs, Navigation, Toggle, Search Box, Lookup, grids… publish their value
+  // first, so an action and any reader of @Name.state.* see the new pick.
+  if(['change','select','click'].includes(action.event))runtime.publishState(component.id,action.value);
   window.dispatchEvent(new CustomEvent('metadrive:in-screen-action',{
    detail:{pageSessionKey:runtime.pageSessionKey,componentId:component.id,event:action.event,value:action.value}}));
   // Page interactions (show/hide/set another component) are applied by the page layout.
@@ -620,6 +643,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     ?runtime.searchRecords(compiled.dataSourceId,query)
     :Promise.reject(new Error('Search Box requires an Object data source')),
    onChange:(value:unknown)=>{
+    runtime.publishState(component.id,value);
     const interactions=pageBehaviors(properties)?.interactions;
     if(actionFlows.change||(Array.isArray(interactions)&&(interactions as Array<{event?:unknown}>).some(item=>item?.event==='change')))
      void onAction({event:'change',value}).catch(()=>{});

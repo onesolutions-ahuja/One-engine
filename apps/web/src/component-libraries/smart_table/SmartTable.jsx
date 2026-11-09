@@ -53,8 +53,10 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   fontSize:finite(p.rowTextSize,13,8,96),
   fontWeight:p.rowBold===true?700:undefined,
   textAlign:p.rowAlignment||undefined,
+  whiteSpace:p.rowWrapText===false?"nowrap":undefined,
+  // A selected row keeps its selected colour; otherwise the Row fill applies.
   background:selected!==null&&String(row.Id??row.id)===selected
-   ?colour(p.selectedRowColor,"#e7f1ff"):undefined
+   ?colour(p.selectedRowColor,"#e7f1ff"):p.rowBackgroundColor?colour(p.rowBackgroundColor,undefined):undefined
  });
  const value=(row,column)=>{
   if(!column.override)return plain(row?.[column.key]);

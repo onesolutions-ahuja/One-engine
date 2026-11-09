@@ -257,40 +257,32 @@ export function evaluateParsedExpression(expression,record,formulaContext){
     if(!match)throw Error('Unknown or inactive Flow: '+name);
     return '$flow.'+match;
    }
-   const named=formulaContext.namedCollections;
-   if(named&&typeof named==='object'&&!Array.isArray(named)&&!reference.includes('.')){
-    const collection=Object.entries(named).find(([key])=>key.toLowerCase()===reference.toLowerCase())?.[1];
-    if(collection&&typeof collection==='object'&&!Array.isArray(collection)
-      &&Array.isArray(collection.items))return collection;
-   }
+   // Named COLLECTION() results are no longer accessible via @CollectionName.
    // Collection selection values come from the authorised page-session state.
    const selected=/^([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(Id|Name|Value|Field|Criteria)$/.exec(reference);
-   if(selected){
-    const selections=formulaContext.namedCollectionSelections;
-    if(!selections||typeof selections!=='object'||Array.isArray(selections))return '';
-    const entry=Object.entries(selections).find(([name])=>name.toLowerCase()===selected[1].toLowerCase())?.[1];
-    if(!entry||typeof entry!=='object'||Array.isArray(entry)
-      ||!Object.prototype.hasOwnProperty.call(entry,selected[2]))return '';
-    const result=entry[selected[2]];
-    return result===null||['string','number','boolean'].includes(typeof result)?result:'';
-   }
+   if(selected)throw Error('Collection selection references are no longer supported: @'+reference);
    if(/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(reference)){
-    const selections=formulaContext.namedCollectionSelections;
-    if(selections&&typeof selections==='object'&&!Array.isArray(selections)){
-     const entry=Object.entries(selections).find(([key])=>key.toLowerCase()===reference.toLowerCase())?.[1];
-     if(entry&&typeof entry==='object'&&!Array.isArray(entry))
-      return entry.Name??entry.Value??entry.Id??'';
-    }
+    if(Object.prototype.hasOwnProperty.call(formulaContext.collectionSources??{},reference))
+     throw Error('Use @'+reference+' as a component Data Source, not a scalar field');
+    throw Error('Bare @Field and named collection references are unsupported: @'+reference+'; use @Object.Field');
    }
    // Object.Field collection references can use only authorised records
    // supplied by the Page Runtime; a formula never performs a database query.
    const sourceRef=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(reference);
    const sources=formulaContext.collectionSources;
+   // Multiple-record components still resolve each display property against
+   // its current row, not against the entire collection of records.
+   if(sourceRef&&formulaContext.collectionResult!==true
+     &&sourceRef[1]===formulaContext.rootObjectApiName
+     &&currentRecord&&typeof currentRecord==='object'&&!Array.isArray(currentRecord)
+     &&Object.prototype.hasOwnProperty.call(currentRecord,sourceRef[2]))
+    return currentRecord[sourceRef[2]]??'';
    if(sourceRef&&formulaContext.collectionResult===true
      &&!['state','event','session'].includes(sourceRef[1])
      &&(!sources||!Object.prototype.hasOwnProperty.call(sources,sourceRef[1])))
     throw Error('COLLECTION source unavailable: '+sourceRef[1]);
-   if(sourceRef&&sources&&Object.prototype.hasOwnProperty.call(sources,sourceRef[1])){
+   if(sourceRef&&sources&&Object.prototype.hasOwnProperty.call(sources,sourceRef[1])
+     &&formulaContext.collectionResult===true){
     const rows=sources[sourceRef[1]];
     if(!Array.isArray(rows))throw Error('COLLECTION source unavailable: '+sourceRef[1]);
     if(rows.length>200)throw Error('COLLECTION source exceeds 200 records');
@@ -355,6 +347,9 @@ export function evaluateParsedExpression(expression,record,formulaContext){
   if(sourceRef&&sourceRef[1]===formulaContext.rootObjectApiName
     &&Object.prototype.hasOwnProperty.call(currentRecord,sourceRef[2]))
    return ownValue(currentRecord,sourceRef[2])??'';
+  if(sourceRef&&sourceRef[1]!==formulaContext.rootObjectApiName
+    &&!['state','event','session'].includes(sourceRef[1]))
+   throw Error('Object field is not bound to the current record: @'+reference);
   if(Object.prototype.hasOwnProperty.call(currentRecord,reference))return ownValue(currentRecord,reference)??'';
   let value=currentRecord;
   for(const part of parts){
@@ -389,8 +384,8 @@ export function evaluateParsedExpression(expression,record,formulaContext){
   const sourceField=node=>{
    if(node?.kind!=='reference')return null;
    const raw=node.value,parts=raw.split('.');
-   if(parts.length>2||parts.length<1||parts.some(part=>!/^[A-Za-z][A-Za-z0-9_]*$/.test(part)))return null;
-   const object=parts.length===2?parts[0]:formulaContext.rootObjectApiName;
+   if(parts.length!==2||parts.some(part=>!/^[A-Za-z][A-Za-z0-9_]*$/.test(part)))return null;
+   const object=parts[0];
    const field=parts.at(-1);
    const sources=formulaContext.collectionSources;
    if(!object||!sources||!Object.prototype.hasOwnProperty.call(sources,object))return null;
@@ -522,16 +517,27 @@ export function evaluateParsedExpression(expression,record,formulaContext){
    const rows=formulaContext.collectionRows;
    // A single row-field (or row expression) sums over the bounded, authorised
    // collection passed by the page runtime. This is universal, not Cart logic.
-   const rowField=reference=>/^[A-Za-z][A-Za-z0-9_]*$/.test(reference)
-    &&Array.isArray(rows)&&rows.some(row=>row&&typeof row==='object'
-      &&Object.prototype.hasOwnProperty.call(row,reference));
+   const rowField=reference=>{
+    const match=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(reference);
+    return Boolean(match&&match[1]===formulaContext.rootObjectApiName
+     &&Array.isArray(rows)&&rows.some(row=>row&&typeof row==='object'
+       &&Object.prototype.hasOwnProperty.call(row,match[2])));
+   };
    const usesRowField=part=>part.kind==='reference'?rowField(part.value):
     part.kind==='unary'?usesRowField(part.value):
     part.kind==='binary'?usesRowField(part.left)||usesRowField(part.right):
     part.kind==='call'&&part.name!=='SUM'?part.args.some(usesRowField):false;
-   const direct=operand.kind==='reference'?evaluate(operand,currentRecord):null;
    const objectField=operand.kind==='reference'
     ?/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(operand.value):null;
+   const sourceRows=objectField?formulaContext.collectionSources?.[objectField[1]]:null;
+   const permitted=objectField?formulaContext.collectionSourceFields?.[objectField[1]]:null;
+   if(Array.isArray(sourceRows)&&(!Array.isArray(permitted)||!permitted.includes(objectField[2])))
+    throw Error('COLLECTION field unavailable: '+objectField[0]);
+   if(Array.isArray(sourceRows)&&sourceRows.length>200)
+    throw Error('SUM requires a bounded numeric collection');
+   const direct=Array.isArray(sourceRows)&&objectField
+    ?sourceRows.map(row=>({objectApiName:objectField[1],record:row}))
+    :operand.kind==='reference'?evaluate(operand,currentRecord):null;
    if(objectField&&Array.isArray(direct)
     &&direct.every(item=>item&&typeof item==='object'&&!Array.isArray(item)
       &&item.objectApiName===objectField[1]&&item.record&&typeof item.record==='object')){

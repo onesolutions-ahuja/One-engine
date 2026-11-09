@@ -43,14 +43,14 @@ function makeBoxes(lines:Row[],products:Row[],cartId:string):FormulaBox[]{
   const s=(a:number[])=>round(a.reduce((n,v)=>n+v,0));
   const C=(name:string,a:number[])=>collection(name,a);
   const specs:FormulaBox[]=[
-    {label:'Distinct products',formula:'COUNT('+C('DistinctProducts',Array.from(new Set(lines.map(x=>id(x.Product)))).map(()=>1))+')',expected:unique},
+    {label:'Distinct products',formula:'SUM('+C('DistinctProducts',Array.from(new Set(lines.map(x=>id(x.Product)))).map(()=>1))+')',expected:unique},
     {label:'Total item quantity',formula:'SUM('+C('Quantities',qty)+')',expected:units},
     {label:'VAT total (20%)',formula:'ROUND(SUM('+C('Vat',vat)+'),2)',expected:s(vat),money:true},
     {label:'Coke products total',formula:'ROUND(SUM('+C('Coke',coke.map(x=>x.total))+'),2)',expected:s(coke.map(x=>x.total)),money:true},
     {label:'Total × 1.2',formula:'ROUND(SUM('+C('LineTotals',totals)+')*1.2,2)',expected:round(total*1.2),money:true},
     {label:'Cart subtotal',formula:'ROUND(SUM('+C('Subtotal',totals)+'),2)',expected:total,money:true},
-    {label:'Cart line count',formula:'COUNT('+C('Rows',qty.map(()=>1))+')',expected:lines.length},
-    {label:'Average line total',formula:'IFERROR(ROUND(AVERAGE('+C('AverageLine',totals)+'),2),0)',expected:lines.length?round(total/lines.length):0,money:true},
+    {label:'Cart line count',formula:'SUM('+C('Rows',qty.map(()=>1))+')',expected:lines.length},
+    {label:'Average line total',formula:'IFERROR(ROUND(SUM('+C('AverageLine',totals)+')/'+Math.max(1,lines.length)+',2),0)',expected:lines.length?round(total/lines.length):0,money:true},
     {label:'Highest line total',formula:'MAX('+C('MaxLine',totals)+')',expected:Math.max(0,...totals),money:true},
     {label:'Lowest line total',formula:'MIN('+C('MinLine',totals)+')',expected:totals.length?Math.min(...totals):0,money:true},
     {label:'Coke unit quantity',formula:'SUM('+C('CokeUnits',coke.map(x=>x.quantity))+')',expected:s(coke.map(x=>x.quantity))},

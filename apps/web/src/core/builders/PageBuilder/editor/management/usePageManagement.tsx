@@ -8,6 +8,7 @@ import { remapComponentInteractionTargets } from '../../pageComponentTree';
 import { findRegisteredComponent } from '../../../../components/Registry/componentRegistryLookup';
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary';
+import { pageActivationAppCandidates, resolvePageActivationApp } from '../../pageAppMembership';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
 import { downloadCode } from '../../../../pages/PageCompiler/downloadPageScript';
 import { fetchServerPageScriptSource } from '../../../../pages/PageCompiler/serverPageScript';
@@ -42,7 +43,8 @@ export function usePageManagement(
   } = editorState;
   const { selectSavedPage, openPageDesignLayout } = layoutActions;
 
-  const savePage = async (status?: 'Active' | 'Draft', candidate: LightningPageMetadata = page, returnToList = false) => {
+  const savePage = async (status?: 'Active' | 'Draft', candidate: LightningPageMetadata = page,
+    returnToList = false, listActivation = false) => {
     const duplicateId=duplicatePageComponentId(candidate.components);
     if(duplicateId){onNotify(duplicateId);return;}
     const propertyIssues=candidate.components.flatMap(c=>{
@@ -57,7 +59,7 @@ export function usePageManagement(
       return;
     }
     // When activating a list row, its persisted identity is that row, not the open editor page.
-    const previousApiName = candidate === page ? savedPageApiName.current : candidate.apiName;
+    const previousApiName = listActivation ? candidate.apiName : savedPageApiName.current;
     if (metadataNameConflictExcept(candidate.apiName, pages.map(item => item.apiName), previousApiName)) {
       onNotify('A Lightning page with this API name already exists');
       return;
@@ -75,18 +77,26 @@ export function usePageManagement(
       return;
     }
     const nextPage = status ? { ...candidate, status } : candidate;
-    // App Page availability is resolved from SQL activation assignments.
-    const targetAppId = builderAppApiName || preparedAppId;
-    if (status === 'Active' && nextPage.pageType === 'App Page'
-      && !(nextPage.activationAssignments ?? []).some(item => item.appId === targetAppId)) {
-      if (!targetAppId || !apps.some(item => item.apiName === targetAppId)) {
-        onNotify('Select an installed application before activating this App Page');
+    // List activation uses this row's persisted membership, never a different open page.
+    const preferredAppId = listActivation
+      ? (pageListAppTab !== 'all' && pageListAppTab !== 'other' ? pageListAppTab : '')
+      : (builderAppApiName || preparedAppId);
+    const targetAppId = status === 'Active' && nextPage.pageType === 'App Page'
+      ? resolvePageActivationApp(apps, nextPage, preferredAppId, !listActivation) : null;
+    if (status === 'Active' && nextPage.pageType === 'App Page') {
+      if (!targetAppId) {
+        const associations = pageActivationAppCandidates(apps, nextPage);
+        onNotify(associations.length > 1
+          ? 'This page belongs to multiple applications. Choose an application tab before activating it.'
+          : 'Assign this App Page to an installed application in Edit Page before activating it.');
         return;
       }
-      nextPage.activationAssignments = [...(nextPage.activationAssignments ?? []), {
-        id: crypto.randomUUID(), scope: 'App Default', appId: targetAppId,
-        profileId: null, recordTypeId: null, formFactors: [...nextPage.devices]
-      }];
+      if (!(nextPage.activationAssignments ?? []).some(item => item.appId === targetAppId)) {
+        nextPage.activationAssignments = [...(nextPage.activationAssignments ?? []), {
+          id: crypto.randomUUID(), scope: 'App Default', appId: targetAppId,
+          profileId: null, recordTypeId: null, formFactors: [...nextPage.devices]
+        }];
+      }
     }
     setSaving(true);
     try {
@@ -107,7 +117,6 @@ export function usePageManagement(
           if(!published)return;
         }
         if (status === 'Active' && nextPage.pageType === 'App Page') {
-          const targetAppId = builderAppApiName || preparedAppId;
           const destinationApp = apps.find(item => item.apiName === targetAppId);
           if (destinationApp && !destinationApp.navigationPageApiNames.includes(nextPage.apiName)) {
             const navigationPageApiNames = [...destinationApp.navigationPageApiNames, nextPage.apiName];
@@ -125,18 +134,39 @@ export function usePageManagement(
           } else if (destinationApp) onAppLinked(nextPage.apiName);
         }
         // Saving a different list row must not change the editor's persisted page identity.
-        if (candidate === page) savedPageApiName.current = nextPage.apiName;
-        setSavedFeedback(true);
-        setUndoStack([]);
-        setSelectionUndoStack([]);
-        setSelectionRedoStack([]);
-        setRedoStack([]);
-        if (returnToList) onBackToPages();
+        if (!listActivation) {
+          savedPageApiName.current = nextPage.apiName;
+          setSavedFeedback(true);
+          setUndoStack([]);
+          setSelectionUndoStack([]);
+          setSelectionRedoStack([]);
+          setRedoStack([]);
+          if (returnToList) onBackToPages();
+        }
         return saved;
       }
     } finally {
       setSaving(false);
     }
+  };
+  /** Activate a list row from its latest authored device draft, not the list's Desktop summary. */
+  const activateListedPage=async(item:LightningPageMetadata)=>{
+    if(saving)return;
+    setSaving(true);
+    try{
+      const summary=layoutSummaries[item.apiName]??(await fetchLayoutSummaries([item.apiName]))
+        .find(row=>row.apiName===item.apiName);
+      const variant=primaryPageLayout(summary);
+      const {page:current}=await request<{page:LightningPageMetadata}>(
+        `/metadata/pages/${encodeURIComponent(item.apiName)}/layouts/${variant}/editor`);
+      if(current.status==='Active'){
+        onNotify('This page is already active. Refresh the list to see its current status.');
+        return;
+      }
+      await savePage('Active',current,false,true);
+    }catch(error){
+      onNotify(error instanceof Error?error.message:'Unable to load the page layout for activation');
+    }finally{setSaving(false);}
   };
   const publishCurrentLayout=async()=>{
     if(saving)return;
@@ -246,12 +276,7 @@ export function usePageManagement(
     }
   };
   // Rebuild the app tabs from tenant app metadata on every render. No app names are hardcoded.
-  const pageAppIds = (item: LightningPageMetadata): string[] => apps.filter(app =>
-    (app.navigationPageApiNames ?? []).includes(item.apiName)
-    || (app.navigationOrder ?? []).some(entry => entry.type === 'App Page' && entry.apiName === item.apiName)
-    || (item.activationAssignments ?? []).some(assignment => assignment.appId === app.apiName)
-    || item.ownerNamespace === app.apiName
-  ).map(app => app.apiName);
+  const pageAppIds = (item: LightningPageMetadata): string[] => pageActivationAppCandidates(apps,item);
   const pageAppTabs = [...apps].sort((a,b) => a.label.localeCompare(b.label));
   const pageTabType = (item: LightningPageMetadata) => item.pageType;
   const visiblePages = pages.filter(item => (recordPageContext

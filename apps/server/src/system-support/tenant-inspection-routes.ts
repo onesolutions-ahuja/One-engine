@@ -5,6 +5,7 @@ import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {PlatformTenantService} from '../system-files/platform-tenant-service.js';
+import {tenantDeveloperDomain} from './tenant-developer-domain.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Req=Request<Record<string,string>>&{actor?:Actor};
@@ -258,8 +259,7 @@ export function registerTenantInspectionRoutes(app:Express,db:SqlPersistence,
   const removeDomain=(external:boolean)=>wrap(async(req,res)=>{
     const {actor,tenantId,slug:name}=await target(req,external,true);
     const domain=validHost(req.params.domain);
-    const base=process.env.METADRIVE_TENANT_BASE_DOMAIN?.toLowerCase();
-    if(base&&domain===name+'.'+base)throw new Error('Cannot remove platform-owned login domain');
+    if(domain===tenantDeveloperDomain(name))throw new Error('Cannot remove platform-owned login domain');
     await db.transaction(async client=>{
       const claim=await client.query('DELETE FROM md_tenant_domain_claims WHERE tenant_id=$1 AND domain=$2 RETURNING domain',
         [tenantId,domain]);

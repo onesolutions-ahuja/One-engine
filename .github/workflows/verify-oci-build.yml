@@ -16,6 +16,8 @@ jobs:
       - run: npm ci
       - name: Page components and formula regression tests
         run: node scripts/check-test-components.mjs
+      - name: Tenant onboarding backend regression tests
+        run: npm run test:system --workspace apps/server
       - name: Page activation regression tests
         run: node --import tsx --test --test-name-pattern='Page Builder activat|publishing standalone Page Builder templates' apps/web/test/frontend.test.mjs apps/server/test/system/backend.test.mjs
       - name: Compile server exactly as OCI

@@ -3,7 +3,7 @@ import * as React from 'react';
 import {
 ArrowLeft, Check, ClipboardPaste, Copy, Database, Eye, EyeOff, Filter, Type, MoveHorizontal,
 MoveVertical, Puzzle, Smartphone, RefreshCw, Save, Scissors, SlidersHorizontal, Undo2, Redo2, Trash2,
-Workflow, Layers3
+Workflow, Layers3, ChevronDown
 } from 'lucide-react';
 import RibbonColorPalette from '../../RibbonColorPalette';
 import PageComponentNavigator from '../../PageComponentNavigator';
@@ -48,7 +48,8 @@ export function createPageRibbon(
     showLayoutHistory, setSelectedHistoryVersion, ribbonCatalog, updateComponent,
     componentClipboard, undoStack, redoStack, switchingLayout, setInspectorTab, setActivePanel,
     selectionIds, ribbonTab, selectedId, paletteInsertRegion, setPaletteInsertRegion,
-    inspectorSection, setInspectorSection, canvasBinding, selectRibbonTab, ribbonStripRef,
+    inspectorSection, setInspectorSection, openDesignSection, toggleDesignSection,
+    canvasBinding, selectRibbonTab, ribbonStripRef,
     setGroupEditId, setSelectionIds, setSelectedId, setSelectedRegion, setPageSettingsOpen,
     pagePreviewAreaRef, setFitCanvas, setFitFullPage, fitCanvas, fitFullPage, setCanvasZoom,
     canvasZoom, fitScale, advancedEditor, setRibbonPropertyHost, layoutSummaries, layoutCopySource,
@@ -233,6 +234,7 @@ export function createPageRibbon(
     (part==='source'||selectedHasDataRibbon) ? (
     <SmartRibbon key={'smart-data-'+part} tab="Data" part={part} api={selectedRibbonApi}
       inspectorSection={inspectorSection} onInspectorSectionChange={setInspectorSection}
+      openDesignSection={openDesignSection} onToggleDesignSection={toggleDesignSection}
       definitions={ribbonCatalog.properties}
       properties={selected.properties} objects={objects} pageObjectApiName={page.targetObject}
       componentId={selected.id} pageComponents={page.components}
@@ -258,6 +260,7 @@ export function createPageRibbon(
                 design2SlotRules={ribbonCatalog.design2SlotRules}
                 design2Arrange={canvasArrangeProps}
                 inspectorSection={inspectorSection} onInspectorSectionChange={setInspectorSection}
+                openDesignSection={openDesignSection} onToggleDesignSection={toggleDesignSection}
                 properties={selected.properties} objects={objects} pageObjectApiName={page.targetObject}
                 componentId={selected.id} pageComponents={page.components}
                 canvasBinding={canvasBinding}
@@ -458,9 +461,12 @@ export function createPageRibbon(
                 }else updateComponent(selected.id,{properties:{...selected.properties,iconId}});
               }}/>}
           {smartRibbonElement}
-          {ribbonTab==='Component Design 2' && <details className="page-builder-dock-section page-builder-canvas-section" open>
-            <summary>Canvas</summary>
-            <div className="page-builder-dock-section-body">
+          {ribbonTab==='Component Design 2' && <section className="smart-inspector-section page-builder-dock-section page-builder-canvas-section">
+            <button type="button" className="smart-inspector-section-toggle"
+              aria-expanded={openDesignSection==='Canvas'} onClick={()=>toggleDesignSection('Canvas')}>
+              <ChevronDown size={15} aria-hidden="true"/>Canvas
+            </button>
+            {openDesignSection==='Canvas'&&<div className="page-builder-dock-section-body">
               <div className="page-builder-canvas-fields">
                 <label data-ribbon-property="canvasWidth" className="une-sql-home-control une-ribbon-size-with-icon" title="Canvas Width">
                   <span className="une-ribbon-embedded-icon"><MoveHorizontal size={17}/></span>
@@ -488,11 +494,14 @@ export function createPageRibbon(
                       if(Number.isFinite(value)){setFitCanvas(false);setCanvasZoom(Math.min(200,Math.max(20,value)));}}}/>%
                 </label>
               </div>
-            </div>
-          </details>}
-          {ribbonTab==='Component Design 2' && <details className="page-builder-dock-section page-builder-conditional-section" open>
-            <summary>Conditional Visibility</summary>
-            <div className="page-builder-dock-section-body">
+            </div>}
+          </section>}
+          {ribbonTab==='Component Design 2' && <section className="smart-inspector-section page-builder-dock-section page-builder-conditional-section">
+            <button type="button" className="smart-inspector-section-toggle"
+              aria-expanded={openDesignSection==='Conditional Visibility'} onClick={()=>toggleDesignSection('Conditional Visibility')}>
+              <ChevronDown size={15} aria-hidden="true"/>Conditional Visibility
+            </button>
+            {openDesignSection==='Conditional Visibility'&&<div className="page-builder-dock-section-body">
               <div className="page-builder-visibility-controls">
                 <label className="ribbon-small-checkbox"><input type="checkbox"
                   checked={selected?.visible??false} disabled={!selected}
@@ -503,8 +512,8 @@ export function createPageRibbon(
                   <Filter size={17} aria-hidden="true"/></button>
                 <button type="button" disabled={!selected} onClick={openVisibilityEditor}>Conditions</button>
               </div>
-            </div>
-          </details>}
+            </div>}
+          </section>}
         </div>);
 
   return {

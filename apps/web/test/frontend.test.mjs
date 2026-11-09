@@ -490,3 +490,21 @@ test('SCREEN third argument passes the chosen record to the popup',async()=>{
  const scope=fs.readFileSync(new URL('../src/core/components/RegisteredComponent/PageFormulaScope.tsx',import.meta.url),'utf8');
  assert.match(scope,/keys\.push\('recordId'\)/,'every component publishes $component.Name.recordId');
 });
+
+test('Page Builder activates existing list rows without false API-name duplicates',async()=>{
+ const {metadataNameConflictExcept}=await import('../src/core/metadata/Definitions/metadataApiNames.ts');
+ const pageNames=['serviceflowcalendar','serviceflowhome','serviceflownewappointment'];
+ // A different page may be open in the editor; the selected row is still its own identity.
+ assert.equal(metadataNameConflictExcept('serviceflownewappointment',pageNames,'serviceflownewappointment'),false);
+ assert.equal(metadataNameConflictExcept('serviceflowhome',pageNames,'serviceflownewappointment'),true);
+ assert.equal(metadataNameConflictExcept('SERVICEFLOWHOME',pageNames,'serviceflownewappointment'),true);
+ assert.equal(metadataNameConflictExcept('serviceflowhome',['serviceflowhome','SERVICEFLOWHOME'],'serviceflowhome'),true);
+ // Renaming the current page must still detect other page names case-insensitively.
+ assert.equal(metadataNameConflictExcept('serviceflowcalendar',pageNames,'serviceflowhome'),true);
+ assert.equal(metadataNameConflictExcept('renamedhome',pageNames,'serviceflowhome'),false);
+ const management=fs.readFileSync(new URL('../src/core/builders/PageBuilder/editor/management/usePageManagement.tsx',import.meta.url),'utf8');
+ assert.match(management,/const previousApiName = candidate === page \? savedPageApiName\.current : candidate\.apiName/);
+ assert.match(management,/metadataNameConflictExcept\(candidate\.apiName, pages\.map\(item => item\.apiName\), previousApiName\)/);
+ assert.match(management,/onSave\(nextPage, previousApiName\)/);
+ assert.match(management,/if \(candidate === page\) savedPageApiName\.current = nextPage\.apiName/);
+});

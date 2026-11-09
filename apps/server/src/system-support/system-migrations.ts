@@ -295,6 +295,112 @@ export async function applySystemMigrations(db:SqlPersistence) {
     WHERE slot_key LIKE 'extra_calendar%'
     ON CONFLICT(component_api,area,slot_key) DO NOTHING
   `);
+  // Design 2 click-to-style: switch on icons for parts the components already draw.
+  // 1) Missing properties, copied from an existing property of the same kind
+  //    (same control, limits and icon size). Bold has no default so existing
+  //    buttons keep their current weight until a builder picks one.
+  await client.query(`
+    WITH specs(property_key,label,section_group,template_key,keep_default,ordinal) AS (VALUES
+     ('rowBackgroundColor','Row fill','Row','summaryBackgroundColor',false,1),
+     ('rowWrapText','Row wrap','Row','footerWrapText',true,2),
+     ('summaryWrapText','Summary wrap','Summary','footerWrapText',true,3),
+     ('qtyIncreaseTextSize','Plus text size','Button 4','customButton1TextSize',true,4),
+     ('qtyIncreaseAlignment','Plus alignment','Button 4','customButton1Alignment',true,5),
+     ('qtyIncreaseBold','Plus bold','Button 4','customButton3Bold',false,6),
+     ('qtyDecreaseTextSize','Minus text size','Button 5','customButton1TextSize',true,7),
+     ('qtyDecreaseAlignment','Minus alignment','Button 5','customButton1Alignment',true,8),
+     ('qtyDecreaseBold','Minus bold','Button 5','customButton3Bold',false,9),
+     ('customButton1Bold','Custom 1 bold','Button','customButton3Bold',false,10),
+     ('customButton2Bold','Custom 2 bold','Button 2','customButton3Bold',false,11),
+     ('supportingRadius','Supporting radius','Header Supporting','rowSupportingRadius',true,12),
+     ('headerRadius','Header radius','Header','rowSupportingRadius',true,13)
+    ), missing AS (
+      SELECT specs.* FROM specs WHERE NOT EXISTS(
+        SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key)
+    ), last_order AS (
+      SELECT COALESCE(MAX(sort_order),0) AS sort_order FROM md_builder_shared_properties
+    )
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,min_value,max_value,
+      field_select,choices,scope,design_row,design_width,design_height,design_order,design_caption,
+      design_caption_width,design_display,enabled_when)
+    SELECT m.property_key,m.label,'Design2',m.section_group,t.control_kind,
+     last_order.sort_order+ROW_NUMBER() OVER(ORDER BY m.ordinal),
+     CASE WHEN m.keep_default THEN t.default_value ELSE NULL END,t.min_value,t.max_value,
+     t.field_select,t.choices,t.scope,t.design_row,t.design_width,t.design_height,t.design_order,
+     t.design_caption,t.design_caption_width,t.design_display,t.enabled_when
+    FROM missing m JOIN md_builder_shared_properties t ON t.property_key=m.template_key
+     CROSS JOIN last_order
+    ON CONFLICT(property_key) DO NOTHING
+  `);
+  // 2) Which component uses which property, and on which icon of which area.
+  //    Cart/Card Grid/Numpad button areas follow the existing SQL mapping:
+  //    Cart Button=Custom 1, Button 2=Custom 2, Button 4=plus, Button 5=minus;
+  //    Card Grid Button 3=card button. Only parts the renderer draws are listed.
+  await client.query(`
+    WITH specs(component_api,area,slot_key,property_key) AS (VALUES
+     ('smart_cart','Row','fill','rowBackgroundColor'),('smart_cart','Row','wrap','rowWrapText'),
+     ('smart_cart','Summary','wrap','summaryWrapText'),('smart_cart','Header','radius','headerRadius'),
+     ('smart_cart','Button','bold','customButton1Bold'),
+     ('smart_cart','Button 2','alignment','customButton2Alignment'),('smart_cart','Button 2','size','customButton2TextSize'),
+     ('smart_cart','Button 2','bold','customButton2Bold'),
+     ('smart_cart','Button 4','alignment','qtyIncreaseAlignment'),('smart_cart','Button 4','size','qtyIncreaseTextSize'),
+     ('smart_cart','Button 4','bold','qtyIncreaseBold'),
+     ('smart_cart','Button 5','alignment','qtyDecreaseAlignment'),('smart_cart','Button 5','size','qtyDecreaseTextSize'),
+     ('smart_cart','Button 5','bold','qtyDecreaseBold'),
+     ('smart_cart','Image','border','imageBorderColor'),('smart_cart','Image','fill','imageBackgroundColor'),
+     ('smart_table','Row','fill','rowBackgroundColor'),('smart_table','Row','wrap','rowWrapText'),
+     ('smart_card_grid','Button','bold','customButton1Bold'),
+     ('smart_card_grid','Button 2','alignment','customButton2Alignment'),('smart_card_grid','Button 2','size','customButton2TextSize'),
+     ('smart_card_grid','Button 2','bold','customButton2Bold'),
+     ('smart_card_grid','Button 3','alignment','cardButtonAlignment'),('smart_card_grid','Button 3','size','cardButtonTextSize'),
+     ('smart_card_grid','Button 3','bold','cardButtonBold'),
+     ('smart_card_grid','Header Supporting','fill','supportingBackgroundColor'),
+     ('smart_card_grid','Header Supporting','border','supportingBorderColor'),
+     ('smart_card_grid','Footer','fill','footerBackgroundColor'),('smart_card_grid','Footer','border','footerBorderColor'),
+     ('smart_card_grid','Footer','height','footerHeight'),('smart_card_grid','Footer','alignment','footerAlignment'),
+     ('smart_numpad','Button 2','bold','customButton1Bold'),('smart_numpad','Button 3','bold','customButton2Bold'),
+     ('smart_textbox','Header Supporting','fill','supportingBackgroundColor'),
+     ('smart_textbox','Header Supporting','height','supportingBoxHeight'),
+     ('smart_textbox','Header Supporting','size','supportingTextSize'),
+     ('smart_textbox','Header Supporting','radius','supportingRadius'),
+     ('smart_textbox','Header','radius','headerRadius'),
+     ('smart_image','Header','fill','headerBodyColor'),('smart_image','Header','text','headerTextColor'),
+     ('smart_image','Header','bold','headerBold'),('smart_image','Header','size','headerTextSize'),
+     ('smart_image','Image','border','imageBorderColor'),
+     ('smart_navigation','Image','border','imageBorderColor'),('smart_navigation','Image','height','imageHeight'),
+     ('smart_navigation','Image','width','imageWidth')
+    ), usable AS (
+      SELECT v.* FROM specs v
+      -- The panel draws all 16 icon positions for every area, so no slot row is needed.
+      JOIN md_builder_shared_properties p ON p.property_key=v.property_key
+      JOIN md_builder_ribbon_components c ON c.component_api=v.component_api
+    ), enabled AS (
+      INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+      SELECT DISTINCT component_api,property_key,true FROM usable
+      ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
+      RETURNING 1
+    )
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT component_api,area,slot_key,property_key FROM usable
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+  // Navigation icons are 22px; the shared imageHeight default (220) is for cards.
+  await client.query(`
+    UPDATE md_builder_ribbon_component_rules SET default_value_override='22'::jsonb
+    WHERE component_api='smart_navigation' AND property_key IN ('imageHeight','imageWidth')
+      AND default_value_override IS NULL
+  `);
+  // 3) Row fill/wrap and Summary wrap were already mapped to icons, but their
+  //    properties did not exist; enable them for the components now that they do.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    SELECT DISTINCT r.component_api,r.property_key,true
+    FROM md_builder_design2_slot_rules r
+    JOIN md_builder_shared_properties p ON p.property_key=r.property_key
+    WHERE r.property_key IN ('rowBackgroundColor','rowWrapText','summaryWrapText')
+    ON CONFLICT(component_api,property_key) DO NOTHING
+  `);
   // Cover setup tables introduced by later migrations in the same transaction.
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });

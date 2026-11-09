@@ -1901,7 +1901,14 @@ export function createSystemServer(db:SqlPersistence) {
     if(!split||split.dataSteps!==steps){
       res.json({supported:false});return;
     }
-    res.json(await executeServerDataAction(db,records,actor,formula,scope,steps,rbac));
+    const started=performance.now();
+    const stats={operations:0,reusedReads:0,steps:[] as string[]};
+    const result=await executeServerDataAction(db,records,actor,formula,scope,steps,rbac,stats);
+    // Server time and work for this save, visible in the browser's network timing.
+    res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1)
+      +',ops;desc="'+stats.operations+' operations, '+stats.reusedReads+' reused reads"'
+      +',steps;desc="'+stats.steps.join(' | ').replace(/["\\]/g,'')+'"');
+    res.json(result);
   }));
   app.get('/api/action-formulas/credentials',route(async(req,res)=>{
     const actor=req.actor!;

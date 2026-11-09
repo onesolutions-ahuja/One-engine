@@ -102,7 +102,9 @@ function parseRecordOperation(path:string,init?:{method:string;body?:string}){
  */
 export async function executeServerDataAction(
  db:Sql,records:Records,actor:Actor,formula:string,scope:Record<string,unknown>,dataSteps:number,
- rbac?:Pick<RbacEngine,'require'>
+ rbac?:Pick<RbacEngine,'require'>,
+ /** Filled for the Server-Timing header: operations run and reads reused. */
+ stats?:{operations:number;reusedReads:number;steps:string[]}
 ):Promise<{supported:true;error?:string;changes?:Array<{key:string;value:unknown}>;
  recordChanged?:boolean;mutatedObjectApiNames?:string[];variables?:Record<string,unknown>;
  completedActionCount?:number;recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>}>{
@@ -113,8 +115,23 @@ export async function executeServerDataAction(
  // shared interpreter later parallelizes independent read-only functions.
  let pending:Promise<unknown>=Promise.resolve();
  const confirmedObjects=new Set<string>();
+ // Identical reads between two writes return the same rows inside this one
+ // transaction, so they run once: a cart total plan asks SUMIFS over the same
+ // lines for Subtotal, Tax and Total. Any write clears the reuse.
+ const reads=new Map<string,Promise<unknown>>();
  const request=<T>(path:string,init?:{method:string;body?:string}):Promise<T>=>{
-  const operation=pending.then(()=>db.transaction(async()=>{
+  const method=(init?.method??'GET').toUpperCase();
+  const isRead=method==='GET'||path==='/formulas/evaluate'&&method==='POST';
+  const readKey=isRead?method+' '+path+' '+(init?.body??''):'';
+  if(isRead){
+   const reused=reads.get(readKey);
+   // A copy, so a step that changes a returned row cannot change another's.
+   if(reused){if(stats)stats.reusedReads++;return reused.then(value=>structuredClone(value)) as Promise<T>;}
+  }else reads.clear();
+  if(stats)stats.operations++;
+  const label=method+' '+path.split('?')[0].replace(/\/[0-9a-f-]{36}$/i,'/:id');
+  let startedAt=0;
+  const operation=pending.then(()=>{startedAt=performance.now();}).then(()=>db.transaction(async()=>{
    if(path.startsWith('/records/')&&path.includes('/aggregate?')&&
      (init?.method??'GET')==='GET'){
     const url=new URL(path,'http://formula.internal.invalid');
@@ -173,6 +190,14 @@ export async function executeServerDataAction(
    throw Error('Unsupported Formula data action');
   }));
   pending=operation.then(()=>undefined,()=>undefined);
+  // Each operation's own duration (not its wait behind the previous one).
+  if(stats)void pending.then(()=>{
+   if(stats.steps.length<20)stats.steps.push(label+' '+(performance.now()-startedAt).toFixed(0)+'ms');
+  });
+  if(isRead){
+   reads.set(readKey,operation);
+   operation.catch(()=>{if(reads.get(readKey)===operation)reads.delete(readKey);});
+  }
   return operation as Promise<T>;
  };
  const authenticated=/\$session\.(?:user|tenant)\./.test(formula)

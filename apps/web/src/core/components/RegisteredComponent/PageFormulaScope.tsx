@@ -32,23 +32,38 @@ function nameToken(name:string){
 /** Subscribe only to the named component properties actually referenced by a binding.
  * A change in one Text or Cart component must not rerender all page components.
  */
+// Runtime inputs that are data or metadata, never authored bindings. Scanning
+// them (all Objects' field metadata, rows, page state) on every render ran
+// String.matchAll ~12,000 times per component: ~5 ms each, ~0.4 s for a page
+// of 50 formula boxes after every tap.
+const nonBindingKeys=new Set(['objects','records','items','record','currentRecord','recordData',
+ 'pageState','apps','pages','reports','pageComponents','recordPagination']);
+const dependencyCache=new WeakMap<object,string[]>();
 export function componentFormulaDependencies(source:unknown):string[]{
+ if(source&&typeof source==='object'){
+  const cached=dependencyCache.get(source);
+  if(cached)return cached;
+ }
  const found=new Set<string>();
  const seen=new WeakSet<object>();
- const visit=(value:unknown,depth:number):void=>{
+ const visit=(value:unknown,depth:number,key?:string):void=>{
   if(depth>8||value===null||value===undefined)return;
   if(typeof value==='string'){
+   if(!value.includes('$component.'))return;
    for(const match of value.matchAll(/\$component\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)/g))
     found.add(match[1]+'.'+match[2]);
   }else if(typeof value==='object'){
+   if(depth===1&&key&&nonBindingKeys.has(key))return;
    if(seen.has(value))return;
    seen.add(value);
-   const items=Array.isArray(value)?value:Object.values(value as Record<string,unknown>);
-   for(const child of items)visit(child,depth+1);
+   if(Array.isArray(value))for(const child of value)visit(child,depth+1);
+   else for(const [childKey,child] of Object.entries(value as Record<string,unknown>))visit(child,depth+1,childKey);
   }
  };
  visit(source,0);
- return [...found].sort();
+ const result=[...found].sort();
+ if(source&&typeof source==='object')dependencyCache.set(source,result);
+ return result;
 }
 export function useFormulaDependencyVersion(scope:Scope|null,source:unknown):string{
  const key=componentFormulaDependencies(source).join('|');

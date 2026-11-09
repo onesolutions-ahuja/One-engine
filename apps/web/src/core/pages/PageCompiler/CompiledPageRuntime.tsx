@@ -42,6 +42,7 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  /** The server-built page file this page runs from (null: the browser-compiled plan). */
  script:LoadedPageScript|null;
  data:CompiledDataLayer;request:Request;objects:ObjectMetadata[];pageSessionKey:string;recordId:string;
+ searchRecords(sourceId:string,query:string):Promise<Record<string,unknown>[]>;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
  resetSession(next?:string):void;
@@ -73,9 +74,14 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   const sessionListeners=new Set<()=>void>();
   // Which selections clear which (Category → Product): computed once for the page.
   const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
-  const data=createCompiledDataLayer(compiled,
-   compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage),store.get);
+  const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
+  const data=createCompiledDataLayer(compiled,sourceLoader,store.get);
   return {compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
+   searchRecords:async(sourceId:string,query:string)=>{
+    const source=compiled.dataSources.find(item=>item.id===sourceId);
+    if(!source)throw Error('Search Box has no configured Object data source');
+    return sourceLoader.search(source,store.get(),query);
+   },
    pageSessionKey,recordId,
    sessionId:()=>sessionId,
    subscribeSession(listener){sessionListeners.add(listener);return ()=>{sessionListeners.delete(listener);};},
@@ -584,6 +590,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(runtime.request,id,getAccessToken()??''),
    viewRevision:source.version,
    loadCompanySettings:()=>runtime.request('/metadata/currencies'),
+   searchRecords:(query:string)=>compiled.dataSourceId
+    ?runtime.searchRecords(compiled.dataSourceId,query)
+    :Promise.reject(new Error('Search Box requires an Object data source')),
    onChange:(value:unknown)=>{
     const interactions=pageBehaviors(properties)?.interactions;
     if(actionFlows.change||(Array.isArray(interactions)&&(interactions as Array<{event?:unknown}>).some(item=>item?.event==='change')))

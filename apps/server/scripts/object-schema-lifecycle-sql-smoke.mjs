@@ -91,7 +91,7 @@ try{
   ['IF(ISNUMBER(@Amount),ROUND(@Amount,1),0)',12.3,{Amount:12.34}],
   ['IFERROR(VALUE("bad"),UPPER("fallback"))','FALLBACK',{}],
   ['TODAY()','2024-02-29',{}],
-  ['NOW()','2024-02-29T12:34:56.000Z',{}],
+  ['NOW()','2024-02-29T12:34:00.000Z',{}],
   ['GEOLOCATION(51.5,-0.1)',{latitude:51.5,longitude:-0.1},{}],
   ['SUM(COLLECTION("Numbers",2,3,5))',10,{},'flow_formula']
  ];

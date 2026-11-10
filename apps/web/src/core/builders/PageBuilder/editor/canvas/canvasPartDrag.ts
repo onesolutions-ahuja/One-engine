@@ -1,5 +1,5 @@
 import type * as React from 'react';
-import { partSnapLabel, partSnapRule, snapPartValue } from '../../canvasPartSnap';
+import { nextPartOffset, partOffsetKeys, partSnapLabel, partSnapRule, snapPartValue, withPartOffset } from '../../canvasPartSnap';
 
 /** Builder controls drawn inside a component keep their own pointer handling. */
 const EDITOR_CONTROLS='.canvas-element-actions,.canvas-drop-zone,.free-canvas-resize-handle,'+
@@ -12,14 +12,16 @@ export function partUnderPointer(host:HTMLElement,x:number,y:number):HTMLElement
   &&host.contains(node)&&node.closest('[data-component-id]')===host);
 }
 
-/** Press on a draggable part of the SELECTED component, drag, and drop: the part
- * snaps to the nearest allowed place and the existing property is updated.
- * A press without movement stays a normal click (selects that part).
+/** Press on a draggable part of the SELECTED component and drag it:
+ * - plain drag moves it freely; its X/Y offset is saved (no number boxes);
+ * - Shift+drag snaps it to the nearest place its dropdown offers (offset cleared).
+ * A press without movement stays a normal click (selects that part). Esc cancels.
  * Returns true when the press belongs to a part, so the component does not move. */
 export function startCanvasPartDrag(
  event:React.PointerEvent<HTMLElement>,
  componentType:string,
- handlers:{chooseArea:(area:string)=>void;suppressClick:()=>void;onDrop:(property:string,value:string)=>void}
+ properties:Readonly<Record<string,unknown>>,
+ handlers:{chooseArea:(area:string)=>void;suppressClick:()=>void;onDrop:(next:Record<string,unknown>)=>void}
 ):boolean{
  if(event.button!==0||event.pointerType==='touch')return false;
  const host=event.currentTarget;
@@ -36,32 +38,47 @@ export function startCanvasPartDrag(
  event.stopPropagation();
  const startX=event.clientX,startY=event.clientY;
  const frame=host.getBoundingClientRect();
- // Canvas zoom/fit scales the page; translate is in the part's own pixels.
  const scale=host.offsetWidth>0?frame.width/host.offsetWidth:1;
- let dragging=false,value='';
+ const keys=partOffsetKeys(rule);
+ const current={x:properties[keys.x],y:properties[keys.y]};
+ // The part may already be moved: keep its saved translate and add the drag to it.
+ const savedTranslate=part.style.getPropertyValue('translate');
+ const start=nextPartOffset(current,0,0);
+ let dragging=false,snap=false,value='',dx=0,dy=0;
  const finish=(commit:boolean)=>{
   window.removeEventListener('pointermove',move);
   window.removeEventListener('pointerup',up);
   window.removeEventListener('pointercancel',cancel);
   window.removeEventListener('keydown',key,true);
-  part.style.removeProperty('translate');
+  if(savedTranslate)part.style.setProperty('translate',savedTranslate);
+  else part.style.removeProperty('translate');
   part.removeAttribute('data-part-dragging');
   part.removeAttribute('data-part-snap');
   if(!dragging)return;
   handlers.suppressClick();
-  if(commit&&value)handlers.onDrop(rule.property,value);
+  if(!commit)return;
+  if(snap&&value)handlers.onDrop(withPartOffset({...properties,[rule.property]:value},rule,{x:0,y:0}));
+  else if(!snap)handlers.onDrop(withPartOffset(properties,rule,nextPartOffset(current,dx,dy)));
  };
  const move=(next:PointerEvent)=>{
-  const dx=next.clientX-startX,dy=next.clientY-startY;
+  const screenX=next.clientX-startX,screenY=next.clientY-startY;
   if(!dragging){
-   if(Math.hypot(dx,dy)<4)return;
+   if(Math.hypot(screenX,screenY)<4)return;
    dragging=true;
    handlers.chooseArea(area);
    part.setAttribute('data-part-dragging','true');
   }
-  part.style.setProperty('translate',(dx/scale)+'px '+(dy/scale)+'px');
-  value=snapPartValue(rule.mode,{x:next.clientX,y:next.clientY},box.getBoundingClientRect());
-  part.setAttribute('data-part-snap',partSnapLabel(value));
+  // Page pixels: canvas zoom/fit is undone so the saved offset is the real one.
+  dx=screenX/scale;dy=screenY/scale;
+  snap=next.shiftKey;
+  part.style.setProperty('translate',(start.x+dx)+'px '+(start.y+dy)+'px');
+  if(snap){
+   value=snapPartValue(rule.mode,{x:next.clientX,y:next.clientY},box.getBoundingClientRect());
+   part.setAttribute('data-part-snap','Snap: '+partSnapLabel(value));
+  }else{
+   const offset=nextPartOffset(current,dx,dy);
+   part.setAttribute('data-part-snap',offset.x||offset.y?'X '+offset.x+'  Y '+offset.y:'Original place');
+  }
  };
  const up=()=>finish(true);
  const cancel=()=>finish(false);

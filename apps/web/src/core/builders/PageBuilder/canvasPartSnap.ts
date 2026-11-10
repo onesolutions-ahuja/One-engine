@@ -1,43 +1,45 @@
-/** Drag-and-snap for parts inside a Smart component (badge, image, buttons, text).
- * Pure rules: which part can be dragged, which existing property it writes, and
- * which allowed value the drop point snaps to. No new position data is stored. */
+/** Dragging parts inside a Smart component (badge, image, buttons, text).
+ * Plain drag moves the part freely: its X/Y offset (px, from where the part
+ * normally sits) is saved as <offset>OffsetX / <offset>OffsetY. Shift+drag
+ * snaps it to the nearest place its dropdown offers and clears the offset.
+ * Pure rules and maths only; no DOM. */
 
 export type PartSnapMode='badge'|'edges'|'sides'|'align';
-export type PartSnapRule={property:string;mode:PartSnapMode};
+export type PartSnapRule={property:string;mode:PartSnapMode;offset:string};
 type Box={left:number;top:number;width:number;height:number};
 
-const rule=(property:string,mode:PartSnapMode):PartSnapRule=>({property,mode});
+const rule=(property:string,mode:PartSnapMode,offset:string):PartSnapRule=>({property,mode,offset});
 
 /** Component API → Design area (data-design-area) → property it moves. */
 export const PART_SNAP_RULES:Readonly<Record<string,Readonly<Record<string,PartSnapRule>>>>={
  smart_card_grid:{
-  Badge:rule('badgeAlignment','badge'),
-  Image:rule('imagePlacement','edges'),
-  Header:rule('headerAlignment','align'),
-  'Header Supporting':rule('supportingAlignment','align'),
-  Footer:rule('footerAlignment','align'),
-  Button:rule('customButton1Placement','sides'),
-  'Button 2':rule('customButton2Placement','sides'),
-  'Button 3':rule('cardButtonPlacement','sides')
+  Badge:rule('badgeAlignment','badge','badge'),
+  Image:rule('imagePlacement','edges','image'),
+  Header:rule('headerAlignment','align','header'),
+  'Header Supporting':rule('supportingAlignment','align','supporting'),
+  Footer:rule('footerAlignment','align','footer'),
+  Button:rule('customButton1Placement','sides','customButton1'),
+  'Button 2':rule('customButton2Placement','sides','customButton2'),
+  'Button 3':rule('cardButtonPlacement','sides','cardButton')
  },
  smart_image:{
-  Badge:rule('badgeAlignment','badge'),
-  Image:rule('imagePlacement','edges'),
+  Badge:rule('badgeAlignment','badge','badge'),
+  Image:rule('imagePlacement','edges','image'),
   // The standalone Image caption reads labelAlignment first.
-  Header:rule('labelAlignment','align')
+  Header:rule('labelAlignment','align','header')
  },
  smart_cart:{
-  Image:rule('imagePlacement','sides'),
-  Header:rule('headerAlignment','align'),
-  Summary:rule('summaryAlignment','align'),
-  Footer:rule('footerAlignment','align'),
-  Button:rule('customButton1Placement','sides'),
-  'Button 2':rule('customButton2Placement','sides'),
-  'Button 4':rule('qtyIncreasePlacement','sides'),
-  'Button 5':rule('qtyDecreasePlacement','sides')
+  Image:rule('imagePlacement','sides','image'),
+  Header:rule('headerAlignment','align','header'),
+  Summary:rule('summaryAlignment','align','summary'),
+  Footer:rule('footerAlignment','align','footer'),
+  Button:rule('customButton1Placement','sides','customButton1'),
+  'Button 2':rule('customButton2Placement','sides','customButton2'),
+  'Button 4':rule('qtyIncreasePlacement','sides','qtyIncrease'),
+  'Button 5':rule('qtyDecreasePlacement','sides','qtyDecrease')
  },
  smart_textbox:{
-  Header:rule('headerAlignment','align')
+  Header:rule('headerAlignment','align','header')
  }
 };
 
@@ -71,4 +73,31 @@ export function snapPartValue(mode:PartSnapMode,point:{x:number;y:number},box:Bo
 /** Readable name of a snapped value, shown next to the part while dragging. */
 export function partSnapLabel(value:string):string{
  return value.replace(/^image-/,'').split('-').map(word=>word[0].toUpperCase()+word.slice(1)).join(' ');
+}
+
+/** Saved offset keys of a part, e.g. badgeOffsetX / badgeOffsetY. */
+export function partOffsetKeys(rule:PartSnapRule):{x:string;y:string}{
+ return {x:rule.offset+'OffsetX',y:rule.offset+'OffsetY'};
+}
+
+const offsetNumber=(value:unknown)=>{
+ const number=typeof value==='number'?value:typeof value==='string'&&value.trim()?Number(value):0;
+ return Number.isFinite(number)?Math.max(-2000,Math.min(2000,Math.round(number))):0;
+};
+
+/** New offset after a free drag of (dx,dy) page pixels. Ending within 3px of
+ * where the part normally sits clears the offset (drag it back to reset). */
+export function nextPartOffset(current:{x:unknown;y:unknown},dx:number,dy:number):{x:number;y:number}{
+ const x=offsetNumber(offsetNumber(current.x)+dx),y=offsetNumber(offsetNumber(current.y)+dy);
+ return Math.abs(x)<=3&&Math.abs(y)<=3?{x:0,y:0}:{x,y};
+}
+
+/** Component properties after a drop: offsets of 0 are removed, not stored. */
+export function withPartOffset(properties:Readonly<Record<string,unknown>>,rule:PartSnapRule,
+ offset:{x:number;y:number}):Record<string,unknown>{
+ const keys=partOffsetKeys(rule);
+ const next:Record<string,unknown>={...properties};
+ if(offset.x)next[keys.x]=offset.x;else delete next[keys.x];
+ if(offset.y)next[keys.y]=offset.y;else delete next[keys.y];
+ return next;
 }

@@ -25,3 +25,6 @@
 }
 .preview-device-scroll::-webkit-scrollbar{width:4px;height:4px}
 .preview-device-scroll::-webkit-scrollbar-thumb{background:rgba(15,23,42,.35);border-radius:4px}
+/* While the mouse drags the screen: no text selection, grabbing hand. */
+.preview-device-viewport[data-drag-scrolling="true"],
+.preview-device-viewport[data-drag-scrolling="true"] *{user-select:none!important;cursor:grabbing!important}

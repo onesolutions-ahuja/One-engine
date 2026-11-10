@@ -475,6 +475,33 @@ try{
    profileId:null,recordTypeId:null,formFactors:['Desktop']}]
  });
  assert.equal((await pageService.resolveAppPage(tenantId,'AuditApp',appPage.apiName,'Desktop'))?.page.apiName,appPage.apiName);
+ // Regression: an active App Page that App Manager puts in the navigation
+ // must open even when it has no App Default activation row. Explicit rules,
+ // device restrictions and unlisted pages still take precedence.
+ const navigationOnlyPage=await pageService.save(tenantId,'Audit_Navigation_Only',{
+   apiName:'Audit_Navigation_Only',label:'Navigation only page',targetObject:'',
+   pageType:'App Page',layoutMode:'template',template:'one-region',
+   canvasWidth:1200,canvasHeight:800,status:'Active',devices:['Desktop'],
+   components:[],activationAssignments:[]
+ });
+ assert.equal(await pageService.resolveAppPage(tenantId,'AuditApp',navigationOnlyPage.apiName,'Desktop'),null,
+   'An unlisted App Page must not be publicly routable');
+ await db.query(`INSERT INTO md_tenant_app_navigation
+   (tenant_id,app_id,entry_type,api_name,sort_order)
+   SELECT m.tenant_id,m.app_id,'App Page',$3,20
+   FROM md_tenant_app_metadata m WHERE m.tenant_id=$1 AND m.api_name=$2`,
+   [tenantId,'AuditApp',navigationOnlyPage.apiName]);
+ assert.equal((await pageService.resolveAppPage(tenantId,'AuditApp',navigationOnlyPage.apiName,'Desktop'))?.page.apiName,
+   navigationOnlyPage.apiName,'Active navigation-only App Pages should open');
+ assert.equal(await pageService.resolveAppPage(tenantId,'AuditApp',navigationOnlyPage.apiName,'Phone'),null,
+   'Navigation must not bypass page device eligibility');
+ await pageService.save(tenantId,navigationOnlyPage.apiName,{
+   ...navigationOnlyPage,activationAssignments:[{
+     id:'anotherAppOnly',scope:'App Default',appId:'AnotherApp',formFactors:['Desktop']
+   }]
+ });
+ assert.equal(await pageService.resolveAppPage(tenantId,'AuditApp',navigationOnlyPage.apiName,'Desktop'),null,
+   'An assignment to another app must not be overridden by navigation');
 
  const {RecordEngine}=await import(new URL('record-engine.js',built).href);
  const records=new RecordEngine(db,new RbacEngine(db));

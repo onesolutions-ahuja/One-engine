@@ -390,6 +390,21 @@ export class PageRuntime {
               AND (($4='Desktop' AND x.desktop) OR ($4='Phone' AND x.phone)
                 OR ($4='Tablet' AND (x.tablet OR x.desktop))
                 OR ($4='Custom' AND (x.custom OR x.desktop))))
+          -- An explicitly navigable, active App Page is a valid destination when no
+          -- app-specific activation rules exist. Do not override rules for other apps.
+          OR (
+            NOT $5::boolean
+            AND EXISTS (SELECT 1 FROM md_lightning_page_details d
+              WHERE d.tenant_id=p.tenant_id AND d.page_id=p.id
+                AND d.status='Active' AND d.page_type='App Page'
+                AND $4=ANY(d.devices))
+            AND NOT EXISTS (SELECT 1 FROM md_lightning_page_activation x
+              WHERE x.tenant_id=p.tenant_id AND x.page_id=p.id
+                AND x.app_api IS NOT NULL)
+            AND EXISTS (SELECT 1 FROM md_tenant_app_navigation n
+              WHERE n.tenant_id=i.tenant_id AND n.app_id=i.app_id
+                AND n.entry_type='App Page' AND n.api_name=p.api_name)
+          )
           OR (
             NOT $5::boolean AND NOT EXISTS(SELECT 1 FROM md_lightning_page_details d
               WHERE d.tenant_id=p.tenant_id AND d.page_id=p.id)

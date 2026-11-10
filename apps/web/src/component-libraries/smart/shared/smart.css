@@ -203,3 +203,13 @@
 .smart-navigation[style*="--smart-navigation-focus-color"] .smart-navigation-item:focus-visible{
  background:var(--smart-navigation-focus-color)!important;
 }
+/* Text in Smart components wraps as before, and a line break from a formula
+   (e.g. @Customer.Name & CHAR(10) & @Customer.Email) starts a new line.
+   Parts that are single-line by design still set nowrap themselves. */
+.smart-runtime{white-space:pre-line}
+/* Smart Button: Wrap Text on lets a long label use several lines instead of "…". */
+.smart-runtime.smart_button>.smart-button.is-wrapped,
+.smart-runtime.smart_button>.smart-button.is-wrapped .smart-button-label{
+ white-space:pre-line;text-overflow:clip;overflow-wrap:anywhere;
+}
+.smart-runtime.smart_button>.smart-button.is-wrapped .smart-button-label{text-align:inherit}

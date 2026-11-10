@@ -20,7 +20,7 @@ export function formulaAllowedInContext(name:string,context:'action'|'data'|'uni
 }
 
 export const SQL_SCALAR_FORMULAS:ReadonlySet<string>=new Set([
- 'ISBLANK','ISNULL','ISNUMBER','TEXT','VALUE','LEN','LOWER','UPPER','PROPER',
+ 'ISBLANK','ISNULL','ISNUMBER','TEXT','VALUE','LEN','LOWER','UPPER','PROPER','CHAR',
  'LEFT','RIGHT','FIND','CONTAINS','BEGINS','ISPICKVAL','INCLUDES',
  'ROUND','ROUNDUP','ROUNDDOWN','MIN','MAX','DATE','DATEVALUE','TODAY','NOW',
  'DAY','MONTH','YEAR','HOUR','MINUTE','SECOND','WEEKDAY',

@@ -84,6 +84,7 @@ export function compileFormulaSql(node:Expression,bindings:SqlFormulaBindings):s
   case 'TEXT':count(node,1);return text(x);
   case 'VALUE':count(node,1);return number(x);
   case 'LEN':count(node,1);return 'char_length('+text(x)+')';
+  case 'CHAR':count(node,1);return 'chr(greatest(1,least(1114111,'+integer(x)+')))';
   case 'LOWER':count(node,1);return 'lower('+text(x)+')';
   case 'UPPER':count(node,1);return 'upper('+text(x)+')';
   case 'PROPER':count(node,1);return 'initcap(lower('+text(x)+'))';

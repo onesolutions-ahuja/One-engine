@@ -145,6 +145,12 @@ function evaluateNode(node:Expression,resolve:FormulaResolver,context:FormulaEva
     case 'TEXT':arity(1);return formulaText(argument(0));
     case 'VALUE':arity(1);return numeric(argument(0));
     case 'LEN':arity(1);return textPoints(argument(0)).length;
+    // Excel CHAR(code): CHAR(10) is a new line.
+    case 'CHAR':arity(1);{
+      const code=Math.trunc(numeric(argument(0)));
+      if(code<1||code>1114111)throw new Error('CHAR needs a character code from 1 to 1114111');
+      return String.fromCodePoint(code);
+    }
     case 'COLLECTION':{
       arity(2,20);
       const name=argument(0);
@@ -385,6 +391,7 @@ export function inferFlowFormulaType(expression:string,resolve:FormulaTypeResolv
       case 'TEXT':arity(1);return 'Text';
       case 'VALUE':arity(1);requireText(0);return 'Number';
       case 'LEN':arity(1);requireText(0);return 'Number';
+      case 'CHAR':arity(1);requireNumber(0);return 'Text';
       case 'LOWER':case 'UPPER':case 'PROPER':
       arity(1);requireText(0);return 'Text';
       case 'LEFT':case 'RIGHT':arity(1,2);requireText(0);if(args.length===2)requireNumber(1);return 'Text';

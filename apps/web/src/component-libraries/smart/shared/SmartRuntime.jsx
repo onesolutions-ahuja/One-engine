@@ -278,7 +278,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     backgroundColor:p.headerBodyColor||undefined,
     color:headerResult.error?formulaDisplayErrorColor:
      focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
-    whiteSpace:p.wrapText===false?"nowrap":"normal",
+    // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
+    whiteSpace:p.wrapText===false?"nowrap":"pre-line",
     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
     padding:fixedGridHeader
       ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
@@ -706,12 +707,13 @@ export default function SmartRuntime(p){
  // far right (e.g. "Start Order  →"), right text puts it at the far left, and
  // centred or unset text keeps the icon just before the caption.
  const iconSide=buttonIcon&&label?(p.labelAlignment==="left"?"end":p.labelAlignment==="right"?"start":"inline"):"inline";
- if(name==="smart_button")content=<button data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Button text":undefined} type="button" className="smart-button"
+ if(name==="smart_button")content=<button data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Button text":undefined} type="button" className={"smart-button"+(p.wrapText===true?" is-wrapped":"")}
    title={label||"Button"} aria-label={label||buttonIcon?.label||"Button"}
    onClick={()=>fire("click",record)} data-icon-side={iconSide==="inline"?undefined:iconSide}
    style={{...style,...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12)),
     padding:buttonIcon&&!label?"4px":undefined,
     justifyContent:label?(p.labelAlignment==="right"?"flex-end":p.labelAlignment==="center"?"center":"flex-start"):"center",
+    ...(p.wrapText===true?{textAlign:p.labelAlignment==="right"?"right":p.labelAlignment==="center"?"center":"left"}:{}),
     fontWeight:typeof p.headerBold==="boolean"?(p.headerBold?700:400):undefined,
     background:p.backgroundColor||"#2267bc",color:p.labelColor||"#fff",borderColor:p.borderColor}}>
    {buttonIcon&&<span className="smart-button-glyph" aria-hidden="true" style={{

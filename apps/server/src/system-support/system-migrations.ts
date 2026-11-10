@@ -461,6 +461,60 @@ export async function applySystemMigrations(db:SqlPersistence) {
       AND property_key IN ('customButton1Placement','customButton2Placement')
       AND default_value_override IS NULL
   `);
+  // 5) Wrap Text where a label could only show on one line ("Check …").
+  //    Smart Button reuses wrapText (off by default: buttons stay one line until
+  //    switched on); Card Grid's card button reuses cardButtonWrapText; Card Grid
+  //    and Cart custom buttons get their own wrap properties (blank = as today).
+  await client.query(`
+    WITH specs(property_key,label,section_group,ordinal) AS (VALUES
+     ('customButton1WrapText','Custom 1 wrap','Button',1),
+     ('customButton2WrapText','Custom 2 wrap','Button 2',2)
+    ), missing AS (
+      SELECT specs.* FROM specs WHERE NOT EXISTS(
+        SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key)
+    ), last_order AS (
+      SELECT COALESCE(MAX(sort_order),0) AS sort_order FROM md_builder_shared_properties
+    )
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,min_value,max_value,
+      field_select,choices,scope,design_row,design_width,design_height,design_order,design_caption,
+      design_caption_width,design_display,enabled_when)
+    SELECT m.property_key,m.label,'Design2',m.section_group,t.control_kind,
+     last_order.sort_order+ROW_NUMBER() OVER(ORDER BY m.ordinal),NULL,t.min_value,t.max_value,
+     t.field_select,t.choices,t.scope,t.design_row,t.design_width,t.design_height,t.design_order,
+     t.design_caption,t.design_caption_width,t.design_display,t.enabled_when
+    FROM missing m JOIN md_builder_shared_properties t ON t.property_key='cardButtonWrapText'
+     CROSS JOIN last_order
+    ON CONFLICT(property_key) DO NOTHING
+  `);
+  await client.query(`
+    WITH specs(component_api,area,slot_key,property_key) AS (VALUES
+     ('smart_button','Body','wrap','wrapText'),
+     ('smart_card_grid','Button 3','wrap','cardButtonWrapText'),
+     ('smart_card_grid','Button','wrap','customButton1WrapText'),
+     ('smart_card_grid','Button 2','wrap','customButton2WrapText'),
+     ('smart_cart','Button','wrap','customButton1WrapText'),
+     ('smart_cart','Button 2','wrap','customButton2WrapText')
+    ), usable AS (
+      SELECT v.* FROM specs v
+      JOIN md_builder_shared_properties p ON p.property_key=v.property_key
+      JOIN md_builder_ribbon_components c ON c.component_api=v.component_api
+    ), enabled AS (
+      INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+      SELECT DISTINCT component_api,property_key,true FROM usable
+      ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
+      RETURNING 1
+    )
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT component_api,area,slot_key,property_key FROM usable
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+  // Existing buttons are single-line; show Wrap Text as off for them.
+  await client.query(`
+    UPDATE md_builder_ribbon_component_rules SET default_value_override='false'::jsonb
+    WHERE component_api='smart_button' AND property_key='wrapText'
+      AND default_value_override IS NULL
+  `);
   // Cover setup tables introduced by later migrations in the same transaction.
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });

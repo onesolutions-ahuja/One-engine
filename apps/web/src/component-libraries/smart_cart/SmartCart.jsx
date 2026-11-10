@@ -255,7 +255,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
             fontSize:n(p.rowSupportingTextSize,11,8,96),
             fontWeight:p.rowSupportingBold===true?700:400,
             textAlign:align(p.rowSupportingAlignment),
-            whiteSpace:p.rowSupportingWrapText===false?"nowrap":"normal",
+            whiteSpace:p.rowSupportingWrapText===false?"nowrap":"pre-line",
             overflowWrap:"anywhere"
            }}>{rowSupporting}</span>}
          </div>

@@ -44,7 +44,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   height:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==""
    ?finite(p.headerBoxHeight,0,0,2000):undefined,
   fontWeight:p.headerBold===false?400:700,
-  whiteSpace:p.wrapText===false?"nowrap":"normal"
+  whiteSpace:p.wrapText===false?"nowrap":"pre-line"
  };
  const rowHeight=finite(p.rowHeight,40,22,300);
  const rowStyle=row=>({

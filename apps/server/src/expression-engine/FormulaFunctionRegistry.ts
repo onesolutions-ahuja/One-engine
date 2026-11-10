@@ -21,7 +21,7 @@ type DefinitionInput=[name:string,min:number,max:number,contexts?:readonly Formu
 const serverContexts:readonly FormulaExpressionContext[]=['formula_field','validation_rule','flow_formula'];
 const ribbonFunctions=new Set([
   'IF','IFERROR','AND','OR','NOT','ISBLANK','ISNULL','ISNUMBER',
-  'BLANKVALUE','NULLVALUE','TEXT','VALUE','LEN','LOWER','UPPER','PROPER',
+  'BLANKVALUE','NULLVALUE','TEXT','VALUE','LEN','LOWER','UPPER','PROPER','CHAR',
   'LEFT','RIGHT','FIND','CONTAINS','BEGINS','ISPICKVAL','INCLUDES','ROUND',
   'ROUNDUP','ROUNDDOWN','MIN','MAX','DATE','DATEVALUE','TODAY','NOW',
   'DAY','MONTH','YEAR','HOUR','MINUTE','SECOND','WEEKDAY','ADDDAYS',
@@ -34,7 +34,7 @@ const numberFunctions=new Set([
   'HOUR','MINUTE','SECOND','WEEKDAY','DISTANCE'
 ]);
 const textFunctions=new Set([
-  'TEXT','LEFT','RIGHT','LOWER','UPPER','PROPER'
+  'TEXT','LEFT','RIGHT','LOWER','UPPER','PROPER','CHAR'
 ]);
 const checkboxFunctions=new Set([
   'AND','OR','NOT','ISBLANK','ISNULL','ISNUMBER','CONTAINS','BEGINS',
@@ -43,7 +43,7 @@ const checkboxFunctions=new Set([
 const explicitParameters=new Map<string,FormulaValueKind[]>([
   ['COLLECTION',['Text','Any']],['TABLE',['Collection','Any']],['SUM',['Collection']],['IF',['Checkbox','Any','Any']],['IFERROR',['Any','Any']],['NOT',['Checkbox']],
   ['AND',['Checkbox']],['OR',['Checkbox']],['VALUE',['Text']],
-  ['LEN',['Text']],['LEFT',['Text','Number']],['RIGHT',['Text','Number']],
+  ['LEN',['Text']],['CHAR',['Number']],['LEFT',['Text','Number']],['RIGHT',['Text','Number']],
   ['FIND',['Text','Text','Number']],
   
   ['CONTAINS',['Text','Text']],['BEGINS',['Text','Text']],['ISPICKVAL',['Picklist','Text']],
@@ -68,7 +68,7 @@ const inputs:DefinitionInput[]=[
   ['IF',3,3],['IFERROR',2,2],['AND',1,20],['OR',1,20],['NOT',1,1],
   ['ISBLANK',1,1],['ISNULL',1,1],['ISNUMBER',1,1],
   
-  ['BLANKVALUE',2,2],['NULLVALUE',2,2],['TEXT',1,1],['VALUE',1,1],['LEN',1,1],
+  ['BLANKVALUE',2,2],['NULLVALUE',2,2],['TEXT',1,1],['VALUE',1,1],['LEN',1,1],['CHAR',1,1],
 
   ['COLLECTION',2,20,['flow_formula','ribbon_binding']],
   ['TABLE',1,129,['ribbon_binding']],['SUM',1,1],

@@ -21,6 +21,10 @@ export function smartCustomButtonAppearance(properties,key){
  const bold=p[key+'Bold'];
  if(bold===true)style.fontWeight=700;
  else if(bold===false)style.fontWeight=400;
+ // Optional wrap: false keeps the label on one line; absent keeps the CSS default.
+ const wrap=p[key+'WrapText'];
+ if(wrap===false)style.whiteSpace='nowrap';
+ else if(wrap===true)style.whiteSpace='pre-line';
  const size=px(p[key+'TextSize'],8,96);
  if(size)style.fontSize=size;
  const width=px(p[key+'Width'],0,1200);

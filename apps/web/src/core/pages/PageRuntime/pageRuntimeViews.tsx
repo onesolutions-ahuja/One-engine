@@ -1,4 +1,5 @@
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
+import {runtimeComponentLabel} from './smartComponentLabel';
 import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
 import {nextAccessibleTabIndex} from '../PageRuntime/tabKeyboardNavigation';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
@@ -1037,8 +1038,7 @@ function MetadataBoundPageComponent({
       ...rowResolvedProperties, ...componentLayoutProps(properties, formFactor),
       ...(definition.apiName.startsWith('smart_') && component.position
         ? {canvasFrameSized:true}:{}),
-      label: component.type.startsWith('Custom:smart_') && typeof resolvedProperties.label === 'string'
-        ? resolvedProperties.label : component.label,
+      label: runtimeComponentLabel(component, resolvedProperties.label),
       properties: rowResolvedProperties, objects, reports, flows: availableFlows, pageState, children,
       dataCollection,
       formulaCollectionSources:namedSource.formulaSources,namedCollections:namedSource.namedCollections,
@@ -1353,8 +1353,7 @@ function LightningAppRuntime({
               if(behaviorAction(component.properties,'change',appVisibilityContext)==='enabled')
                 emitInteraction(component,'change',value);
             },
-            label: component.type.startsWith('Custom:smart_') && typeof component.properties.label === 'string'
-              ? component.properties.label : component.label,
+            label: runtimeComponentLabel(component, component.properties.label),
             properties: component.properties,
             pageSessionKey: appId + ':' + page.apiName, componentId: component.id,
             device: layoutDevice, children: nestedChildren

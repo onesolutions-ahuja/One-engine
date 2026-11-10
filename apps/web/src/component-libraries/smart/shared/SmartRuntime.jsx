@@ -882,7 +882,10 @@ export default function SmartRuntime(p){
    }}
    style={{
    boxSizing:"border-box",width:"100%",height:"100%",minHeight:0,minWidth:0,
-   overflowY:"auto",overflowX:"auto",overscrollBehavior:"contain",
+   overflowY:"auto",overflowX:"auto",
+   // Contain sideways swipes only: a vertical swipe that reaches the end of the
+   // grid must keep scrolling the page on phones.
+   overscrollBehaviorX:"contain",overscrollBehaviorY:"auto",
    // Keep the full border and shadow inside the scroll viewport in both
    // published pages and the Page Builder (all Cards/Rows settings).
    padding:4,scrollPadding:4,

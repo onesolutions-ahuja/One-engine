@@ -9,6 +9,12 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
+import {isActionPlan,isScreenAction} from '../../../../../server/src/expression-engine/ActionFormulas.js';
+import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../PageRuntime/screenFormula';
+import {runSequenceFlow} from '../PageRuntime/formulaFlowSequence';
+import {flowActionFormulaTarget} from '../PageRuntime/actionFlowFormula';
+import {runtimeComponentLabel} from '../PageRuntime/smartComponentLabel';
+import {evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
 import {requestPageMediaAsset} from '../PageRuntime/pageMediaAssetCoalescer';
 import type {PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {scopedFieldAllows} from '../PageRuntime/fieldScopedRecordFilters';
@@ -435,7 +441,15 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    let result:Awaited<ReturnType<typeof executePageFormulaAction>>;
    try{
     result=await executePageFormulaAction(runtime.request,settings,event,runtime.store.get(),runtime.objects,objectApiName,
-     session,undefined,undefined,undefined,{},prediction=>{
+     session,(template,id)=>previewPrintTemplate(template,id,runtime.pageSessionKey,session,currentAppId),
+     // SCREEN/CLOSESCREEN/FLOW steps inside an action plan (same as the standard runtime).
+     async(name,target,mode,screenRecordId)=>{
+      if(name==='CLOSESCREEN')return closeFormulaScreen(runtime.pageSessionKey);
+      if(name==='SCREEN')return openFormulaScreen('SCREEN('+target+(mode?','+mode:'')+')',navigationContext,
+       onNavigate as never,runtime.pageSessionKey,session,
+       screenRecordId??String(event.recordId??runtime.store.get().recordId??record?.Id??''));
+      return runSequenceFlow(target,availableFlows,runtime.request,onLaunchFlow);
+     },undefined,{},prediction=>{
       predicted=true;
       saved({objectApiNames:prediction.objectApiNames,recordChanges:prediction.recordChanges,optimistic:prediction.batch});
      },compiledAction);
@@ -471,7 +485,23 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     return {updated:true};
    }
    if(settings.actionType==='Formula'){
-    const assignment=parseActionFormulaAssignment(String(settings.formula??''));
+    const formula=String(settings.formula??'');
+    // SCREEN(Page[,mode[,record]]) opens a page or popup (was missing in compiled mode).
+    if(isScreenAction(formula))
+     return openFormulaScreen(formula,navigationContext,onNavigate as never,runtime.pageSessionKey,session,
+      String(event.recordId??pageState.recordId??record?.Id??''),
+      source=>{
+       const result=evaluateFieldExpressionDetailed('='+source,event,{sessionId:session,pageState});
+       if(result.error)throw Error('SCREEN record Id: '+result.error);
+       return result.value;
+      });
+    // $flow formula: IF(..., $flow.A, $flow.B) picks the Flow; blank = do nothing.
+    if(!isActionPlan(formula)){
+     const flow=flowActionFormulaTarget(settings,event,pageState,session,availableFlows);
+     if(flow==='')return {skipped:true};
+     if(flow)return runBinding({...settings,actionType:'Flow',flowApiName:flow},event);
+    }
+    const assignment=parseActionFormulaAssignment(formula);
     if(assignment?.kind==='filter'){
      const value=String(resolveActionFormulaValue(assignment.value,event,pageState,session)??'');
      return selectFilter(assignment.key,value,value);
@@ -629,7 +659,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   <RegisteredComponent definition={definition} layoutTransparent props={{
    ...resolved,...componentLayoutProps(properties,formFactor),
    ...(definition.apiName.startsWith('smart_')&&component.position?{canvasFrameSized:true}:{}),
-   label:component.type.startsWith('Custom:smart_')&&typeof resolved.label==='string'?resolved.label:component.label,
+   label:runtimeComponentLabel(component,resolved.label),
    properties:resolved,objects:runtime.objects,reports:reports??[],flows:availableFlows,pageState:state,children,
    dataCollection,formulaCollectionSources:namedSource.formulaSources,namedCollections:namedSource.namedCollections,
    fieldAllowed:(key:string,row:Record<string,unknown>)=>scopedFieldAllows(properties.dataFieldFilters,key,row,fields,

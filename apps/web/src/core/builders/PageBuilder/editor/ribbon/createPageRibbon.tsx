@@ -105,7 +105,10 @@ export function createPageRibbon(
          onChange={e=>applyPage({...page,canvasFillColor:e.target.value})}/>;
        case 'canvasHeight':return <BuilderNumberInput key={page.apiName+':'+page.layoutVariant+':height'}
         aria-label="Page height" min={320} max={10000} step={1} integer
-        disabled={page.layoutVariant!=='Custom'} value={page.canvasHeight}
+        // Width is fixed by the device (Mobile 390, Tablet 1024), but height is
+        // page length: phone/tablet pages scroll, so builders must be able to
+        // make the canvas taller to keep adding components below the fold.
+        value={page.canvasHeight}
         onValueChange={n=>applyPage({...page,canvasHeight:n})}/>;
       case 'restoreVersion':return <button type="button" aria-label="Restore version" title="Restore selected version"
         disabled={saving||selectedHistoryVersion===null||

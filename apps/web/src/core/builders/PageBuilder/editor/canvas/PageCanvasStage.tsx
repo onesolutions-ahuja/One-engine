@@ -11,6 +11,7 @@ import { formatRecordValue } from '../../../../records/RecordWorkspace/recordCsv
 import { appRoutePath, type AppRoute } from '../../../../workspace/Navigation/appRouting';
 import { Grid2X2, Move, Plus } from 'lucide-react';
 import { childrenOf } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
+import PreviewDeviceFrame from '../../PreviewDeviceFrame';
 
 import type { createPageRibbon } from '../ribbon/createPageRibbon';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -132,6 +133,10 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
              onDrop={previewMode ? undefined : (event) => handleDrop(event)}>
             {previewMode && page.pageType !== 'Record Page' ? <div className="page-builder-live-runtime" aria-label="Compiled runtime preview of current draft">
               {previewBar}
+              {/* Phone/Tablet Preview runs inside a device-sized screen that scrolls
+                  on its own, like Chrome's device mode. SCREEN(...,popup) pages
+                  open inside this screen (data-formula-screen-host). */}
+              <PreviewDeviceFrame device={device} width={page.canvasWidth}>
               {scriptPending ? <div className="records-message" role="status">Loading the server-built page…</div> :
               <LightningAppRuntime compiledPage={script?.plan ?? compiledPreview ?? undefined} compiledScript={script}
                 appId={builderAppApiName || apps[0]?.apiName || 'Records'}
@@ -143,6 +148,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
                 formFactor={device} previewLayoutDevice={device}
                 onNavigate={(route:AppRoute) => { window.open(appRoutePath(route),'_blank','noopener,noreferrer'); }}
                 onLaunchFlow={onLaunchFlow} onStandaloneModeChange={() => {}} />}
+              </PreviewDeviceFrame>
             </div> : withRecordPreviewRuntime(<div
               className={`record-preview ${page.layoutMode === 'free-canvas' ? 'free-canvas-preview' : page.pageType === 'Record Page' ? 'record-page-preview' : page.pageType === 'App Page' ? 'app-page-preview' : 'home-page-preview'} ${device === 'Phone' ? 'phone-preview' : device === 'Tablet' ? 'tablet-preview' : ''}`}
               style={{...(page.layoutMode === 'free-canvas' ? {

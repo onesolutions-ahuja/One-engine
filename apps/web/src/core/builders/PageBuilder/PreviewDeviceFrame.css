@@ -1,0 +1,30 @@
+/* Builder Preview device screen (Phone/Tablet). Never used by published apps. */
+.preview-device-frame{
+  display:flex;justify-content:center;align-items:flex-start;
+  width:100%;padding:12px 0 24px;box-sizing:border-box;
+}
+.preview-device-viewport{
+  position:relative;box-sizing:content-box;flex:0 0 auto;
+  /* The device height, shrunk to fit the builder window. */
+  height:min(var(--preview-device-height,844px),calc(100dvh - 190px));
+  min-height:320px;
+  border:10px solid #1f2937;border-radius:34px;background:#fff;
+  box-shadow:0 12px 32px rgba(15,23,42,.25);
+  overflow:hidden;
+  /* Makes position:fixed content (bottom bars, popups) stay inside the screen. */
+  transform:translateZ(0);
+}
+.preview-device-viewport[data-device="Tablet"]{border-radius:22px;}
+.preview-device-scroll{
+  position:absolute;inset:0;
+  overflow-x:hidden;overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  /* Thin overlay-style scrollbar, as on a phone. */
+  scrollbar-width:thin;
+}
+.preview-device-scroll::-webkit-scrollbar{width:4px;height:4px}
+.preview-device-scroll::-webkit-scrollbar-thumb{background:rgba(15,23,42,.35);border-radius:4px}
+/* While the mouse drags the screen: no text selection, grabbing hand. */
+.preview-device-viewport[data-drag-scrolling="true"],
+.preview-device-viewport[data-drag-scrolling="true"] *{user-select:none!important;cursor:grabbing!important}

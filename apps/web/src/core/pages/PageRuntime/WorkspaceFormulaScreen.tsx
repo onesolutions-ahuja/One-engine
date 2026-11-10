@@ -4,7 +4,9 @@ import type {PopupScreen} from './screenFormula';
 import {FormulaScreenDialog} from './FormulaScreenDialog';
 
 type Request={appId:string;screen:PopupScreen};
-export default function WorkspaceFormulaScreen({render}:{render:(request:Request)=>React.ReactNode}){
+/** Device of the Builder Preview screen the popup opened in ('Phone'/'Tablet'), if any. */
+type RenderRequest=Request&{frameDevice?:string};
+export default function WorkspaceFormulaScreen({render}:{render:(request:RenderRequest)=>React.ReactNode}){
  const [requests,setRequests]=React.useState<Request[]>([]);
  React.useEffect(()=>{
   const open=(event:Event)=>{
@@ -18,8 +20,12 @@ export default function WorkspaceFormulaScreen({render}:{render:(request:Request
  return <>{requests.map(request=>{
   const {screen}=request;
   const close=()=>setRequests(current=>current.filter(item=>item!==request));
-  return createPortal(<FormulaScreenDialog screen={screen} onClose={close}>
-    <React.Suspense fallback={null}>{render(request)}</React.Suspense>
-   </FormulaScreenDialog>,document.body,screen.instance);
+  // Builder Preview of a Phone/Tablet layout: open inside the device screen.
+  const host=typeof document!=='undefined'
+   ?document.querySelector<HTMLElement>('[data-formula-screen-host]'):null;
+  return createPortal(<FormulaScreenDialog screen={screen} onClose={close}
+    frameDevice={host?.dataset.device}>
+    <React.Suspense fallback={null}>{render({...request,frameDevice:host?.dataset.device})}</React.Suspense>
+   </FormulaScreenDialog>,host??document.body,screen.instance);
  })}</>;
 }

@@ -12,7 +12,7 @@ import {
 } from '../expression-engine/FormulaParser.js';
 import {
   evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
-  formulaDateTimeParts,formulaIsoDateTime,formulaTimeText,
+  formulaDateTimeParts,formulaNowIsoDateTime,formulaTimeText,
   formulaWeekday,isFormulaDate,parseFormulaDateTime
 } from '../expression-engine/FormulaDate.js';
 import {roundFormulaNumber} from '../expression-engine/FormulaNumeric.js';
@@ -220,7 +220,7 @@ function evaluateNode(node:Expression,resolve:FormulaResolver,context:FormulaEva
     case 'TODAY':arity(0);{
       return formulaDateText(formulaDateParts(context.now as Date,context.timeZone??'UTC'));
     }
-    case 'NOW':arity(0);return formulaIsoDateTime(context.now as Date);
+    case 'NOW':arity(0);return formulaNowIsoDateTime(context.now as Date);
     case 'DAY':case 'MONTH':case 'YEAR':case 'HOUR':case 'MINUTE':case 'SECOND':case 'WEEKDAY':arity(1);{
       const parts=formulaDateTimeParts(text(argument(0)),context.timeZone??'UTC');
       switch(node.name){

@@ -14,7 +14,7 @@ import {roundFormulaNumber} from '../../../../server/src/expression-engine/Formu
 import {parseComponentStateReference,readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
 import {
  evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
- formulaDateTimeParts,formulaIsoDateTime,formulaTimeText,
+ formulaDateTimeParts,formulaIsoDateTime,formulaNowIsoDateTime,formulaTimeText,
  formulaWeekday,isFormulaDate,parseFormulaDateTime
 } from '../../../../server/src/expression-engine/FormulaDate.js';
 
@@ -125,7 +125,7 @@ const evaluateCall=(name,args,context)=>{
    throw Error('DISTANCE unit must be km or mi');
   }
   case 'TODAY':arity(0);return formulaDateText(formulaDateParts(context.now,context.timeZone));
-  case 'NOW':arity(0);return formulaIsoDateTime(context.now);
+  case 'NOW':arity(0);return formulaNowIsoDateTime(context.now);
   case 'TIMENOW':arity(0);return formulaTimeText(context.now,context.timeZone);
   case 'DAY':case 'MONTH':case 'YEAR':{
    arity(1);const parts=formulaDateTimeParts(text(args[0]),context.timeZone);

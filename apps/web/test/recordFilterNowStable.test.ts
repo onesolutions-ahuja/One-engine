@@ -21,3 +21,13 @@ test('NOW() in a record filter is stable within a minute (no request loop)',()=>
   assert.match(next.filters[0].value,/^2026-11-10T09:14:00/,'moves on each minute');
  }finally{Date.now=realNow;}
 });
+
+test('NOW() is to the minute everywhere; TIMENOW() keeps seconds',async()=>{
+ const {evaluateFieldExpressionDetailed}=await import('../src/component-libraries/shared/FieldExpression.js');
+ const {evaluateFlowFormula}=await import('../../server/src/system-files/flow-formula-runtime');
+ const now=new Date('2026-11-10T09:37:42.519Z');
+ assert.equal(evaluateFieldExpressionDetailed('=NOW()',{},{now}).value,'2026-11-10T09:37:00.000Z');
+ assert.equal(evaluateFieldExpressionDetailed('=TIMENOW()',{},{now,timeZone:'UTC'}).value,'09:37:42.519');
+ assert.equal(evaluateFlowFormula('NOW()',()=>undefined,{now}),'2026-11-10T09:37:00.000Z');
+ assert.equal(evaluateFlowFormula('TIMENOW()',()=>undefined,{now,timeZone:'UTC'}),'09:37:42.519');
+});

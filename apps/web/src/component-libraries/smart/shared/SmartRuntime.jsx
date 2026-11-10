@@ -860,7 +860,10 @@ export default function SmartRuntime(p){
   const rows=Math.max(1,Math.floor(number(p.cardsPerColumn,3,1,40)));
   const columns=Math.max(1,Math.floor(number(p.cardsPerRow,3,1,12)));
   const gap=number(p.gap,12,0,160);
-  const minimumCardHeight=number(p.cardMinHeight,96,96,1200);
+  // One visible row: the card fills the grid, so a short grid no longer gets a
+  // scrollbar from a fixed 96px card floor. Several rows keep the 96px default.
+  // A Card Min Height the builder sets is honoured down to 24px either way.
+  const minimumCardHeight=number(p.cardMinHeight,rows===1?24:96,24,1200);
   // The requested column count remains exact, but cards never collapse below
   // a usable minimum width. Excess columns scroll horizontally in this grid.
   const minimumCardWidth=number(p.cardMinWidth??p.cardWidth,180,96,1200);

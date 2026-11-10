@@ -38,6 +38,9 @@
 .lightning :is(.setup-tree,.notification-panel,.one-table-wrapper,.one-conversation-scroll,.one-conversation-messages,.one-conversation-new,.free-canvas-preview,.free-canvas-runtime-component,.md-chatter-scroll,.md-chatter-messages,.md-chatter-new-thread,.md-chatter-contact-choices){
  scrollbar-width:thin;scrollbar-color:var(--md-scroll-thumb) transparent;overscroll-behavior:contain;
 }
+/* Free-canvas page components sit inside the page scroll: let vertical swipes
+   that reach a component's end continue to scroll the page. */
+.lightning .free-canvas-runtime-component{overscroll-behavior-y:auto}
 .one-ui{--one-accent:var(--md-primary);--one-border:var(--md-border);--one-radius:var(--md-radius-xl);--one-gap:var(--md-space-3);--one-pad:var(--md-space-4);--one-fg:var(--md-text);font-family:var(--md-font)}
 .one-ui .one-btn,.one-ui .one-control{min-height:var(--md-control-height)}
 .one-ui .one-heading{font-weight:var(--md-weight-semibold)}

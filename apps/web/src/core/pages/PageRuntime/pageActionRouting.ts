@@ -55,9 +55,13 @@ export function resolvePageActionRoute(
   if (!app) throw new Error('Select an existing destination application in Page Builder.');
   if (kind === 'App Home') return { kind: 'app-home', appId };
   const pageApiName = String(binding.navigationPageApiName ?? '');
-  const page = context.pages.find((item) => item.apiName === pageApiName);
+  // Page API names are stored lowercase; formulas often keep the label's casing
+  // (SCREEN(ServiceFlowHome)). Prefer an exact match, then a case-insensitive one.
+  const wanted = pageApiName.toLowerCase();
+  const page = context.pages.find((item) => item.apiName === pageApiName)
+    ?? context.pages.find((item) => item.apiName.toLowerCase() === wanted && pageIsAvailableInApp(item, app));
   if (!page || !pageIsAvailableInApp(page, app)) {
     throw new Error('Select an active App Page assigned to the destination application.');
   }
-  return { kind: 'app-page', appId, pageApiName };
+  return { kind: 'app-page', appId, pageApiName: page.apiName };
 }

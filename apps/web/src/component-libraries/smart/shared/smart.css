@@ -103,7 +103,8 @@
 .smart-runtime.smart_card_grid>.smart-grid,
 .smart-runtime.smart_tabs>.smart-tabs-shell{
  overflow:auto!important;
- overscroll-behavior:contain;
+ /* Vertical swipes chain to the page so a phone page never gets "stuck". */
+ overscroll-behavior-x:contain;overscroll-behavior-y:auto;
  min-width:0;min-height:0;
  scrollbar-width:thin;
 }

@@ -10,7 +10,12 @@ export type PopupScreen={page:string;sessionId:string;recordId:string;instance:s
 export function openFormulaScreen(source:string,context:PageActionRoutingContext,
  onNavigate:(route:PageActionRoute)=>void,parentKey:string,sessionId:string,recordId:string,
  resolveRecord?:(formula:string)=>unknown){
- const {page,mode,record}=parseScreenAction(source);
+ const parsed=parseScreenAction(source);
+ const {mode,record}=parsed;
+ // Page API names are lowercase; formulas may keep the label's casing.
+ const page=context.pages.find(item=>item.apiName===parsed.page)?.apiName
+  ??context.pages.find(item=>item.apiName.toLowerCase()===parsed.page.toLowerCase())?.apiName
+  ??parsed.page;
  if(record!==undefined){
   if(!resolveRecord)throw Error('SCREEN record Id needs a page formula context');
   const value=resolveRecord(record);

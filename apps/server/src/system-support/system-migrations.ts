@@ -401,6 +401,66 @@ export async function applySystemMigrations(db:SqlPersistence) {
     WHERE r.property_key IN ('rowBackgroundColor','rowWrapText','summaryWrapText')
     ON CONFLICT(component_api,property_key) DO NOTHING
   `);
+  // 4) Drag-to-place: which side card buttons, cart row buttons and cart +/-
+  //    sit on. Same icon control as imagePlacement, limited to left/right, in
+  //    each button area's existing 'placement' icon. Defaults equal the order
+  //    the renderer already draws, so existing pages do not move.
+  await client.query(`
+    WITH specs(property_key,label,section_group,default_side,ordinal) AS (VALUES
+     ('cardButtonPlacement','Card button side','Button 3','right',1),
+     ('customButton1Placement','Custom 1 side','Button','right',2),
+     ('customButton2Placement','Custom 2 side','Button 2','right',3),
+     ('qtyIncreasePlacement','Plus side','Button 4','right',4),
+     ('qtyDecreasePlacement','Minus side','Button 5','left',5)
+    ), missing AS (
+      SELECT specs.* FROM specs WHERE NOT EXISTS(
+        SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key)
+    ), last_order AS (
+      SELECT COALESCE(MAX(sort_order),0) AS sort_order FROM md_builder_shared_properties
+    )
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,min_value,max_value,
+      field_select,choices,scope,design_row,design_width,design_height,design_order,design_caption,
+      design_caption_width,design_display,enabled_when)
+    SELECT m.property_key,m.label,'Design2',m.section_group,t.control_kind,
+     last_order.sort_order+ROW_NUMBER() OVER(ORDER BY m.ordinal),
+     to_jsonb(m.default_side),t.min_value,t.max_value,
+     t.field_select,'["left","right"]'::jsonb,t.scope,t.design_row,t.design_width,t.design_height,
+     t.design_order,'Side',t.design_caption_width,t.design_display,NULL
+    FROM missing m JOIN md_builder_shared_properties t ON t.property_key='imagePlacement'
+     CROSS JOIN last_order
+    ON CONFLICT(property_key) DO NOTHING
+  `);
+  await client.query(`
+    WITH specs(component_api,area,slot_key,property_key) AS (VALUES
+     ('smart_card_grid','Button','placement','customButton1Placement'),
+     ('smart_card_grid','Button 2','placement','customButton2Placement'),
+     ('smart_card_grid','Button 3','placement','cardButtonPlacement'),
+     ('smart_cart','Button','placement','customButton1Placement'),
+     ('smart_cart','Button 2','placement','customButton2Placement'),
+     ('smart_cart','Button 4','placement','qtyIncreasePlacement'),
+     ('smart_cart','Button 5','placement','qtyDecreasePlacement')
+    ), usable AS (
+      SELECT v.* FROM specs v
+      JOIN md_builder_shared_properties p ON p.property_key=v.property_key
+      JOIN md_builder_ribbon_components c ON c.component_api=v.component_api
+    ), enabled AS (
+      INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+      SELECT DISTINCT component_api,property_key,true FROM usable
+      ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
+      RETURNING 1
+    )
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT component_api,area,slot_key,property_key FROM usable
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
+  // Cart custom buttons are drawn left to right in the expanded row today.
+  await client.query(`
+    UPDATE md_builder_ribbon_component_rules SET default_value_override='"left"'::jsonb
+    WHERE component_api='smart_cart'
+      AND property_key IN ('customButton1Placement','customButton2Placement')
+      AND default_value_override IS NULL
+  `);
   // Cover setup tables introduced by later migrations in the same transaction.
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });

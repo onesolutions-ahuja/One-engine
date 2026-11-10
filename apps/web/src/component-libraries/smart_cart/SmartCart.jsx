@@ -1,6 +1,7 @@
 /** Cart is presentation-only; expressions and actions use the existing shared runtimes. */
 import {groupCartRows} from './cartGrouping.js';
 import {smartCustomButtonAppearance} from '../smart/shared/SmartCustomButtonAppearance.js';
+import {smartPartOrderStyle,smartPartSide} from '../smart/shared/SmartPartPlacement.js';
 const n=(v,f,min=0,max=2000)=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
 const shadow=v=>v==="large"?"0 8px 20px #0003":v==="medium"?"0 3px 9px #0003":"none";
 const border=v=>v?"1px solid "+v:"1px solid transparent";
@@ -45,6 +46,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
   {key:"customButton1",label:String(p.customButton1Label||"Custom Button 1"),visible:p.customButton1Visible!==false},
   {key:"customButton2",label:String(p.customButton2Label||"Custom Button 2"),visible:p.customButton2Visible!==false}
  ].filter(action=>action.visible);
+ // Row buttons set to the right side move to the far end of the row;
+ // the first of them takes the free space. Blank keeps them on the left.
+ const firstRightAction=expandedActions.find(action=>
+  smartPartSide(p[action.key+"Placement"],"left")==="right")?.key;
  // Financial amounts come from explicit permission-checked Page State/Flow
  // bindings. Do not infer VAT, discounts or a payable total from line prices.
  const money=value=>{
@@ -132,12 +137,12 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     ?Number(computed):null;
   if(!numeric)return <span className="smart-cart-qty-value">{display(computed)}</span>;
   return <div className="smart-cart-qty-controls" aria-label={"Quantity controls for "+String(name||"Product")}>
-   {showDecrease&&<button type="button" data-design-area={p.builderPreview?"Button 5":undefined} className="smart-cart-qty-button" style={smartCustomButtonAppearance(p,"qtyDecrease")}
+   {showDecrease&&<button type="button" data-design-area={p.builderPreview?"Button 5":undefined} className="smart-cart-qty-button" style={{...smartCustomButtonAppearance(p,"qtyDecrease"),...smartPartOrderStyle(p.qtyDecreasePlacement,"left")}}
     aria-label={"Decrease quantity for "+String(name||"Product")}
     disabled={demo||!canDecrease||payload.recordId===null||quantity===null||quantity<=0}
     onClick={()=>fire?.(actions.qtyDecrease?'qtyDecrease':'qtyIcon',{...payload,delta:-1,operation:"decrement",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>−</button>}
    <span className="smart-cart-qty-value" aria-label={quantity===null?"Quantity not bound":"Quantity "+quantity}>{display(computed)}</span>
-   {showIncrease&&<button type="button" data-design-area={p.builderPreview?"Button 4":undefined} className="smart-cart-qty-button" style={smartCustomButtonAppearance(p,"qtyIncrease")}
+   {showIncrease&&<button type="button" data-design-area={p.builderPreview?"Button 4":undefined} className="smart-cart-qty-button" style={{...smartCustomButtonAppearance(p,"qtyIncrease"),...smartPartOrderStyle(p.qtyIncreasePlacement,"right")}}
     aria-label={"Increase quantity for "+String(name||"Product")}
     disabled={demo||!canIncrease||payload.recordId===null||quantity===null}
     onClick={()=>fire?.(actions.qtyIncrease?'qtyIncrease':'qtyIcon',{...payload,delta:1,operation:"increment",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>+</button>}
@@ -271,7 +276,9 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
           return <button data-md-bind={p.builderPreview?(action.key+"Label"):undefined} data-md-bind-titles={p.builderPreview?(action.key==="customButton1"?"Custom Button 1 text":"Custom Button 2 text"):undefined} type="button" key={action.key}
            data-design-area={p.builderPreview?(action.key==="customButton1"?"Button":"Button 2"):undefined}
            className="smart-cart-custom-action"
-           style={smartCustomButtonAppearance(p,action.key)}
+           style={{...smartCustomButtonAppearance(p,action.key),
+            ...smartPartOrderStyle(p[action.key+"Placement"],"left"),
+            ...(action.key===firstRightAction?{marginLeft:"auto"}:{})}}
            disabled={demo||!actions[action.key]||itemId===null}
            aria-label={String(label||action.label)}
            onClick={()=>fire?.(action.key,{...payload,selectedRowIndex:i})}>

@@ -1,7 +1,7 @@
 /** Cart is presentation-only; expressions and actions use the existing shared runtimes. */
 import {groupCartRows} from './cartGrouping.js';
 import {smartCustomButtonAppearance} from '../smart/shared/SmartCustomButtonAppearance.js';
-import {smartPartOrderStyle,smartPartSide} from '../smart/shared/SmartPartPlacement.js';
+import {smartPartOffsetStyle,smartPartOrderStyle,smartPartSide} from '../smart/shared/SmartPartPlacement.js';
 const n=(v,f,min=0,max=2000)=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
 const shadow=v=>v==="large"?"0 8px 20px #0003":v==="medium"?"0 3px 9px #0003":"none";
 const border=v=>v?"1px solid "+v:"1px solid transparent";
@@ -137,12 +137,12 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     ?Number(computed):null;
   if(!numeric)return <span className="smart-cart-qty-value">{display(computed)}</span>;
   return <div className="smart-cart-qty-controls" aria-label={"Quantity controls for "+String(name||"Product")}>
-   {showDecrease&&<button type="button" data-design-area={p.builderPreview?"Button 5":undefined} className="smart-cart-qty-button" style={{...smartCustomButtonAppearance(p,"qtyDecrease"),...smartPartOrderStyle(p.qtyDecreasePlacement,"left")}}
+   {showDecrease&&<button type="button" data-design-area={p.builderPreview?"Button 5":undefined} className="smart-cart-qty-button" style={{...smartCustomButtonAppearance(p,"qtyDecrease"),...smartPartOrderStyle(p.qtyDecreasePlacement,"left"),...smartPartOffsetStyle(p,"qtyDecrease")}}
     aria-label={"Decrease quantity for "+String(name||"Product")}
     disabled={demo||!canDecrease||payload.recordId===null||quantity===null||quantity<=0}
     onClick={()=>fire?.(actions.qtyDecrease?'qtyDecrease':'qtyIcon',{...payload,delta:-1,operation:"decrement",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>−</button>}
    <span className="smart-cart-qty-value" aria-label={quantity===null?"Quantity not bound":"Quantity "+quantity}>{display(computed)}</span>
-   {showIncrease&&<button type="button" data-design-area={p.builderPreview?"Button 4":undefined} className="smart-cart-qty-button" style={{...smartCustomButtonAppearance(p,"qtyIncrease"),...smartPartOrderStyle(p.qtyIncreasePlacement,"right")}}
+   {showIncrease&&<button type="button" data-design-area={p.builderPreview?"Button 4":undefined} className="smart-cart-qty-button" style={{...smartCustomButtonAppearance(p,"qtyIncrease"),...smartPartOrderStyle(p.qtyIncreasePlacement,"right"),...smartPartOffsetStyle(p,"qtyIncrease")}}
     aria-label={"Increase quantity for "+String(name||"Product")}
     disabled={demo||!canIncrease||payload.recordId===null||quantity===null}
     onClick={()=>fire?.(actions.qtyIncrease?'qtyIncrease':'qtyIcon',{...payload,delta:1,operation:"increment",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>+</button>}
@@ -152,6 +152,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
   backgroundColor:p.backgroundColor||"#fff",border:border(p.borderColor),
   borderRadius:n(p.radius,12),boxShadow:shadow(p.shadow)}}>
   <header data-design-area={p.builderPreview?"Header":undefined} className="smart-cart-header" style={{
+   ...smartPartOffsetStyle(p,"header"),
    backgroundColor:p.headerBodyColor??"#255d9d",
    borderRadius:n(p.headerRadius,n(p.radius,12),0,600),
    height:n(p.headerBoxHeight,52,24),minHeight:n(p.headerBoxHeight,52,24),
@@ -232,7 +233,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
          textAlign:p.rowAlignment?align(p.rowAlignment):undefined}}>
        {visible.map(index=>{
         if(index===0)return <div key={index} className={"smart-cart-product "+(p.imagePlacement==="right"?"image-right":"image-left")}>
-         <span data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Product image":undefined} className="smart-cart-image-binding" data-design-area={p.builderPreview?"Image":undefined} ><Picture src={src} alt={String(name||"Product")} loadAsset={p.loadAsset}
+         <span data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Product image":undefined} className="smart-cart-image-binding" data-design-area={p.builderPreview?"Image":undefined} style={smartPartOffsetStyle(p,"image")}><Picture src={src} alt={String(name||"Product")} loadAsset={p.loadAsset}
           style={{width:n(p.imageHeight,44,16),height:n(p.imageHeight,44,16),
            border:border(p.imageBorderColor),borderRadius:4,
            backgroundColor:p.imageBackgroundColor||undefined,
@@ -278,6 +279,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
            className="smart-cart-custom-action"
            style={{...smartCustomButtonAppearance(p,action.key),
             ...smartPartOrderStyle(p[action.key+"Placement"],"left"),
+            ...smartPartOffsetStyle(p,action.key),
             ...(action.key===firstRightAction?{marginLeft:"auto"}:{})}}
            disabled={demo||!actions[action.key]||itemId===null}
            aria-label={String(label||action.label)}
@@ -291,7 +293,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     </div>
    </>}
   </div>
-  <section data-design-area={p.builderPreview?"Summary":undefined} className="smart-cart-summary" aria-label="Cart summary" style={{
+  <section data-design-area={p.builderPreview?"Summary":undefined} className="smart-cart-summary" aria-label="Cart summary" style={{...smartPartOffsetStyle(p,"summary"),
    backgroundColor:p.summaryBackgroundColor||"#f7f9fc",
    border:border(p.summaryBorderColor),borderRadius:n(p.summaryRadius,8),
    boxShadow:shadow(p.summaryShadow),minHeight:n(p.summaryHeight,148,40),
@@ -303,7 +305,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
      fontWeight:p.summaryTextWeight===true?700:400,color:p.summaryTextColor||"#52657d",
      whiteSpace:p.summaryWrapText===false?"nowrap":undefined}}>
     <span data-md-bind={p.builderPreview?(label.toLowerCase()+"Label"):undefined} data-md-bind-titles={p.builderPreview?(label+" summary heading"):undefined}>{summaryLabels[label]}</span><span data-md-bind={p.builderPreview?(label.toLowerCase()+"Value"):undefined} data-md-bind-titles={p.builderPreview?(label+" amount"):undefined} aria-label={summaryAmounts[label]===null?summaryLabels[label]+" not bound":undefined}>{summaryAmounts[label]??"—"}</span></div>)}
-   <div data-design-area={p.builderPreview?"Footer":undefined} className="smart-cart-summary-line smart-cart-total" style={{
+   <div data-design-area={p.builderPreview?"Footer":undefined} className="smart-cart-summary-line smart-cart-total" style={{...smartPartOffsetStyle(p,"footer"),
     fontSize:n(p.footerTextSize,p.summary2TextSize===undefined?18:n(p.summary2TextSize,18,8,96),8,96),
     fontWeight:typeof p.footerBold==="boolean"?(p.footerBold?700:400):
       p.summary2TextWeight===false?400:700,

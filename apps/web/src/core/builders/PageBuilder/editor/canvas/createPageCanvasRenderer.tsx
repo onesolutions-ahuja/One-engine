@@ -227,15 +227,12 @@ export function createPageCanvasRenderer(
       onPointerDownCapture={!previewMode && !libraryPreview && selectedId === component.id && !isCanvasLocked(component)
         ? event => {
           // On the selected component, pressing a part (badge, image, buttons,
-          // text) drags that part instead of the component; it snaps to the
-          // nearest allowed place and updates the part's existing property.
-          startCanvasPartDrag(event, component.type, {
+          // text) drags that part instead of the component: freely (saved as
+          // its X/Y offset) or, with Shift, snapped to its dropdown places.
+          startCanvasPartDrag(event, component.type, component.properties, {
             chooseArea: chooseCanvasDesignArea,
             suppressClick: () => { suppressCanvasClickRef.current = true; },
-            onDrop: (property, value) => {
-              if (component.properties[property] !== value)
-                updateComponent(component.id, { properties: { ...component.properties, [property]: value } });
-            }
+            onDrop: properties => updateComponent(component.id, { properties })
           }); } : undefined}
       onPointerDown={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? event => {
         // A scrollable component is still a movable shape. Only native scrollbar

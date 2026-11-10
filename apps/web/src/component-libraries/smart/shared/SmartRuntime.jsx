@@ -4,7 +4,7 @@ import SmartScheduleCalendar from "../../smart_calendar/SmartScheduleCalendar.js
 import icons from "../../smart_icon/iconCatalog.json";
 import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
-import {smartPartOrderStyle} from "./SmartPartPlacement.js";
+import {smartPartOffsetStyle,smartPartOrderStyle} from "./SmartPartPlacement.js";
 import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../shared/FieldExpression.js";
 import {useSqlFormulaDisplay,isSelectedSqlFormula} from "../../shared/useSqlFormulaDisplay";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
@@ -225,7 +225,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ...(focused&&focusedHeight>0?{height:"min(100%, "+focusedHeight+"px)"}:{}),
   ...(focused&&(focusedWidth>0||focusedHeight>0)?{margin:"auto"}:{})
  }} data-selected={selected?"true":undefined}>
-  {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{order:["right","bottom"].includes(p.imagePlacement)?2:0,
+  {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{...smartPartOffsetStyle(p,"image"),order:["right","bottom"].includes(p.imagePlacement)?2:0,
     flex:horizontal?(imageWidth!==null?"0 0 "+imageWidth+"px":"1 1 50%"):
       single?(hasImageHeight?"0 1 "+imageHeight+"px":"1 1 auto"):
       grid?"1 1 "+imageHeight+"px":undefined,
@@ -259,7 +259,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        border:nativeImageBorder}}/>}
   </div>}
   {header&&headerHeight>0&&<div data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Card title":undefined} className="smart-card-content" style={{
-    order:1,flex:horizontal?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
+    ...smartPartOffsetStyle(p,"header"),order:1,flex:horizontal?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
     display:"flex",alignItems:fixedGridHeader?"safe center":"center",
     // Explicit Card Grid heights bound the title box; excess text is scrollable.
     // Standalone Image captions retain intrinsic growth for large typography.
@@ -287,7 +287,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   {grid&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
    style={cardPadding===null?undefined:{padding:cardPadding+"px"}}>
    {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
-     style={{color:description==='FORMULAERROR'?formulaDisplayErrorColor:
+     style={{...smartPartOffsetStyle(p,"supporting"),color:description==='FORMULAERROR'?formulaDisplayErrorColor:
       focusedText||p.supportingTextColor||undefined,
       backgroundColor:p.supportingBackgroundColor||undefined,
       border:p.supportingBorderColor?"1px solid "+p.supportingBorderColor:undefined,
@@ -296,7 +296,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        ?number(p.supportingTextSize,14,8,96):undefined,
       textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description}</span>}
    {(value||buttonText||customButtons.length>0)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
-    style={{backgroundColor:p.footerBackgroundColor||undefined,
+    style={{...smartPartOffsetStyle(p,"footer"),backgroundColor:p.footerBackgroundColor||undefined,
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
      minHeight:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
       ?number(p.footerHeight,0,0,1200):undefined,
@@ -312,6 +312,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       disabled={!onButtonClick} aria-label={buttonText}
       style={{
        ...smartPartOrderStyle(p.cardButtonPlacement,"right"),
+       ...smartPartOffsetStyle(p,"cardButton"),
        backgroundColor:p.cardButtonFill||p.accentColor||"#2563eb",
        borderColor:p.cardButtonBorderColor||p.cardButtonFill||p.accentColor||"#2563eb",
        ...smartShapeAppearance(p.cardButtonShape||"shape:round-rectangle",
@@ -338,14 +339,14 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     {customButtons.map(key=>{
      const label=gridText(p,key+"Label",record)||(key==="customButton1"?"+":"−");
      return <button key={key} data-md-bind={p.builderPreview?(key+"Label"):undefined} data-design-area={p.builderPreview?(key==="customButton1"?"Button":"Button 2"):undefined} type="button" className="smart-card-button smart-card-custom-action"
-      style={{...smartCustomButtonAppearance(p,key),...smartPartOrderStyle(p[key+"Placement"],"right")}} disabled={!p.actionFlows?.[key]||!onCustomButton||p.previewOnly||p.builderPreview}
+      style={{...smartCustomButtonAppearance(p,key),...smartPartOrderStyle(p[key+"Placement"],"right"),...smartPartOffsetStyle(p,key)}} disabled={!p.actionFlows?.[key]||!onCustomButton||p.previewOnly||p.builderPreview}
       aria-label={label}
       onClick={event=>{event.stopPropagation();onCustomButton?.(key);}}>{label}</button>;
     })}
    </div>}
   </div>}
   {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
-   style={{fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
+   style={{...smartPartOffsetStyle(p,"badge"),fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
    color:badgeResult.error?formulaDisplayErrorColor:p.badgeTextColor||"#fff",
    background:badgeResult.error?"#fff":p.badgeBodyColor||"#2563eb",
    border:p.badgeBorderColor?"1px solid "+p.badgeBorderColor:undefined,
@@ -752,7 +753,7 @@ export default function SmartRuntime(p){
     {caption|| (p.builderPreview?"Caption":"")}
    </span>
    <div data-design-area={p.builderPreview?"Header":undefined} className="smart-textbox-value-panel" style={{
-    backgroundColor:p.headerBodyColor||"#fff",color:p.headerTextColor||"#1e293b",
+    ...smartPartOffsetStyle(p,"header"),backgroundColor:p.headerBodyColor||"#fff",color:p.headerTextColor||"#1e293b",
     borderRadius:p.headerRadius!==undefined&&p.headerRadius!==null&&p.headerRadius!==""
      ?number(p.headerRadius,0,0,128):undefined,
     fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""

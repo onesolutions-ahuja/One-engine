@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {partSnapRule,snapPartValue,partSnapLabel} from '../src/core/builders/PageBuilder/canvasPartSnap';
-import {smartPartOrderStyle,smartPartSide} from '../src/component-libraries/smart/shared/SmartPartPlacement.js';
+import {partSnapRule,snapPartValue,partSnapLabel,partOffsetKeys,nextPartOffset,withPartOffset} from '../src/core/builders/PageBuilder/canvasPartSnap';
+import {smartPartOffsetStyle,smartPartOrderStyle,smartPartSide} from '../src/component-libraries/smart/shared/SmartPartPlacement.js';
 
 const box={left:100,top:200,width:300,height:150};
 const at=(fx:number,fy:number)=>({x:box.left+fx*box.width,y:box.top+fy*box.height});
 
 test('only listed parts of listed components can be dragged',()=>{
- assert.deepEqual(partSnapRule('Custom:smart_card_grid','Badge'),{property:'badgeAlignment',mode:'badge'});
+ assert.deepEqual(partSnapRule('Custom:smart_card_grid','Badge'),{property:'badgeAlignment',mode:'badge',offset:'badge'});
  assert.equal(partSnapRule('Custom:smart_cart','Button 5')?.property,'qtyDecreasePlacement');
  assert.equal(partSnapRule('Custom:smart_cart','Button 4')?.property,'qtyIncreasePlacement');
  assert.equal(partSnapRule('Custom:smart_card_grid','Button 3')?.property,'cardButtonPlacement');
@@ -53,4 +53,27 @@ test('button side adds no style unless moved off the side it always used',()=>{
  assert.deepEqual(smartPartOrderStyle('left','right'),{order:-1});
  assert.deepEqual(smartPartOrderStyle('right','left'),{order:1});
  assert.equal(smartPartSide('middle','left'),'left');
+});
+
+test('free drag saves X/Y offset per part; dragging back clears it',()=>{
+ const badge=partSnapRule('Custom:smart_card_grid','Badge')!;
+ assert.deepEqual(partOffsetKeys(badge),{x:'badgeOffsetX',y:'badgeOffsetY'});
+ assert.deepEqual(partOffsetKeys(partSnapRule('Custom:smart_cart','Button 5')!),{x:'qtyDecreaseOffsetX',y:'qtyDecreaseOffsetY'});
+ assert.deepEqual(nextPartOffset({x:undefined,y:undefined},-20.4,12.6),{x:-20,y:13});
+ assert.deepEqual(nextPartOffset({x:-20,y:13},5,-3),{x:-15,y:10});
+ assert.deepEqual(nextPartOffset({x:'-15',y:'10'},14,-8),{x:0,y:0},'within 3px of home resets');
+ assert.deepEqual(nextPartOffset({x:0,y:0},99999,0),{x:2000,y:0},'clamped');
+ const moved=withPartOffset({badgeAlignment:'image-top-right',other:1},badge,{x:-20,y:13});
+ assert.deepEqual(moved,{badgeAlignment:'image-top-right',other:1,badgeOffsetX:-20,badgeOffsetY:13});
+ assert.deepEqual(withPartOffset(moved,badge,{x:0,y:0}),{badgeAlignment:'image-top-right',other:1});
+ assert.deepEqual(withPartOffset({badgeOffsetY:4},badge,{x:6,y:0}),{badgeOffsetX:6});
+});
+
+test('renderer offset style: translate only when an offset is saved',()=>{
+ assert.deepEqual(smartPartOffsetStyle({},'badge'),{});
+ assert.deepEqual(smartPartOffsetStyle({badgeOffsetX:0,badgeOffsetY:0},'badge'),{});
+ assert.deepEqual(smartPartOffsetStyle({badgeOffsetX:-20,badgeOffsetY:'13'},'badge'),{translate:'-20px 13px'});
+ assert.deepEqual(smartPartOffsetStyle({qtyIncreaseOffsetY:5},'qtyIncrease'),{translate:'0px 5px'});
+ assert.deepEqual(smartPartOffsetStyle({headerOffsetX:'abc'},'header'),{});
+ assert.deepEqual(smartPartOffsetStyle(undefined,'header'),{});
 });

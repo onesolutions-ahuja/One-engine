@@ -1,4 +1,5 @@
 import { useFormFactor } from '../../../workspace/Responsive/useFormFactor';
+import { partSnapRule } from '../canvasPartSnap';
 import { ensureComponentInstanceNames } from '../../../../../../server/src/system-support/page-component-names';
 import { relatedListRelationships } from '../relatedListRelationships';
 import { pageTemplates, pageStringList } from '../pageEditorMetadata';
@@ -300,12 +301,18 @@ export function usePageEditorState(
     if(!viewport)return;
     viewport.querySelectorAll('[data-design-area-active]')
       .forEach(node=>node.removeAttribute('data-design-area-active'));
-    if(!selectedId||!inspectorSection||inspectorSection==='Body')return;
+    viewport.querySelectorAll('[data-part-draggable]')
+      .forEach(node=>node.removeAttribute('data-part-draggable'));
+    if(!selectedId)return;
     const host=Array.from(viewport.querySelectorAll<HTMLElement>('[data-component-id]'))
       .find(node=>node.dataset.componentId===selectedId);
+    const type=page.components.find(component=>component.id===selectedId)?.type??'';
     host?.querySelectorAll<HTMLElement>('[data-design-area]').forEach(node=>{
-      if(node.dataset.designArea===inspectorSection
-        &&node.closest('[data-component-id]')===host)node.setAttribute('data-design-area-active','true');
+      if(node.closest('[data-component-id]')!==host)return;
+      // Parts that can be dragged inside the selected component get a dashed outline.
+      if(partSnapRule(type,node.dataset.designArea))node.setAttribute('data-part-draggable','true');
+      if(inspectorSection&&inspectorSection!=='Body'&&node.dataset.designArea===inspectorSection)
+        node.setAttribute('data-design-area-active','true');
     });
   },[selectedId,inspectorSection,page]);
   const componentNeedsData = (type: string) => {

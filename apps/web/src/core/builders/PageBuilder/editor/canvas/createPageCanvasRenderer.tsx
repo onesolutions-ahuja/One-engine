@@ -15,6 +15,7 @@ import { isCanvasLocked } from '../../canvasInteractions';
 import { canvasGroupKey, canMoveCanvasLayer, canvasSiblingLayerIndex } from '../../canvasLayerGroups';
 import { canvasScrollbarHit } from '../../canvasPointerInteractions';
 import { selectCanvasIds } from '../../canvasSelectionInteractions';
+import { startCanvasPartDrag } from './canvasPartDrag';
 import { needsMetadataComponentRuntime } from '../../../../pages/PageRuntime/pageComponentBindings';
 import { CompiledPreviewSlot, MemoizedCompiledComponentNode } from '../../../../pages/PageCompiler/CompiledPageRuntime';
 import {
@@ -52,6 +53,7 @@ export function createPageCanvasRenderer(
     componentMenuId, componentClipboard, applyPage, fields, previewFieldValue, defaultRelatedLists,
     relatedListOptions, setOpenBuilderTabs, externalPreviewWindowRef, ribbonCatalog, canvasBinding,
     selectCanvasDataBinding, selectedRegion, setActivePanel, openAddBlocks, chooseCanvasDesignArea,
+    updateComponent,
   } = editorState;
   const {
     page, libraryComponents, apps, request, dashboards, reports, objects, flows, pages,
@@ -222,6 +224,19 @@ export function createPageCanvasRenderer(
         setSelectedRegion(null);setSelectedId(component.id);selectRibbonTab('Component Design 2');
       }} : undefined}
       onContextMenu={!libraryPreview && !previewMode ? event => { event.preventDefault(); event.stopPropagation(); setSelectedRegion(null); setSelectedId(component.id); setComponentMenuId(component.id); } : undefined}
+      onPointerDownCapture={!previewMode && !libraryPreview && selectedId === component.id && !isCanvasLocked(component)
+        ? event => {
+          // On the selected component, pressing a part (badge, image, buttons,
+          // text) drags that part instead of the component; it snaps to the
+          // nearest allowed place and updates the part's existing property.
+          startCanvasPartDrag(event, component.type, {
+            chooseArea: chooseCanvasDesignArea,
+            suppressClick: () => { suppressCanvasClickRef.current = true; },
+            onDrop: (property, value) => {
+              if (component.properties[property] !== value)
+                updateComponent(component.id, { properties: { ...component.properties, [property]: value } });
+            }
+          }); } : undefined}
       onPointerDown={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? event => {
         // A scrollable component is still a movable shape. Only native scrollbar
         // rails and touch panning are excluded; never exclude all Cart/Grid content.

@@ -4,6 +4,7 @@ import SmartScheduleCalendar from "../../smart_calendar/SmartScheduleCalendar.js
 import icons from "../../smart_icon/iconCatalog.json";
 import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
+import {smartPartOrderStyle} from "./SmartPartPlacement.js";
 import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../shared/FieldExpression.js";
 import {useSqlFormulaDisplay,isSelectedSqlFormula} from "../../shared/useSqlFormulaDisplay";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
@@ -310,6 +311,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
       disabled={!onButtonClick} aria-label={buttonText}
       style={{
+       ...smartPartOrderStyle(p.cardButtonPlacement,"right"),
        backgroundColor:p.cardButtonFill||p.accentColor||"#2563eb",
        borderColor:p.cardButtonBorderColor||p.cardButtonFill||p.accentColor||"#2563eb",
        ...smartShapeAppearance(p.cardButtonShape||"shape:round-rectangle",
@@ -336,7 +338,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     {customButtons.map(key=>{
      const label=gridText(p,key+"Label",record)||(key==="customButton1"?"+":"−");
      return <button key={key} data-md-bind={p.builderPreview?(key+"Label"):undefined} data-design-area={p.builderPreview?(key==="customButton1"?"Button":"Button 2"):undefined} type="button" className="smart-card-button smart-card-custom-action"
-      style={smartCustomButtonAppearance(p,key)} disabled={!p.actionFlows?.[key]||!onCustomButton||p.previewOnly||p.builderPreview}
+      style={{...smartCustomButtonAppearance(p,key),...smartPartOrderStyle(p[key+"Placement"],"right")}} disabled={!p.actionFlows?.[key]||!onCustomButton||p.previewOnly||p.builderPreview}
       aria-label={label}
       onClick={event=>{event.stopPropagation();onCustomButton?.(key);}}>{label}</button>;
     })}

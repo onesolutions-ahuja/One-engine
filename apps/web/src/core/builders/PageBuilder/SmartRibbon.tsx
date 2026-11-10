@@ -53,6 +53,9 @@ const cartSummaryLabels:Record<string,{key:string;slot:string}>={
  taxValue:{key:'taxLabel',slot:'Summary 3'},
  discountValue:{key:'discountLabel',slot:'Summary 4'}
 };
+// Left/right side of buttons inside a row; also set by dragging the button on the canvas.
+const partSidePropertyIds=['cardButtonPlacement','customButton1Placement','customButton2Placement',
+ 'qtyIncreasePlacement','qtyDecreasePlacement'];
 export default function SmartRibbon({tab,api,definitions,properties,onChange,objects,pageObjectApiName='',position,onPositionChange,layoutMode,sharedPropertyIds,mixedPropertyIds,selectedApis,pageComponents=[],componentId='',canvasBinding=null,design2Slots=[],design2SlotRules=[],componentVisible=true,onVisibleChange,design2Arrange,inspectorSection,onInspectorSectionChange,openDesignSection,onToggleDesignSection,part}:Props){
  const uploadInput=useRef<HTMLInputElement>(null);
  const [uploadBusy,setUploadBusy]=useState(false);
@@ -648,9 +651,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    else if(tab==='Design2'&&kind==='choice'&&property.id==='badgeAlignment')
      editor=<SmartIconDropdown kind="badgeAlignment" value={String(value)} label={title} disabled={!enabled} onChange={write}/>;
    else if(tab==='Design2'&&kind==='choice'&&
-     ['imageFill','imagePlacement','tabOrientation','navigationDirection'].includes(property.id))
+     (['imageFill','imagePlacement','tabOrientation','navigationDirection'].includes(property.id)||
+      partSidePropertyIds.includes(property.id)))
      editor=<Design2IconDropdown
-       mode={property.id==='imagePlacement'?'placement':property.id==='imageFill'?'imageFill':'orientation'}
+       mode={property.id==='imagePlacement'||partSidePropertyIds.includes(property.id)?'placement':
+         property.id==='imageFill'?'imageFill':'orientation'}
        value={String(value)} label={title} disabled={!enabled} allowed={options} onChange={write}/>;
    else if(kind==='choice'&&Array.isArray(value))editor=<SmartMultiSelect
       label={title} choices={options} value={value.filter((item):item is string=>typeof item==='string')}

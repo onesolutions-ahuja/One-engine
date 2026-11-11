@@ -43,7 +43,7 @@ export async function seedInitialUser(client:PoolClient,input:InitialUserInput){
   VALUES($1,$2,now())`,[tenantId,disabledDeveloper.rows[0].id]);
  else await client.query('INSERT INTO md_tenant_developer_accounts(tenant_id,user_id) VALUES($1,$2)',
   [tenantId,disabledDeveloper.rows[0].id]);
- await client.query('UPDATE md_users SET reports_to_user_id=$3 WHERE tenant_id=$1 AND id=$2',
+ if(!sharedIdentity)await client.query('UPDATE md_users SET reports_to_user_id=$3 WHERE tenant_id=$1 AND id=$2',
   [tenantId,user.rows[0].id,disabledDeveloper.rows[0].id]);
  return {administratorUserId:user.rows[0].id,developerUserId:disabledDeveloper.rows[0].id};
 }

@@ -85,6 +85,17 @@ export class AuthenticationService {
     if(result.error)throw new Error(result.error);
     return result.userId!;
   }
+  /** Side-effect-free password check, used only to pick between several tenants
+   * that share one email. The chosen tenant then runs verifyIdentity normally. */
+  async passwordMatches(tenantId:string,email:string,password:string):Promise<boolean> {
+    if(email.length>254||password.length>1024)return false;
+    const {rows}=await this.db.query<{password_hash:string;locked_until:Date|null}>(
+      'SELECT password_hash,locked_until FROM md_users WHERE tenant_id=$1 AND lower(email)=lower($2) AND enabled=true',
+      [tenantId,email.trim()]);
+    const user=rows[0];
+    if(!user||user.locked_until&&new Date(user.locked_until).getTime()>Date.now())return false;
+    return this.verifyPassword(password,user.password_hash);
+  }
   async verifyCurrentPassword(tenantId:string,userId:string,password:string):Promise<void> {
     const {rows}=await this.db.query<{password_hash:string}>(
       'SELECT password_hash FROM md_users WHERE tenant_id=$1 AND id=$2 AND enabled=true',

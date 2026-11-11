@@ -159,6 +159,21 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setError(cause instanceof Error ? cause.message : 'Unable to create tenant');
     } finally { setBusy(false); }
   };
+  const retryDeveloperMailbox = async () => {
+    if(!selected || busy || selected.status!=='SUSPENDED')return;
+    setBusy(true);setError('');setNotice('');
+    try{
+      const result=await request<{tenant:TenantSummary}>(
+        '/platform/tenants/'+encodeURIComponent(selected.tenantId)+'/retry-developer-mailbox',
+        {method:'POST',body:'{}'}
+      );
+      setSelected(result.tenant);
+      setNotice('Developer mailbox provisioned. Tenant reactivated; users must sign in again.');
+      setRevision(n=>n+1);
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Unable to repair developer mailbox');
+    }finally{setBusy(false);}
+  };
   const saveTenant = async (event: FormEvent) => {
     event.preventDefault();
     if (!selected || busy || !permitted) return;
@@ -287,11 +302,13 @@ export default function TenantManagement({ request, permitted }: { request: Requ
           <p className="tenant-provisioning-status"><span className="tenant-pill tenant-pill-active">Provisioning ready</span> <small>Version {selected.provisioning.version} · {shortDate(selected.provisioning.completedAt)}</small></p>
           {selected.developerAccount && <p className="tenant-help">Developer seeder: <strong>{selected.developerAccount.email}</strong> — {selected.developerAccount.activated ? 'Tenant activated' : 'Pending tenant activation'}. The tenant owns all access changes.</p>}
           <p><span className={selected.status === 'ACTIVE' ? 'tenant-pill tenant-pill-active' : 'tenant-pill tenant-pill-suspended'}>{selected.status === 'ACTIVE' ? 'Active' : selected.status === 'ARCHIVED' ? 'Archived' : 'Suspended'}</span></p>
+          {selected.status==='SUSPENDED'&&<p className="tenant-help">This tenant cannot sign in. If its developer mailbox was not created, repair mailbox provisioning before reactivation.</p>}
           {editDetails ? <label>Organisation name<input required maxLength={120} value={editing.name} onChange={(event) => setEditing((old) => ({ ...old, name: event.target.value }))} /></label> : <div className="tenant-readonly-field"><span>Organisation name</span><strong>{selected.name}</strong></div>}
           {editDetails ? <label>Description<textarea rows={4} maxLength={1000} value={editing.description} onChange={(event) => setEditing((old) => ({ ...old, description: event.target.value }))} /></label> : <div className="tenant-readonly-field"><span>Description</span><strong>{selected.description || "Not provided"}</strong></div>}
           <div className="tenant-facts"><span>Created</span><strong>{shortDate(selected.createdAt)}</strong><span>Last updated</span><strong>{shortDate(selected.updatedAt)}</strong><span>Active users</span><strong>{selected.activeUserCount} of {selected.userCount}</strong></div>
           <div className="tenant-actions">{editDetails ? <><button type="submit" className="tenant-button tenant-button-primary" disabled={busy || !editing.name.trim()}>{busy ? 'Saving…' : 'Save details'}</button><button type="button" className="tenant-button" onClick={() => {setEditing({name:selected.name,description:selected.description});setEditDetails(false);}}>Cancel</button></> : <button type="button" className="tenant-button" onClick={() => setEditDetails(true)}>Edit details</button>}
             {selected.status !== 'ARCHIVED' && <button type="button" className={selected.status === 'ACTIVE' ? 'tenant-button tenant-button-danger' : 'tenant-button'} onClick={() => void changeStatus()} disabled={busy}>{selected.status === 'ACTIVE' ? 'Suspend tenant' : 'Reactivate tenant'}</button>}
+            {selected.status==='SUSPENDED'&&<button type="button" className="tenant-button tenant-button-primary" onClick={()=>void retryDeveloperMailbox()} disabled={busy}>{busy?'Repairing…':'Retry developer mailbox'}</button>}
             {selected.status === 'SUSPENDED' && <button type="button" className="tenant-button tenant-button-danger" onClick={() => void changeLifecycle('archive')} disabled={busy}>Archive tenant</button>}
             {selected.status === 'ARCHIVED' && <button type="button" className="tenant-button" onClick={() => void changeLifecycle('restore')} disabled={busy}>Restore to suspended</button>}</div>
           <p className="tenant-help">Tenant ID cannot be changed. Suspended and archived tenants cannot authenticate; reactivation never restores revoked sessions. Archival retains tenant data.</p>

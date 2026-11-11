@@ -13,7 +13,7 @@ export async function seedOneEnginePolicy(client:PoolClient,tenantId:string,user
  const permissionSet=await client.query<{id:string}>(
   'INSERT INTO md_permission_sets (tenant_id,api_name) VALUES ($1,$2) RETURNING id',
   [tenantId,'OneEngine']);
- for(const userId of [users.administratorUserId,users.developerUserId]){
+ for(const userId of new Set([users.administratorUserId,users.developerUserId])){
   await client.query('INSERT INTO md_user_roles (tenant_id,user_id,role_id) VALUES ($1,$2,$3)',
    [tenantId,userId,role.rows[0].id]);
  }

@@ -153,6 +153,17 @@ export async function applySystemMigrations(db:SqlPersistence) {
      END IF;
     END $$;
   `);
+  // Platform-wide switches managed by platform administrators (relational, audited
+  // via md_security_events). Additive and idempotent on every start.
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS md_platform_feature_flags (
+     flag text PRIMARY KEY CHECK (flag IN ('tenant_mail')),
+     enabled boolean NOT NULL DEFAULT false,
+     updated_by_tenant_id uuid REFERENCES md_tenants(id),
+     updated_by_user_id uuid,
+     updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
 
   // Smart Toggle's legacy defaultCheck ribbon setting was retired. Reuse the
   // existing, already-published defaultValue expression instead so Page Builder

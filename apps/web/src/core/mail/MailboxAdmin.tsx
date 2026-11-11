@@ -6,6 +6,8 @@ import './MailboxAdmin.css';
 type Domain={id:string;name:string;isEnabled:boolean;verificationToken?:string|null};
 type Mailbox={id:string;emailAddress:string;name:string;domainId:string;description:string;usedDiskQuota:number;quotas?:Record<string,number>;createdAt:string|null};
 type Props={onLogout:()=>void};
+type MailSettings={tenantMailEnabled:boolean;forcedByServer:boolean;canManageAllTenants:boolean;currentTenant:string};
+type TenantOption={tenantId:string;name:string;status:string};
 const panel:React.CSSProperties={background:'#fff',color:'#172b3f',border:'1px solid #d9e0e7',borderRadius:12,padding:20};
 const field:React.CSSProperties={display:'grid',gap:6,marginBottom:14};
 const input:React.CSSProperties={width:'100%',boxSizing:'border-box',padding:'10px 12px',border:'1px solid #94a3b8',borderRadius:8,font:'inherit',background:'#fff',color:'#172b3f',colorScheme:'light'};
@@ -49,6 +51,33 @@ function ActionDialog({title,onClose,children}:{title:string;onClose:()=>void;ch
 export default function MailboxAdmin({onLogout}:Props){
  const [domains,setDomains]=useState<Domain[]>([]);
  const [tenantMailEnabled,setTenantMailEnabled]=useState(true);
+ const [settings,setSettings]=useState<MailSettings|null>(null);
+ const [tenants,setTenants]=useState<TenantOption[]>([]);
+ const [target,setTarget]=useState('');
+ const crossTenant=Boolean(settings&&target&&target!==settings.currentTenant);
+ // Same API for every tenant; ?tenant= is honoured server-side for platform administrators only.
+ const mailPath=useCallback((path:string)=>crossTenant?path+(path.includes('?')?'&':'?')+'tenant='+encodeURIComponent(target):path,[crossTenant,target]);
+ useEffect(()=>{
+  let cancelled=false;
+  apiRequest<MailSettings>('/mail/settings').then(value=>{
+   if(cancelled)return;
+   setSettings(value);setTarget(current=>current||value.currentTenant);
+   if(value.canManageAllTenants)apiRequest<{tenants:TenantOption[]}>('/platform/tenants?pageSize=100&status=ALL')
+    .then(result=>{if(!cancelled)setTenants(result.tenants.filter(t=>t.status!=='ARCHIVED'));}).catch(()=>{});
+  }).catch(()=>{});
+  return()=>{cancelled=true;};
+ },[]);
+ const toggleTenantMail=async(enabled:boolean)=>{
+  if(enabled&&!window.confirm('Allow tenants to add their own mail domains and mailboxes on the shared mail server? This is audited.'))return;
+  setBusy(true);setError('');setNotice('');
+  try{
+   const value=await apiRequest<{tenantMailEnabled:boolean}>('/mail/settings',{method:'PUT',body:JSON.stringify({tenantMailEnabled:enabled})});
+   setSettings(current=>current?{...current,tenantMailEnabled:value.tenantMailEnabled}:current);
+   setTenantMailEnabled(value.tenantMailEnabled);
+   setNotice(value.tenantMailEnabled?'Tenant mail turned on.':'Tenant mail turned off.');
+  }catch(e){setError(e instanceof Error?e.message:'Unable to change tenant mail');}
+  finally{setBusy(false);}
+ };
  const [newDomain,setNewDomain]=useState('');
  const [mailboxes,setMailboxes]=useState<Mailbox[]>([]);
  const [loading,setLoading]=useState(true);
@@ -73,19 +102,19 @@ export default function MailboxAdmin({onLogout}:Props){
   setLoading(true);setError('');
   try{
    const [d,m]=await Promise.all([
-    apiRequest<{domains:Domain[];tenantMailEnabled?:boolean}>('/mail/domains'),
-    apiRequest<{mailboxes:Mailbox[]}>('/mail/mailboxes')
+    apiRequest<{domains:Domain[];tenantMailEnabled?:boolean}>(mailPath('/mail/domains')),
+    apiRequest<{mailboxes:Mailbox[]}>(mailPath('/mail/mailboxes'))
    ]);
    setDomains(d.domains);setMailboxes(m.mailboxes);setTenantMailEnabled(d.tenantMailEnabled!==false);
-   setDomainId(current=>current||d.domains.find(x=>x.isEnabled)?.id||'');
+   setDomainId(current=>d.domains.some(x=>x.id===current&&x.isEnabled)?current:d.domains.find(x=>x.isEnabled)?.id||'');
   }catch(e){setError(e instanceof Error?e.message:'Unable to load mailboxes');}
   finally{setLoading(false);}
- },[]);
+ },[mailPath]);
  useEffect(()=>{void refresh();},[refresh]);
  const registerDomain=async(event:React.FormEvent)=>{
   event.preventDefault();setBusy(true);setError('');
   try{
-   await apiRequest('/mail/domains',{method:'POST',body:JSON.stringify({domain:newDomain.trim().toLowerCase()})});
+   await apiRequest(mailPath('/mail/domains'),{method:'POST',body:JSON.stringify({domain:newDomain.trim().toLowerCase()})});
    setNewDomain('');setShowDomainCreate(false);setNotice('Mail domain registered. Add the TXT record below.');await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Could not add domain');}
   finally{setBusy(false);}
@@ -93,7 +122,7 @@ export default function MailboxAdmin({onLogout}:Props){
  const verifyDomain=async(id:string)=>{
   setBusy(true);setError('');
   try{
-   await apiRequest('/mail/domains/'+encodeURIComponent(id)+'/verify',{method:'POST'});
+   await apiRequest(mailPath('/mail/domains/'+encodeURIComponent(id)+'/verify'),{method:'POST'});
    setNotice('Domain ownership verified. Configure MX, SPF, DKIM and DMARC before using it.');await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Verification failed');}
   finally{setBusy(false);}
@@ -101,7 +130,7 @@ export default function MailboxAdmin({onLogout}:Props){
  const create=async(event:React.FormEvent)=>{
   event.preventDefault();setBusy(true);setError('');setNotice('');
   try{
-   await apiRequest('/mail/mailboxes',{method:'POST',body:JSON.stringify({name,domainId,password,description})});
+   await apiRequest(mailPath('/mail/mailboxes'),{method:'POST',body:JSON.stringify({name,domainId,password,description})});
    setName('');setPassword('');setDescription('');setShowCreate(false);setNotice('Mailbox created.');await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Mailbox creation failed');}
   finally{setBusy(false);}
@@ -109,7 +138,7 @@ export default function MailboxAdmin({onLogout}:Props){
  const saveDescription=async(event:React.FormEvent)=>{
   event.preventDefault();setBusy(true);setError('');setNotice('');
   try{
-   await apiRequest('/mail/mailboxes/'+encodeURIComponent(editId),{method:'PATCH',body:JSON.stringify({description:editDescription})});
+   await apiRequest(mailPath('/mail/mailboxes/'+encodeURIComponent(editId)),{method:'PATCH',body:JSON.stringify({description:editDescription})});
    setEditId('');setNotice('Mailbox updated.');await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Mailbox update failed');}
   finally{setBusy(false);}
@@ -117,7 +146,7 @@ export default function MailboxAdmin({onLogout}:Props){
  const reset=async(event:React.FormEvent)=>{
   event.preventDefault();setBusy(true);setError('');setNotice('');
   try{
-   await apiRequest('/mail/mailboxes/'+encodeURIComponent(resetId)+'/reset-password',{method:'POST',body:JSON.stringify({password:resetPassword})});
+   await apiRequest(mailPath('/mail/mailboxes/'+encodeURIComponent(resetId)+'/reset-password'),{method:'POST',body:JSON.stringify({password:resetPassword})});
    setResetId('');setResetPassword('');setNotice('Password reset completed.');await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Password reset failed');}
   finally{setBusy(false);}
@@ -128,7 +157,7 @@ export default function MailboxAdmin({onLogout}:Props){
   tab.opener=null;
   setBusy(true);setError('');setNotice('');
   try{
-   const {ticket}=await apiRequest<{ticket:string}>('/mail/mailboxes/'+encodeURIComponent(mailbox.id)+'/open',{method:'POST'});
+   const {ticket}=await apiRequest<{ticket:string}>(mailPath('/mail/mailboxes/'+encodeURIComponent(mailbox.id)+'/open'),{method:'POST'});
    if(tab.closed)throw new Error('Mailbox tab was closed');
    tab.location.replace(window.location.origin+'/mail#admin='+encodeURIComponent(ticket));
   }catch(e){
@@ -140,7 +169,7 @@ export default function MailboxAdmin({onLogout}:Props){
   if(!window.confirm('Permanently delete '+mailbox.emailAddress+' and its mailbox data from the tenant mail server? This cannot be undone.'))return;
   setBusy(true);setError('');setNotice('');
   try{
-   await apiRequest('/mail/mailboxes/'+encodeURIComponent(mailbox.id),{method:'DELETE'});
+   await apiRequest(mailPath('/mail/mailboxes/'+encodeURIComponent(mailbox.id)),{method:'DELETE'});
    setNotice('Mailbox deleted.');await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Mailbox deletion failed');}
   finally{setBusy(false);}
@@ -151,6 +180,19 @@ export default function MailboxAdmin({onLogout}:Props){
     <h1 style={{margin:0,fontSize:30}}>Mailboxes</h1><p style={{margin:'8px 0 0',color:'#52677b'}}>Manage tenant mail accounts, access and mailbox settings.</p></div>
    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={button} onClick={()=>window.location.assign('/une/setup/home')}>Back to workspace</button><button style={button} onClick={onLogout}>Sign out</button></div>
   </header>
+  {settings?.canManageAllTenants&&<section style={{...panel,marginBottom:18,display:'flex',gap:18,flexWrap:'wrap',alignItems:'end',justifyContent:'space-between'}} aria-label="Platform mail administration">
+   <div style={{...field,marginBottom:0,minWidth:260}}><label htmlFor="mail-tenant">Tenant</label>
+    <select id="mail-tenant" style={input} value={target} disabled={busy} onChange={e=>{setTarget(e.target.value);setNotice('');setError('');setShowCreate(false);}}>
+     {!tenants.some(t=>t.tenantId===settings.currentTenant)&&<option value={settings.currentTenant}>{settings.currentTenant} (your tenant)</option>}
+     {tenants.map(t=><option key={t.tenantId} value={t.tenantId}>{t.name} ({t.tenantId}){t.tenantId===settings.currentTenant?' — your tenant':''}</option>)}
+    </select></div>
+   <label style={{display:'flex',gap:8,alignItems:'center'}}>
+    <input type="checkbox" checked={settings.tenantMailEnabled} disabled={busy||settings.forcedByServer}
+     onChange={e=>void toggleTenantMail(e.target.checked)}/>
+    Tenant mail enabled for all tenants{settings.forcedByServer?' (forced on by server setting)':''}
+   </label>
+   {crossTenant&&<p style={{margin:0,color:'#52677b',fontSize:13,flexBasis:'100%'}}>You are managing another tenant's mail as a platform administrator. Changes are audited; opening its mailboxes is not available.</p>}
+  </section>}
   {error&&<div role="alert" style={{...panel,borderColor:'#d97777',color:'#9b1c1c',marginBottom:16}}>{error}</div>}
   {notice&&<div role="status" style={{...panel,borderColor:'#7cb99a',marginBottom:16}}>{notice}</div>}
   <section style={{...panel,marginBottom:18}}>
@@ -164,7 +206,7 @@ export default function MailboxAdmin({onLogout}:Props){
      <button type="button" style={button} disabled={busy} onClick={()=>void verifyDomain(domain.id)}>Verify domain</button>
     </div>}
    </div>)}
-   {!tenantMailEnabled&&<p style={{color:'#9b1c1c',fontSize:14}}>Adding mail domains for other tenants is turned off on this server. A platform administrator must approve tenant mail and set <code>METADRIVE_ENABLE_TENANT_MAIL=true</code> on the server.</p>}
+   {!tenantMailEnabled&&<p style={{color:'#9b1c1c',fontSize:14}}>Tenant mail is turned off. {settings?.canManageAllTenants?'Turn on "Tenant mail enabled" above to allow adding tenant domains.':'A platform administrator must turn on tenant mail before you can add your domain.'}</p>}
    <button type="button" style={button} disabled={busy||!tenantMailEnabled} onClick={()=>setShowDomainCreate(true)}>＋ Add domain</button>
   </section>
   <section style={{...panel,marginBottom:18}}>
@@ -213,7 +255,7 @@ export default function MailboxAdmin({onLogout}:Props){
        {apiName:'used',label:'Storage used',phoneRole:'badge',render:m=>fmtBytes(m.usedDiskQuota)},
        {apiName:'created',label:'Created',phoneRole:'trailing',render:m=>m.createdAt?new Date(m.createdAt).toLocaleDateString():'—'},
        {apiName:'actions',label:'Actions',render:m=><div className="md-mail-admin-row-actions">
-        <button type="button" style={{...primary,minHeight:32}} disabled={busy} onClick={()=>void openMailbox(m)}>Open</button>
+        {!crossTenant&&<button type="button" style={{...primary,minHeight:32}} disabled={busy} onClick={()=>void openMailbox(m)}>Open</button>}
         <details className="md-mail-admin-actions-menu">
           <summary aria-label={'More actions for '+(m.emailAddress||m.name)}>More actions</summary>
           <div className="md-mail-admin-actions-list">
@@ -232,7 +274,7 @@ export default function MailboxAdmin({onLogout}:Props){
      <td style={{padding:'14px 10px',borderBottom:'1px solid #edf1f5'}}>{fmtBytes(m.usedDiskQuota)}</td>
      <td style={{padding:'14px 10px',borderBottom:'1px solid #edf1f5',color:'#52677b'}}>{m.createdAt?new Date(m.createdAt).toLocaleDateString():'—'}</td>
      <td style={{padding:'14px 10px',borderBottom:'1px solid #edf1f5'}}><div className="md-mail-admin-row-actions">
-        <button type="button" style={{...primary,minHeight:32}} disabled={busy} onClick={()=>void openMailbox(m)}>Open</button>
+        {!crossTenant&&<button type="button" style={{...primary,minHeight:32}} disabled={busy} onClick={()=>void openMailbox(m)}>Open</button>}
         <details className="md-mail-admin-actions-menu">
           <summary aria-label={'More actions for '+(m.emailAddress||m.name)}>More actions</summary>
           <div className="md-mail-admin-actions-list">

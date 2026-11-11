@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
-import { CircleAlert, Globe2, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { CircleAlert, Copy, Globe2, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import './TenantDomains.css';
 
 type Domain = { hostname: string; status: 'PENDING' | 'VERIFIED'; createdAt: string; verifiedAt?: string;
-  verification: { type: string; host: string; value: string }; hosting: string };
+  verification: { type: string; host: string; value: string }; hosting: string; platformOwned?: boolean };
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
 
 // Same component serves tenant self-administration and platform-only tenant detail.
 // A platform operator cannot use tenant credentials or bypass DNS ownership.
+/** Registrar "Name/Host" field: the record name relative to the zone being verified. */
+const hostLabel = (domain: Domain) => {
+  const suffix = '.' + domain.hostname;
+  return domain.verification.host.endsWith(suffix)
+    ? domain.verification.host.slice(0, -suffix.length) : domain.verification.host;
+};
+
 export default function TenantDomains({ request, permitted, tenantId }: {
   request: Request; permitted: boolean; tenantId?: string;
 }) {
@@ -44,6 +51,10 @@ export default function TenantDomains({ request, permitted, tenantId }: {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Domain operation failed'); }
     finally { setBusy(false); }
   };
+  const copy = (text: string, what: string) => {
+    void navigator.clipboard?.writeText(text).then(() => setNotice(what + ' copied.'),
+      () => setError('Copy failed; select the text and copy it manually.'));
+  };
   if (!permitted) return null;
   return <section className="tenant-domains" aria-label="Tenant domains">
     <header className="tenant-domain-header"><div><h3><Globe2 size={17} /> Custom domains</h3>
@@ -59,15 +70,26 @@ export default function TenantDomains({ request, permitted, tenantId }: {
         <span className={domain.status === 'VERIFIED' ? 'tenant-pill tenant-pill-active' : 'tenant-pill tenant-pill-suspended'}>
           {domain.status === 'VERIFIED' ? <><ShieldCheck size={12} /> Verified</> : 'Pending DNS'}</span></div>
       {domain.status === 'PENDING' && <div className="tenant-domain-proof">
-        <span>DNS record</span><code>{domain.verification.type} {domain.verification.host}</code>
-        <span>TXT value</span><code>{domain.verification.value}</code>
+        <span>Record type</span><code>{domain.verification.type}</code>
+        <span>Name / Host</span><code>{hostLabel(domain)}
+          <button type="button" className="tenant-button" aria-label="Copy DNS name"
+            onClick={() => copy(hostLabel(domain), 'DNS name')}><Copy size={12} /></button></code>
+        <span>Value</span><code>{domain.verification.value}
+          <button type="button" className="tenant-button" aria-label="Copy TXT value"
+            onClick={() => copy(domain.verification.value, 'TXT value')}><Copy size={12} /></button></code>
+        <span />
+        <small className="tenant-help">Most DNS providers (GoDaddy, Cloudflare, 123-reg) add the domain automatically, so enter
+          only <code>{hostLabel(domain)}</code> as the Name. Full record: <code>{domain.verification.host}</code>.
+          For a subdomain such as crm.example.com, add the subdomain part too
+          (<code>_metadrive-challenge.crm</code>). New records can take up to an hour to publish.</small>
       </div>}
       <div className="tenant-domain-actions">
         {domain.status === 'PENDING' && <button type="button" className="tenant-button" disabled={busy}
           onClick={() => void perform(base + '/' + encodeURIComponent(domain.hostname) + '/verify', 'POST')}>Verify DNS</button>}
-        <button type="button" className="tenant-button tenant-button-danger" disabled={busy}
+        {!domain.platformOwned && <button type="button" className="tenant-button tenant-button-danger" disabled={busy}
           onClick={() => { if (window.confirm('Remove ' + domain.hostname + '? Existing host-bound sessions will stop working here.'))
-            void perform(base + '/' + encodeURIComponent(domain.hostname), 'DELETE'); }}><Trash2 size={14} /> Remove</button>
+            void perform(base + '/' + encodeURIComponent(domain.hostname), 'DELETE'); }}><Trash2 size={14} /> Remove</button>}
+        {domain.platformOwned && <span className="tenant-help">Platform login domain</span>}
       </div>
     </div>)}
     {!adding && domains.length < 5 && <div className="tenant-domain-add">
@@ -78,14 +100,15 @@ export default function TenantDomains({ request, permitted, tenantId }: {
       <label className="form-label">Domain hostname
         <input className="form-control" type="text" autoComplete="off" maxLength={253}
           placeholder="crm.customer.example" value={hostname}
-          onChange={(event) => setHostname(event.target.value)} />
+          autoCapitalize="none" spellCheck={false}
+          onChange={(event) => setHostname(event.target.value.toLowerCase())} />
       </label>
       <div className="tenant-domain-actions">
         <button type="button" className="tenant-button" disabled={busy}
           onClick={() => { setAdding(false); setHostname(''); }}>Cancel</button>
         <button type="button" className="tenant-button tenant-button-primary"
           disabled={busy || !hostname.trim() || domains.length >= 5}
-          onClick={() => void perform(base, 'POST', {hostname: hostname.trim()})}>Save domain</button>
+          onClick={() => void perform(base, 'POST', {hostname: hostname.trim().toLowerCase().replace(/\.$/, '')})}>Save domain</button>
       </div>
     </div>}
   </section>;

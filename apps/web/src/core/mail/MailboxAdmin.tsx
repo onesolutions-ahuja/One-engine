@@ -48,6 +48,7 @@ function ActionDialog({title,onClose,children}:{title:string;onClose:()=>void;ch
 
 export default function MailboxAdmin({onLogout}:Props){
  const [domains,setDomains]=useState<Domain[]>([]);
+ const [tenantMailEnabled,setTenantMailEnabled]=useState(true);
  const [newDomain,setNewDomain]=useState('');
  const [mailboxes,setMailboxes]=useState<Mailbox[]>([]);
  const [loading,setLoading]=useState(true);
@@ -72,10 +73,10 @@ export default function MailboxAdmin({onLogout}:Props){
   setLoading(true);setError('');
   try{
    const [d,m]=await Promise.all([
-    apiRequest<{domains:Domain[]}>('/mail/domains'),
+    apiRequest<{domains:Domain[];tenantMailEnabled?:boolean}>('/mail/domains'),
     apiRequest<{mailboxes:Mailbox[]}>('/mail/mailboxes')
    ]);
-   setDomains(d.domains);setMailboxes(m.mailboxes);
+   setDomains(d.domains);setMailboxes(m.mailboxes);setTenantMailEnabled(d.tenantMailEnabled!==false);
    setDomainId(current=>current||d.domains.find(x=>x.isEnabled)?.id||'');
   }catch(e){setError(e instanceof Error?e.message:'Unable to load mailboxes');}
   finally{setLoading(false);}
@@ -158,12 +159,13 @@ export default function MailboxAdmin({onLogout}:Props){
    {domains.map(domain=><div key={domain.id} style={{padding:'12px 0',borderBottom:'1px solid #e4e9ef'}}>
     <strong>{domain.name}</strong> · {domain.isEnabled?'Verified':'Pending verification'}
     {!domain.isEnabled&&domain.verificationToken&&<div style={{paddingTop:8}}>
-     <p>TXT record name: <code>{'_metadrive-mail.'+domain.name}</code></p>
+     <p>TXT record name: <code>{'_metadrive-mail.'+domain.name}</code> (at GoDaddy and most DNS providers enter only <code>_metadrive-mail</code> as the Name)</p>
      <p>TXT record value: <code>{'metadrive='+domain.verificationToken}</code></p>
      <button type="button" style={button} disabled={busy} onClick={()=>void verifyDomain(domain.id)}>Verify domain</button>
     </div>}
    </div>)}
-   <button type="button" style={button} disabled={busy} onClick={()=>setShowDomainCreate(true)}>＋ Add domain</button>
+   {!tenantMailEnabled&&<p style={{color:'#9b1c1c',fontSize:14}}>Adding mail domains for other tenants is turned off on this server. A platform administrator must approve tenant mail and set <code>METADRIVE_ENABLE_TENANT_MAIL=true</code> on the server.</p>}
+   <button type="button" style={button} disabled={busy||!tenantMailEnabled} onClick={()=>setShowDomainCreate(true)}>＋ Add domain</button>
   </section>
   <section style={{...panel,marginBottom:18}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>

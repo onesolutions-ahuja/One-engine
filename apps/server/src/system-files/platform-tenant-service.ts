@@ -4,6 +4,7 @@ import type {RbacEngine} from './rbac-engine.js';
 import {TenantProvisioning} from './tenant-provisioning.js';
 import {TenantDeveloperMailbox} from '../system-support/tenant-developer-mailbox.js';
 import {tenantDeveloperDomain} from '../system-support/tenant-developer-domain.js';
+import {hasPlatformOneEngine} from './platform-scope.js';
 
 /** People only. Non-login system actors (for example the Communication Logger,
  * seeded into every tenant) are not users an operator can see or license. */
@@ -23,19 +24,13 @@ export class PlatformTenantService {
  constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine){}
  private async platformScope(tenantId:string,userId:string){
   await this.rbac.require(tenantId,userId,'Tenant','manage');
-  // OneEngine membership is required independently of tenant-level Tenant:manage RBAC.
-  const {rows}=await this.db.query<{authorised:boolean}>(`
-   SELECT EXISTS(
-     SELECT 1 FROM md_permission_assignments a
-       JOIN md_permission_sets p ON p.tenant_id=a.tenant_id AND p.id=a.permission_set_id
-       WHERE a.tenant_id=$1 AND a.user_id=$2 AND p.api_name='OneEngine'
-     UNION ALL
-     SELECT 1 FROM md_user_roles ur
-       JOIN md_role_permission_sets rp ON rp.tenant_id=ur.tenant_id AND rp.role_id=ur.role_id
-       JOIN md_permission_sets p ON p.tenant_id=rp.tenant_id AND p.id=rp.permission_set_id
-       WHERE ur.tenant_id=$1 AND ur.user_id=$2 AND p.api_name='OneEngine'
-   ) AS authorised`,[tenantId,userId]);
-  return rows[0]?.authorised===true;
+  // OneEngine is seeded into EVERY tenant, so it only confers platform authority
+  // inside the canonical platform tenant (same rule as OCI deployment).
+  return hasPlatformOneEngine(this.db,tenantId,userId);
+ }
+ /** True when this user may administer other tenants. Never throws for ordinary users. */
+ async isPlatformAdministrator(tenantId:string,userId:string){
+  try{return await this.platformScope(tenantId,userId);}catch{return false;}
  }
  /** Reusable, least-privileged read for scheduling apps. No access to unrelated
   * tenant settings or management APIs. Always tenant-scoped and server-authorised.

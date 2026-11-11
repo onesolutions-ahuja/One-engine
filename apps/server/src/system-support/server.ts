@@ -2886,7 +2886,7 @@ export function createSystemServer(db:SqlPersistence) {
   registerPlatformEventStreamRoutes(app,db,rbac);
   registerBusinessContextRoutes(app,db,rbac,records);
   registerOutboundWebhookRoutes(app,db,rbac);
-  registerDockerMailAdminRoutes(app,db,rbac,adminMailAccess);
+  registerDockerMailAdminRoutes(app,db,rbac,adminMailAccess,platformTenants);
   registerInboundWebhookAdminRoutes(app,db,namedCredentials,rbac);
   app.use('/api',(_req,res)=>{res.status(404).json({error:'API endpoint not implemented in SQL runtime'});});
   registerSecurityWebHost(app,db,process.env.METADRIVE_WEB_DIST);

@@ -2,12 +2,18 @@ import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {MailAdminAccess} from './mail-admin-access.js';
+import type {PlatformTenantService} from '../system-files/platform-tenant-service.js';
 import {createConnection} from 'node:net';
 import {randomBytes} from 'node:crypto';
 import {checkDnsTxtProof,dnsProofFailureMessage} from './dns-txt-proof.js';
 
 type Actor={tenant_id:string;user_id:string};
 type MailRequest=Request<Record<string,string>>&{actor?:Actor};
+/** Target tenant of a mail request. tenant_id is the TARGET; actor_tenant_id is where the user signed in. */
+type Scope=Actor&{actor_tenant_id:string;slug:string;crossTenant:boolean};
+const tenantSlug=/^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SYSTEM_MAIL_DOMAIN='unesolutions.co.uk';
+const GATE_MESSAGE='Tenant mail onboarding requires security approval: a platform administrator must turn on tenant mail in Mail admin';
 const localPart=/^[a-z0-9](?:[a-z0-9._+-]{0,62}[a-z0-9])?$/;
 const socketPath=process.env.METADRIVE_MCP_BROKER_SOCKET??'/run/metadrive-mcp-broker.sock';
 const domainPattern=/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -46,18 +52,71 @@ function problem(res:Response,error:unknown){
   pg==='23505'?'Mail domain or mailbox already registered':message;
  res.status(status).json({error:shown});
 }
-export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac:RbacEngine,adminAccess?:MailAdminAccess){
- async function permission(req:MailRequest,access:'read'|'manage'){
+export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac:RbacEngine,
+  adminAccess?:MailAdminAccess,platform?:Pick<PlatformTenantService,'isPlatformAdministrator'>){
+ const isPlatformAdmin=async(actor:Actor)=>
+  platform?platform.isPlatformAdministrator(actor.tenant_id,actor.user_id):false;
+ /**
+  * Own tenant: central RBAC Mailbox read/manage, as before.
+  * Another tenant (?tenant=<slug>): platform OneEngine in the platform tenant only.
+  */
+ async function permission(req:MailRequest,access:'read'|'manage'):Promise<Scope>{
   const actor=req.actor;
   if(!actor?.tenant_id||!actor.user_id)throw new Error('Permission denied');
-  await rbac.require(actor.tenant_id,actor.user_id,'Mailbox',access);
-  return actor;
+  const own=await db.query<{slug:string}>('SELECT slug FROM md_tenants WHERE id=$1',[actor.tenant_id]);
+  const ownSlug=own.rows[0]?.slug??'';
+  const requested=typeof req.query.tenant==='string'?req.query.tenant.trim().toLowerCase():'';
+  if(!requested||requested===ownSlug){
+   await rbac.require(actor.tenant_id,actor.user_id,'Mailbox',access);
+   return {...actor,actor_tenant_id:actor.tenant_id,slug:ownSlug,crossTenant:false};
+  }
+  if(!tenantSlug.test(requested))throw new Error('Invalid tenant');
+  if(!(await isPlatformAdmin(actor)))throw new Error('Permission denied');
+  const {rows}=await db.query<{id:string;status:string}>('SELECT id,status FROM md_tenants WHERE slug=$1',[requested]);
+  if(!rows[0])throw new Error('Tenant not found');
+  if(access==='manage'&&rows[0].status==='ARCHIVED')throw new Error('Invalid tenant: archived tenants cannot be changed');
+  return {tenant_id:rows[0].id,user_id:actor.user_id,actor_tenant_id:actor.tenant_id,slug:requested,crossTenant:true};
  }
- async function audit(actor:Actor,action:string,address:string){
+ async function audit(scope:Scope,action:string,address:string){
   await db.query('INSERT INTO md_security_events(tenant_id,actor_user_id,action,details) VALUES($1,$2,$3,$4::jsonb)',[
-   actor.tenant_id,actor.user_id,action,JSON.stringify({provider:'docker-mailserver',email:address})
+   scope.actor_tenant_id,scope.user_id,action,JSON.stringify({provider:'docker-mailserver',email:address,
+    ...(scope.crossTenant?{targetTenantId:scope.tenant_id,targetTenant:scope.slug}:{})})
   ]);
  }
+ /** Server env forces it on; otherwise the audited SQL platform switch decides. */
+ async function tenantMailEnabled(){
+  if(process.env.METADRIVE_ENABLE_TENANT_MAIL==='true')return true;
+  const {rows}=await db.query<{enabled:boolean}>(
+   "SELECT enabled FROM md_platform_feature_flags WHERE flag='tenant_mail'");
+  return rows[0]?.enabled===true;
+ }
+ app.get('/api/mail/settings',handler(async(req,res)=>{
+  try{
+   const scope=await permission(req,'read');
+   res.setHeader('Cache-Control','private, no-store');
+   res.json({tenantMailEnabled:await tenantMailEnabled(),
+    forcedByServer:process.env.METADRIVE_ENABLE_TENANT_MAIL==='true',
+    canManageAllTenants:await isPlatformAdmin(req.actor!),currentTenant:scope.slug});
+  }catch(e){problem(res,e);}
+ }));
+ app.put('/api/mail/settings',handler(async(req,res)=>{
+  try{
+   const actor=req.actor;
+   if(!actor?.tenant_id||!actor.user_id||!(await isPlatformAdmin(actor)))throw new Error('Permission denied');
+   const enabled=req.body?.tenantMailEnabled;
+   if(typeof enabled!=='boolean')throw new Error('Invalid mail settings');
+   await db.transaction(async client=>{
+    await client.query(`INSERT INTO md_platform_feature_flags(flag,enabled,updated_by_tenant_id,updated_by_user_id,updated_at)
+     VALUES('tenant_mail',$1,$2,$3,now()) ON CONFLICT(flag) DO UPDATE SET enabled=EXCLUDED.enabled,
+     updated_by_tenant_id=EXCLUDED.updated_by_tenant_id,updated_by_user_id=EXCLUDED.updated_by_user_id,updated_at=now()`,
+     [enabled,actor.tenant_id,actor.user_id]);
+    await client.query('INSERT INTO md_security_events(tenant_id,actor_user_id,action,details) VALUES($1,$2,$3,$4::jsonb)',
+     [actor.tenant_id,actor.user_id,'platform_tenant_mail_'+(enabled?'enabled':'disabled'),JSON.stringify({flag:'tenant_mail',enabled})]);
+   });
+   res.json({tenantMailEnabled:await tenantMailEnabled(),
+    forcedByServer:process.env.METADRIVE_ENABLE_TENANT_MAIL==='true'});
+  }catch(e){problem(res,e);}
+ }));
  const scopedDomain=async(actor:Actor,id:string)=>{
   const {rows}=await db.query<{id:string;domain:string}>(
    'SELECT id,domain FROM md_mail_domains WHERE tenant_id=$1 AND id::text=$2 AND verified_at IS NOT NULL',
@@ -76,11 +135,11 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
    'SELECT id,domain AS name,verified_at IS NOT NULL AS "isEnabled",verification_token AS "verificationToken" FROM md_mail_domains WHERE tenant_id=$1 ORDER BY domain',[actor.tenant_id]);
    res.setHeader('Cache-Control','private, no-store');
    // Lets the UI explain the security gate before the user fills in a domain.
-   res.json({domains:rows,tenantMailEnabled:process.env.METADRIVE_ENABLE_TENANT_MAIL==='true'});}catch(e){problem(res,e);}
+   res.json({domains:rows,tenantMailEnabled:await tenantMailEnabled()});}catch(e){problem(res,e);}
  }));
  app.post('/api/mail/domains',handler(async(req,res)=>{
   try{const actor=await permission(req,'manage'),domain=String(req.body?.domain??'').toLowerCase().trim();
-   if(process.env.METADRIVE_ENABLE_TENANT_MAIL!=='true')throw new Error('Tenant mail onboarding requires security approval: a platform administrator must set METADRIVE_ENABLE_TENANT_MAIL=true on the server');
+   if(domain!==SYSTEM_MAIL_DOMAIN&&!(await tenantMailEnabled()))throw new Error(GATE_MESSAGE);
    if(!domainPattern.test(domain)||domain.endsWith('.local'))throw new Error('Invalid mail domain');
    const existing=await db.query<{tenant_id:string}>('SELECT tenant_id FROM md_mail_domains WHERE domain=$1',[domain]);
    if(existing.rows[0])throw new Error(existing.rows[0].tenant_id===actor.tenant_id
@@ -141,8 +200,7 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
    if(typeof domainId!=='string'||!domainId||typeof password!=='string'||password.length<12||password.length>256
     ||/[\r\n\0]/.test(password)||typeof description!=='string'||description.length>500)throw new Error('Invalid mailbox request');
    const domain=await scopedDomain(actor,domainId),address=name+'@'+domain.domain;
-   if(domain.domain!=='unesolutions.co.uk'&&process.env.METADRIVE_ENABLE_TENANT_MAIL!=='true')
-    throw new Error('Tenant mail onboarding requires security approval: a platform administrator must set METADRIVE_ENABLE_TENANT_MAIL=true on the server');
+   if(domain.domain!==SYSTEM_MAIL_DOMAIN&&!(await tenantMailEnabled()))throw new Error(GATE_MESSAGE);
    // Approve first: an OCI outage must not reserve a mailbox in an unretryable error state.
    await broker('sender_approve',address);
    const {rows}=await db.query<{email:string}>(
@@ -166,6 +224,8 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
   try{
    if(!adminAccess){res.status(503).json({error:'Admin mailbox access unavailable'});return;}
    const actor=await permission(req,'manage'),address=req.params.id;
+   // Reading another tenant's mail is tenant business data: never via platform scope.
+   if(actor.crossTenant)throw new Error('Permission denied');
    await account(actor,address);
    const ticket=await adminAccess.createTicket(actor,address);
    res.setHeader('Cache-Control','no-store');

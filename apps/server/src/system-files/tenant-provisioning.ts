@@ -30,8 +30,6 @@ export class TenantProvisioning {
     const developerIdentityEmail=tenantDeveloperEmail.toLowerCase();
     if(request.tenantDeveloperEmail!==undefined && !/^[a-z0-9][a-z0-9._+-]{0,62}@unesolutions\.co\.uk$/.test(developerIdentityEmail))
       throw new Error('Invalid tenant developer email');
-    if(developerIdentityEmail.toLowerCase()===developerEmail.toLowerCase())
-      throw new Error('Administrator email must differ from tenant developer identity');
     const passwordHash=await new AuthenticationService(this.db).hashPassword(developerPassword);
     // Never reuse the administrator password or expose an initial developer password.
     const developerDisabledHash=await new AuthenticationService(this.db).hashPassword(

@@ -942,6 +942,12 @@ export default function SmartRuntime(p){
         onClick={selectRecord}>{card}</button>
       :<React.Fragment key={r?.Id??r?.id??i}>{card}</React.Fragment>;
    })}
+   {/* A published grid with no authorised records shows a quiet empty state
+       instead of a blank coloured block. */}
+   {!previewRows.length&&!p.loading?<div className="smart-grid-empty" role="status"
+     style={{gridColumn:"1 / -1",alignSelf:"center",textAlign:"center",padding:"8px 12px",
+      opacity:.85,fontSize:14,color:p.supportingTextColor||p.headerTextColor||p.labelColor||undefined}}>
+     Nothing to show yet</div>:null}
   </div>;
  }
  else if(name==="smart_cart")content=<SmartCart p={p} records={recordsOf(p)} Picture={SmartPicture} expression={(formula,row)=>{

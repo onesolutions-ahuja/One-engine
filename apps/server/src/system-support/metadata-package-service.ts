@@ -48,6 +48,7 @@ type Preview={
  preservedCustomizations:Array<{type:string;apiName:string}>;
 };
 const apiNamePattern=/^[A-Za-z][A-Za-z0-9_]{0,127}$/;
+const DEVICE_LAYOUT_VARIANTS=['Tablet','Mobile','Custom'] as const;
 const canonicalPackage=(value:Omit<MetadataPackage,'digest'>)=>JSON.stringify(value);
 const digestOf=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const definitionFields=(value:MetadataObject)=>value.fields.map(({id:_id,...field})=>field);
@@ -160,6 +161,13 @@ function validatePackage(raw:unknown):MetadataPackage{
   if(typeof item.apiName!=='string'||!apiNamePattern.test(item.apiName)
    ||!Array.isArray(item.components)||item.components.length>400)
    throw Error('Invalid package page');
+  if(item.layouts!==undefined&&(!Array.isArray(item.layouts)||item.layouts.length>DEVICE_LAYOUT_VARIANTS.length
+   ||(item.layouts as unknown[]).some(layout=>!layout||typeof layout!=='object'||Array.isArray(layout)
+    ||!DEVICE_LAYOUT_VARIANTS.includes((layout as Record<string,unknown>).layoutVariant as typeof DEVICE_LAYOUT_VARIANTS[number])
+    ||!Array.isArray((layout as Record<string,unknown>).components)
+    ||((layout as Record<string,unknown>).components as unknown[]).length>400)
+   ||new Set((item.layouts as Array<Record<string,unknown>>).map(layout=>layout.layoutVariant)).size!==item.layouts.length))
+   throw Error('Invalid package page layout');
  }
  for(const component of components){
   if(!component||typeof component!=='object'||Array.isArray(component))throw Error('Invalid package component');
@@ -264,6 +272,23 @@ export class MetadataPackageService{
  private async readGrants(tenant:string,user:string){
   await Promise.all(['ObjectDefinition','FieldDefinition','PageDefinition','ComponentDefinition'].map(resource=>
    this.rbac.require(tenant,user,resource,'read')));
+ }
+ /** Pages built only in a device layout (for example Phone-first apps) keep an
+  * empty Desktop base. Export each published non-Desktop layout that differs from
+  * Desktop so installing the package recreates what users actually see. */
+ private async deviceLayouts(tenant:string,name:string,desktop:Record<string,unknown>){
+  const layouts:Array<Record<string,unknown>>=[];
+  for(const variant of DEVICE_LAYOUT_VARIANTS){
+   const loaded=await this.pages.load(tenant,name,variant).catch(()=>null);
+   const page=loaded?.page as Record<string,unknown>|undefined;
+   if(!page||!Array.isArray(page.components)||!page.components.length
+    ||JSON.stringify(page.components)===JSON.stringify(desktop.components))continue;
+   const {id:_id,revision:_revision,updatedAt:_updatedAt,draftRevision:_draft,publishedRevision:_published,
+    desktopDraftRevision:_desktopDraft,desktopBaseVersion:_desktopBase,readonlyVersion:_readonly,
+    activationAssignments:_assignments,...layout}=page;
+   layouts.push({...layout,layoutVariant:variant});
+  }
+  return layouts;
  }
  private async loaded(tenant:string,user:string){
   const [objects,pages,components]=await Promise.all([
@@ -389,7 +414,11 @@ export class MetadataPackageService{
      return {apiName:object.apiName,label:object.label,kind:object.kind,
      fields:definitionFields(object)};
    }),
-   pages:pageNames.map(name=>pageProjection(pageMap.get(name)!)),
+   pages:await Promise.all(pageNames.map(async name=>{
+    const page=pageProjection(pageMap.get(name)!);
+    const layouts=await this.deviceLayouts(tenant,name,page);
+    return layouts.length?{...page,layouts}:page;
+   })),
    components:componentNames.map(name=>{
     const component=componentMap.get(name)!;
     const projected=componentProjection(component) as LibraryComponent;
@@ -765,7 +794,16 @@ export class MetadataPackageService{
     const existing=pageMap.get(page.apiName);
     if(existing&&!oldPageNames.has(page.apiName))throw Error('Package page is not owned by this package: '+page.apiName);
     if(existing&&preview.preservedCustomizations.some(item=>item.type==='page'&&item.apiName===page.apiName))continue;
-    await pages.save(tenant,page.apiName,{...page,revision:existing?.revision});
+    const {layouts,...base}=page as MetadataPage&{layouts?:Array<Record<string,unknown>>};
+    await pages.save(tenant,page.apiName,{...base,revision:existing?.revision});
+    for(const layout of layouts??[]){
+     const variant=layout.layoutVariant as typeof DEVICE_LAYOUT_VARIANTS[number];
+     const editor=await pages.editor(tenant,page.apiName,variant) as Record<string,unknown>;
+     await pages.saveLayoutDraft(tenant,page.apiName,variant,{...layout,apiName:page.apiName,
+      label:editor.label,activationAssignments:editor.activationAssignments,
+      draftRevision:editor.draftRevision,desktopDraftRevision:editor.desktopDraftRevision},user);
+     await pages.publishLayout(tenant,page.apiName,variant,undefined,user);
+    }
    }
    const oldComponentNames=new Set(previous.filter(item=>item.component_type==='component').map(item=>item.component_api));
    for(const component of pkg.contents.components){

@@ -476,6 +476,12 @@
     background: var(--md-ios-surface, #fff);
     border-bottom: .5px solid var(--md-ios-separator, #c6c6c8);
   }
+  /* The header (z-index 80) is the stacking context for the profile sheet, so the
+     sheet's own z-index cannot lift it over the mobile app tab bar (z-index 90).
+     While the sheet is open, raise the header so Sign Out is not hidden. */
+  .lightning:not(.standalone-page-mode):not(.page-builder-editing) .salesforce-header:has(.profile-menu-panel) {
+    z-index: 120;
+  }
   .lightning .salesforce-header .header-page-context { display: none !important; }
   .lightning .salesforce-header .header-installed-apps { display: none !important; }
   .lightning .salesforce-header .header-tools { margin-left: auto; }

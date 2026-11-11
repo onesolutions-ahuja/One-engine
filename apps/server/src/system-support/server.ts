@@ -182,7 +182,21 @@ function cookieOptions(req:Request) {
   const crossSite=Boolean(origin && new URL(origin).hostname !== req.hostname);
   return `HttpOnly; Path=/api/auth; Max-Age=2592000; SameSite=${crossSite?'None':'Lax'}${crossSite||process.env.NODE_ENV==='production'?'; Secure':''}`;
 }
-async function resolveTenant(db:SqlPersistence,req:Request,tenantSlug?:unknown) {
+/** The shared platform web host (the hosted SPA origin used by every tenant). */
+const platformWebHost=()=>(process.env.METADRIVE_PLATFORM_WEB_HOST??'unesolutions.co.uk').trim().toLowerCase();
+/** On the shared platform host, a sign-in email whose domain is a verified domain of
+ * another ACTIVE tenant resolves to that tenant. Verified domain ownership is the
+ * tenant claim; the password/MFA check still runs inside the resolved tenant only. */
+async function emailDomainTenant(db:SqlPersistence,email:unknown):Promise<string|undefined>{
+  if(typeof email!=='string')return undefined;
+  const at=email.trim().toLowerCase().lastIndexOf('@');
+  const domain=at>0?email.trim().toLowerCase().slice(at+1):'';
+  if(!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(domain))return undefined;
+  const {rows}=await db.query<{tenant_id:string}>(`SELECT d.tenant_id FROM md_tenant_domains d
+    JOIN md_tenants t ON t.id=d.tenant_id WHERE d.domain=$1 AND t.status='ACTIVE'`,[domain]);
+  return rows[0]?.tenant_id;
+}
+async function resolveTenant(db:SqlPersistence,req:Request,tenantSlug?:unknown,email?:unknown) {
   // Explicit tenant selection must never override the tenant owning the browser origin.
   const source=req.get('origin');
   let originTenant:string|undefined;
@@ -192,6 +206,10 @@ async function resolveTenant(db:SqlPersistence,req:Request,tenantSlug?:unknown) 
       'SELECT tenant_id FROM md_tenant_domains WHERE domain=$1',[host]);
     originTenant=rows[0]?.tenant_id;
     if(!originTenant) return undefined;
+    if(host===platformWebHost()&&tenantSlug===undefined){
+      const emailTenant=await emailDomainTenant(db,email);
+      if(emailTenant)return emailTenant;
+    }
   }
   if(tenantSlug!==undefined) {
     if(typeof tenantSlug!=='string'|| !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tenantSlug))
@@ -426,7 +444,7 @@ export function createSystemServer(db:SqlPersistence) {
     if(typeof email!=='string'||typeof password!=='string'||!email.trim()) {
       res.status(400).json({error:'Email and password required'});return;
     }
-    const tenantId=await resolveTenant(db,req,tenantSlug);
+    const tenantId=await resolveTenant(db,req,tenantSlug,email);
     if(!tenantId) {res.status(401).json({error:'Invalid credentials or tenant domain'});return;}
     try {
       const userId=await auth.verifyIdentity(tenantId,email,password,req.ip);
@@ -461,19 +479,19 @@ export function createSystemServer(db:SqlPersistence) {
     res.json(await passwordReset.options(tenantId));
   }));
   app.post('/api/auth/password-reset/request',route(async(req,res)=>{
-    const tenantId=await resolveTenant(db,req,req.body?.tenantSlug);
+    const tenantId=await resolveTenant(db,req,req.body?.tenantSlug,req.body?.email);
     if(!tenantId){res.status(400).json({error:'Tenant domain is required'});return;}
     res.setHeader('Cache-Control','no-store');
     res.status(202).json(await passwordReset.request(tenantId,req.body?.email,req.body?.channel));
   }));
   app.post('/api/auth/password-reset/verify',route(async(req,res)=>{
-    const tenantId=await resolveTenant(db,req,req.body?.tenantSlug);
+    const tenantId=await resolveTenant(db,req,req.body?.tenantSlug,req.body?.email);
     if(!tenantId){res.status(400).json({error:'Tenant domain is required'});return;}
     res.setHeader('Cache-Control','no-store');
     res.json(await passwordReset.verify(tenantId,req.body?.email,req.body?.code));
   }));
   app.post('/api/auth/password-reset/confirm',route(async(req,res)=>{
-    const tenantId=await resolveTenant(db,req,req.body?.tenantSlug);
+    const tenantId=await resolveTenant(db,req,req.body?.tenantSlug,req.body?.email);
     if(!tenantId){res.status(400).json({error:'Tenant domain is required'});return;}
     res.setHeader('Cache-Control','no-store');
     res.json(await passwordReset.confirm(tenantId,req.body?.email,req.body?.token,req.body?.newPassword));

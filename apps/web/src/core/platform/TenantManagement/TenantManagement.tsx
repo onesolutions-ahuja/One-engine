@@ -133,19 +133,16 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setError(cause instanceof Error ? cause.message : 'Unable to open tenant');
     }
   };
-  const administratorEmailMatchesDeveloper = create.email.trim().length>0
-    && create.email.trim().toLowerCase()===create.tenantDeveloperEmail.trim().toLowerCase();
   const developerEmailAvailable = Boolean(emailCheck
     && emailCheck.email===create.tenantId+'@unesolutions.co.uk'
     && (create.tenantDeveloperEmail===emailCheck.email&&emailCheck.available
       || emailCheck.alternatives.includes(create.tenantDeveloperEmail)));
   const canCreateTenant = !busy&&!emailChecking&&developerEmailAvailable
-    && Boolean(emailCheck?.developerDomain)&&!administratorEmailMatchesDeveloper;
+    && Boolean(emailCheck?.developerDomain);
 
   const createTenant = async (event: FormEvent) => {
     event.preventDefault();
     if (!permitted || busy) return;
-    if(administratorEmailMatchesDeveloper){setError('Initial administrator and tenant developer emails must be different.');return;}
     if(!developerEmailAvailable||!emailCheck?.developerDomain){setError('Verify an available developer mailbox.');return;}
     setBusy(true); setError(''); setNotice('');
     try {
@@ -336,7 +333,6 @@ export default function TenantManagement({ request, permitted }: { request: Requ
                     onClick={()=>{setCreateKey(crypto.randomUUID());setCreate(old=>({...old,tenantDeveloperEmail:email}));}}>{email}</button>)}</div>}
               </>:create.tenantId?'Tenant ID must contain lowercase letters, numbers or hyphens (maximum 54 characters).':'Enter a tenant ID to verify developer mailbox availability.'}
           </div>
-          {administratorEmailMatchesDeveloper&&<p className="tenant-help tenant-validation-error" role="alert">Initial administrator email must differ from the tenant developer email.</p>}
           <p className="tenant-help">Platform login domain: <strong>{emailCheck?.developerDomain??'assigned automatically'}</strong>. Your organisation does not need its own domain. The administrator can use any valid email address; custom website domains can be added later under Domains.</p>
           <p className="tenant-help">Creates an initial administrator and a disabled developer account with full starting tenant permissions. The new developer identity uses the selected @unesolutions.co.uk mailbox. The tenant administrator activates the developer account from Company Settings; no password is shared with platform operators.</p>
           <div className="setup-draft-footer"><span>Unsaved tenant draft</span><button type="button" className="tenant-button" disabled={busy} onClick={() => { setShowCreate(false); setCreate(emptyCreate); setCreateKey(crypto.randomUUID()); }}>Discard</button><button type="submit" className="tenant-button tenant-button-primary" disabled={!canCreateTenant}>{busy ? 'Creating…' : 'Create tenant'}</button></div>

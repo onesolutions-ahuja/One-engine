@@ -373,6 +373,19 @@ export class PlatformTenantService {
     'SELECT id,status FROM md_tenants WHERE slug=$1 FOR UPDATE',[slug]);
    const row=target.rows[0];if(!row)throw new Error('Tenant not found');
    if(row.status!==transition.from)throw new Error('Invalid tenant status transition');
+   // A partially provisioned tenant must not be made active just because
+   // its operator confirmed the tenant ID in the UI.
+   if(operation==='reactivate'){
+     const mailbox=await client.query<{ready:boolean}>(`
+       SELECT EXISTS (
+         SELECT 1 FROM md_tenant_developer_accounts a
+         JOIN md_users u ON u.tenant_id=a.tenant_id AND u.id=a.user_id
+         JOIN md_mail_accounts m ON m.tenant_id=a.tenant_id AND lower(m.email)=lower(u.email)
+         WHERE a.tenant_id=$1 AND m.status='active'
+       ) AS ready`,[row.id]);
+     if(!mailbox.rows[0]?.ready)
+       throw new Error('Tenant developer mailbox is not provisioned; repair the mailbox before reactivating this tenant');
+   }
    await client.query(`
      UPDATE md_tenants SET status=$2,updated_at=now(),
        archived_at=CASE WHEN $2='ARCHIVED' THEN now() ELSE NULL END

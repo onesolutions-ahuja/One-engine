@@ -4,7 +4,7 @@ import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {MailAdminAccess} from './mail-admin-access.js';
 import {createConnection} from 'node:net';
 import {randomBytes} from 'node:crypto';
-import {resolveTxt} from 'node:dns/promises';
+import {checkDnsTxtProof,dnsProofFailureMessage} from './dns-txt-proof.js';
 
 type Actor={tenant_id:string;user_id:string};
 type MailRequest=Request<Record<string,string>>&{actor?:Actor};
@@ -38,9 +38,13 @@ const handler=(fn:(req:MailRequest,res:Response)=>Promise<void>)=>(req:Request,r
 function problem(res:Response,error:unknown){
  const message=error instanceof Error?error.message:'Mail administration failed';
  const pg=error&&typeof error==='object'&&'code' in error?(error as {code?:string}).code:'';
- const status=message==='Permission denied'?403:pg==='23505'||message==='Mailbox already registered'?409:
+ const status=message==='Permission denied'?403:pg==='23505'||/already registered/.test(message)?409:
+  message.startsWith('DNS ')?422:
   /Invalid|must be|not available|not verified|not found|not supported|requires security approval/.test(message)?400:503;
- res.status(status).json({error:status===503?'Mail administration unavailable':message});
+ if(status===503)console.error('Mail administration failed',error);
+ const shown=status===503?'Mail administration unavailable':
+  pg==='23505'?'Mail domain or mailbox already registered':message;
+ res.status(status).json({error:shown});
 }
 export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac:RbacEngine,adminAccess?:MailAdminAccess){
  async function permission(req:MailRequest,access:'read'|'manage'){
@@ -70,12 +74,17 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
  app.get('/api/mail/domains',handler(async(req,res)=>{
   try{const actor=await permission(req,'read');const {rows}=await db.query(
    'SELECT id,domain AS name,verified_at IS NOT NULL AS "isEnabled",verification_token AS "verificationToken" FROM md_mail_domains WHERE tenant_id=$1 ORDER BY domain',[actor.tenant_id]);
-   res.setHeader('Cache-Control','private, no-store');res.json({domains:rows});}catch(e){problem(res,e);}
+   res.setHeader('Cache-Control','private, no-store');
+   // Lets the UI explain the security gate before the user fills in a domain.
+   res.json({domains:rows,tenantMailEnabled:process.env.METADRIVE_ENABLE_TENANT_MAIL==='true'});}catch(e){problem(res,e);}
  }));
  app.post('/api/mail/domains',handler(async(req,res)=>{
   try{const actor=await permission(req,'manage'),domain=String(req.body?.domain??'').toLowerCase().trim();
-   if(process.env.METADRIVE_ENABLE_TENANT_MAIL!=='true')throw new Error('Tenant mail onboarding requires security approval');
+   if(process.env.METADRIVE_ENABLE_TENANT_MAIL!=='true')throw new Error('Tenant mail onboarding requires security approval: a platform administrator must set METADRIVE_ENABLE_TENANT_MAIL=true on the server');
    if(!domainPattern.test(domain)||domain.endsWith('.local'))throw new Error('Invalid mail domain');
+   const existing=await db.query<{tenant_id:string}>('SELECT tenant_id FROM md_mail_domains WHERE domain=$1',[domain]);
+   if(existing.rows[0])throw new Error(existing.rows[0].tenant_id===actor.tenant_id
+    ?'Mail domain already registered for this tenant':'Mail domain already registered to another tenant');
    const token=randomBytes(24).toString('hex');
    const {rows}=await db.query(
     `INSERT INTO md_mail_domains(tenant_id,domain,verification_token)
@@ -91,11 +100,9 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
     [actor.tenant_id,req.params.id]);
    const domain=rows[0];if(!domain)throw new Error('Mail domain not found');
    if(!domain.verification_token){res.json({verified:true});return;}
-   let entries:string[][]=[];
-   try{entries=await resolveTxt('_metadrive-mail.'+domain.domain);}catch{}
-   if(!entries.some(entry=>entry.join('')==='metadrive='+domain.verification_token)){
-    res.status(409).json({error:'Domain TXT ownership verification has not succeeded'});return;
-   }
+   const recordName='_metadrive-mail.'+domain.domain;
+   const proof=await checkDnsTxtProof(recordName,'metadrive='+domain.verification_token);
+   if(proof.status!=='match')throw new Error(dnsProofFailureMessage(proof,recordName,domain.domain));
    await db.query('UPDATE md_mail_domains SET verified_at=now(),verification_token=NULL WHERE tenant_id=$1 AND id=$2',
     [actor.tenant_id,domain.id]);
    await audit(actor,'mail_domain_verified',domain.domain);
@@ -135,7 +142,7 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
     ||/[\r\n\0]/.test(password)||typeof description!=='string'||description.length>500)throw new Error('Invalid mailbox request');
    const domain=await scopedDomain(actor,domainId),address=name+'@'+domain.domain;
    if(domain.domain!=='unesolutions.co.uk'&&process.env.METADRIVE_ENABLE_TENANT_MAIL!=='true')
-    throw new Error('Tenant mail onboarding requires security approval');
+    throw new Error('Tenant mail onboarding requires security approval: a platform administrator must set METADRIVE_ENABLE_TENANT_MAIL=true on the server');
    // Approve first: an OCI outage must not reserve a mailbox in an unretryable error state.
    await broker('sender_approve',address);
    const {rows}=await db.query<{email:string}>(

@@ -138,6 +138,21 @@ export async function applySystemMigrations(db:SqlPersistence) {
     VALUES('smart_text','Others','extra_inputRows','inputRows')
     ON CONFLICT(component_api,area,slot_key) DO NOTHING
   `);
+  // Usage targets include storage_bytes, which routinely exceed the original
+  // 1,000,000,000 ceiling (1 GB). Widen once to the API's own limit; idempotent.
+  await client.query(`
+    DO $$
+    BEGIN
+     IF EXISTS (SELECT 1 FROM pg_constraint
+       WHERE conrelid='md_tenant_usage_targets'::regclass
+         AND conname='md_tenant_usage_targets_target_value_check'
+         AND pg_get_constraintdef(oid) LIKE '%1000000000)%') THEN
+      ALTER TABLE md_tenant_usage_targets DROP CONSTRAINT md_tenant_usage_targets_target_value_check;
+      ALTER TABLE md_tenant_usage_targets ADD CONSTRAINT md_tenant_usage_targets_target_value_check
+       CHECK (target_value BETWEEN 1 AND 9007199254740991);
+     END IF;
+    END $$;
+  `);
 
   // Smart Toggle's legacy defaultCheck ribbon setting was retired. Reuse the
   // existing, already-published defaultValue expression instead so Page Builder

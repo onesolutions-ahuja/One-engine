@@ -1,11 +1,11 @@
 import {randomBytes} from 'node:crypto';
-import {resolveTxt} from 'node:dns/promises';
 import {isIP} from 'node:net';
 import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import {HUMAN_USER,type PlatformTenantService} from '../system-files/platform-tenant-service.js';
 import {tenantDeveloperDomain} from './tenant-developer-domain.js';
+import {checkDnsTxtProof,dnsProofFailureMessage} from './dns-txt-proof.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Req=Request<Record<string,string>>&{actor?:Actor};
@@ -20,7 +20,10 @@ const hostname=/^(?=.{4,253}$)[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]
 const metrics=['users','records','objects','flows'] as const;
 type UsageMetric=typeof metrics[number]|'storage_bytes'|'api_requests_daily';
 type Counts=Record<string,number>;
-const validHost=(input:unknown):string=>{
+const validHost=(raw:unknown):string=>{
+  // Accept what users paste: surrounding spaces, capitals, a trailing dot or a URL.
+  const input=typeof raw==='string'?raw.trim().toLowerCase()
+    .replace(/^https?:\/\//,'').replace(/[/?#].*$/,'').replace(/\.$/,''):raw;
   if(typeof input!=='string'||!hostname.test(input)||isIP(input)||
     /\.(?:internal|localhost|local|invalid|example|test)$/.test(input))
     throw new Error('Invalid tenant domain');
@@ -185,7 +188,10 @@ export function registerTenantInspectionRoutes(app:Express,db:SqlPersistence,
     res.json({usage:await usage(req,true)});
   }));
   const listDomains=(external:boolean)=>wrap(async(req,res)=>{
-    const {tenantId}=await target(req,external,false);
+    const {tenantId,slug:name}=await target(req,external,false);
+    let platformDomain='';
+    try{platformDomain=tenantDeveloperDomain(name);}catch{/* misconfigured base: nothing flagged */}
+    res.setHeader('Cache-Control','private, no-store');
     const {rows}=await db.query<{domain:string;proof_token:string|null;created_at:Date;
       verified_at:Date|null}>(`
       SELECT domain,proof_token,created_at,verified_at FROM md_tenant_domain_claims
@@ -200,12 +206,19 @@ export function registerTenantInspectionRoutes(app:Express,db:SqlPersistence,
       createdAt:r.created_at,verifiedAt:r.verified_at??undefined,
       verification:{type:'TXT',host:'_metadrive-challenge.'+r.domain,
         value:r.proof_token?'metadrive-verification='+r.proof_token:''},
-      hosting:r.verified_at?'Configure TLS for this domain':'DNS verification pending'
+      hosting:r.verified_at?'Configure TLS for this domain':'DNS verification pending',
+      platformOwned:r.domain===platformDomain
     }))});
   });
   const addDomain=(external:boolean)=>wrap(async(req,res)=>{
     const {actor,tenantId}=await target(req,external,true);
     const domain=validHost(req.body?.hostname);
+    // The platform tenant namespace is assigned by the platform only; a pending
+    // claim there would block a future tenant from being provisioned.
+    let platformBase='';
+    try{platformBase=tenantDeveloperDomain('x').slice(2);}catch{/* checked at provisioning */}
+    if(platformBase&&(domain===platformBase||domain.endsWith('.'+platformBase)))
+      throw new Error('Invalid tenant domain: platform tenant subdomains are assigned automatically');
     const proof=randomBytes(24).toString('hex');
     await db.transaction(async client=>{
       const {rows}=await client.query<{n:string}>(`
@@ -214,9 +227,15 @@ export function registerTenantInspectionRoutes(app:Express,db:SqlPersistence,
           UNION SELECT domain FROM md_tenant_domains WHERE tenant_id=$1
         ) d`,[tenantId]);
       if(Number(rows[0].n)>=5)throw new Error('Maximum five tenant domains allowed');
-      const claimed=await client.query(
-        'SELECT 1 FROM md_tenant_domains WHERE domain=$1',[domain]);
-      if(claimed.rowCount)throw new Error('Domain already registered');
+      const claimed=await client.query<{tenant_id:string}>(
+        'SELECT tenant_id FROM md_tenant_domains WHERE domain=$1',[domain]);
+      if(claimed.rows[0])throw new Error(claimed.rows[0].tenant_id===tenantId
+        ?'Domain already registered for this tenant':'Domain already registered to another tenant');
+      const pending=await client.query<{tenant_id:string}>(
+        'SELECT tenant_id FROM md_tenant_domain_claims WHERE domain=$1',[domain]);
+      if(pending.rows[0])throw new Error(pending.rows[0].tenant_id===tenantId
+        ?'Domain already added for this tenant; publish its TXT record and verify it'
+        :'Domain already claimed by another tenant');
       await client.query(`INSERT INTO md_tenant_domain_claims(tenant_id,domain,proof_token)
         VALUES($1,$2,$3)`,[tenantId,domain,proof]);
       await audit(client,actor,'tenant_domain_claim_created',{targetTenantId:tenantId,domain});
@@ -233,11 +252,9 @@ export function registerTenantInspectionRoutes(app:Express,db:SqlPersistence,
       WHERE tenant_id=$1 AND domain=$2`,[tenantId,domain]);
     if(!rows[0])throw new Error('Domain claim not found');
     if(!rows[0].verified_at){
-      let txt:string[][];
-      try{txt=await resolveTxt('_metadrive-challenge.'+domain);}
-      catch{throw new Error('Domain DNS TXT proof unavailable');}
-      if(!txt.some(parts=>parts.join('')==='metadrive-verification='+rows[0].proof_token))
-        throw new Error('Domain DNS ownership proof does not match');
+      const recordName='_metadrive-challenge.'+domain;
+      const proof=await checkDnsTxtProof(recordName,'metadrive-verification='+rows[0].proof_token);
+      if(proof.status!=='match')throw new Error(dnsProofFailureMessage(proof,recordName,domain));
       await db.transaction(async client=>{
         const current=await client.query<{proof_token:string;verified_at:Date|null}>(`
           SELECT proof_token,verified_at FROM md_tenant_domain_claims

@@ -2930,6 +2930,15 @@ export function createSystemServer(db:SqlPersistence) {
     else if(err.message==='API Name already exists'||err.message==='API Name already exists for this language')res.status(409).json({error:err.message});
     else if((err as Error&{code?:string;constraint?:string}).code==='23505' && /_api_(?:name|version)_ci_uq$|_id_ci_uq$/.test((err as Error&{constraint?:string}).constraint??''))res.status(409).json({error:'API Name already exists'});
     else if(['23503','23505'].includes((err as Error&{code?:string}).code??''))res.status(409).json({error:'Policy dependency or duplicate identity conflict'});
+    // Tenant provisioning and custom-domain outcomes are user-actionable, never SQL outages.
+    else if(err.message==='Authenticated tenant required')res.status(401).json({error:err.message});
+    else if(/^(Domain already |Domain proof was changed|Maximum five tenant domains|Cannot remove platform-owned|Tenant already exists|Tenant developer email already registered|Idempotency key conflict|Invalid tenant status transition)/.test(err.message))
+      res.status(409).json({error:err.message});
+    else if(err.message.startsWith('DNS ')||err.message.startsWith('Domain DNS '))res.status(422).json({error:err.message});
+    else if(/^(Administrator email must differ|Tenant developer email is required|Offline briefcase cannot|Flow service user must be|Logo file content does not match)/.test(err.message))
+      res.status(400).json({error:err.message});
+    else if(err.message==='Tenant login base domain is not configured')
+      res.status(500).json({error:'Tenant login base domain is not configured on the server (METADRIVE_TENANT_BASE_DOMAIN)'});
     else if(err.message==='Record not found'||err.message.endsWith('not found')) res.status(404).json({error:err.message});
     else if(err.message.startsWith('Flow cannot activate: ')||err.message.startsWith('Invalid ')||err.message.startsWith('Unsupported ')
       ||/^(Unknown |Duplicate |Cyclic |Stale |External |Queue |Active sharing|Restriction |Portal |Too many)/.test(err.message)) res.status(400).json({error:err.message});

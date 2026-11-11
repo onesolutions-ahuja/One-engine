@@ -130,6 +130,19 @@ export function registerDockerMailAdminRoutes(app:Express,db:SqlPersistence,rbac
   if(!rows[0]||rows[0].status!=='active')throw new Error('Mailbox not found');
   return rows[0];
  };
+ // Platform administrators: every tenant's verified mail domains, so a mailbox can be
+ // created for any tenant without switching the tenant picker first.
+ app.get('/api/mail/platform-domains',handler(async(req,res)=>{
+  try{
+   const actor=req.actor;
+   if(!actor?.tenant_id||!actor.user_id||!(await isPlatformAdmin(actor)))throw new Error('Permission denied');
+   const {rows}=await db.query(`SELECT d.id,d.domain AS name,t.slug AS tenant,t.name AS "tenantName"
+     FROM md_mail_domains d JOIN md_tenants t ON t.id=d.tenant_id
+     WHERE d.verified_at IS NOT NULL AND t.status<>'ARCHIVED' ORDER BY t.name,d.domain`);
+   res.setHeader('Cache-Control','private, no-store');
+   res.json({domains:rows});
+  }catch(e){problem(res,e);}
+ }));
  app.get('/api/mail/domains',handler(async(req,res)=>{
   try{const actor=await permission(req,'read');const {rows}=await db.query(
    'SELECT id,domain AS name,verified_at IS NOT NULL AS "isEnabled",verification_token AS "verificationToken" FROM md_mail_domains WHERE tenant_id=$1 ORDER BY domain',[actor.tenant_id]);

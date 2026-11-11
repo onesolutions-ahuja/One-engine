@@ -8,6 +8,7 @@ type Mailbox={id:string;emailAddress:string;name:string;domainId:string;descript
 type Props={onLogout:()=>void};
 type MailSettings={tenantMailEnabled:boolean;forcedByServer:boolean;canManageAllTenants:boolean;currentTenant:string};
 type TenantOption={tenantId:string;name:string;status:string};
+type PlatformDomain={id:string;name:string;tenant:string;tenantName:string};
 const panel:React.CSSProperties={background:'#fff',color:'#172b3f',border:'1px solid #d9e0e7',borderRadius:12,padding:20};
 const field:React.CSSProperties={display:'grid',gap:6,marginBottom:14};
 const input:React.CSSProperties={width:'100%',boxSizing:'border-box',padding:'10px 12px',border:'1px solid #94a3b8',borderRadius:8,font:'inherit',background:'#fff',color:'#172b3f',colorScheme:'light'};
@@ -53,6 +54,7 @@ export default function MailboxAdmin({onLogout}:Props){
  const [tenantMailEnabled,setTenantMailEnabled]=useState(true);
  const [settings,setSettings]=useState<MailSettings|null>(null);
  const [tenants,setTenants]=useState<TenantOption[]>([]);
+ const [platformDomains,setPlatformDomains]=useState<PlatformDomain[]>([]);
  const [target,setTarget]=useState('');
  const crossTenant=Boolean(settings&&target&&target!==settings.currentTenant);
  // Same API for every tenant; ?tenant= is honoured server-side for platform administrators only.
@@ -62,6 +64,8 @@ export default function MailboxAdmin({onLogout}:Props){
   apiRequest<MailSettings>('/mail/settings').then(value=>{
    if(cancelled)return;
    setSettings(value);setTarget(current=>current||value.currentTenant);
+   if(value.canManageAllTenants)apiRequest<{domains:PlatformDomain[]}>('/mail/platform-domains')
+    .then(result=>{if(!cancelled)setPlatformDomains(result.domains);}).catch(()=>{});
    if(value.canManageAllTenants)apiRequest<{tenants:TenantOption[]}>('/platform/tenants?pageSize=100&status=ALL')
     .then(result=>{if(!cancelled)setTenants(result.tenants.filter(t=>t.status!=='ARCHIVED'));}).catch(()=>{});
   }).catch(()=>{});
@@ -107,6 +111,7 @@ export default function MailboxAdmin({onLogout}:Props){
    ]);
    setDomains(d.domains);setMailboxes(m.mailboxes);setTenantMailEnabled(d.tenantMailEnabled!==false);
    setDomainId(current=>d.domains.some(x=>x.id===current&&x.isEnabled)?current:d.domains.find(x=>x.isEnabled)?.id||'');
+   apiRequest<{domains:PlatformDomain[]}>('/mail/platform-domains').then(r=>setPlatformDomains(r.domains)).catch(()=>{});
   }catch(e){setError(e instanceof Error?e.message:'Unable to load mailboxes');}
   finally{setLoading(false);}
  },[mailPath]);
@@ -130,8 +135,14 @@ export default function MailboxAdmin({onLogout}:Props){
  const create=async(event:React.FormEvent)=>{
   event.preventDefault();setBusy(true);setError('');setNotice('');
   try{
-   await apiRequest(mailPath('/mail/mailboxes'),{method:'POST',body:JSON.stringify({name,domainId,password,description})});
-   setName('');setPassword('');setDescription('');setShowCreate(false);setNotice('Mailbox created.');await refresh();
+   // Platform administrators pick a domain from any tenant; the mailbox is created in that tenant.
+   const chosen=platformDomains.find(d=>d.id===domainId);
+   const path=chosen&&settings&&chosen.tenant!==settings.currentTenant
+    ?'/mail/mailboxes?tenant='+encodeURIComponent(chosen.tenant):chosen?'/mail/mailboxes':mailPath('/mail/mailboxes');
+   await apiRequest(path,{method:'POST',body:JSON.stringify({name,domainId,password,description})});
+   setName('');setPassword('');setDescription('');setShowCreate(false);
+   setNotice('Mailbox '+name+'@'+(chosen?.name??domains.find(d=>d.id===domainId)?.name??'')+' created.');
+   if(chosen&&chosen.tenant!==target)setTarget(chosen.tenant);else await refresh();
   }catch(e){setError(e instanceof Error?e.message:'Mailbox creation failed');}
   finally{setBusy(false);}
  };
@@ -212,13 +223,16 @@ export default function MailboxAdmin({onLogout}:Props){
   <section style={{...panel,marginBottom:18}}>
    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap'}}>
     <div><h2 style={{margin:'0 0 4px',fontSize:18}}>Mailbox accounts</h2><p style={{margin:0,color:'#52677b',fontSize:14}}>Only mailboxes assigned to your signed-in MetaDrive tenant are listed.</p></div>
-    <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>void refresh()} disabled={loading||busy}>Refresh</button><button style={primary} onClick={()=>setShowCreate(v=>!v)} disabled={busy||!domains.some(d=>d.isEnabled)}>＋ Create mailbox</button></div>
+    <div style={{display:'flex',gap:8}}><button style={button} onClick={()=>void refresh()} disabled={loading||busy}>Refresh</button><button style={primary} onClick={()=>{setShowCreate(v=>!v);if(platformDomains.length&&!platformDomains.some(d=>d.id===domainId))
+     setDomainId((platformDomains.find(d=>d.tenant===target)??platformDomains[0]).id);}} disabled={busy||!(domains.some(d=>d.isEnabled)||platformDomains.length)}>＋ Create mailbox</button></div>
    </div>
    {!domains.some(domain=>domain.isEnabled)&&<p style={{margin:'12px 0 0',color:'#52677b'}}>Verify a mail domain before creating a mailbox.</p>}
    {showCreate&&<ActionDialog title="Create mailbox" onClose={()=>{if(!busy)setShowCreate(false);}}>
     <form onSubmit={create}>
      <div style={field}><label htmlFor="mail-name">Mailbox name</label><input id="mail-name" name="mailbox-local-part" autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={64} required value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. accounts" title="Enter only the mailbox name, without @domain" style={input} pattern="[A-Za-z0-9](?:[A-Za-z0-9._+\-]{0,62}[A-Za-z0-9])?" /></div>
-     <div style={field}><label htmlFor="mail-domain">Domain</label><select id="mail-domain" required value={domainId} onChange={e=>setDomainId(e.target.value)} style={input}>{domains.filter(d=>d.isEnabled).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+     <div style={field}><label htmlFor="mail-domain">Domain</label><select id="mail-domain" required value={domainId} onChange={e=>setDomainId(e.target.value)} style={input}>{platformDomains.length
+      ?platformDomains.map(d=><option key={d.id} value={d.id}>{d.name} — {d.tenantName}</option>)
+      :domains.filter(d=>d.isEnabled).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
      <div style={field}><label htmlFor="mail-password">Initial password (minimum 12 characters)</label><input id="mail-password" type="password" autoComplete="new-password" required minLength={12} maxLength={256} value={password} onChange={e=>setPassword(e.target.value)} style={input}/></div>
      <div style={field}><label htmlFor="mail-description">Description (optional)</label><input id="mail-description" value={description} maxLength={500} onChange={e=>setDescription(e.target.value)} style={input}/></div>
      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button style={primary} disabled={busy}>{busy?'Creating…':'Create mailbox'}</button><button type="button" style={button} disabled={busy} onClick={closeCreate}>Cancel</button></div>

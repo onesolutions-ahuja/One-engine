@@ -306,6 +306,34 @@ export class PlatformTenantService {
   await this.db.query("UPDATE md_tenants SET status='ACTIVE' WHERE id=$1",[targetId]);
   return {...await this.get(tenantId,userId,result.slug),replayed:result.replayed};
  }
+ /** Repair provisioning without reusing an initial password or creating another
+  * tenant/user. Only the original developer email recorded for this tenant
+  * can be provisioned, and the tenant stays suspended until it succeeds.
+  */
+ async retryDeveloperMailbox(tenantId:string,userId:string,slug:string){
+  await this.requirePlatform(tenantId,userId);
+  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))throw new Error('Invalid tenant');
+  const result=await this.db.query<{id:string;status:string;email:string;mail_status:string|null}>(`
+    SELECT t.id,t.status,u.email,m.status AS mail_status FROM md_tenants t
+    JOIN md_tenant_developer_accounts a ON a.tenant_id=t.id
+    JOIN md_users u ON u.tenant_id=t.id AND u.id=a.user_id
+    LEFT JOIN md_mail_accounts m ON m.tenant_id=t.id AND lower(m.email)=lower(u.email)
+    WHERE t.slug=$1`,[slug]);
+  const tenant=result.rows[0];
+  if(!tenant)throw new Error('Tenant developer account not found');
+  if(tenant.status!=='SUSPENDED')throw new Error('Mailbox repair requires a suspended tenant');
+  if(tenant.mail_status!=='active'){
+   await new TenantDeveloperMailbox(this.db).provision(slug,tenant.email.toLowerCase(),tenantId,userId);
+  }
+  // Only activate if the original developer mailbox is now confirmed active.
+  const check=await this.db.query<{ready:boolean}>(`
+    SELECT EXISTS(SELECT 1 FROM md_mail_accounts
+     WHERE tenant_id=$1 AND lower(email)=$2 AND status='active') AS ready`,
+    [tenant.id,tenant.email.toLowerCase()]);
+  if(!check.rows[0]?.ready)throw new Error('Developer mailbox is not active');
+  // Preserve audit and session semantics through the normal lifecycle transition.
+  return this.transition(tenantId,userId,slug,'reactivate');
+ }
  async developerEmailAvailability(tenantId:string,userId:string,slug:string){
   await this.requirePlatform(tenantId,userId);
   const developerDomain=tenantDeveloperDomain(slug);

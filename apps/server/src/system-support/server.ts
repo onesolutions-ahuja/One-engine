@@ -184,18 +184,21 @@ function cookieOptions(req:Request) {
 }
 /** The shared platform web host (the hosted SPA origin used by every tenant). */
 const platformWebHost=()=>(process.env.METADRIVE_PLATFORM_WEB_HOST??'unesolutions.co.uk').trim().toLowerCase();
-/** On the shared platform host, a sign-in email whose domain is a verified domain of
- * another ACTIVE tenant resolves to that tenant. Verified domain ownership is the
- * tenant claim; the password/MFA check still runs inside the resolved tenant only. */
-async function emailDomainTenant(db:SqlPersistence,email:unknown):Promise<string|undefined>{
-  if(typeof email!=='string')return undefined;
-  const at=email.trim().toLowerCase().lastIndexOf('@');
-  const domain=at>0?email.trim().toLowerCase().slice(at+1):'';
-  if(!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(domain))return undefined;
-  const {rows}=await db.query<{tenant_id:string}>(`SELECT d.tenant_id FROM md_tenant_domains d
-    JOIN md_tenants t ON t.id=d.tenant_id WHERE d.domain=$1 AND t.status='ACTIVE'`,[domain]);
-  return rows[0]?.tenant_id;
+/** Single platform sign-in: every tenant signs in on the shared platform host.
+ * Candidate tenants are the ACTIVE tenants with an enabled internal user for the
+ * email. The password/MFA check still runs only inside the chosen tenant. */
+async function platformEmailTenants(db:SqlPersistence,email:unknown):Promise<string[]>{
+  if(typeof email!=='string'||!email.trim()||email.length>254)return [];
+  const {rows}=await db.query<{tenant_id:string}>(`SELECT u.tenant_id FROM md_users u
+    JOIN md_tenants t ON t.id=u.tenant_id
+    WHERE lower(u.email)=lower($1) AND u.enabled=true AND u.user_type='internal' AND t.status='ACTIVE'
+    ORDER BY t.created_at,u.tenant_id`,[email.trim()]);
+  return rows.map(row=>row.tenant_id);
 }
+const isPlatformHost=(req:Request)=>{
+  const source=req.get('origin');
+  try{return !!source&&new URL(source).hostname.toLowerCase()===platformWebHost();}catch{return false;}
+};
 async function resolveTenant(db:SqlPersistence,req:Request,tenantSlug?:unknown,email?:unknown) {
   // Explicit tenant selection must never override the tenant owning the browser origin.
   const source=req.get('origin');
@@ -207,8 +210,10 @@ async function resolveTenant(db:SqlPersistence,req:Request,tenantSlug?:unknown,e
     originTenant=rows[0]?.tenant_id;
     if(!originTenant) return undefined;
     if(host===platformWebHost()&&tenantSlug===undefined){
-      const emailTenant=await emailDomainTenant(db,email);
-      if(emailTenant)return emailTenant;
+      const candidates=await platformEmailTenants(db,email);
+      // One account for this email: that tenant. Several: keep the origin tenant
+      // when it is one of them, otherwise the oldest tenant (login picks by password).
+      if(candidates.length)return candidates.includes(originTenant)?originTenant:candidates[0];
     }
   }
   if(tenantSlug!==undefined) {
@@ -444,8 +449,18 @@ export function createSystemServer(db:SqlPersistence) {
     if(typeof email!=='string'||typeof password!=='string'||!email.trim()) {
       res.status(400).json({error:'Email and password required'});return;
     }
-    const tenantId=await resolveTenant(db,req,tenantSlug,email);
+    let tenantId=await resolveTenant(db,req,tenantSlug,email);
     if(!tenantId) {res.status(401).json({error:'Invalid credentials or tenant domain'});return;}
+    if(tenantSlug===undefined&&isPlatformHost(req)){
+      // The same email can exist in several tenants: sign in to the one whose
+      // password matches (checked without side effects; the chosen tenant then
+      // records success/failure and lockout as usual).
+      const candidates=await platformEmailTenants(db,email);
+      if(candidates.length>1){
+        for(const candidate of candidates)
+          if(await auth.passwordMatches(candidate,email,password)){tenantId=candidate;break;}
+      }
+    }
     try {
       const userId=await auth.verifyIdentity(tenantId,email,password,req.ip);
       const challenge=await mfa.createChallenge(tenantId,userId,{ip:req.ip});

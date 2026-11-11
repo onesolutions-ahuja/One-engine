@@ -196,12 +196,17 @@ async function platformEmailTenants(db:SqlPersistence,email:unknown):Promise<str
   return rows.map(row=>row.tenant_id);
 }
 const isPlatformHost=(req:Request)=>{
-  const source=req.get('origin');
+  const source=req.get('origin')??refererOrigin(req);
   try{return !!source&&new URL(source).hostname.toLowerCase()===platformWebHost();}catch{return false;}
+};
+const refererOrigin=(req:Request)=>{
+  const referer=req.get('referer');
+  try{return referer?new URL(referer).origin:undefined;}catch{return undefined;}
 };
 async function resolveTenant(db:SqlPersistence,req:Request,tenantSlug?:unknown,email?:unknown) {
   // Explicit tenant selection must never override the tenant owning the browser origin.
-  const source=req.get('origin');
+  // Browsers omit Origin on same-origin GET requests; fall back to the Referer's origin.
+  const source=req.get('origin')??refererOrigin(req);
   let originTenant:string|undefined;
   if(source) {
     const host=new URL(source).hostname.toLowerCase();
@@ -488,7 +493,7 @@ export function createSystemServer(db:SqlPersistence) {
     } catch {res.status(401).json({error:'Invalid refresh session'});}
   }));
   app.get('/api/auth/password-reset/options',route(async(req,res)=>{
-    const tenantId=await resolveTenant(db,req,req.query.tenantSlug);
+    const tenantId=await resolveTenant(db,req,req.query.tenantSlug,req.query.email);
     if(!tenantId){res.status(400).json({error:'Tenant domain is required'});return;}
     res.setHeader('Cache-Control','no-store');
     res.json(await passwordReset.options(tenantId));

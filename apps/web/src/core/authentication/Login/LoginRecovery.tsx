@@ -45,11 +45,19 @@ export default function LoginRecovery({onClose}:{onClose:()=>void}){
   if(!email.trim()||busy||!options.channels[selected])return;
   setBusy(true);setMessage('');setChannel(selected);
   try{
+   // One sign-in page serves every tenant: load the recovery policy of the
+   // tenant that owns this email before requesting.
+   const tenantOptions=await apiRequest<Options>('/auth/password-reset/options?email='+encodeURIComponent(email.trim()))
+    .catch(()=>options);
+   setOptions(tenantOptions);
+   if(!tenantOptions.channels[selected]){
+    setMessage('This recovery method is not available for your organisation. Contact your administrator.');return;
+   }
    const response=await apiRequest<{message:string}>('/auth/password-reset/request',{
     method:'POST',body:JSON.stringify({email:email.trim(),channel:selected})
    });
-   if(options.method==='OTP')setStep('verify');
-   setMessage(options.method==='LINK'?'If your account exists, check your email for a reset link.':response.message);
+   if(tenantOptions.method==='OTP')setStep('verify');
+   setMessage(tenantOptions.method==='LINK'?'If your account exists, check your email for a reset link.':response.message);
   }catch(error){setMessage(error instanceof Error?error.message:'Recovery request failed');}
   finally{setBusy(false);}
  };

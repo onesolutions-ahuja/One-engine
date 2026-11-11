@@ -14,7 +14,7 @@ import {roundFormulaNumber} from '../../../../server/src/expression-engine/Formu
 import {parseComponentStateReference,readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
 import {
  evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
- formulaDateTimeParts,formulaIsoDateTime,formulaTimeText,
+ formulaDateTimeParts,formulaIsoDateTime,formulaNowIsoDateTime,formulaTimeText,
  formulaWeekday,isFormulaDate,parseFormulaDateTime
 } from '../../../../server/src/expression-engine/FormulaDate.js';
 
@@ -56,6 +56,12 @@ const evaluateCall=(name,args,context)=>{
   case 'PROPER':arity(1);return text(args[0]).toLowerCase()
    .replace(/(^|[^\p{L}\p{N}])(\p{L})/gu,(_match,prefix,letter)=>prefix+letter.toUpperCase());
   case 'LEN':arity(1);return textPoints(args[0]).length;
+  // Excel CHAR(code): CHAR(10) is a new line, e.g. @Name & CHAR(10) & @Email.
+  case 'CHAR':arity(1);{
+   const code=Math.trunc(numeric(args[0]));
+   if(code<1||code>1114111)throw Error('CHAR needs a character code from 1 to 1114111');
+   return String.fromCodePoint(code);
+  }
   case 'LEFT':arity(1,2);return textPoints(args[0])
    .slice(0,Math.max(0,Math.trunc(numeric(args.length===1?1:args[1])))).join('');
   case 'RIGHT':arity(1,2);{
@@ -125,7 +131,7 @@ const evaluateCall=(name,args,context)=>{
    throw Error('DISTANCE unit must be km or mi');
   }
   case 'TODAY':arity(0);return formulaDateText(formulaDateParts(context.now,context.timeZone));
-  case 'NOW':arity(0);return formulaIsoDateTime(context.now);
+  case 'NOW':arity(0);return formulaNowIsoDateTime(context.now);
   case 'TIMENOW':arity(0);return formulaTimeText(context.now,context.timeZone);
   case 'DAY':case 'MONTH':case 'YEAR':{
    arity(1);const parts=formulaDateTimeParts(text(args[0]),context.timeZone);

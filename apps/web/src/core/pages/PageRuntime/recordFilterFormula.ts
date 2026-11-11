@@ -83,7 +83,11 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  // server as a plain filter value, so filtering stays server-side and permission-scoped.
  if(node.kind==='call'&&valueFunctions.has(node.name)&&node.args.length<=8){
   const args=node.args.map(arg=>formulaLiteral(asState(arg,state,sessionId)));
-  const result=evaluateFieldExpressionDetailed(node.name+'('+args.join(',')+')',{},{sessionId});
+  // NOW()/TIMENOW() are read at whole-minute precision. A millisecond clock made
+  // the server filter (and so the query) different on every render: each reply
+  // re-rendered the page and fired a new request, ~100 requests a second.
+  const result=evaluateFieldExpressionDetailed(node.name+'('+args.join(',')+')',{},
+   {sessionId,now:new Date(Math.floor(Date.now()/60000)*60000)});
   if(result.error)throw Error(result.error);
   return result.value;
  }

@@ -973,6 +973,10 @@ export function createSystemServer(db:SqlPersistence) {
       res.json(await platformTenants.transition(actor.tenant_id,actor.user_id,req.params.slug,operation));
     }));
   }
+  app.post('/api/platform/tenants/:slug/developer-mailbox',route(async(req,res)=>{
+    const actor=req.actor!;
+    res.json(await platformTenants.provisionDeveloperMailbox(actor.tenant_id,actor.user_id,req.params.slug));
+  }));
   app.post('/api/platform/tenants',route(async(req,res)=>{
     const actor=req.actor!;
     const payload=await platformTenants.create(actor.tenant_id,actor.user_id,req.body,req.get('idempotency-key'));
@@ -2903,6 +2907,7 @@ export function createSystemServer(db:SqlPersistence) {
     else if(/^(Cannot alter own|Cannot escalate own|Standard profile|Reserved permission|Managed package metadata is read-only)/.test(err.message))res.status(403).json({error:err.message});
     else if(err.message==='Login blocked by transaction security policy'||err.message==='MFA required for connected app consent')res.status(403).json({error:err.message});
     else if(err.message==='Permission denied') res.status(403).json({error:'Permission denied'});
+    else if(err.message.startsWith('Developer mailbox provisioning failed'))res.status(502).json({error:err.message});
     else if(err.message==='App licence or entitlement unavailable')
       res.status(403).json({error:err.message});
     else if(/^(Install dependency first:|Uninstall dependent app first:|Missing app package resource:|Missing app navigation resource:|App package metadata conflict:|Unresolved app package Page Component reference:|App package Page Component dependency missing|App package Page Component property target unavailable or ambiguous|App downgrade is not allowed)/.test(err.message))

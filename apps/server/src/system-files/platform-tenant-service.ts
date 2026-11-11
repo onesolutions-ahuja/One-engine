@@ -5,6 +5,20 @@ import {TenantProvisioning} from './tenant-provisioning.js';
 import {TenantDeveloperMailbox} from '../system-support/tenant-developer-mailbox.js';
 import {tenantDeveloperDomain} from '../system-support/tenant-developer-domain.js';
 
+/** People only. Non-login system actors (for example the Communication Logger,
+ * seeded into every tenant) are not users an operator can see or license. */
+export const HUMAN_USER=`u.email NOT LIKE '%@system.invalid'
+ AND NOT EXISTS(SELECT 1 FROM md_communication_logger_accounts c
+  WHERE c.tenant_id=u.tenant_id AND c.user_id=u.id)`;
+/** Operator-safe reason: SQL internals stay in the server log. */
+const mailboxFailure=(error:unknown)=>{
+ const message=error instanceof Error?error.message:'';
+ if((error as {code?:unknown})?.code!==undefined)return 'database rejected the mailbox record';
+ return /^(Invalid tenant developer email|Developer mailbox|Tenant not found)/.test(message)
+  ?message:'mail server unavailable';
+};
+type DeveloperAccount={email:string;activated:boolean;mailboxStatus:'active'|'pending'|'error'|'missing'};
+
 export class PlatformTenantService {
  constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine){}
  private async platformScope(tenantId:string,userId:string){
@@ -301,7 +315,9 @@ export class PlatformTenantService {
   try{
     await mail.provision(result.slug,chosen,tenantId,userId);
   }catch(error){
-    throw new Error('Tenant created but developer mailbox provisioning failed; tenant suspended. Retry the same request to resume provisioning.');
+    console.error('Tenant developer mailbox provisioning failed',error);
+    throw new Error('Developer mailbox provisioning failed: '+mailboxFailure(error)
+      +'. The tenant was created but is suspended until the mailbox exists; open it and choose "Retry developer mailbox".');
   }
   await this.db.query("UPDATE md_tenants SET status='ACTIVE' WHERE id=$1",[targetId]);
   return {...await this.get(tenantId,userId,result.slug),replayed:result.replayed};
@@ -321,8 +337,8 @@ export class PlatformTenantService {
   }>(`
     SELECT t.id,t.slug,t.name,t.description,t.status,t.created_at,t.updated_at,
       t.archived_at,t.retention_until,t.legal_hold,
-      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id) AS users,
-      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND u.enabled=true) AS active_users
+      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND ${HUMAN_USER}) AS users,
+      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND u.enabled=true AND ${HUMAN_USER}) AS active_users
     FROM md_tenants t WHERE t.slug=$1 AND ($2::uuid IS NULL OR t.id=$2)
   `,[slug,platform?null:tenantId]);
   const t=rows[0];if(!t)throw new Error('Tenant not found');
@@ -331,8 +347,48 @@ export class PlatformTenantService {
    createdAt:t.created_at,updatedAt:t.updated_at,archivedAt:t.archived_at,
    retentionUntil:t.retention_until,legalHold:t.legal_hold,
    userCount:Number(t.users),activeUserCount:Number(t.active_users),
-   provisioning:{status:'READY' as const,version:1,completedAt:t.created_at},developerAccount:null
+   provisioning:{status:'READY' as const,version:1,completedAt:t.created_at},
+   developerAccount:platform?await this.developerAccount(t.id):null
   }};
+ }
+ /** Seeded developer identity and its platform mailbox; no credentials. */
+ private async developerAccount(targetId:string):Promise<DeveloperAccount|null>{
+  const {rows}=await this.db.query<{email:string;activated:boolean;mailbox_status:string|null}>(`
+   SELECT u.email,(a.activated_at IS NOT NULL) AS activated,m.status AS mailbox_status
+   FROM md_tenant_developer_accounts a
+   JOIN md_users u ON u.tenant_id=a.tenant_id AND u.id=a.user_id
+   LEFT JOIN md_mail_accounts m ON m.tenant_id=a.tenant_id AND lower(m.email)=lower(u.email)
+   WHERE a.tenant_id=$1`,[targetId]);
+  const row=rows[0];if(!row)return null;
+  const status=row.mailbox_status;
+  return {email:row.email,activated:row.activated,
+   mailboxStatus:status==='active'||status==='pending'||status==='error'?status:'missing'};
+ }
+ /** Retry the developer mailbox for an existing tenant (for example after a
+  * failed creation). A tenant still suspended by that failed creation, and
+  * never transitioned since, is reactivated exactly as creation would have. */
+ async provisionDeveloperMailbox(tenantId:string,userId:string,slug:string){
+  await this.requirePlatform(tenantId,userId);
+  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))throw new Error('Invalid tenant');
+  const {rows}=await this.db.query<{id:string;status:string;email:string;last_operation:string|null}>(`
+   SELECT t.id,t.status,u.email,
+    (SELECT l.operation FROM md_tenant_lifecycle_audit l WHERE l.target_tenant_id=t.id
+      ORDER BY l.created_at DESC LIMIT 1) AS last_operation
+   FROM md_tenants t
+   JOIN md_tenant_developer_accounts a ON a.tenant_id=t.id
+   JOIN md_users u ON u.tenant_id=a.tenant_id AND u.id=a.user_id
+   WHERE t.slug=$1`,[slug]);
+  const target=rows[0];
+  if(!target)throw new Error('Tenant developer account not found');
+  try{
+   await new TenantDeveloperMailbox(this.db).provision(slug,target.email.toLowerCase(),tenantId,userId);
+  }catch(error){
+   console.error('Tenant developer mailbox provisioning failed',error);
+   throw new Error('Developer mailbox provisioning failed: '+mailboxFailure(error));
+  }
+  if(target.status==='SUSPENDED'&&target.last_operation==='create')
+   await this.db.query("UPDATE md_tenants SET status='ACTIVE',updated_at=now() WHERE id=$1 AND status='SUSPENDED'",[target.id]);
+  return this.get(tenantId,userId,slug);
  }
  async updateDetails(tenantId:string,userId:string,slug:string,body:unknown) {
   await this.requirePlatform(tenantId,userId);
@@ -409,8 +465,8 @@ export class PlatformTenantService {
   }>(`
     SELECT t.id,t.slug,t.name,t.description,t.status,t.created_at,t.updated_at,
       t.archived_at,t.retention_until,t.legal_hold,
-      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id) AS users,
-      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND u.enabled=true) AS active_users
+      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND ${HUMAN_USER}) AS users,
+      (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND u.enabled=true AND ${HUMAN_USER}) AS active_users
     FROM md_tenants t
     WHERE ($1::uuid IS NULL OR t.id=$1)
       AND ($2::text IS NULL OR t.slug ILIKE $2 OR t.name ILIKE $2)

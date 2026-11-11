@@ -142,6 +142,14 @@ export function formulaIsoDateTime(date:Date):string {
   return date.toISOString();
 }
 
+/** NOW(): date and time to the minute (seconds and milliseconds are 00).
+ * TIMENOW() keeps seconds. A minute value also keeps NOW() in record filters
+ * and Page State from changing on every render. */
+export function formulaNowIsoDateTime(date:Date):string {
+  checkedInstant(date);
+  return new Date(Math.floor(date.getTime()/60000)*60000).toISOString();
+}
+
 export function formulaTimeText(date:Date,timeZone='UTC'):string {
   const parts=formulaDateParts(date,timeZone);
   return `${String(parts.hour).padStart(2,'0')}:${String(parts.minute).padStart(2,'0')}:${String(parts.second).padStart(2,'0')}.${String(parts.millisecond).padStart(3,'0')}`;

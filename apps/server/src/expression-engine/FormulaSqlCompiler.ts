@@ -84,6 +84,7 @@ export function compileFormulaSql(node:Expression,bindings:SqlFormulaBindings):s
   case 'TEXT':count(node,1);return text(x);
   case 'VALUE':count(node,1);return number(x);
   case 'LEN':count(node,1);return 'char_length('+text(x)+')';
+  case 'CHAR':count(node,1);return 'chr(greatest(1,least(1114111,'+integer(x)+')))';
   case 'LOWER':count(node,1);return 'lower('+text(x)+')';
   case 'UPPER':count(node,1);return 'upper('+text(x)+')';
   case 'PROPER':count(node,1);return 'initcap(lower('+text(x)+'))';
@@ -115,7 +116,8 @@ export function compileFormulaSql(node:Expression,bindings:SqlFormulaBindings):s
     " ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN "+date(x)+'::text ELSE (('+datetime(x)+
     ' AT TIME ZONE '+tz+')::date)::text END)';
   case 'TODAY':count(node,0);return '(('+now+' AT TIME ZONE '+tz+')::date)::text';
-  case 'NOW':count(node,0);return "to_char("+now+" AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')";
+  // NOW() is to the minute (seconds 00), as in the browser and Flow runtimes.
+  case 'NOW':count(node,0);return "to_char(date_trunc('minute',"+now+" AT TIME ZONE 'UTC'),'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')";
   case 'DAY':case 'MONTH':case 'YEAR':case 'HOUR':case 'MINUTE':case 'SECOND':{
    count(node,1);
    const part=name.toLowerCase();

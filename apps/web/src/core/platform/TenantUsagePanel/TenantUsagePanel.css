@@ -14,3 +14,14 @@
 .tenant-usage-warning { color: var(--md-warning,#b45309); font-weight: 600; }
 
 @media(pointer:coarse){.tenant-usage-targets input{min-height:var(--md-control-touch,44px)}}
+
+/* Inside the tenant page the tab already frames the panel: keep it compact. */
+.tenant-page .tenant-usage{margin-top:0;padding-top:0;border-top:0}
+.tenant-page .tenant-usage-grid{gap:10px;margin-bottom:10px}
+.tenant-page .tenant-usage-stat{padding:10px 12px;border-radius:8px}
+.tenant-page .tenant-usage-stat strong{font-size:1.1rem;margin-top:2px}
+.tenant-page .tenant-usage form{margin-top:8px;padding-top:14px;border-top:1px solid var(--border,#d6dce5)}
+.tenant-page .tenant-usage h4{margin:0}
+.tenant-page .tenant-usage-targets{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:8px 0 12px}
+.tenant-page .tenant-usage form{max-width:none}
+.tenant-page .tenant-usage form>button{justify-self:start}

@@ -131,3 +131,35 @@
 /* Tenant creation: managed domain cannot be edited; show security validation inline. */
 .tenant-create-dialog input[readonly]{background:var(--md-canvas,#f8fafc);cursor:default}
 .tenant-create-dialog .tenant-validation-error{color:#9b2533}
+
+/* Tenant page: opening a tenant replaces the directory with its own page. */
+.tenant-heading-detail{align-items:flex-end;margin-bottom:16px}
+.tenant-heading-detail p{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tenant-heading-detail code{font-size:12px}
+.tenant-back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:4px 0;margin-bottom:6px;color:var(--md-primary,#1d4ed8);font-weight:600;cursor:pointer}
+.tenant-back:hover{text-decoration:underline}
+.tenant-title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tenant-title-row h1{margin:0}
+.tenant-table tbody .tenant-row-link{cursor:pointer}
+.tenant-detail.tenant-page{padding:clamp(14px,1.6vw,20px)}
+.tenant-detail-tabs{margin-bottom:16px}
+.tenant-overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:14px;align-items:start}
+.tenant-card{display:grid;gap:12px;align-content:start;border:1px solid var(--md-border,#e0e5eb);border-radius:10px;padding:16px;background:var(--md-surface,#fff);min-width:0}
+.tenant-detail form.tenant-card{max-width:none}
+.tenant-card-wide{grid-column:1/-1}
+.tenant-card-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tenant-card-heading h3{margin:0;font-size:15px}
+.tenant-button.tenant-button-small{min-height:32px;padding:5px 12px}
+.tenant-card label{display:grid;gap:5px;font-weight:600}
+.tenant-card .tenant-facts{margin:0;grid-template-columns:minmax(96px,max-content) minmax(0,1fr);border:0;padding:0;gap:8px 18px}
+.tenant-card .tenant-facts dt{color:var(--md-muted,#64748b)}
+.tenant-card .tenant-facts dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.tenant-muted{color:var(--md-muted,#64748b);font-weight:400}
+.tenant-retention-row{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.tenant-retention-row>label:first-child{flex:0 1 240px}
+.tenant-detail .tenant-checkbox{display:inline-flex;align-items:center;gap:8px;font-weight:600;min-height:40px}
+.tenant-detail input[type=checkbox]{width:18px;height:18px;min-height:0;flex:none}
+.tenant-alert-warning{background:#fff8e6;border-color:#f1d48a;color:#7a4b00;flex-wrap:wrap}
+.tenant-alert-warning>span{flex:1;min-width:220px}
+.tenant-create-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.tenant-create-dialog{width:min(820px,100%)}

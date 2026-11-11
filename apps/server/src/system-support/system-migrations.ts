@@ -515,6 +515,29 @@ export async function applySystemMigrations(db:SqlPersistence) {
     WHERE component_api='smart_button' AND property_key='wrapText'
       AND default_value_override IS NULL
   `);
+  // Tenant developer mailboxes live on the platform-owned mail domain but
+  // belong to the new tenant. The baseline's (tenant_id,domain) foreign key
+  // made every such insert fail, leaving new tenants suspended without a
+  // mailbox. Keep domain integrity with a domain-only key; the tenant mail
+  // admin API still only creates mailboxes on domains the caller owns.
+  await client.query(`
+    DO $$
+    DECLARE legacy text;
+    BEGIN
+     FOR legacy IN
+      SELECT c.conname FROM pg_constraint c
+      WHERE c.conrelid='md_mail_accounts'::regclass AND c.contype='f'
+        AND c.confrelid='md_mail_domains'::regclass AND cardinality(c.conkey)=2
+     LOOP
+      EXECUTE format('ALTER TABLE md_mail_accounts DROP CONSTRAINT %I',legacy);
+     END LOOP;
+     IF NOT EXISTS(SELECT 1 FROM pg_constraint
+       WHERE conrelid='md_mail_accounts'::regclass AND conname='md_mail_accounts_domain_fkey') THEN
+      ALTER TABLE md_mail_accounts ADD CONSTRAINT md_mail_accounts_domain_fkey
+       FOREIGN KEY(domain) REFERENCES md_mail_domains(domain);
+     END IF;
+    END $$;
+  `);
   // Cover setup tables introduced by later migrations in the same transaction.
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });

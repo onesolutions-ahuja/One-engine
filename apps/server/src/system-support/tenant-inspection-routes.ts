@@ -4,7 +4,7 @@ import {isIP} from 'node:net';
 import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
-import type {PlatformTenantService} from '../system-files/platform-tenant-service.js';
+import {HUMAN_USER,type PlatformTenantService} from '../system-files/platform-tenant-service.js';
 import {tenantDeveloperDomain} from './tenant-developer-domain.js';
 
 type Actor={tenant_id:string;user_id:string};
@@ -96,8 +96,8 @@ export function registerTenantInspectionRoutes(app:Express,db:SqlPersistence,
     const {tenantId,slug:name}=await target(req,external,false);
     const {rows}=await db.query<Record<string,string>>(`
       SELECT t.status,
-       (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id) AS users,
-       (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND u.enabled) AS active_users,
+       (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND ${HUMAN_USER}) AS users,
+       (SELECT count(*)::text FROM md_users u WHERE u.tenant_id=t.id AND u.enabled AND ${HUMAN_USER}) AS active_users,
        (SELECT count(*)::text FROM md_object_definitions o WHERE o.tenant_id=t.id) AS objects,
        (SELECT count(*)::text FROM md_object_definitions o WHERE o.tenant_id=t.id
           AND o.api_name LIKE '%\\_\\_c' ESCAPE '\\') AS custom_objects,

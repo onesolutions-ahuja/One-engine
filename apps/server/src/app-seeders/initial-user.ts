@@ -23,13 +23,25 @@ export async function seedInitialUser(client:PoolClient,input:InitialUserInput){
   [tenantId,'Default','Default Profile']);
  await client.query('INSERT INTO md_user_profiles(tenant_id,user_id,profile_id) VALUES($1,$2,$3)',
   [tenantId,user.rows[0].id,profile.rows[0].id]);
- const disabledDeveloper=await client.query<{id:string}>(`
+ // A single email represents a single login within a tenant. When the owner
+ // selects the same address for both roles, reuse the administrator identity
+ // rather than inserting a duplicate that violates md_users_email_per_tenant.
+ const sharedIdentity=input.administratorEmail.trim().toLowerCase()===input.developerEmail.trim().toLowerCase();
+ const disabledDeveloper=sharedIdentity
+  ?{rows:[{id:user.rows[0].id}]}
+  :await client.query<{id:string}>(`
   INSERT INTO md_users(tenant_id,email,password_hash,display_name,enabled)
   VALUES($1,$2,$3,'Tenant Developer',false) RETURNING id`,
   [tenantId,input.developerEmail.toLowerCase(),input.disabledDeveloperPasswordHash]);
- await client.query('INSERT INTO md_user_profiles(tenant_id,user_id,profile_id) VALUES($1,$2,$3)',
+ if(!sharedIdentity)await client.query('INSERT INTO md_user_profiles(tenant_id,user_id,profile_id) VALUES($1,$2,$3)',
   [tenantId,disabledDeveloper.rows[0].id,profile.rows[0].id]);
- await client.query('INSERT INTO md_tenant_developer_accounts(tenant_id,user_id) VALUES($1,$2)',
+ // Shared developer identities already have an enabled password-bearing login.
+ // Mark them activated at bootstrap; they must never be offered activation
+ // that would reset the same administrator's credentials.
+ if(sharedIdentity)await client.query(`
+  INSERT INTO md_tenant_developer_accounts(tenant_id,user_id,activated_at)
+  VALUES($1,$2,now())`,[tenantId,disabledDeveloper.rows[0].id]);
+ else await client.query('INSERT INTO md_tenant_developer_accounts(tenant_id,user_id) VALUES($1,$2)',
   [tenantId,disabledDeveloper.rows[0].id]);
  await client.query('UPDATE md_users SET reports_to_user_id=$3 WHERE tenant_id=$1 AND id=$2',
   [tenantId,user.rows[0].id,disabledDeveloper.rows[0].id]);

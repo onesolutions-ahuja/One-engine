@@ -7,9 +7,8 @@ import {HUMAN_USER,PlatformTenantService} from '../system-files/platform-tenant-
 /**
  * Cross-tenant user administration for platform operators.
  *
- * Authority: OneEngine held inside the canonical platform tenant
- * (PlatformTenantService.requirePlatform). OneEngine seeded into a customer
- * tenant never reaches these endpoints' data for other tenants.
+ * Authority: OneEngine held by an enabled internal user of any active tenant
+ * (PlatformTenantService.requirePlatform / hasPlatformOneEngine).
  *
  * Every change writes a platform-tenant security event; row-level changes are
  * also captured by the setup audit trigger with the platform actor.

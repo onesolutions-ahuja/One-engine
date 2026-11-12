@@ -26,7 +26,7 @@ const when = (value: string | null) => {
 /**
  * Platform operator view of one tenant's users: list, create, edit, activate,
  * deactivate, unlock, licence and delete. Authorised server-side by OneEngine
- * in the platform tenant; this component only renders for platform operators.
+ * in any tenant; the server rejects everyone else.
  */
 export default function TenantUsersPanel({ request, permitted, tenantId }: {
   request: Request; permitted: boolean; tenantId: string;

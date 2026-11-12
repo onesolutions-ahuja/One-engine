@@ -109,6 +109,31 @@ export async function applySystemMigrations(db:SqlPersistence) {
    appliedNewMigration=true;
    await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',[name,checksum]);
   }
+  // Upgrade-safe AppExchange publishing tables (idempotent; the SQL baseline is immutable).
+  await client.query(`-- AppExchange publishing: a catalogue app published from a tenant-authored app.
+CREATE TABLE IF NOT EXISTS md_app_publications (
+ app_id uuid PRIMARY KEY REFERENCES md_apps(id),
+ source_tenant_id uuid NOT NULL REFERENCES md_tenants(id),
+ source_app_id uuid NOT NULL REFERENCES md_apps(id),
+ package_api text NOT NULL CHECK(package_api ~ '^[A-Za-z][A-Za-z0-9_]{0,127}$'),
+ created_by uuid,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(source_tenant_id,source_app_id)
+);
+-- Portable metadata package (objects, fields, pages, components, flows, layouts,
+-- permission sets) for each published version. Never contains credentials.
+CREATE TABLE IF NOT EXISTS md_app_package_manifests (
+ app_id uuid NOT NULL,
+ version integer NOT NULL,
+ metadata_package jsonb NOT NULL CHECK(jsonb_typeof(metadata_package)='object'),
+ activate_flows text[] NOT NULL DEFAULT '{}',
+ home_pages jsonb NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(home_pages)='array'),
+ published_by uuid,
+ published_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(app_id,version),
+ FOREIGN KEY(app_id,version) REFERENCES md_app_package_versions(app_id,version) ON DELETE CASCADE
+);
+`);
   // Upgrade-safe account recovery additions (idempotent; the SQL baseline is immutable).
   // platform_default: the platform tenant offers its SMS/WhatsApp callout to all tenants.
   // delivery_channel 'admin': audited set-password links issued by an admin or platform support.

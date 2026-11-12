@@ -40,12 +40,18 @@ export type MetadataPackage={
  contents:PackageContent;
  digest:string;
 };
+type MissingDependency={type:Dependency['type']|'named-credential';apiName:string};
 type Preview={
  canInstall:boolean;
  operation:'install'|'upgrade'|'reinstall';
- missingDependencies:Dependency[];
+ missingDependencies:MissingDependency[];
  conflicts:Array<{type:string;apiName:string;reason:string}>;
  preservedCustomizations:Array<{type:string;apiName:string}>;
+ /** Metadata the tenant already has that the package does not own. Objects are
+  * merged (only missing fields are added); everything else is reused unchanged. */
+ reused:Array<{type:string;apiName:string}>;
+ /** Fields the package adds to objects it reuses, as Object.Field. */
+ addedFields:string[];
 };
 const apiNamePattern=/^[A-Za-z][A-Za-z0-9_]{0,127}$/;
 const DEVICE_LAYOUT_VARIANTS=['Tablet','Mobile','Custom'] as const;
@@ -346,6 +352,25 @@ export class MetadataPackageService{
   }
   return document;
  }
+ /** Named Credentials the package's Flows call, by name. Credentials are never
+  * packaged: each tenant supplies its own (for example via a connector app). */
+ private credentialNames(contents:PackageContent):string[]{
+  const names=new Set<string>();
+  for(const flow of contents.flows??[])for(const element of flow.elements as Array<Record<string,unknown>>){
+   const config=element&&typeof element.config==='object'&&!Array.isArray(element.config)
+    ?element.config as Record<string,unknown>:undefined;
+   if(typeof config?.namedCredentialApiName==='string')names.add(config.namedCredentialApiName);
+  }
+  return [...names].sort();
+ }
+ private async missingCredentials(tenant:string,contents:PackageContent):Promise<MissingDependency[]>{
+  const names=this.credentialNames(contents);
+  if(!names.length)return [];
+  const {rows}=await this.db.query<{name:string}>(`SELECT name FROM md_named_credentials
+   WHERE tenant_id=$1 AND enabled=true AND name=ANY($2::text[])`,[tenant,names]);
+  const present=new Set(rows.map(row=>row.name));
+  return names.filter(name=>!present.has(name)).map(apiName=>({type:'named-credential' as const,apiName}));
+ }
  private dependencies(contents:PackageContent):Dependency[]{
   const internalObjects=new Set(contents.objects.map(item=>item.apiName));
   const internalComponents=new Set(contents.components.map(item=>item.apiName));
@@ -370,7 +395,14 @@ export class MetadataPackageService{
   }
   return [...values.values()].sort((a,b)=>a.type.localeCompare(b.type)||a.apiName.localeCompare(b.apiName));
  }
- async export(tenant:string,user:string,input:unknown):Promise<MetadataPackage>{
+ /**
+  * options.portablePages strips page activation assignments (they hold this tenant's
+  * app and profile IDs). Record Pages left without an assignment are exported as
+  * Draft so the installing tenant activates them deliberately. Used by AppExchange
+  * publishing, where the app's navigation and home pages place the pages instead.
+  */
+ async export(tenant:string,user:string,input:unknown,
+  options:{portablePages?:boolean}={}):Promise<MetadataPackage>{
   await this.readGrants(tenant,user);
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Invalid package export request');
   const p=input as Record<string,unknown>;
@@ -415,7 +447,13 @@ export class MetadataPackageService{
      fields:definitionFields(object)};
    }),
    pages:await Promise.all(pageNames.map(async name=>{
-    const page=pageProjection(pageMap.get(name)!);
+    let page=pageProjection(pageMap.get(name)!);
+    if(options.portablePages){
+     const {activationAssignments:_assignments,...rest}=page as Record<string,unknown>;
+     page={...rest,activationAssignments:[],
+      ...(rest.status==='Active'&&!['App Page','In-Screen Page','Print Template'].includes(String(rest.pageType))
+       ?{status:'Draft'}:{})} as unknown as typeof page;
+    }
     const layouts=await this.deviceLayouts(tenant,name,page);
     return layouts.length?{...page,layouts}:page;
    })),
@@ -502,7 +540,8 @@ export class MetadataPackageService{
   if(this.dependencies(pkg.contents).some(item=>!declared.has(JSON.stringify([item.type,item.apiName]))))
    throw Error('Package manifest omits one or more required dependencies');
   const [current,missing,receipt,tracked]=await Promise.all([
-   this.loaded(tenant,user),this.dependenciesMissing(tenant,pkg.dependencies,pkg.contents),
+   this.loaded(tenant,user),
+   this.dependenciesMissing(tenant,pkg.dependencies,pkg.contents) as Promise<MissingDependency[]>,
    this.db.query<{version:number;digest:string;package_type:string;active:boolean}>(
     'SELECT version,digest,package_type,active FROM md_metadata_package_installations WHERE tenant_id=$1 AND package_api=$2',
     [tenant,pkg.package.apiName]),this.tracked(tenant,pkg.package.apiName)
@@ -530,6 +569,9 @@ export class MetadataPackageService{
   }
   const conflicts:Array<{type:string;apiName:string;reason:string}>=[];
   const preserved:Array<{type:string;apiName:string}>=[];
+  const reused:Array<{type:string;apiName:string}>=[];
+  const addedFields:string[]=[];
+  missing.push(...await this.missingCredentials(tenant,pkg.contents));
   const profileNames=new Set((rbacSnapshot?.profiles??[]).map(profile=>profile.apiName));
   for(const config of pkg.contents.objectConfigurations??[]){
    const layoutLabels=new Set(config.pageLayouts.map(layout=>String(
@@ -566,7 +608,9 @@ export class MetadataPackageService{
    if(!existing)return;
    const owned=trackedByKey.get(JSON.stringify([type,api]));
    if(!owned){
-    conflicts.push({type,apiName:api,reason:'A component with this name already exists and is not owned by this package'});
+    // Upsert semantics: the tenant's existing metadata always wins. Objects are
+    // merged (missing fields only); other components are reused unchanged.
+    reused.push({type,apiName:api});
     return;
    }
    if(owned.component_state==='Retained'&&operation!=='reinstall'){
@@ -584,7 +628,9 @@ export class MetadataPackageService{
     const prior=existing.fields.find(item=>item.apiName===field.apiName);
     if(prior&&prior.dataType!==field.dataType)
      conflicts.push({type:'field',apiName:object.apiName+'.'+String(field.apiName),
-      reason:'Field type upgrades require an explicit field migration'});
+      reason:'The tenant already has this field with a different type ('+String(prior.dataType)
+       +'); the package needs '+String(field.dataType)});
+    else if(!prior)addedFields.push(object.apiName+'.'+String(field.apiName));
    }
   }
   for(const page of pkg.contents.pages)inspect('page',page.apiName,
@@ -606,7 +652,7 @@ export class MetadataPackageService{
   for(const config of pkg.contents.objectConfigurations??[])
    if(!available.has(config.apiName))missing.push({type:'object',apiName:config.apiName});
   return {canInstall:missing.length===0&&conflicts.length===0,operation,
-   missingDependencies:missing,conflicts,preservedCustomizations:preserved};
+   missingDependencies:missing,conflicts,preservedCustomizations:preserved,reused,addedFields};
  }
  private async writeGrant(tenant:string,user:string,resource:string,
   action:'create'|'manage'|'read'){
@@ -671,6 +717,9 @@ export class MetadataPackageService{
     throw Error('Package installation changed while applying the update');
    const previous=await this.tracked(tenant,pkg.package.apiName,client);
    const previousKeys=new Set(previous.map(item=>JSON.stringify([item.component_type,item.component_api])));
+   // Tenant-owned metadata the package reuses: never overwritten, never tracked as owned.
+   const reusedKeys=new Set(preview.reused.map(item=>JSON.stringify([item.type,item.apiName])));
+   const isReused=(type:string,api:string)=>reusedKeys.has(JSON.stringify([type,api]));
    const currentObjects=await definitions.list(tenant) as MetadataObject[];
    const objectMap=new Map(currentObjects.map(item=>[item.apiName,item]));
    const oldObjectNames=new Set(previous.filter(item=>item.component_type==='object').map(item=>item.component_api));
@@ -680,7 +729,7 @@ export class MetadataPackageService{
     if(preservedObjects.has(object.apiName))continue;
     const existing=objectMap.get(object.apiName);
     if(!existing)await definitions.create(tenant,object.apiName,object.label,[]);
-    else if(!oldObjectNames.has(object.apiName))
+    else if(!oldObjectNames.has(object.apiName)&&!isReused('object',object.apiName))
      throw Error('Package object is not owned by this package: '+object.apiName);
    }
    const refreshedObjects=await definitions.list(tenant) as MetadataObject[];
@@ -719,7 +768,8 @@ export class MetadataPackageService{
     }
    }
    for(const config of pkg.contents.objectConfigurations??[]){
-     if(preview.preservedCustomizations.some(item=>item.type==='object-config'&&item.apiName===config.apiName))
+     if(preview.preservedCustomizations.some(item=>item.type==='object-config'&&item.apiName===config.apiName)
+      ||isReused('object-config',config.apiName))
       continue;
      if(!objectManager)throw Error('Object Manager metadata packaging is unavailable');
      await objectManager.persistWithin(client,tenant,config.apiName,config.configuration);
@@ -758,7 +808,8 @@ export class MetadataPackageService{
      },currentRevision,user);
     }
     for(const flow of pkg.contents.flows??[]){
-     if(preview.preservedCustomizations.some(item=>item.type==='flow'&&item.apiName===flow.apiName))continue;
+     if(preview.preservedCustomizations.some(item=>item.type==='flow'&&item.apiName===flow.apiName)
+      ||isReused('flow',flow.apiName))continue;
      if(!flowRuntime)throw Error('Flow metadata packaging is unavailable');
      const old=previous.some(item=>item.component_type==='flow'&&item.component_api===flow.apiName);
      const existingFlow=old?await flowRuntime.loadEditor(tenant,flow.apiName):undefined;
@@ -775,6 +826,7 @@ export class MetadataPackageService{
      const state=await this.rbacAdministration.describe(tenant,user);
      const permissionSets=[...state.permissionSets];
      for(const incoming of pkg.contents.permissionSets){
+      if(isReused('permission-set',incoming.apiName))continue;
       const index=permissionSets.findIndex(item=>item.apiName===incoming.apiName);
       const currentSet=index>=0?permissionSets[index]:undefined;
       if(currentSet&&!previous.some(item=>item.component_type==='permission-set'
@@ -792,6 +844,7 @@ export class MetadataPackageService{
    const pageMap=new Map(currentPages.map(item=>[item.apiName,item]));
    for(const page of pkg.contents.pages){
     const existing=pageMap.get(page.apiName);
+    if(existing&&isReused('page',page.apiName))continue;
     if(existing&&!oldPageNames.has(page.apiName))throw Error('Package page is not owned by this package: '+page.apiName);
     if(existing&&preview.preservedCustomizations.some(item=>item.type==='page'&&item.apiName===page.apiName))continue;
     const {layouts,...base}=page as MetadataPage&{layouts?:Array<Record<string,unknown>>};
@@ -807,6 +860,7 @@ export class MetadataPackageService{
    }
    const oldComponentNames=new Set(previous.filter(item=>item.component_type==='component').map(item=>item.component_api));
    for(const component of pkg.contents.components){
+    if(isReused('component',component.apiName))continue;
     const exists=componentNames.has(component.apiName)||oldComponentNames.has(component.apiName);
     if(exists&&!oldComponentNames.has(component.apiName))throw Error('Package component is not owned by this package: '+component.apiName);
     if(preview.preservedCustomizations.some(item=>item.type==='component'&&item.apiName===component.apiName))continue;
@@ -890,6 +944,7 @@ export class MetadataPackageService{
      ...(pkg.contents.permissionSets??[]).map(item=>['permission-set',item.apiName,
       digestOf(permissionSetProjection(item))])
     ] as Array<['object'|'page'|'component'|'flow'|'object-config'|'permission-set',string,string]>){
+    if(isReused(type,api))continue;
     if(previousKeys.has(JSON.stringify([type,api]))){
      await client.query(`UPDATE md_metadata_package_components SET component_state='Active',component_digest=$5
       WHERE tenant_id=$1 AND package_api=$2 AND component_type=$3 AND component_api=$4`,
@@ -902,7 +957,8 @@ export class MetadataPackageService{
     VALUES($1,$2,'metadata-package.installed',$3::jsonb)`,[tenant,user,JSON.stringify({
      packageApi:pkg.package.apiName,version:pkg.package.version,type:pkg.package.type,digest:pkg.digest
     })]);
-   return {package:pkg.package,operation:preview.operation,preservedCustomizations:preview.preservedCustomizations};
+   return {package:pkg.package,operation:preview.operation,preservedCustomizations:preview.preservedCustomizations,
+    reused:preview.reused,addedFields:preview.addedFields};
   });
  }
  async uninstall(tenant:string,user:string,packageApi:string){

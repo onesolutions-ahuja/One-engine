@@ -1,6 +1,6 @@
 import ResponsiveDataList from '../../records/ResponsiveDataList/ResponsiveDataList';
 import { useState } from 'react';
-import { Copy, Pencil, Search } from 'lucide-react';
+import { Copy, Pencil, Search, Store } from 'lucide-react';
 import type { LightningAppMetadata } from '../../metadata/Definitions/metadata';
 import './AppManagerList.css';
 
@@ -9,9 +9,11 @@ type Props = {
   busy: boolean;
   onEdit: (app: LightningAppMetadata) => void;
   onClone: (app: LightningAppMetadata) => void;
+  /** Present only for OneEngine holders: publish this app to AppExchange. */
+  onPublish?: (app: LightningAppMetadata) => void;
 };
 
-export default function AppManagerList({apps, busy, onEdit, onClone}: Props) {
+export default function AppManagerList({apps, busy, onEdit, onClone, onPublish}: Props) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'label'|'apiName'|'navigation'|'pages'>('label');
   const [descending, setDescending] = useState(false);
@@ -53,6 +55,7 @@ export default function AppManagerList({apps, busy, onEdit, onClone}: Props) {
         {apiName:'actions',label:'Actions',render:app=><div className="app-manager-list-actions">
          <button type="button" className="btn" disabled={busy} aria-label={"Edit "+app.label} onClick={()=>onEdit(app)}>Edit</button>
          <button type="button" className="btn" disabled={busy} aria-label={"Clone "+app.label} onClick={()=>onClone(app)}>Clone</button>
+         {onPublish&&<button type="button" className="btn" disabled={busy} aria-label={"Publish "+app.label+" to AppExchange"} onClick={()=>onPublish(app)}>Publish</button>}
         </div>}
       ]}/>
     <div className="app-manager-list-scroll md-mobile-table-replaced md-tablet-table-replaced">
@@ -83,6 +86,11 @@ export default function AppManagerList({apps, busy, onEdit, onClone}: Props) {
               aria-label={'Clone ' + app.label} onClick={() => onClone(app)} title={'Clone ' + app.label}>
               <Copy size={14} aria-hidden="true"/> Clone
             </button>
+            {onPublish && <button type="button" className="btn btn-small" disabled={busy}
+              aria-label={'Publish ' + app.label + ' to AppExchange'} onClick={() => onPublish(app)}
+              title={'Publish ' + app.label + ' to AppExchange'}>
+              <Store size={14} aria-hidden="true"/> Publish
+            </button>}
           </div></td>
         </tr>)}</tbody>
       </table>

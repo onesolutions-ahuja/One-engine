@@ -432,3 +432,8 @@
  .exchange-detail-footer{flex-wrap:wrap}
  .exchange-detail-footer .btn{min-height:44px}
 }
+/* AppExchange install preview: what the upsert install creates, reuses or still needs. */
+.exchange-install-plan { border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-size: 0.9rem; }
+.exchange-install-plan h3 { margin: 0 0 6px; font-size: 0.95rem; }
+.exchange-install-plan ul { margin: 4px 0 0; padding-left: 18px; }
+.exchange-install-plan .form-error { margin-top: 8px; }

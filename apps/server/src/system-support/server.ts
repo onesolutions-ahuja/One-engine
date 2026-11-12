@@ -115,6 +115,7 @@ import { AppRuntime,appHomeFormFactor } from '../system-files/app-runtime.js';
 import { TenantProvisioning } from '../system-files/tenant-provisioning.js';
 import {PlatformTenantService} from '../system-files/platform-tenant-service.js';
 import {PlatformTenantUserService} from './platform-tenant-user-service.js';
+import {AppPublishingService} from './app-publishing-service.js';
 import {NativeTenantRecordReader} from './native-tenant-records.js';
 import {rotateFirstLoginPassword} from './first-login-rotation.js';
 import {reconcileBootstrapPassword} from './bootstrap-password-sync.js';
@@ -356,6 +357,7 @@ export function createSystemServer(db:SqlPersistence) {
   records.setRecordTriggerHandler((client,tenantId,userId,objectApi,operation,record,prior,phase,isClone)=>
     flowRecordTriggers.execute(client,tenantId,userId,objectApi,operation,record,prior,phase,isClone));
   const apps=new AppRuntime(db);
+  const appPublishing=new AppPublishingService(db,rbac,apps,metadataPackages,definitions,pages,library,flows);
   const platformTenants=new PlatformTenantService(db,rbac);
   const platformTenantUsers=new PlatformTenantUserService(db,rbac);
   const recoveryContacts=new TenantRecoveryContacts(db,rbac,mfa,namedCredentials);
@@ -2265,8 +2267,24 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     await rbac.require(actor.tenant_id,actor.user_id,'AppExchange','manage');
     if(req.body?.pageSeed)await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','create');
-    await apps.install(actor.tenant_id,req.params.apiName,req.body?.pageSeed);
-    res.status(204).end();
+    const result=await appPublishing.install(actor,req.params.apiName,req.body?.pageSeed);
+    if(!result.packaged){res.status(204).end();return;}
+    res.json(result);
+  }));
+  // What installing a published AppExchange app will create, reuse or still needs.
+  app.get('/api/apps/:apiName/install-preview',route(async(req,res)=>{
+    const actor=req.actor!;
+    await rbac.require(actor.tenant_id,actor.user_id,'AppExchange','read');
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(await appPublishing.preview(actor,req.params.apiName));
+  }));
+  // Publish a tenant-authored app to AppExchange (OneEngine).
+  app.get('/api/platform/apps/:apiName/publish',route(async(req,res)=>{
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(await appPublishing.discover(req.actor!,req.params.apiName));
+  }));
+  app.post('/api/platform/apps/:apiName/publish',route(async(req,res)=>{
+    res.status(201).json(await appPublishing.publish(req.actor!,req.params.apiName,req.body));
   }));
   app.delete('/api/metadata/apps/:apiName',route(async(req,res)=>{
     const actor=req.actor!;

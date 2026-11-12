@@ -164,3 +164,18 @@ test('validation rules support ISNEW, ISCHANGED and PRIORVALUE',async()=>{
   'first numbering is allowed');
  assert.throws(()=>evaluateFlowFormula('ISNEW()',()=>null,{},'flow_formula'),/not available in flow formula/);
 });
+
+test('SQL validation path evaluates NOT and record lifecycle functions',async()=>{
+ const {evaluateResolvedFormulaSql}=await import('../../src/system-support/formula-sql-runtime.ts');
+ const rule='AND(NOT(ISNEW()), NOT(ISBLANK(PRIORVALUE($Record.InvoiceNumber))), '+
+  'OR(ISCHANGED($Record.InvoiceNumber), ISCHANGED($Record.Total)))';
+ // ISBLANK is SQL-compiled: answer it from the bound child value.
+ const db={query:async(_sql,params)=>{const v=params.at(-1);return {rows:[{value:v===null||v===''}]};}};
+ const run=(current,prior,stage)=>evaluateResolvedFormulaSql(db,rule,
+  name=>name.startsWith('$Record.')?current[name.slice(8)]??null:null,
+  {transactionStage:stage,currentRecord:current,priorRecord:prior,timeZone:'UTC',now:new Date()},'validation_rule');
+ assert.equal(await run({InvoiceNumber:null,Total:3.7},null,'create'),false,'new invoice saves');
+ assert.equal(await run({InvoiceNumber:'INV-1',Total:9},{InvoiceNumber:'INV-1',Total:3.7},'update'),true,
+  'issued total change is blocked');
+ assert.equal(await run({InvoiceNumber:'INV-1',Total:3.7},{InvoiceNumber:'INV-1',Total:3.7},'update'),false);
+});

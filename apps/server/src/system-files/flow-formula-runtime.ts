@@ -302,8 +302,8 @@ function evaluateNode(node:Expression,resolve:FormulaResolver,context:FormulaEva
 /** Evaluate a prevalidated server-side action AST node using the same pure Flow
  * scalar evaluator. Callers must opt in only expressions proven compatible. */
 export function evaluateFlowFormulaNode(node:Expression,resolve:(name:string)=>unknown,
- context:FormulaEvaluationContext={}):unknown{
- validateFormulaFunctions(node,'ribbon_binding');
+ context:FormulaEvaluationContext={},expressionContext:FormulaExpressionContext='ribbon_binding'):unknown{
+ validateFormulaFunctions(node,expressionContext);
  return evaluate(node,resolve,context);
 }
 

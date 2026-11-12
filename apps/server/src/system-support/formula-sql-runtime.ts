@@ -5,7 +5,7 @@ import {Parser,type Expression} from '../expression-engine/FormulaParser.js';
 import {tokenize} from '../expression-engine/FormulaTokenizer.js';
 import {validateFormulaFunctions} from '../expression-engine/FormulaFunctionRegistry.js';
 import {compileFormulaSql,SQL_SCALAR_FORMULAS,SQL_RECORD_AGGREGATES} from '../expression-engine/FormulaSqlCompiler.js';
-import {evaluateFlowFormula,type FormulaEvaluationContext} from '../system-files/flow-formula-runtime.js';
+import {evaluateFlowFormula,evaluateFlowFormulaNode,type FormulaEvaluationContext} from '../system-files/flow-formula-runtime.js';
 import {evaluateFormulaBinary,evaluateFormulaUnary,formulaTruth} from '../expression-engine/FormulaParser.js';
 import {createNamedFormulaCollection} from '../expression-engine/FormulaCollection.js';
 import type {FormulaExpressionContext} from '../expression-engine/FormulaFunctionRegistry.js';
@@ -512,8 +512,16 @@ export async function evaluateResolvedFormulaSql(
   const {rows}=await db.query<{value:unknown}>('SELECT to_jsonb(('+expression+')) AS value WHERE '+timeZone+' IS NOT NULL AND '+now+' IS NOT NULL',params);
   return rows[0]?.value??null;
  };
+ const pureNow=context.now===undefined?new Date():context.now instanceof Date?context.now:new Date(context.now);
  const evaluate=async(node:Expression):Promise<unknown>=>{
   if(possible(node))return query(node);
+  // Subtrees with no SQL-only function (e.g. NOT(ISNEW()), ISCHANGED($Record.X))
+  // use the shared pure evaluator in the caller's formula context.
+  if(!hasSql(node))return evaluateFlowFormulaNode(node,resolve,{...context,now:pureNow},formulaContext);
+  if(node.kind==='call'&&node.name==='NOT'){
+   if(node.args.length!==1)throw Error('Invalid NOT formula argument count');
+   return !formulaTruth(await evaluate(node.args[0]));
+  }
   if(node.kind==='literal')return node.value;
   if(node.kind==='reference')return resolve(node.value);
   if(node.kind==='unary')return evaluateFormulaUnary(node.operator,await evaluate(node.value));

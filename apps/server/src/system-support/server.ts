@@ -22,7 +22,7 @@ import {retireRemovedApps,deleteRetiredChatterMetadata} from '../app-seeders/ret
 import {migrateSmartRendererKeys} from '../app-seeders/smart-components.js';
 import {seedMailAdminPermissions} from '../app-seeders/mail-admin-permissions.js';
 import {reconcileCoreObjects} from '../app-seeders/core-objects.js';
-import {seedPlatformOneEngineDeploymentPermission} from '../app-seeders/oneengine-policy.js';
+import {seedPlatformOneEngineDeploymentPermission,upgradeTenantDeveloperPolicy} from '../app-seeders/oneengine-policy.js';
 import { AuthenticationService } from '../system-files/authentication.js';
 import {PasswordRecoverySettingsService} from './password-recovery-settings-service.js';
 import {PasswordResetService} from './password-reset-service.js';
@@ -114,6 +114,7 @@ import {flowFormulaReferences} from '../system-files/flow-formula-runtime.js';
 import { AppRuntime,appHomeFormFactor } from '../system-files/app-runtime.js';
 import { TenantProvisioning } from '../system-files/tenant-provisioning.js';
 import {PlatformTenantService} from '../system-files/platform-tenant-service.js';
+import {PlatformTenantUserService} from './platform-tenant-user-service.js';
 import {NativeTenantRecordReader} from './native-tenant-records.js';
 import {rotateFirstLoginPassword} from './first-login-rotation.js';
 import {reconcileBootstrapPassword} from './bootstrap-password-sync.js';
@@ -356,6 +357,7 @@ export function createSystemServer(db:SqlPersistence) {
     flowRecordTriggers.execute(client,tenantId,userId,objectApi,operation,record,prior,phase,isClone));
   const apps=new AppRuntime(db);
   const platformTenants=new PlatformTenantService(db,rbac);
+  const platformTenantUsers=new PlatformTenantUserService(db,rbac);
   const recoveryContacts=new TenantRecoveryContacts(db,rbac,mfa,namedCredentials);
   const recoveryCases=new TenantRecoveryCases(db,rbac,platformTenants,mfa,recoveryContacts,namedCredentials);
 
@@ -1015,6 +1017,23 @@ export function createSystemServer(db:SqlPersistence) {
   app.post('/api/platform/tenants/:slug/developer-mailbox',route(async(req,res)=>{
     const actor=req.actor!;
     res.json(await platformTenants.provisionDeveloperMailbox(actor.tenant_id,actor.user_id,req.params.slug));
+  }));
+  // Platform user administration for any tenant (OneEngine in the platform tenant).
+  app.get('/api/platform/tenants/:slug/users',route(async(req,res)=>{
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(await platformTenantUsers.list(req.actor!,req.params.slug,req.query as Record<string,unknown>));
+  }));
+  app.post('/api/platform/tenants/:slug/users',route(async(req,res)=>{
+    res.setHeader('Cache-Control','private, no-store');
+    res.status(201).json(await platformTenantUsers.create(req.actor!,req.params.slug,req.body));
+  }));
+  app.patch('/api/platform/tenants/:slug/users/:userId',route(async(req,res)=>{
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(await platformTenantUsers.update(req.actor!,req.params.slug,req.params.userId,req.body));
+  }));
+  app.delete('/api/platform/tenants/:slug/users/:userId',route(async(req,res)=>{
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(await platformTenantUsers.remove(req.actor!,req.params.slug,req.params.userId));
   }));
   app.post('/api/platform/tenants',route(async(req,res)=>{
     const actor=req.actor!;
@@ -3037,6 +3056,7 @@ export async function startSystemServer() {
     console.info('Core metadata seeder: existing tenants backfilled:',seededTenants);
     const deploymentPermission=await seedPlatformOneEngineDeploymentPermission(db);
     console.info('Platform OneEngine deployment policy:',deploymentPermission);
+    console.info('Tenant Developer role moved from OneEngine to TenantDeveloper for tenants:',await upgradeTenantDeveloperPolicy(db));
     const status=await reconcileBootstrapPassword(db); if(status!=='disabled')console.info('First-install credential reconciliation:',status);
     const firstLogin=await rotateFirstLoginPassword(db);
     if(firstLogin!=='disabled')console.info('First-login credential rotation:',firstLogin);

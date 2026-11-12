@@ -5,6 +5,7 @@ import {snapshot,grantRules,type Snapshot,type Rule} from './rbac-contract.js';
 import {readRbac} from './rbac-description.js';
 import {validateRbac,groupMutes} from './rbac-validation.js';
 import {writeRbac} from './rbac-persistence.js';
+import {hasPlatformOneEngine} from '../system-files/platform-tenant-service.js';
 const stable=(value:unknown):string=>JSON.stringify(value,(_key,v)=>
  v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v);
 const assignments=(u:Snapshot['users'][number])=>stable({
@@ -51,7 +52,7 @@ export class RbacAdministration{
    }
    for(const p of next.profiles)if(p.isStandard&&!previous.profiles.some(old=>old.id===p.id&&old.isStandard))
     throw Error('Standard profile identity is protected');
-   for(const p of previous.permissionSets.filter(p=>['OneEngine','PlatformDeveloper'].includes(p.apiName))){
+   for(const p of previous.permissionSets.filter(p=>['OneEngine','PlatformDeveloper','TenantDeveloper'].includes(p.apiName))){
     if(next.permissionSets.find(n=>n.id===p.id)?.apiName!==p.apiName)throw Error('Reserved permission set identity is protected');
    }
    // Platform policy administration remains a separately assigned authority.
@@ -138,6 +139,18 @@ export class RbacAdministration{
     if(u.roleId)for(const link of roleLinks.rows)if(link.role_id===u.roleId)sources.add(link.permission_set_id);
     return sources;
    };
+   // OneEngine is system-wide authority. Only a current OneEngine holder may grant or
+   // revoke it (directly, or via profiles or groups), or create a set with that name;
+   // tenant-wide wildcard rights alone must never let a tenant admin self-promote.
+   const oneEngineIds=new Set([...previous.permissionSets,...next.permissionSets]
+    .filter(p=>p.apiName==='OneEngine').map(p=>p.id));
+   const holdsOneEngine=(state:Snapshot,u:Snapshot['users'][number]|undefined)=>
+    !!u&&[...effectiveSources(state,u)].some(id=>oneEngineIds.has(id));
+   const oneEngineChanged=next.permissionSets.some(p=>p.apiName==='OneEngine'
+     &&!previous.permissionSets.some(o=>o.id===p.id&&o.apiName==='OneEngine'))
+    ||next.users.some(u=>holdsOneEngine(next,u)!==holdsOneEngine(previous,previous.users.find(o=>o.id===u.id)));
+   if(oneEngineChanged&&!(await hasPlatformOneEngine(tx,tenant,actor)))
+    throw Error('Reserved permission set OneEngine can only be granted or revoked by a OneEngine holder');
    for(const user of next.users){
     const oldUser=previous.users.find(u=>u.id===user.id)!;
     const before=effectiveSources(previous,oldUser);

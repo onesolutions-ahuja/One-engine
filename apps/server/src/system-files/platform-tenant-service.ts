@@ -24,17 +24,18 @@ export const PLATFORM_TENANT_DOMAIN='unesolutions.co.uk';
 
 /**
  * Platform (cross-tenant) authority: OneEngine membership (direct, role, profile or
- * group) held by an enabled internal user OF THE PLATFORM TENANT. Every tenant has its
- * own OneEngine permission set, so OneEngine alone must never grant cross-tenant access.
+ * group) held by an enabled internal user of ANY active tenant. OneEngine is the
+ * system-wide control policy: whoever holds it administers every tenant (tenants,
+ * users, licences, recovery). Tenant-scoped administration must use a different
+ * permission set, never OneEngine. PLATFORM_TENANT_DOMAIN no longer limits this.
  */
 export async function hasPlatformOneEngine(db:Pick<SqlPersistence,'query'>,
   tenantId:string,userId:string):Promise<boolean>{
   const {rows}=await db.query<{authorised:boolean}>(`
    SELECT EXISTS(
-    SELECT 1 FROM md_tenant_domains d JOIN md_tenants t ON t.id=d.tenant_id
+    SELECT 1 FROM md_tenants t
     JOIN md_users u ON u.tenant_id=t.id AND u.id=$2
-    WHERE d.tenant_id=$1 AND d.domain=$3
-      AND t.status='ACTIVE' AND u.enabled=true AND u.user_type='internal'
+    WHERE t.id=$1 AND t.status='ACTIVE' AND u.enabled=true AND u.user_type='internal'
    ) AND EXISTS(
     SELECT 1 FROM md_permission_assignments a JOIN md_permission_sets p
      ON p.tenant_id=a.tenant_id AND p.id=a.permission_set_id
@@ -51,7 +52,7 @@ export async function hasPlatformOneEngine(db:Pick<SqlPersistence,'query'>,
      ON gs.tenant_id=ug.tenant_id AND gs.group_id=ug.group_id
      JOIN md_permission_sets p ON p.tenant_id=gs.tenant_id AND p.id=gs.permission_set_id
      WHERE ug.tenant_id=$1 AND ug.user_id=$2 AND p.api_name='OneEngine'
-   ) AS authorised`,[tenantId,userId,PLATFORM_TENANT_DOMAIN]);
+   ) AS authorised`,[tenantId,userId]);
   return rows[0]?.authorised===true;
 }
 
@@ -59,8 +60,7 @@ export class PlatformTenantService {
  constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine){}
  private async platformScope(tenantId:string,userId:string){
   await this.rbac.require(tenantId,userId,'Tenant','manage');
-  // OneEngine is seeded into EVERY tenant, so it only confers platform authority
-  // inside the canonical platform tenant (same rule as OCI deployment).
+  // OneEngine in any tenant confers system-wide authority (see hasPlatformOneEngine).
   return hasPlatformOneEngine(this.db,tenantId,userId);
  }
  /** True when this user may administer other tenants. Never throws for ordinary users. */

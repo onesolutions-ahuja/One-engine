@@ -56,6 +56,9 @@ export class TenantProvisioning {
       if(existing.rowCount)throw new Error('Tenant already exists; refusing to overwrite');
       const duplicate=await client.query('SELECT 1 FROM md_users WHERE lower(email)=$1 LIMIT 1',[developerIdentityEmail]);
       if(duplicate.rowCount)throw new Error('Tenant developer email already registered');
+      // The first tenant of a fresh system owns it (OneEngine); every later
+      // tenant's developer is limited to its own tenant (TenantDeveloper).
+      const firstTenant=(await client.query('SELECT 1 FROM md_tenants LIMIT 1')).rowCount===0;
       const tenant=await client.query<{id:string}>(
         'INSERT INTO md_tenants (slug,name) VALUES ($1,$2) RETURNING id',[slug,name]);
       const tenantId=tenant.rows[0].id;
@@ -71,7 +74,7 @@ export class TenantProvisioning {
         developerEmail:developerIdentityEmail,
         disabledDeveloperPasswordHash:developerDisabledHash
       });
-      await seedOneEnginePolicy(client,tenantId,users);
+      await seedOneEnginePolicy(client,tenantId,users,{systemOwner:firstTenant});
       await seedCoreObjects(client,tenantId);
       if(authority){
         await client.query(`INSERT INTO md_tenant_provisioning_requests

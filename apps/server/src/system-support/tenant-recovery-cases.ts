@@ -266,7 +266,7 @@ export class TenantRecoveryCases{
     SELECT r.id FROM md_roles r
      JOIN md_role_permission_sets rp ON rp.tenant_id=r.tenant_id AND rp.role_id=r.id
      JOIN md_permission_sets p ON p.tenant_id=rp.tenant_id AND p.id=rp.permission_set_id
-     WHERE r.tenant_id=$1 AND r.api_name='TenantDeveloper' AND p.api_name='OneEngine'`,
+     WHERE r.tenant_id=$1 AND r.api_name='TenantDeveloper' AND p.api_name IN('TenantDeveloper','OneEngine')`,
     [actor.tenant_id]);
    if(!role.rows[0])throw Error('Tenant developer administrator policy unavailable');
    await client.query(`INSERT INTO md_user_roles(tenant_id,user_id,role_id)

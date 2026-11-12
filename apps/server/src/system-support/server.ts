@@ -1466,7 +1466,7 @@ export function createSystemServer(db:SqlPersistence) {
     const page=await pages.resolveInScreenPage(actor.tenant_id,req.params.appId,
       req.params.pageApiName,String(req.query.formFactor??'Desktop'),
       req.path.split('/').at(-2)==='print-templates'?'Print Template':'In-Screen Page');
-    if(!page)throw new Error('In-Screen Page is not published or permitted for this app');
+    if(!page)throw new Error('In-Screen Page not found');
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Vary','Authorization, Cookie');
     res.json({page:page.page});

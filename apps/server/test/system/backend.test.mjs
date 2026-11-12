@@ -127,3 +127,22 @@ test('publishing standalone Page Builder templates does not demand navigation as
  for(const type of ['App Page','In-Screen Page','Print Template'])
   assert.equal(pageRequiresActivationAssignment(type),false,type);
 });
+
+test('Custom-only In-Screen Pages open when the host asks for another layout',async()=>{
+ const {PageRuntime}=await import('../../src/system-files/page-runtime.ts');
+ const asked=[];
+ const db={query:async(_sql,params)=>{asked.push(params[3]);
+  return {rows:params[3]==='Custom'&&params[2]==='popup'?[{api_name:'popup'}]:[]};}};
+ const runtime=new PageRuntime(db);
+ const loads=[];
+ runtime.load=async(tenant,api,variant)=>{loads.push([tenant,api,variant]);return {page:{apiName:api}};};
+ const page=await runtime.resolveInScreenPage('t1','APP','popup','Desktop');
+ assert.equal(page?.page.apiName,'popup');
+ assert.deepEqual(asked,['Desktop','Custom'],'exact layout first, then Custom');
+ assert.equal(loads[0][2],'Custom','the Custom layout is the one served');
+ asked.length=0;
+ assert.equal(await runtime.resolveInScreenPage('t1','APP','missing','Custom').catch(e=>e),null);
+ assert.deepEqual(asked,['Custom'],'Custom requests do not retry');
+ const routes=readFileSync(new URL('../../src/system-support/server.ts',import.meta.url),'utf8');
+ assert.match(routes,/throw new Error\('In-Screen Page not found'\)/,'missing popups are 404, not SQL outages');
+});

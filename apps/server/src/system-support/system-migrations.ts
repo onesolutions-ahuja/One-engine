@@ -114,10 +114,13 @@ export async function applySystemMigrations(db:SqlPersistence) {
   // delivery_channel 'admin': audited set-password links issued by an admin or platform support.
   await client.query(`ALTER TABLE md_password_recovery_channel_actions
     ADD COLUMN IF NOT EXISTS platform_default boolean NOT NULL DEFAULT false`);
-  await client.query(`DO $$ BEGIN
+  await client.query(`DO $$ DECLARE r record; BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='md_password_reset_challenges_delivery_channel_v2') THEN
-      ALTER TABLE md_password_reset_challenges
-        DROP CONSTRAINT IF EXISTS md_password_reset_challenges_delivery_channel_check;
+      -- Drop the original column CHECK whatever it was named.
+      FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='md_password_reset_challenges'::regclass
+        AND contype='c' AND pg_get_constraintdef(oid) LIKE '%delivery_channel%' LOOP
+        EXECUTE format('ALTER TABLE md_password_reset_challenges DROP CONSTRAINT %I',r.conname);
+      END LOOP;
       ALTER TABLE md_password_reset_challenges ADD CONSTRAINT md_password_reset_challenges_delivery_channel_v2
         CHECK(delivery_channel IN('email','sms','whatsapp','admin'));
     END IF;

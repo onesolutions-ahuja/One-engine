@@ -120,7 +120,32 @@ function evaluateNode(node:Expression,resolve:FormulaResolver,context:FormulaEva
     if(node.args.length<minimum||node.args.length>maximum)
       throw new Error('Invalid argument count for '+node.name);
   };
+  // Lifecycle helpers read the field named by the argument, not its value.
+  const lifecycleField=():{reference:string;field:string}=>{
+    const target=node.args[0];
+    if(!target||target.kind!=='reference')throw new Error(node.name+' requires a field reference');
+    const reference=target.value;
+    const field=reference.startsWith('$Record.')?reference.slice(8)
+      :reference.startsWith('$')?'':reference.includes('.')?reference.slice(reference.indexOf('.')+1):reference;
+    if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(field))throw new Error(node.name+' requires a record field');
+    return {reference,field};
+  };
+  const isNewRecord=():boolean=>context.transactionStage==='create'||context.transactionStage==='clone'
+    ||(context.transactionStage!=='update'&&!context.priorRecord);
   switch(node.name){
+    case 'ISNEW':arity(0);return isNewRecord();
+    case 'PRIORVALUE':arity(1);{
+      const {reference,field}=lifecycleField();
+      return isNewRecord()||!context.priorRecord?resolve(reference):context.priorRecord[field]??null;
+    }
+    case 'ISCHANGED':arity(1);{
+      const {reference,field}=lifecycleField();
+      if(isNewRecord()||!context.priorRecord)return false;
+      const blank=(value:unknown)=>value===null||value===undefined||value==='';
+      const current=resolve(reference),prior=context.priorRecord[field];
+      if(blank(current)&&blank(prior))return false;
+      return formulaText(current)!==formulaText(prior);
+    }
     case 'IF':arity(3);return truth(argument(0))?argument(1):argument(2);
     case 'IFERROR':arity(2);{
       try{return argument(0);}
@@ -383,6 +408,9 @@ export function inferFlowFormulaType(expression:string,resolve:FormulaTypeResolv
       case 'AND':case 'OR':arity(1,20);args.forEach((_,index)=>requireType(index,['Checkbox']));return 'Checkbox';
       case 'NOT':arity(1);requireType(0,['Checkbox']);return 'Checkbox';
       case 'ISBLANK':case 'ISNULL':case 'ISNUMBER':arity(1);return 'Checkbox';
+      case 'ISNEW':arity(0);return 'Checkbox';
+      case 'ISCHANGED':arity(1);return 'Checkbox';
+      case 'PRIORVALUE':arity(1);return args[0];
       case 'BLANKVALUE':case 'NULLVALUE':arity(2);{
         const result=compatibleFormulaTypes(args[0],args[1]);
         if(!result)throw new Error(node.name+' argument types do not match');

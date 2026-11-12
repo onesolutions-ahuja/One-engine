@@ -146,3 +146,21 @@ test('Custom-only In-Screen Pages open when the host asks for another layout',as
  const routes=readFileSync(new URL('../../src/system-support/server.ts',import.meta.url),'utf8');
  assert.match(routes,/throw new Error\('In-Screen Page not found'\)/,'missing popups are 404, not SQL outages');
 });
+
+test('validation rules support ISNEW, ISCHANGED and PRIORVALUE',async()=>{
+ const {evaluateFlowFormula}=await import('../../src/system-files/flow-formula-runtime.ts');
+ // Seeded AceAssist rule that blocked every Invoice save with "Unsupported formula function: ISNEW".
+ const rule='AND(NOT(ISNEW()), NOT(ISBLANK(PRIORVALUE($Record.InvoiceNumber))), '+
+  'OR(ISCHANGED($Record.InvoiceNumber), ISCHANGED($Record.Total)))';
+ const run=(current,prior,stage)=>evaluateFlowFormula(rule,
+  name=>name.startsWith('$Record.')?current[name.slice(8)]??null:null,
+  {transactionStage:stage,currentRecord:current,priorRecord:prior},'validation_rule');
+ assert.equal(run({InvoiceNumber:null,Total:3.7},null,'create'),false,'new invoices pass');
+ assert.equal(run({InvoiceNumber:'INV-1',Total:3.7},{InvoiceNumber:'INV-1',Total:3.7},'update'),false,
+  'unchanged issued invoice passes');
+ assert.equal(run({InvoiceNumber:'INV-1',Total:9},{InvoiceNumber:'INV-1',Total:3.7},'update'),true,
+  'changing an issued total is blocked');
+ assert.equal(run({InvoiceNumber:'INV-2',Total:3.7},{InvoiceNumber:null,Total:3.7},'update'),false,
+  'first numbering is allowed');
+ assert.throws(()=>evaluateFlowFormula('ISNEW()',()=>null,{},'flow_formula'),/not available in flow formula/);
+});

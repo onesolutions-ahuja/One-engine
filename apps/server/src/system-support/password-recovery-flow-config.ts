@@ -1,10 +1,13 @@
 import type {SqlExecutor} from '../system-files/sql-persistence.js';
+import {PLATFORM_TENANT_DOMAIN} from '../system-files/platform-tenant-service.js';
 
 export type RecoveryChannel='email'|'whatsapp'|'sms';
 export type RecoveryMethod='OTP'|'LINK';
 export type RecoveryChannelAction={
  channel:'whatsapp'|'sms';enabled:boolean;flowServiceUserId:string|null;
  credentialId:string|null;calloutPath:string;calloutBody:string;messageTemplate:string;
+ /** Platform tenant only: offer this callout to every tenant without its own channel. */
+ platformDefault:boolean;
 };
 export type RecoveryFlowConfig={
  method:RecoveryMethod;otpLength:4|6;expiryMinutes:number;maxAttempts:number;
@@ -17,16 +20,16 @@ export const defaultRecoveryFlow:RecoveryFlowConfig={
  emailSubject:defaultRecoverySubject,emailTemplate:defaultRecoveryMessage,
  channels:{
   whatsapp:{channel:'whatsapp',enabled:false,flowServiceUserId:null,credentialId:null,
-   calloutPath:'',calloutBody:'',messageTemplate:defaultRecoveryMessage},
+   calloutPath:'',calloutBody:'',messageTemplate:defaultRecoveryMessage,platformDefault:false},
   sms:{channel:'sms',enabled:false,flowServiceUserId:null,credentialId:null,
-   calloutPath:'',calloutBody:'',messageTemplate:defaultRecoveryMessage}
+   calloutPath:'',calloutBody:'',messageTemplate:defaultRecoveryMessage,platformDefault:false}
  }
 };
 type FlowRow={method:RecoveryMethod;otp_length:4|6;otp_expiry_minutes:number;max_otp_attempts:number;
  email_subject:string;email_template:string};
 type ActionRow={channel:'sms'|'whatsapp';enabled:boolean;flow_service_user_id:string|null;
  credential_id:string|null;callout_path:string;callout_body:string;message_template:string;
- credential_enabled:boolean|null;credential_protocol:string|null;service_user_enabled:boolean|null};
+ platform_default:boolean|null;credential_enabled:boolean|null;credential_protocol:string|null;service_user_enabled:boolean|null};
 export const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function recoveryActionReady(action:RecoveryChannelAction):boolean{
  return action.enabled&&!!action.credentialId&&!!action.flowServiceUserId
@@ -42,7 +45,7 @@ export async function readRecoveryFlow(db:SqlExecutor,tenantId:string):Promise<R
   db.query<FlowRow>(`SELECT method,otp_length,otp_expiry_minutes,max_otp_attempts,
    email_subject,email_template FROM md_password_recovery_flow WHERE tenant_id=$1`,[tenantId]),
   db.query<ActionRow>(`SELECT a.channel,a.enabled,a.flow_service_user_id,a.credential_id,
-   a.callout_path,a.callout_body,a.message_template,
+   a.callout_path,a.callout_body,a.message_template,a.platform_default,
    c.enabled AS credential_enabled,c.protocol AS credential_protocol,u.enabled AS service_user_enabled
    FROM md_password_recovery_channel_actions a
    LEFT JOIN md_named_credentials c ON c.tenant_id=a.tenant_id AND c.id=a.credential_id
@@ -66,8 +69,27 @@ export async function readRecoveryFlow(db:SqlExecutor,tenantId:string):Promise<R
     &&action.credential_protocol==='HTTPS'&&action.service_user_enabled===true,
    flowServiceUserId:action.flow_service_user_id,credentialId:action.credential_id,
    calloutPath:action.callout_path,calloutBody:action.callout_body,
-   messageTemplate:action.message_template
+   messageTemplate:action.message_template,platformDefault:action.platform_default===true
   };
  }
  return config;
+}
+
+export async function platformTenantId(db:SqlExecutor):Promise<string|null>{
+ const {rows}=await db.query<{tenant_id:string}>(`SELECT d.tenant_id FROM md_tenant_domains d
+  JOIN md_tenants t ON t.id=d.tenant_id WHERE d.domain=$1 AND t.status='ACTIVE' LIMIT 1`,[PLATFORM_TENANT_DOMAIN]);
+ return rows[0]?.tenant_id??null;
+}
+export type EffectiveRecoveryAction={action:RecoveryChannelAction;calloutTenantId:string;source:'tenant'|'platform'};
+/** The tenant's own channel wins; otherwise a ready platform-default channel is used.
+ * The callout always runs inside the tenant that owns the Named Credential. */
+export async function effectiveRecoveryAction(db:SqlExecutor,tenantId:string,flow:RecoveryFlowConfig,
+ channel:'sms'|'whatsapp'):Promise<EffectiveRecoveryAction|null>{
+ const own=flow.channels[channel];
+ if(recoveryActionReady(own))return {action:own,calloutTenantId:tenantId,source:'tenant'};
+ const platform=await platformTenantId(db);
+ if(!platform||platform===tenantId)return null;
+ const platformAction=(await readRecoveryFlow(db,platform)).channels[channel];
+ return platformAction.platformDefault&&recoveryActionReady(platformAction)
+  ?{action:platformAction,calloutTenantId:platform,source:'platform'}:null;
 }

@@ -164,17 +164,21 @@ function AutomationSettingsWorkspace({ canManage }: { canManage: boolean }) {
 }
 
 type TenantMfaMode = 'Off' | 'Optional' | 'Required';
+const isJsonObject=(text:string)=>{try{const v=JSON.parse(text) as unknown;return !!v&&typeof v==='object'&&!Array.isArray(v);}catch{return false;}};
 
 type RecoveryChannel='sms'|'whatsapp';
 type RecoveryAction={channel:RecoveryChannel;enabled:boolean;flowServiceUserId:string|null;
- credentialId:string|null;calloutPath:string;calloutBody:string;messageTemplate:string};
+ credentialId:string|null;calloutPath:string;calloutBody:string;messageTemplate:string;platformDefault?:boolean};
 type RecoveryFlow={method:'OTP'|'LINK';otpLength:4|6;expiryMinutes:number;maxAttempts:number;
  emailSubject:string;emailTemplate:string;channels:Record<RecoveryChannel,RecoveryAction>};
-type RecoverySettings={flow:RecoveryFlow;revision:number;fromEmail:string;deliveryReady:boolean;linkReady:boolean};
+type RecoverySettings={flow:RecoveryFlow;revision:number;fromEmail:string;deliveryReady:boolean;linkReady:boolean;
+ isPlatformTenant?:boolean;platformDefaults?:Record<RecoveryChannel,boolean>};
 function TenantEmailRecoverySettings({canManage}:{canManage:boolean}){
  const [flow,setFlow]=useState<RecoveryFlow|null>(null);
  const [revision,setRevision]=useState(0),[deliveryReady,setDeliveryReady]=useState(false);
  const [linkReady,setLinkReady]=useState(false),[fromEmail,setFromEmail]=useState('');
+ const [isPlatformTenant,setIsPlatformTenant]=useState(false);
+ const [platformDefaults,setPlatformDefaults]=useState<Record<RecoveryChannel,boolean>>({sms:false,whatsapp:false});
  const [credentials,setCredentials]=useState<Array<{id:string;name:string;protocol:string;enabled:boolean}>>([]);
  const [serviceUsers,setServiceUsers]=useState<Array<{id:string;email:string;enabled:boolean}>>([]);
  const [editing,setEditing]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
@@ -190,6 +194,7 @@ function TenantEmailRecoverySettings({canManage}:{canManage:boolean}){
   let active=true;
   void apiRequest<RecoverySettings>('/auth/password-recovery/settings')
    .then(r=>{if(active){setFlow(r.flow);setRevision(r.revision);setDeliveryReady(r.deliveryReady);
+    setIsPlatformTenant(r.isPlatformTenant===true);setPlatformDefaults(r.platformDefaults??{sms:false,whatsapp:false});
     setLinkReady(r.linkReady);setFromEmail(r.fromEmail);}}).catch(()=>{});
   void apiRequest<{credentials:typeof credentials}>('/named-credentials')
    .then(r=>{if(active)setCredentials(r.credentials.filter(item=>item.protocol==='HTTPS'&&item.enabled));}).catch(()=>{});
@@ -201,7 +206,11 @@ function TenantEmailRecoverySettings({canManage}:{canManage:boolean}){
  const recoveryDirty=editing&&snapshot.current!==null&&JSON.stringify(flow)!==JSON.stringify(snapshot.current);
  const recoveryReady=(['whatsapp','sms'] as const).every(channel=>!flow.channels[channel].enabled
   ||Boolean(flow.channels[channel].flowServiceUserId&&flow.channels[channel].credentialId
-   &&flow.channels[channel].messageTemplate.trim()&&flow.channels[channel].calloutPath.startsWith('/')));
+   &&flow.channels[channel].messageTemplate.trim()&&flow.channels[channel].calloutPath.trim().replace(/^\/+/,'')
+   &&isJsonObject(flow.channels[channel].calloutBody)));
+ const channelStatus=(channel:RecoveryChannel)=>flow.channels[channel].enabled
+  ?(flow.channels[channel].platformDefault?'Enabled · offered to all tenants':'Enabled')
+  :platformDefaults[channel]?'Using platform default':'Not configured';
  const change=(patch:Partial<RecoveryFlow>)=>setFlow(value=>value?{...value,...patch}:value);
  const changeChannel=(channel:RecoveryChannel,patch:Partial<RecoveryAction>)=>
   setFlow(value=>value?{...value,channels:{...value.channels,
@@ -286,7 +295,12 @@ function TenantEmailRecoverySettings({canManage}:{canManage:boolean}){
        value={action.calloutBody}
        onChange={event=>changeChannel(channel,{calloutBody:event.target.value})}/></label>
      </details>
-     <p>Requires verified account phone, authorised service user and configured Named Credential.</p>
+     {isPlatformTenant&&<label className="checkbox-row"><input type="checkbox" checked={action.platformDefault===true}
+      disabled={!action.enabled}
+      onChange={event=>changeChannel(channel,{platformDefault:event.target.checked})}/>
+      Offer to all tenants (platform default — used by any tenant without its own {channel==='whatsapp'?'WhatsApp':'SMS'} callout)</label>}
+     {!isPlatformTenant&&platformDefaults[channel]&&!action.enabled&&<p>The platform's {channel==='whatsapp'?'WhatsApp':'SMS'} callout is used until you enable your own.</p>}
+     <p>Merge fields for the JSON template: {'{!Recovery.Phone}'}, {'{!Recovery.Code}'}, {'{!Recovery.Message}'}. Codes are only sent to users with a recovery mobile number on file.</p>
     </details>;
    })}
   </div>:<div className="settings-read-first-section">
@@ -294,8 +308,8 @@ function TenantEmailRecoverySettings({canManage}:{canManage:boolean}){
    <SettingsViewRow label="OTP length" value={flow.otpLength+' digits'} canEdit={canManage} onEdit={()=>begin('otp')}/>
    <SettingsViewRow label="Expiry" value={flow.expiryMinutes+' minutes'} canEdit={canManage} onEdit={()=>begin('otp')}/>
    <SettingsViewRow label="Platform email" value={deliveryReady?'Configured':'Not configured'} canEdit={canManage} onEdit={()=>begin('email')}/>
-   <SettingsViewRow label="WhatsApp HTTP Callout" value={flow.channels.whatsapp.enabled?'Enabled':'Not configured'} canEdit={canManage} onEdit={()=>begin('whatsapp')}/>
-   <SettingsViewRow label="SMSGate HTTP Callout" value={flow.channels.sms.enabled?'Enabled':'Not configured'} canEdit={canManage} onEdit={()=>begin('sms')}/>
+   <SettingsViewRow label="WhatsApp HTTP Callout" value={channelStatus('whatsapp')} canEdit={canManage} onEdit={()=>begin('whatsapp')}/>
+   <SettingsViewRow label="SMS HTTP Callout" value={channelStatus('sms')} canEdit={canManage} onEdit={()=>begin('sms')}/>
   </div>}
   {editing&&canManage&&<div className="settings-read-first-toolbar md-recovery-save-bar">
    <span>{recoveryDirty?'Unsaved recovery Flow changes':'No unsaved changes'}</span>
@@ -304,7 +318,7 @@ function TenantEmailRecoverySettings({canManage}:{canManage:boolean}){
     <Save size={14}/>{busy?'Saving…':'Save Flow'}
    </button>
   </div>}
-  {editing&&!recoveryReady&&<p role="alert" className="form-error">For each enabled WhatsApp or SMS channel, select a service user and Named Credential and supply a message and relative endpoint before saving.</p>}
+  {editing&&!recoveryReady&&<p role="alert" className="form-error">For each enabled WhatsApp or SMS channel, select a service user and Named Credential and supply a message, a relative endpoint and a JSON object request template before saving.</p>}
   {message&&<p role="status">{message}</p>}
  </section>;
 }

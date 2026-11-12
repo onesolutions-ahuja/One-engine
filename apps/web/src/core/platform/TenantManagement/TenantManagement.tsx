@@ -7,6 +7,7 @@ import AdminPropertyControl from '../../builders/AdminPropertyControl/AdminPrope
 import TenantDomains from '../TenantDomains/TenantDomains';
 import TenantRecoveryPanel from '../TenantRecoveryPanel/TenantRecoveryPanel';
 import TenantUsagePanel from '../TenantUsagePanel/TenantUsagePanel';
+import TenantUsersPanel from '../TenantUsersPanel/TenantUsersPanel';
 import SeederManager from './SeederManager';
 import {PlatformPageSlot} from '../Workspace/PlatformPageSlot';
 
@@ -50,7 +51,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
   const [emailCheckError,setEmailCheckError] = useState('');
   const [createKey, setCreateKey] = useState(() => crypto.randomUUID());
   const [showCreate, setShowCreate] = useState(false);
-  const [detailTab, setDetailTab] = useState<'details' | 'usage' | 'domains' | 'recovery' | 'seeders'>('details');
+  const [detailTab, setDetailTab] = useState<'details' | 'users' | 'usage' | 'domains' | 'recovery' | 'seeders'>('details');
   const [editDetails, setEditDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -338,7 +339,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
         <Mail size={17} /><span>Developer mailbox <strong>{developer.email}</strong> was not created ({mailboxLabel[developer.mailboxStatus ?? 'missing'].toLowerCase()}).</span>
         <button type="button" className="tenant-button tenant-button-primary" onClick={() => void retryMailbox()} disabled={busy}>{busy ? 'Working…' : 'Retry developer mailbox'}</button>
       </div>}
-      <div className="tenant-detail-tabs" role="tablist" aria-label="Tenant details sections">{([["details","Overview"],["usage","Usage"],["domains","Domains"],["recovery","Recovery"],["seeders","Seeders"]] as const).map(([id,label]) => <button type="button" key={id} role="tab" aria-selected={detailTab === id} className={detailTab === id ? "active" : ""} onClick={() => setDetailTab(id)}>{label}</button>)}</div>
+      <div className="tenant-detail-tabs" role="tablist" aria-label="Tenant details sections">{([["details","Overview"],["users","Users"],["usage","Usage"],["domains","Domains"],["recovery","Recovery"],["seeders","Seeders"]] as const).map(([id,label]) => <button type="button" key={id} role="tab" aria-selected={detailTab === id} className={detailTab === id ? "active" : ""} onClick={() => setDetailTab(id)}>{label}</button>)}</div>
       {detailTab === "details" && <div className="tenant-overview-grid">
         <form className="tenant-card" onSubmit={(event) => void saveTenant(event)}>
           <div className="tenant-card-heading"><h3>Organisation</h3>{!editDetails && <button type="button" className="tenant-button tenant-button-small" onClick={() => setEditDetails(true)}>Edit</button>}</div>
@@ -374,7 +375,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
           <p className="tenant-help">Changes are audited. Nothing is ever deleted automatically.</p>
         </section>
       </div>}
-      {detailTab === "usage" && <PlatformPageSlot slotKey="tenant-usage"><TenantUsagePanel request={request} tenantId={selected.tenantId} permitted={permitted} /></PlatformPageSlot>}{detailTab === "domains" && <PlatformPageSlot slotKey="tenant-domains"><TenantDomains request={request} permitted={permitted} tenantId={selected.tenantId} /></PlatformPageSlot>}{detailTab === "seeders" && <SeederManager request={request} tenantId={selected.tenantId} />}{detailTab === "recovery" && <PlatformPageSlot slotKey="tenant-recovery"><TenantRecoveryPanel request={request} operator permitted={permitted} tenantId={selected.tenantId} /></PlatformPageSlot>}
+      {detailTab === "users" && <TenantUsersPanel request={request} tenantId={selected.tenantId} permitted={permitted} />}{detailTab === "usage" && <PlatformPageSlot slotKey="tenant-usage"><TenantUsagePanel request={request} tenantId={selected.tenantId} permitted={permitted} /></PlatformPageSlot>}{detailTab === "domains" && <PlatformPageSlot slotKey="tenant-domains"><TenantDomains request={request} permitted={permitted} tenantId={selected.tenantId} /></PlatformPageSlot>}{detailTab === "seeders" && <SeederManager request={request} tenantId={selected.tenantId} />}{detailTab === "recovery" && <PlatformPageSlot slotKey="tenant-recovery"><TenantRecoveryPanel request={request} operator permitted={permitted} tenantId={selected.tenantId} /></PlatformPageSlot>}
     </section></PlatformPageSlot>}
     {showCreate&&<div className="tenant-create-backdrop" role="presentation">
       <section className="tenant-create-dialog" role="dialog" aria-modal="true" aria-labelledby="tenant-create-title"

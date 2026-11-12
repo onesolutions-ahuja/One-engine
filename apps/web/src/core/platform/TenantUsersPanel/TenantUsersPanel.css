@@ -1,0 +1,11 @@
+.tenant-users { display: grid; gap: 12px; }
+.tenant-users-search { display: flex; align-items: center; gap: 8px; }
+.tenant-users-search .form-control { flex: 1; }
+.tenant-users-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.tenant-users-form { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; }
+.tenant-users-form h4 { margin: 0; }
+.tenant-users-form-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: end; }
+.tenant-users-fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tenant-users-fieldset legend { font-weight: 600; margin-bottom: 4px; }
+.tenant-users-sets { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); max-height: 240px; overflow: auto; }
+.tenant-users-check { display: flex; align-items: center; gap: 8px; }

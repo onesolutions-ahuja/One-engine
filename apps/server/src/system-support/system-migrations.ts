@@ -109,6 +109,19 @@ export async function applySystemMigrations(db:SqlPersistence) {
    appliedNewMigration=true;
    await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',[name,checksum]);
   }
+  // Upgrade-safe account recovery additions (idempotent; the SQL baseline is immutable).
+  // platform_default: the platform tenant offers its SMS/WhatsApp callout to all tenants.
+  // delivery_channel 'admin': audited set-password links issued by an admin or platform support.
+  await client.query(`ALTER TABLE md_password_recovery_channel_actions
+    ADD COLUMN IF NOT EXISTS platform_default boolean NOT NULL DEFAULT false`);
+  await client.query(`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='md_password_reset_challenges_delivery_channel_v2') THEN
+      ALTER TABLE md_password_reset_challenges
+        DROP CONSTRAINT IF EXISTS md_password_reset_challenges_delivery_channel_check;
+      ALTER TABLE md_password_reset_challenges ADD CONSTRAINT md_password_reset_challenges_delivery_channel_v2
+        CHECK(delivery_channel IN('email','sms','whatsapp','admin'));
+    END IF;
+  END $$`);
   // Upgrade-safe global ribbon metadata. Reapplying these idempotent inserts
   // works with the immutable single SQL baseline and already-created tenants.
   await client.query(`

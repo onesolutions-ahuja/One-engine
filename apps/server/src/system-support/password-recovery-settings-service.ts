@@ -1,7 +1,7 @@
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import {isPlatformRecoveryMailConfigured} from './platform-recovery-mailer.js';
-import {readRecoveryFlow,recoveryActionReady,uuidPattern,
+import {platformTenantId,readRecoveryFlow,recoveryActionReady,uuidPattern,
  type RecoveryChannelAction,type RecoveryFlowConfig} from './password-recovery-flow-config.js';
 
 const textField=(value:unknown,max:number,label:string)=>{
@@ -17,10 +17,13 @@ function parseChannel(raw:unknown,channel:'sms'|'whatsapp'):RecoveryChannelActio
  if(serviceUser!==null&&(typeof serviceUser!=='string'||!uuidPattern.test(serviceUser))
   ||credential!==null&&(typeof credential!=='string'||!uuidPattern.test(credential)))
   throw new Error('Invalid recovery Flow service identity or credential');
- const path=typeof x.calloutPath==='string'?x.calloutPath:'';
+ // Endpoints are relative to the Named Credential's base URL; accept an optional leading '/'.
+ const path=typeof x.calloutPath==='string'?x.calloutPath.trim().replace(/^\/+/,''):'';
  const body=typeof x.calloutBody==='string'?x.calloutBody:'';
  const message=textField(x.messageTemplate,5000,'recovery message template');
- if(path.length>2048||path.startsWith('/')||path.includes('\\')||path.includes('..')
+ if(x.platformDefault!==undefined&&typeof x.platformDefault!=='boolean')
+  throw new Error('Invalid platform default flag');
+ if(path.length>2048||path.includes('\\')||path.includes('..')
   ||body.length>32768)throw new Error('Invalid recovery HTTP Callout mapping');
  if(body){
   try{const parsed=JSON.parse(body) as unknown;
@@ -30,9 +33,9 @@ function parseChannel(raw:unknown,channel:'sms'|'whatsapp'):RecoveryChannelActio
  }
  const action:RecoveryChannelAction={channel,enabled:x.enabled,
   flowServiceUserId:serviceUser,credentialId:credential,
-  calloutPath:path,calloutBody:body,messageTemplate:message};
+  calloutPath:path,calloutBody:body,messageTemplate:message,platformDefault:x.platformDefault===true};
  if(action.enabled&&!recoveryActionReady(action))
-  throw new Error('Set a service user, HTTPS Named Credential and HTTP Callout for '+channel);
+  throw new Error('Set a service user, HTTPS Named Credential, relative endpoint and JSON request template for '+channel);
  return action;
 }
 function parseFlow(raw:unknown):RecoveryFlowConfig{
@@ -66,7 +69,12 @@ export class PasswordRecoverySettingsService{
    readRecoveryFlow(this.db,tenantId),
    this.db.query<{revision:number}>('SELECT revision FROM md_password_recovery_flow WHERE tenant_id=$1',[tenantId])
   ]);
-  return {policy:{method:flow.method,defaultChannel:'email',allowedChannels:flow.method==='OTP'
+  const platform=await platformTenantId(this.db);
+  const platformFlow=platform&&platform!==tenantId?await readRecoveryFlow(this.db,platform):null;
+  const platformDefaults={
+   sms:!!platformFlow&&platformFlow.channels.sms.platformDefault&&recoveryActionReady(platformFlow.channels.sms),
+   whatsapp:!!platformFlow&&platformFlow.channels.whatsapp.platformDefault&&recoveryActionReady(platformFlow.channels.whatsapp)};
+  return {isPlatformTenant:platform===tenantId,platformDefaults,policy:{method:flow.method,defaultChannel:'email',allowedChannels:flow.method==='OTP'
    ?(['email',...(flow.channels.sms.enabled?['sms']:[]),...(flow.channels.whatsapp.enabled?['whatsapp']:[])]):
      ['email'],templates:{email:{subject:flow.emailSubject,body:flow.emailTemplate}}},
    flow,revision:revisionResult.rows[0]?.revision??0,
@@ -90,6 +98,9 @@ export class PasswordRecoverySettingsService{
    flow=parseFlow({...old,method:policy.method,emailSubject:templates?.email?.subject??old.emailSubject,
     emailTemplate:templates?.email?.body??old.emailTemplate});
   }
+  if((flow.channels.sms.platformDefault||flow.channels.whatsapp.platformDefault)
+   &&await platformTenantId(this.db)!==tenantId)
+   throw new Error('Only the platform tenant can offer a recovery channel to all tenants');
   const revision=payload.revision===undefined?undefined:Number(payload.revision);
   if(revision!==undefined&&(!Number.isSafeInteger(revision)||revision<0))
    throw new Error('Invalid recovery Flow version');
@@ -109,15 +120,15 @@ export class PasswordRecoverySettingsService{
    for(const channel of ['sms','whatsapp'] as const){
     const action=flow.channels[channel];
     await client.query(`INSERT INTO md_password_recovery_channel_actions
-     (tenant_id,channel,enabled,flow_service_user_id,credential_id,callout_path,callout_body,message_template)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+     (tenant_id,channel,enabled,flow_service_user_id,credential_id,callout_path,callout_body,message_template,platform_default)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT(tenant_id,channel) DO UPDATE SET enabled=EXCLUDED.enabled,
       flow_service_user_id=EXCLUDED.flow_service_user_id,credential_id=EXCLUDED.credential_id,
       callout_path=EXCLUDED.callout_path,callout_body=EXCLUDED.callout_body,
-      message_template=EXCLUDED.message_template,
+      message_template=EXCLUDED.message_template,platform_default=EXCLUDED.platform_default,
       revision=md_password_recovery_channel_actions.revision+1,updated_at=now()`,
      [tenantId,channel,action.enabled,action.flowServiceUserId,action.credentialId,
-      action.calloutPath,action.calloutBody,action.messageTemplate]);
+      action.calloutPath,action.calloutBody,action.messageTemplate,action.platformDefault&&action.enabled]);
    }
    await client.query(`INSERT INTO md_security_events(tenant_id,actor_user_id,action)
     VALUES($1,$2,'PasswordRecoveryFlowUpdated')`,[tenantId,userId]);

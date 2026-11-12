@@ -26,6 +26,7 @@ import {seedPlatformOneEngineDeploymentPermission} from '../app-seeders/oneengin
 import { AuthenticationService } from '../system-files/authentication.js';
 import {PasswordRecoverySettingsService} from './password-recovery-settings-service.js';
 import {PasswordResetService} from './password-reset-service.js';
+import {AccountAssistService} from './account-assist-service.js';
 import {PasswordPolicyService} from './password-policy-service.js';
 import {MfaService} from './mfa-service.js';
 import {MfaBackupService} from './mfa-backup-service.js';
@@ -2386,6 +2387,23 @@ export function createSystemServer(db:SqlPersistence) {
       WHERE EXISTS(SELECT 1 FROM md_users WHERE tenant_id=$1 AND id=$3)`,[tenantId,userId,target]);
     if(!rows[0]?.allowed)throw new Error('Permission denied');
   };
+  const accountAssist=new AccountAssistService(db,rbac,auth,requireUserReportingScope);
+  const noStore=(res:Response)=>res.setHeader('Cache-Control','no-store');
+  app.get('/api/auth/recovery-phone',route(async(req,res)=>{
+    noStore(res);res.json(await accountAssist.readOwnPhone(req.actor!));
+  }));
+  app.put('/api/auth/recovery-phone',route(async(req,res)=>{
+    noStore(res);res.json(await accountAssist.setOwnPhone(req.actor!,req.body));
+  }));
+  app.put('/api/records/User/:id/recovery-phone',route(async(req,res)=>{
+    noStore(res);res.json(await accountAssist.setUserPhone(req.actor!,req.params.id,req.body));
+  }));
+  app.post('/api/records/User/:id/password-reset-link',route(async(req,res)=>{
+    noStore(res);res.status(201).json(await accountAssist.adminResetLink(req.actor!,req.params.id,req.body));
+  }));
+  app.post('/api/platform/tenants/:tenantId/password-reset-link',route(async(req,res)=>{
+    noStore(res);res.status(201).json(await accountAssist.platformResetLink(req.actor!,req.params.tenantId,req.body));
+  }));
   const readUser=async(tenantId:string,userId:string,id:string)=>{
     await requireUserReportingScope(tenantId,userId,id);
     const result=await db.query<{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null}>(

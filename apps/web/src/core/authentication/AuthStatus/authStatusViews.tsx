@@ -1,3 +1,4 @@
+import { OwnRecoveryPhone } from '../../security/AccountAssist/AccountAssist';
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { ChevronDown, X, Wifi, WifiOff } from 'lucide-react';
 import {useDismissOnOutside} from '../../accessibility/Dismiss/useDismissOnOutside';
@@ -8,6 +9,7 @@ export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout:
   const profileMenuRef = useRef<HTMLDivElement>(null);
   useDismissOnOutside(profileMenuRef, open, () => setOpen(false));
   const [editing, setEditing] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -32,7 +34,15 @@ export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout:
       onClick={() => setOpen((state) => !state)}>Profile <ChevronDown size={13} /></button>
     {open && <div className="profile-menu-panel">
       <button type="button" onClick={() => { setEditing(true); setOpen(false); reset(); }}>Change Password</button>
+      <button type="button" onClick={() => { setPhoneOpen(true); setOpen(false); }}>Recovery Mobile</button>
       <button type="button" onClick={() => void onLogout()}>Sign Out</button>
+    </div>}
+    {phoneOpen && <div className="profile-password-backdrop" role="presentation">
+      <section className="profile-password-dialog" role="dialog" aria-modal="true" aria-label="Recovery mobile">
+        <div className="profile-password-heading"><h2>Recovery Mobile</h2>
+          <button type="button" className="icon-button" aria-label="Close" onClick={() => setPhoneOpen(false)}><X size={18} /></button></div>
+        <OwnRecoveryPhone />
+      </section>
     </div>}
     {editing && <div className="profile-password-backdrop" role="presentation">
       <section className="profile-password-dialog" role="dialog" aria-modal="true" aria-labelledby="change-password-heading">

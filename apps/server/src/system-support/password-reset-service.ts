@@ -3,7 +3,7 @@ import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {AuthenticationService} from '../system-files/authentication.js';
 import {checkPasswordHistory,retainPasswordHistory} from './password-policy-service.js';
 import {isPlatformRecoveryMailConfigured} from './platform-recovery-mailer.js';
-import {readRecoveryFlow,renderRecoveryText,recoveryActionReady,
+import {effectiveRecoveryAction,readRecoveryFlow,renderRecoveryText,
  type RecoveryChannel} from './password-recovery-flow-config.js';
 
 const digest=(s:string)=>createHash('sha256').update(s).digest('hex');
@@ -36,10 +36,13 @@ export class PasswordResetService {
   const mailReady=isPlatformRecoveryMailConfigured()
    &&(flow.method==='LINK'||!!process.env.METADRIVE_PASSWORD_RESET_OTP_SECRET
      &&Buffer.byteLength(process.env.METADRIVE_PASSWORD_RESET_OTP_SECRET)>=32);
+  const phoneReady=async(channel:'sms'|'whatsapp')=>flow.method==='OTP'&&!!this.httpCallout
+   &&!!await effectiveRecoveryAction(this.db,tenantId,flow,channel);
+  // Channels are reported per tenant, never per account, so the page cannot be used
+  // to discover which accounts exist or have a phone. Accounts without a verified
+  // recovery phone are simply never sent an SMS/WhatsApp code.
   return {otpLength:flow.otpLength,method:flow.method,
-   channels:{email:mailReady,
-    sms:flow.method==='OTP'&&recoveryActionReady(flow.channels.sms)&&!!this.httpCallout,
-    whatsapp:flow.method==='OTP'&&recoveryActionReady(flow.channels.whatsapp)&&!!this.httpCallout}};
+   channels:{email:mailReady,sms:await phoneReady('sms'),whatsapp:await phoneReady('whatsapp')}};
  }
  async request(tenantId:string,email:unknown,requestedChannel:unknown='email'){
   if(!validEmail(email)||!['email','sms','whatsapp'].includes(String(requestedChannel)))
@@ -51,8 +54,9 @@ export class PasswordResetService {
   if(flow.method==='OTP'&&(!process.env.METADRIVE_PASSWORD_RESET_OTP_SECRET
     ||Buffer.byteLength(process.env.METADRIVE_PASSWORD_RESET_OTP_SECRET)<32))
    return {message:acknowledgement};
-  const action=channel==='email'?null:flow.channels[channel];
-  if(action&&!recoveryActionReady(action))return {message:acknowledgement};
+  const effective=channel==='email'?null:await effectiveRecoveryAction(this.db,tenantId,flow,channel);
+  if(channel!=='email'&&!effective)return {message:acknowledgement};
+  const action=effective?.action??null;
   const {rows:users}=await this.db.query<{id:string;name:string;phone_e164:string|null}>(`
    SELECT u.id,t.name,p.phone_e164 FROM md_users u
    JOIN md_tenants t ON t.id=u.tenant_id
@@ -102,7 +106,7 @@ export class PasswordResetService {
     if(!this.httpCallout||!action?.flowServiceUserId||!action.credentialId)
      throw new Error('Recovery HTTP Callout unavailable');
     const message=renderRecoveryText(action.messageTemplate,code,expires,user.name);
-    await this.httpCallout(tenantId,action.flowServiceUserId,{
+    await this.httpCallout(effective!.calloutTenantId,action.flowServiceUserId,{
      namedCredentialId:action.credentialId,method:'POST',path:action.calloutPath,
      body:action.calloutBody
     },{'Recovery.Phone':user.phone_e164,'Recovery.Code':code,

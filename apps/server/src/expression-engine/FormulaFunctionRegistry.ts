@@ -38,7 +38,7 @@ const textFunctions=new Set([
 ]);
 const checkboxFunctions=new Set([
   'AND','OR','NOT','ISBLANK','ISNULL','ISNUMBER','CONTAINS','BEGINS',
-  'ISPICKVAL','INCLUDES','VERIFYPIN'
+  'ISPICKVAL','INCLUDES','VERIFYPIN','ISNEW','ISCHANGED'
 ]);
 const explicitParameters=new Map<string,FormulaValueKind[]>([
   ['COLLECTION',['Text','Any']],['TABLE',['Collection','Any']],['SUM',['Collection']],['IF',['Checkbox','Any','Any']],['IFERROR',['Any','Any']],['NOT',['Checkbox']],
@@ -91,7 +91,10 @@ const inputs:DefinitionInput[]=[
   ['SUMIFS',2,42,['ribbon_binding']],['AVERAGEIFS',2,42,['ribbon_binding']],
   ['MINIFS',2,42,['ribbon_binding']],['MAXIFS',2,42,['ribbon_binding']],
   // Server-side hashed PIN comparison: VERIFYPIN(Pin) or VERIFYPIN(UserId, Pin).
-  ['VERIFYPIN',1,2,['ribbon_binding']]
+  ['VERIFYPIN',1,2,['ribbon_binding']],
+  // Record save lifecycle; validation rules only (current and prior record).
+  ['ISNEW',0,0,['validation_rule']],['ISCHANGED',1,1,['validation_rule']],
+  ['PRIORVALUE',1,1,['validation_rule']]
 ];
 
 const definitions=new Map<string,FormulaFunctionDefinition>();

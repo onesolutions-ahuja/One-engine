@@ -329,12 +329,23 @@ export class PageRuntime {
       [tenantId,objectApi,appId,profileId,recordTypeId,dbDevice,mode,strictCustom]);
     return rows[0]?this.metadata(tenantId,rows[0].api_name,runtimeLayoutVariant(device)):null;
   }
-  /** Published in-screen surfaces never enter normal application navigation. */
+  /**
+   * Published in-screen surfaces never enter normal application navigation.
+   * A popup built only for the Custom layout is still served when the host asks
+   * for Desktop/Tablet/Phone, matching resolveAppPage's Custom preference: an
+   * App Page on the Custom layout must be able to open its Custom-only popups.
+   */
   async resolveInScreenPage(tenantId:string,appId:string,pageApi:string,device:string,pageType:'In-Screen Page'|'Print Template'='In-Screen Page'):
     Promise<Awaited<ReturnType<PageRuntime['load']>>|null>{
     if(!['Desktop','Phone','Mobile','Tablet','Custom'].includes(device))
       throw new Error('Invalid in-screen page device');
-    const factor=device==='Mobile'?'Phone':device;
+    const exact=await this.findInScreenPage(tenantId,appId,pageApi,device==='Mobile'?'Phone':device,pageType);
+    if(exact)return this.load(tenantId,exact,runtimeLayoutVariant(device));
+    if(device==='Custom')return null;
+    const custom=await this.findInScreenPage(tenantId,appId,pageApi,'Custom',pageType);
+    return custom?this.load(tenantId,custom,runtimeLayoutVariant('Custom')):null;
+  }
+  private async findInScreenPage(tenantId:string,appId:string,pageApi:string,factor:string,pageType:string):Promise<string|null>{
     const {rows}=await this.db.query<{api_name:string}>(`
       SELECT p.api_name FROM md_page_definitions p
       JOIN md_lightning_page_details d ON d.tenant_id=p.tenant_id AND d.page_id=p.id
@@ -359,7 +370,7 @@ export class PageRuntime {
           WHERE x.tenant_id=p.tenant_id AND x.page_id=p.id AND x.app_api IS NOT NULL
         ))
       LIMIT 1`,[tenantId,appId,pageApi,factor,pageType]);
-    return rows[0]?this.load(tenantId,rows[0].api_name,runtimeLayoutVariant(device)):null;
+    return rows[0]?.api_name??null;
   }
 
   async resolveAppPage(tenantId:string,appId:string,pageApi:string,device:string,viewportWidth?:number,strictCustom=false):Promise<Awaited<ReturnType<PageRuntime['load']>>|null>{

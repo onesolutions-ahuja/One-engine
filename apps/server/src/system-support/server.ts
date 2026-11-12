@@ -22,7 +22,7 @@ import {retireRemovedApps,deleteRetiredChatterMetadata} from '../app-seeders/ret
 import {migrateSmartRendererKeys} from '../app-seeders/smart-components.js';
 import {seedMailAdminPermissions} from '../app-seeders/mail-admin-permissions.js';
 import {reconcileCoreObjects} from '../app-seeders/core-objects.js';
-import {seedPlatformOneEngineDeploymentPermission} from '../app-seeders/oneengine-policy.js';
+import {seedPlatformOneEngineDeploymentPermission,upgradeTenantDeveloperPolicy} from '../app-seeders/oneengine-policy.js';
 import { AuthenticationService } from '../system-files/authentication.js';
 import {PasswordRecoverySettingsService} from './password-recovery-settings-service.js';
 import {PasswordResetService} from './password-reset-service.js';
@@ -3056,6 +3056,7 @@ export async function startSystemServer() {
     console.info('Core metadata seeder: existing tenants backfilled:',seededTenants);
     const deploymentPermission=await seedPlatformOneEngineDeploymentPermission(db);
     console.info('Platform OneEngine deployment policy:',deploymentPermission);
+    console.info('Tenant Developer role moved from OneEngine to TenantDeveloper for tenants:',await upgradeTenantDeveloperPolicy(db));
     const status=await reconcileBootstrapPassword(db); if(status!=='disabled')console.info('First-install credential reconciliation:',status);
     const firstLogin=await rotateFirstLoginPassword(db);
     if(firstLogin!=='disabled')console.info('First-login credential rotation:',firstLogin);

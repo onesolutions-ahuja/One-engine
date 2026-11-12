@@ -70,3 +70,62 @@ export async function seedPlatformOneEngineDeploymentPermission(
   SELECT tenant_id FROM audited`);
  return rows.length;
 }
+
+/**
+ * One-time upgrade for tenants provisioned before TenantDeveloper existed: their
+ * Tenant Developer role granted OneEngine, which is now system-wide authority.
+ * Relinks that role to a TenantDeveloper permission set (full rights inside the
+ * tenant only). Idempotent: one receipt per tenant in md_security_events.
+ *
+ * System-owner tenants are left unchanged so their operators keep OneEngine:
+ * the oldest tenant, and any tenant where an enabled internal user holds
+ * OneEngine by direct assignment. Direct OneEngine assignments, profiles and
+ * groups are never changed anywhere.
+ */
+export async function upgradeTenantDeveloperPolicy(db:Pick<SqlPersistence,'query'|'transaction'>):Promise<string[]>{
+ const {rows:candidates}=await db.query<{id:string;slug:string}>(`
+  SELECT t.id,t.slug FROM md_tenants t
+  WHERE t.id<>(SELECT id FROM md_tenants ORDER BY created_at,id LIMIT 1)
+   AND NOT EXISTS(SELECT 1 FROM md_security_events e
+    WHERE e.tenant_id=t.id AND e.action='tenant-developer-policy.upgraded')
+   AND NOT EXISTS(SELECT 1 FROM md_permission_assignments a
+    JOIN md_permission_sets p ON p.tenant_id=a.tenant_id AND p.id=a.permission_set_id
+    JOIN md_users u ON u.tenant_id=a.tenant_id AND u.id=a.user_id
+    WHERE a.tenant_id=t.id AND p.api_name='OneEngine' AND u.enabled AND u.user_type='internal')
+  ORDER BY t.created_at,t.id`);
+ const upgraded:string[]=[];
+ for(const tenant of candidates){
+  const changed=await db.transaction(async client=>{
+   await client.query('SELECT id FROM md_tenants WHERE id=$1 FOR UPDATE',[tenant.id]);
+   const done=await client.query(`SELECT 1 FROM md_security_events
+    WHERE tenant_id=$1 AND action='tenant-developer-policy.upgraded'`,[tenant.id]);
+   if(done.rowCount)return false;
+   const role=await client.query<{id:string}>(
+    "SELECT id FROM md_roles WHERE tenant_id=$1 AND api_name='TenantDeveloper'",[tenant.id]);
+   const oneEngine=await client.query<{id:string}>(
+    "SELECT id FROM md_permission_sets WHERE tenant_id=$1 AND api_name='OneEngine'",[tenant.id]);
+   let relinked=0;
+   if(role.rows[0]&&oneEngine.rows[0]){
+    const created=await client.query<{id:string}>(`
+     INSERT INTO md_permission_sets(tenant_id,api_name,label,description) VALUES($1,$2,$3,$4)
+     ON CONFLICT(tenant_id,api_name) DO NOTHING RETURNING id`,
+     [tenant.id,TENANT_DEVELOPER_PERMISSION_SET,'Tenant Developer','Full administration of this tenant only; no access to other tenants']);
+    if(created.rows[0])await client.query(`INSERT INTO md_permission_rules(tenant_id,permission_set_id,resource,action,effect)
+     VALUES($1,$2,'*','*','allow') ON CONFLICT DO NOTHING`,[tenant.id,created.rows[0].id]);
+    const target=created.rows[0]??(await client.query<{id:string}>(
+     'SELECT id FROM md_permission_sets WHERE tenant_id=$1 AND api_name=$2',[tenant.id,TENANT_DEVELOPER_PERMISSION_SET])).rows[0];
+    const removed=await client.query(`DELETE FROM md_role_permission_sets
+     WHERE tenant_id=$1 AND role_id=$2 AND permission_set_id=$3`,[tenant.id,role.rows[0].id,oneEngine.rows[0].id]);
+    relinked=removed.rowCount??0;
+    if(relinked)await client.query(`INSERT INTO md_role_permission_sets(tenant_id,role_id,permission_set_id)
+     VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[tenant.id,role.rows[0].id,target.id]);
+   }
+   await client.query(`INSERT INTO md_security_events(tenant_id,actor_user_id,action,details)
+    VALUES($1,NULL,'tenant-developer-policy.upgraded',$2::jsonb)`,
+    [tenant.id,JSON.stringify({role:'TenantDeveloper',from:'OneEngine',to:TENANT_DEVELOPER_PERMISSION_SET,relinked})]);
+   return relinked>0;
+  });
+  if(changed)upgraded.push(tenant.slug);
+ }
+ return upgraded;
+}

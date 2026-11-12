@@ -501,7 +501,7 @@ export function renderSetupShell(ctx: any) {
             })} objects={objects} apps={apps} profiles={accessControl.profiles} reports={reports} libraryComponents={libraryComponents} flows={flows} onChange={changePage} onSelectPage={(apiName: string) => { const selected = pages.find((item) => item.apiName === apiName); if (selected) { setPage(selected); navigateRoute({ kind: 'setup', workspace: 'page-builder', resourceApiName: selected.apiName }); } }} onTargetObjectChange={openPageForObject} onLaunchFlow={(apiName: string, inputs: Record<string, unknown>,context?:{requestId?:string}) => void runFlow(apiName, inputs,context)} onSave={savePageFromBuilder} onUpdatePageDetails={updatePageDetailsFromBuilder} onPublish={publishPageFromBuilder} onDeactivate={deactivatePageFromBuilder} onSaveApp={saveApp} onDeleteApp={deleteApp} onDeletePage={deletePage} request={apiRequest} canManageRoutes={canManageApps} onExit={() => { setPage(pages.find((item) => item.apiName === route.resourceApiName) ?? pages[0] ?? defaultLightningPage); pageRouteApiName.current = ''; navigateRoute({ kind: 'setup', workspace: 'home' }); }} onNotify={notify} />}
           {route.kind === 'setup' && workspace === 'app-manager' && !advancedMetadataLoaded && <section className="setup-card" role="status">Loading live applications…</section>}
           {route.kind === 'setup' && workspace === 'app-manager' && advancedMetadataLoaded && <PlatformWorkspaceSurface workspace="app-manager" componentRuntime={protectedPageRuntime} permitted={canReadMetadata} resolving={!sessionPermissionsLoaded} pages={pages} libraryComponents={libraryComponents} device={runtimeFormFactor} canEditSystemPage={canManagePlatformTenants} onEditSystemPage={(apiName: string)=>{const selected=pages.find(p=>p.apiName===apiName);if(selected)setPage(selected);navigateRoute({kind:'setup',workspace:'page-builder',resourceApiName:apiName});}}><AppManager apps={apps} objects={objects} pages={pages} flows={flows} libraryComponents={libraryComponents} reports={reports} dashboards={dashboards}
-            onSave={saveApp} onDelete={deleteApp} request={apiRequest}
+            onSave={saveApp} onDelete={deleteApp} request={apiRequest} canPublish={canManagePlatformTenants}
             onOpenWorkspace={(destination) => navigateRoute({kind:'setup', workspace:destination})} /></PlatformWorkspaceSurface>}
           {route.kind === 'setup' && workspace === 'dashboard-builder' && (
             dashboardsError ? <section className="setup-card" role="alert">Unable to load dashboards: {dashboardsError}</section> :
@@ -596,12 +596,14 @@ export function renderSetupShell(ctx: any) {
               await apiRequest('/connector-apps/'+encodeURIComponent(appKey)+'/licence',{method:'POST',body:'{}'});
             }}
             installApp={async(appKey:string)=>{
-              await apiRequest('/apps/'+encodeURIComponent(appKey)+'/install',{method:'POST',body:'{}'});
+              const result=await apiRequest<unknown>('/apps/'+encodeURIComponent(appKey)+'/install',{method:'POST',body:'{}'});
               const [installed,published]=await Promise.all([
                 apiRequest<{apps:LightningAppMetadata[]}>('/metadata/apps'),
                 apiRequest<{pages:LightningPageMetadata[]}>('/metadata/pages')]);
               setApps(installed.apps);setPages(published.pages);
+              return result;
             }}
+            previewInstall={(appKey:string)=>apiRequest('/apps/'+encodeURIComponent(appKey)+'/install-preview')}
             uninstallApp={async(appKey:string)=>{
               await apiRequest('/metadata/apps/'+encodeURIComponent(appKey),{method:'DELETE'});
               const [installed,published]=await Promise.all([

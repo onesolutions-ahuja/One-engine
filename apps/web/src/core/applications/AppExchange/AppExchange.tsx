@@ -5,6 +5,17 @@ const ConnectorAppWorkspace = lazy(() => import('../../integrations/ConnectorApp
 import type { NamedCredentialMetadata } from '../../metadata/Definitions/metadata';
 import {PlatformPageSlot} from '../../platform/Workspace/PlatformPageSlot';
 
+/** Server preview of installing a published AppExchange app into this tenant. */
+export type AppInstallPreview = { packaged: false } | {
+  packaged: true; version: number; upToDate: boolean; canInstall: boolean;
+  create: Record<'objects'|'pages'|'components'|'flows'|'permissionSets', string[]>;
+  reused: Array<{type: string; apiName: string}>; addedFields: string[];
+  missingDependencies: Array<{type: string; apiName: string}>;
+  conflicts: Array<{type: string; apiName: string; reason: string}>;
+  activateFlows: string[];
+};
+const plural = (count: number, word: string) => count + ' ' + word + (count === 1 ? '' : 's');
+
 type Props = {
   credentials: NamedCredentialMetadata[];
   flows: ConnectorFlowSummary[];
@@ -16,7 +27,8 @@ type Props = {
   encryptionReady: boolean | null;
   loadApps: () => Promise<ConnectorApp[]>;
   executeLifecycleFlow: (flowName: string, appKey: string) => Promise<void>;
-  installApp: (appKey: string) => Promise<void>;
+  installApp: (appKey: string) => Promise<unknown>;
+  previewInstall?: (appKey: string) => Promise<AppInstallPreview>;
   uninstallApp: (appKey: string) => Promise<void>;
   grantLicence: (appKey: string) => Promise<void>;
   canManageLicences: boolean;
@@ -37,6 +49,8 @@ export default function AppExchange(props: Props) {
   const [view, setView] = useState<'discover'|'installed'>('discover');
   const [selected, setSelected] = useState<string | null>(null);
   const [openedKey, setOpenedKey] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const [preview, setPreview] = useState<{key: string; value?: AppInstallPreview; error?: string} | null>(null);
 
   const refresh = useCallback(async () => {
     const rows = await props.loadApps();
@@ -59,18 +73,35 @@ export default function AppExchange(props: Props) {
   const installed = apps.filter((app) => app.Installed__c).length;
   const details = selected ? apps.find((app) => app.AppKey__c === selected) : undefined;
   const opened = openedKey ? apps.find((app) => app.AppKey__c === openedKey) : undefined;
+  const previewKey = details && details.AppType__c !== 'ConnectorApp' && props.previewInstall
+    && (!details.Installed__c || (details.PackageVersion__c ?? 0) > (details.InstalledPackageVersion__c ?? 0))
+    ? details.AppKey__c : null;
+  useEffect(() => {
+    if (!previewKey || !props.previewInstall) { setPreview(null); return; }
+    let active = true;
+    setPreview({key: previewKey});
+    props.previewInstall(previewKey).then((value) => { if (active) setPreview({key: previewKey, value}); })
+      .catch((reason: unknown) => { if (active) setPreview({key: previewKey, error: reason instanceof Error ? reason.message : 'Unable to preview install'}); });
+    return () => { active = false; };
+  }, [previewKey, props.previewInstall]);
+  const plan = preview?.key === previewKey ? preview?.value : undefined;
+  const blocked = !!plan && plan.packaged && !plan.canInstall;
 
   const action = async (app: ConnectorApp, operation: 'install'|'trial'|'uninstall'|'grant-install') => {
     if (busy) return;
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setNotice('');
+    const report = (result: unknown) => {
+      const warnings = (result as {flowWarnings?: string[]} | undefined)?.flowWarnings ?? [];
+      if (warnings.length) setNotice(app.Name + ' installed. Some flows stayed inactive: ' + warnings.join('; '));
+    };
     try {
       if (operation === 'install') {
         if (app.LicenceStatus__c !== 'ACTIVE') throw new Error('An active app licence is required before installation');
-        await props.installApp(app.AppKey__c);
+        report(await props.installApp(app.AppKey__c));
       } else if (operation === 'grant-install') {
         if (!props.canManageLicences || !props.canInstall) throw new Error('Licence management permission required');
         await props.grantLicence(app.AppKey__c);
-        await props.installApp(app.AppKey__c);
+        report(await props.installApp(app.AppKey__c));
       } else if (operation === 'uninstall') {
         await props.uninstallApp(app.AppKey__c);
       } else {
@@ -119,6 +150,7 @@ export default function AppExchange(props: Props) {
     </section></PlatformPageSlot>
     <div className="exchange-content">
       {error && <div className="records-message" role="alert">{error}</div>}
+      {notice && <div className="records-message" role="status">{notice}</div>}
       <PlatformPageSlot slotKey="marketplace-filters"><div className="exchange-tabs" role="tablist" aria-label="Marketplace views">
         <button role="tab" aria-selected={view === 'discover'} className={view === 'discover' ? 'active' : ''} onClick={() => setView('discover')}>Discover apps</button>
         <button role="tab" aria-selected={view === 'installed'} className={view === 'installed' ? 'active' : ''} onClick={() => setView('installed')}>Installed apps <span aria-live="polite">{loading ? 'Loading…' : error ? 'Unavailable' : installed}</span></button>
@@ -181,17 +213,37 @@ export default function AppExchange(props: Props) {
         {!details.Installed__c && <div className="exchange-data-note"><LockKeyhole size={15}/>
           <span>Access is granted through user profiles and permission sets. Installation does not grant credentials access to every user.</span>
         </div>}
+        {previewKey && <div className="exchange-install-plan" aria-live="polite">
+          <h3>What installing does in your workspace</h3>
+          {!preview?.value && !preview?.error && <p role="status">Checking your existing objects and fields…</p>}
+          {preview?.error && <p role="alert">{preview.error}</p>}
+          {plan?.packaged && plan.upToDate && <p>Metadata is already up to date; this refreshes the app's navigation.</p>}
+          {plan?.packaged && !plan.upToDate && <ul>
+            {plan.create.objects.length > 0 && <li>Creates {plural(plan.create.objects.length, 'object')}: {plan.create.objects.join(', ')}</li>}
+            {plan.addedFields.length > 0 && <li>Adds {plural(plan.addedFields.length, 'missing field')} to objects you already have</li>}
+            {plan.reused.length > 0 && <li>Reuses {plural(plan.reused.length, 'item')} you already have, unchanged: {plan.reused.map((item) => item.apiName).join(', ')}</li>}
+            {plan.create.pages.length > 0 && <li>Adds {plural(plan.create.pages.length, 'page')}</li>}
+            {plan.create.flows.length > 0 && <li>Adds {plural(plan.create.flows.length, 'flow')}{plan.activateFlows.length ? ' (' + plan.activateFlows.length + ' activated after install)' : ''}</li>}
+            {plan.create.permissionSets.length > 0 && <li>Adds permission sets: {plan.create.permissionSets.join(', ')}</li>}
+          </ul>}
+          {plan?.packaged && plan.missingDependencies.length > 0 && <div className="form-error" role="alert"><strong>Set up first:</strong><ul>
+            {plan.missingDependencies.map((item) => <li key={item.type + item.apiName}>{item.type === 'named-credential'
+              ? 'Named Credential "' + item.apiName + '" (install the matching connector, e.g. WhatsApp Connector, and enter your own credentials)'
+              : item.type + ' ' + item.apiName}</li>)}</ul></div>}
+          {plan?.packaged && plan.conflicts.length > 0 && <div className="form-error" role="alert"><strong>Cannot install yet:</strong><ul>
+            {plan.conflicts.map((item) => <li key={item.type + item.apiName}>{item.apiName}: {item.reason}</li>)}</ul></div>}
+        </div>}
         <div className="exchange-detail-footer"><span><PackageCheck size={14}/> {details.AppType__c === 'ConnectorApp' ? 'Connector App' : 'Application'}</span>
           {details.Installed__c
             ? <>
                 {details.PackageVersion__c && details.PackageVersion__c > (details.InstalledPackageVersion__c ?? 0) &&
-                  <button className="btn btn-brand" disabled={busy || !props.canInstall || details.LicenceStatus__c !== 'ACTIVE'}
+                  <button className="btn btn-brand" disabled={busy || blocked || !props.canInstall || details.LicenceStatus__c !== 'ACTIVE'}
                     onClick={() => void action(details,'install')}>{busy ? 'Updating…' : 'Update package'}</button>}
                 {details.AppType__c === 'ConnectorApp'
                   ? <button className="btn btn-brand" onClick={() => {setOpenedKey(details.AppKey__c);setSelected(null);}}>Configure connector</button>
                   : <span>Open this application using the app dropdown.</span>}
               </>
-            : <button className="btn btn-brand" disabled={busy || !props.canInstall ||
+            : <button className="btn btn-brand" disabled={busy || blocked || !props.canInstall ||
                 (details.LicenceStatus__c !== 'ACTIVE' && !props.canManageLicences)}
                 onClick={() => void action(details,details.LicenceStatus__c === 'ACTIVE' ? 'install' : 'grant-install')}>
                 {busy ? 'Installing…' : details.LicenceStatus__c === 'ACTIVE'

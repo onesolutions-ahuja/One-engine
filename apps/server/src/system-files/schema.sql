@@ -2141,6 +2141,29 @@ CREATE TABLE IF NOT EXISTS md_app_package_page_property_templates (
        AND reference_parent_api IS NULL)
  )
 );
+-- AppExchange publishing: a catalogue app published from a tenant-authored app.
+CREATE TABLE IF NOT EXISTS md_app_publications (
+ app_id uuid PRIMARY KEY REFERENCES md_apps(id),
+ source_tenant_id uuid NOT NULL REFERENCES md_tenants(id),
+ source_app_id uuid NOT NULL REFERENCES md_apps(id),
+ package_api text NOT NULL CHECK(package_api ~ '^[A-Za-z][A-Za-z0-9_]{0,127}$'),
+ created_by uuid,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(source_tenant_id,source_app_id)
+);
+-- Portable metadata package (objects, fields, pages, components, flows, layouts,
+-- permission sets) for each published version. Never contains credentials.
+CREATE TABLE IF NOT EXISTS md_app_package_manifests (
+ app_id uuid NOT NULL,
+ version integer NOT NULL,
+ metadata_package jsonb NOT NULL CHECK(jsonb_typeof(metadata_package)='object'),
+ activate_flows text[] NOT NULL DEFAULT '{}',
+ home_pages jsonb NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(home_pages)='array'),
+ published_by uuid,
+ published_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(app_id,version),
+ FOREIGN KEY(app_id,version) REFERENCES md_app_package_versions(app_id,version) ON DELETE CASCADE
+);
 
 -- Core tenant policy. Defaults preserve existing passwords; failed logins are bounded.
 CREATE TABLE IF NOT EXISTS md_password_policies (

@@ -2,6 +2,7 @@ import {generateMetadataApiName} from '../../metadata/Definitions/metadataApiNam
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
 import AppManagerList from '../AppManagerList/AppManagerList';
+import AppPublishDialog from '../AppPublishDialog/AppPublishDialog';
 import { cloneAppConfiguration } from './appCloneConfiguration';
 import ChecklistMultiSelect, { type ChecklistChoice } from '../../../component-libraries/shared/primitives/ChecklistMultiSelect/ChecklistMultiSelect';
 import './AppManagerLayout.css';
@@ -51,7 +52,8 @@ export default function AppManager({
   onClose,
   onOpenPage,
   initialSelectedApiName = '',
-  onSelectedAppChange
+  onSelectedAppChange,
+  canPublish = false
 }: {
   apps: LightningAppMetadata[];
   objects: ObjectMetadata[];
@@ -61,7 +63,7 @@ export default function AppManager({
   reports?: ReportMetadata[];
   dashboards?: DashboardMetadata[];
   onOpenWorkspace?: (destination: SetupDestination) => void;
-  request?: <T>(path: string) => Promise<T>;
+  request?: <T>(path: string, init?: RequestInit) => Promise<T>;
   onSave: (app: LightningAppMetadata, updating: boolean) => Promise<void>;
   onDelete: (apiName: string) => Promise<void>;
   embedded?: boolean;
@@ -69,7 +71,10 @@ export default function AppManager({
   onOpenPage?: (apiName: string) => void;
   initialSelectedApiName?: string;
   onSelectedAppChange?: (apiName: string) => void;
+  /** OneEngine holders may publish tenant-built apps to AppExchange. */
+  canPublish?: boolean;
 }) {
+  const [publishing, setPublishing] = useState('');
   const linkedAppApiName=embedded?'':new URLSearchParams(window.location.search).get('editApp')??'';
   const initialApp=linkedAppApiName==='new'?undefined:apps.find(app=>app.apiName===(initialSelectedApiName||linkedAppApiName))??apps[0];
   const [selectedApiName, setSelectedApiName] = useState(initialApp?.apiName ?? '');
@@ -343,7 +348,9 @@ export default function AppManager({
     {!embedded && view === 'list' ? <>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
-      <AppManagerList apps={apps} busy={busy} onEdit={editApp} onClone={cloneApp}/>
+      <AppManagerList apps={apps} busy={busy} onEdit={editApp} onClone={cloneApp}
+        onPublish={canPublish && request ? (app) => setPublishing(app.apiName) : undefined}/>
+      {publishing && request && <AppPublishDialog appApiName={publishing} request={request} onClose={() => setPublishing('')}/>}
     </> : <>
     <ol className="app-manager-stepper" aria-label="Application setup steps">
       {steps.map((step,index)=><li key={step.id} className="app-manager-step-item">

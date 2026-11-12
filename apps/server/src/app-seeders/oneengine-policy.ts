@@ -1,28 +1,45 @@
 import type {PoolClient} from 'pg';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 
-/** OneEnginePolicy grants Core tenant permissions only on initial provisioning.
- * Changes after provisioning are owned by the RBAC administration UI.
+/** Permission set that administers ONE tenant only. Seeded for every tenant's developers. */
+export const TENANT_DEVELOPER_PERMISSION_SET='TenantDeveloper';
+
+/**
+ * Initial tenant RBAC, applied only on provisioning; later changes are owned by
+ * the RBAC administration UI.
+ *
+ * - TenantDeveloper permission set: full rights inside this tenant only. The
+ *   Tenant Developer role (administrator + developer identity) uses it.
+ * - OneEngine permission set: system-wide control of every tenant. It is created
+ *   in every tenant so the system owner can grant it, but it is assigned only in
+ *   the first tenant of a fresh system (systemOwner). Only an existing OneEngine
+ *   holder may grant it afterwards.
  */
 export async function seedOneEnginePolicy(client:PoolClient,tenantId:string,users:{
  administratorUserId:string;developerUserId:string;
-}):Promise<void>{
+},options:{systemOwner?:boolean}={}):Promise<void>{
  const role=await client.query<{id:string}>(
   'INSERT INTO md_roles (tenant_id,api_name,label) VALUES ($1,$2,$3) RETURNING id',
   [tenantId,'TenantDeveloper','Tenant Developer']);
- const permissionSet=await client.query<{id:string}>(
+ const oneEngine=await client.query<{id:string}>(
   'INSERT INTO md_permission_sets (tenant_id,api_name) VALUES ($1,$2) RETURNING id',
   [tenantId,'OneEngine']);
+ const tenantDeveloper=await client.query<{id:string}>(
+  'INSERT INTO md_permission_sets (tenant_id,api_name,label,description) VALUES ($1,$2,$3,$4) RETURNING id',
+  [tenantId,TENANT_DEVELOPER_PERMISSION_SET,'Tenant Developer','Full administration of this tenant only; no access to other tenants']);
  for(const userId of [users.administratorUserId,users.developerUserId]){
   await client.query('INSERT INTO md_user_roles (tenant_id,user_id,role_id) VALUES ($1,$2,$3)',
    [tenantId,userId,role.rows[0].id]);
  }
  await client.query('INSERT INTO md_role_permission_sets (tenant_id,role_id,permission_set_id) VALUES ($1,$2,$3)',
-  [tenantId,role.rows[0].id,permissionSet.rows[0].id]);
- // Wildcard rights are SQL rules, never an email/identity-based bypass.
- await client.query(
-  "INSERT INTO md_permission_rules (tenant_id,permission_set_id,resource,action,effect) VALUES ($1,$2,'*','*','allow')",
-  [tenantId,permissionSet.rows[0].id]);
+  [tenantId,role.rows[0].id,options.systemOwner?oneEngine.rows[0].id:tenantDeveloper.rows[0].id]);
+ // Wildcard rights are SQL rules, never an email/identity-based bypass. Both sets
+ // allow everything inside their own tenant; cross-tenant authority is granted
+ // only by OneEngine membership (hasPlatformOneEngine), never by these rules.
+ for(const id of [oneEngine.rows[0].id,tenantDeveloper.rows[0].id])
+  await client.query(
+   "INSERT INTO md_permission_rules (tenant_id,permission_set_id,resource,action,effect) VALUES ($1,$2,'*','*','allow')",
+   [tenantId,id]);
  // Add only missing setup navigation policies; do not overwrite customised grants.
  await client.query('SELECT md_seed_setup_menu_permission_sets($1::uuid)',[tenantId]);
 }

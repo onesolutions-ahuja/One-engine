@@ -204,7 +204,7 @@ function validatePackage(raw:unknown):MetadataPackage{
   const item=permissionSet as Record<string,unknown>;
   if(typeof item.apiName!=='string'||!apiNamePattern.test(item.apiName)
    ||typeof item.label!=='string'||!item.label.trim()||item.label.length>120
-   ||['OneEngine','PlatformDeveloper'].includes(item.apiName)||Object.hasOwn(item,'id')
+   ||['OneEngine','PlatformDeveloper','TenantDeveloper'].includes(item.apiName)||Object.hasOwn(item,'id')
    ||typeof item.systemPermissions!=='object'||Array.isArray(item.systemPermissions)
    ||!Array.isArray(item.advancedRules))
    throw Error('Invalid package permission set');

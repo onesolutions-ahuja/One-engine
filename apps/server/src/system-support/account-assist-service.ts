@@ -122,7 +122,7 @@ export class AccountAssistService{
    const {rows}=await client.query<{id:string;email:string}>(`SELECT u.id,u.email FROM md_users u
      JOIN md_tenants t ON t.id=u.tenant_id
      WHERE u.tenant_id=$1 AND u.enabled=true AND u.user_type='internal' AND t.status='ACTIVE'
-       AND ($2::uuid IS NULL OR u.id=$2::uuid) AND ($3::text IS NULL OR lower(u.email)=$3)
+       AND ($2::uuid IS NULL OR u.id=$2::uuid) AND ($3::text IS NULL OR lower(u.email)=$3::text)
      FOR UPDATE OF u`,[tenantId,target.userId??null,target.email??null]);
    const user=rows[0];
    if(!user||rows.length!==1)throw new Error('No active user with that email in this tenant');
@@ -130,7 +130,7 @@ export class AccountAssistService{
      WHERE tenant_id=$1 AND user_id=$2 AND consumed_at IS NULL`,[tenantId,user.id]);
    const {rows:expiry}=await client.query<{expires_at:Date}>(`INSERT INTO md_password_reset_challenges
      (id,tenant_id,user_id,token_hash,expires_at,delivery_channel)
-     VALUES($1,$2,$3,$4,now()+($5 * interval '1 minute'),'admin') RETURNING expires_at`,
+     VALUES($1,$2,$3,$4,now()+make_interval(mins=>$5::int),'admin') RETURNING expires_at`,
      [id,tenantId,user.id,digest(token),LINK_MINUTES]);
    // Unlock so the new password can be used straight away; the reset itself still revokes sessions.
    await client.query('UPDATE md_users SET failed_login_attempts=0,locked_until=NULL WHERE tenant_id=$1 AND id=$2',

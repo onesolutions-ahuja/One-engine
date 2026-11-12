@@ -1,6 +1,9 @@
 import {useEffect, useState} from 'react';
 import {apiRequest} from '../../authentication/Client/authClient';
 
+const radioRow = {display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8,
+  width: 'auto', margin: '0 0 6px', fontWeight: 400, cursor: 'pointer'} as const;
+const panelStyle = {display: 'grid', gap: 10, maxWidth: 560} as const;
 type LinkResult = {resetUrl: string; email: string; expiresAt: string; validMinutes: number};
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -13,12 +16,11 @@ function AssistFields({reason, setReason, requested, setRequested}: {
       <textarea className="form-control" rows={2} maxLength={500} value={reason}
         placeholder="e.g. User called support from their registered number and cannot sign in"
         onChange={e => setReason(e.target.value)} /></label>
-    <fieldset className="account-assist-requested">
-      <legend className="form-label">Did the user ask for this?</legend>
-      <label className="checkbox-row"><input type="radio" name="assist-requested" checked={requested === true}
-        onChange={() => setRequested(true)} /> Yes, at the user's request</label>
-      <label className="checkbox-row"><input type="radio" name="assist-requested" checked={requested === false}
-        onChange={() => setRequested(false)} /> No, admin decision</label>
+    <fieldset style={{border: 0, padding: 0, margin: '4px 0 12px'}}>
+      <legend className="form-label" style={{marginBottom: 6}}>Did the user ask for this?</legend>
+      {([[true, "Yes, at the user's request"], [false, 'No, admin decision']] as const).map(([value, label]) =>
+        <label key={label} style={radioRow}><input type="radio" name="assist-requested" style={{margin: 0, width: 16, height: 16, flex: '0 0 auto'}}
+          checked={requested === value} onChange={() => setRequested(value)} /><span>{label}</span></label>)}
     </fieldset>
   </>;
 }
@@ -32,8 +34,9 @@ function ResetLinkResult({result}: {result: LinkResult}) {
     <input className="form-control" readOnly value={result.resetUrl} onFocus={e => e.currentTarget.select()} />
     <button className="btn" type="button" onClick={() => void navigator.clipboard?.writeText(result.resetUrl)
       .then(() => setCopied(true))}>{copied ? 'Copied' : 'Copy link'}</button>
-    <p>Give it to the user over a channel only they can see (for example a call to their known number).
-      Using it signs out all their sessions; MFA still applies at their next sign-in.</p>
+    <p>How it reaches the user: open it yourself in a <strong>private/incognito window</strong> and set the
+      password together with them (e.g. on a call), or send it to them directly (WhatsApp/phone message to a number
+      you know is theirs). It works once, then expires. Using it signs out all their sessions; MFA still applies.</p>
   </div>;
 }
 
@@ -49,7 +52,7 @@ export function AdminUserAccountAssist({userId, userLabel}: {userId: string; use
     try {await fn();} catch (e) {setError(e instanceof Error ? e.message : 'Request failed');} finally {setBusy(false);}
   };
   const body = (extra: Record<string, unknown>) => JSON.stringify({reason: reason.trim(), requestedByUser: requested, ...extra});
-  return <section className="account-assist" aria-label={'Account recovery for ' + userLabel}>
+  return <section className="account-assist" style={panelStyle} aria-label={'Account recovery for ' + userLabel}>
     <h3>Account recovery</h3>
     <AssistFields reason={reason} setReason={setReason} requested={requested} setRequested={setRequested} />
     <label className="form-label">Recovery mobile (for SMS / WhatsApp codes)
@@ -84,19 +87,19 @@ export function PlatformPasswordResetPanel({request, tenantId}: {request: Reques
   const [email, setEmail] = useState(''), [reason, setReason] = useState('');
   const [requested, setRequested] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [link, setLink] = useState<LinkResult | null>(null);
-  return <section className="account-assist" aria-label="Tenant user password reset">
+  return <section className="account-assist" style={panelStyle} aria-label="Tenant user password reset">
     <h3>Reset a user's password</h3>
     <p>Creates a one-time set-password link. The tenant sees who issued it, when and why in its Audit Trail.</p>
     <label className="form-label">User email<input className="form-control" type="email" value={email}
       onChange={e => setEmail(e.target.value)} /></label>
     <AssistFields reason={reason} setReason={setReason} requested={requested} setRequested={setRequested} />
-    <button className="btn btn-brand" type="button" disabled={busy || !email.trim() || !ready(reason, requested)}
+    <div><button className="btn btn-brand" type="button" disabled={busy || !email.trim() || !ready(reason, requested)}
       onClick={() => {
         setBusy(true); setError(''); setLink(null);
         void request<LinkResult>('/platform/tenants/' + encodeURIComponent(tenantId) + '/password-reset-link', {
           method: 'POST', body: JSON.stringify({email: email.trim(), reason: reason.trim(), requestedByUser: requested})})
           .then(setLink).catch(e => setError(e instanceof Error ? e.message : 'Request failed')).finally(() => setBusy(false));
-      }}>Create password reset link</button>
+      }}>Create password reset link</button></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {link && <ResetLinkResult result={link} />}
   </section>;
@@ -115,7 +118,7 @@ export function OwnRecoveryPhone() {
       .then(r => {setCurrent(r.phone); setPhone(''); setPassword(''); setMessage(value ? 'Recovery mobile saved' : 'Recovery mobile removed');})
       .catch(e => setError(e instanceof Error ? e.message : 'Request failed')).finally(() => setBusy(false));
   };
-  return <section className="account-assist" aria-label="Recovery mobile">
+  return <section className="account-assist" style={panelStyle} aria-label="Recovery mobile">
     <h3>Recovery mobile</h3>
     <p>Used for password reset codes by SMS or WhatsApp. Current: {current ?? 'not set'}</p>
     <label className="form-label">Mobile number<input className="form-control" inputMode="tel" placeholder="+447700900123"

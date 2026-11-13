@@ -1149,6 +1149,7 @@ function LightningAppRuntime({
   onStandaloneModeChange,
   inScreenPage=false,
   inScreenContext,
+  instanceKey,
   previewPage,
   previewLayoutDevice,
   compiledPage:compiledPageProp,
@@ -1170,6 +1171,8 @@ function LightningAppRuntime({
   onStandaloneModeChange: (enabled: boolean) => void;
   inScreenPage?: boolean;
   inScreenContext?: {sessionId?:string;values?:Record<string,unknown>};
+  /** SCREEN(...,popup) instance: CLOSESCREEN() inside the popup closes this one. */
+  instanceKey?: string;
   /** Unpublished draft for the Page Builder. Uses this runtime without fetching/caching a published page. */
   previewPage?: LightningPageMetadata;
   /** Match the device selected in the builder instead of the admin window width. */
@@ -1200,6 +1203,9 @@ function LightningAppRuntime({
   // Never run components from the previous route while navigating. Cached
   // definitions render immediately; uncached routes show the loading state.
   const page=previewPage??(routePending?cached:pageLoad.page);
+  // A popup page runs under its own SCREEN instance key, so CLOSESCREEN() and
+  // page-state events reach that popup instead of another copy of the page.
+  const runtimeSessionKey=page?(inScreenPage&&instanceKey?instanceKey:appId+':'+page.apiName):'';
   // Published pages run their server-converted file (classic engine if that fails).
   const appScript=useAppPageScript(apiRequest,appId,previewPage?null:page,!previewPage&&!compiledPageProp);
   const compiledScript=compiledScriptProp??(appScript.status==='ready'?appScript.script:null);
@@ -1214,7 +1220,7 @@ function LightningAppRuntime({
   useEffect(()=>setInteractionOverrides({}),[appId,page?.apiName]);
   useEffect(()=>{
     if(!page)return;
-    const session=appId+':'+page.apiName;
+    const session=runtimeSessionKey;
     const targets=page.components.map(item=>{
       const definition=item.type.startsWith('Custom:')
         ?findRegisteredComponent(libraryComponents,item.type.slice('Custom:'.length),'page'):undefined;
@@ -1238,18 +1244,18 @@ function LightningAppRuntime({
     };
     window.addEventListener('metadrive:page-component-interaction',onInteraction);
     return()=>window.removeEventListener('metadrive:page-component-interaction',onInteraction);
-  },[page,appId,libraryComponents,layoutState,requestedLayout]);
+  },[page,appId,runtimeSessionKey,libraryComponents,layoutState,requestedLayout]);
   useEffect(()=>{
     setLayoutState(inScreenPage?inScreenContext?.values??{}:{});
     const listener=(event:Event)=>{
       const detail=(event as CustomEvent<{pageSessionKey:string;key:string;value:unknown}>).detail;
-      if(detail?.pageSessionKey!==appId+':'+page?.apiName)return;
+      if(!runtimeSessionKey||detail?.pageSessionKey!==runtimeSessionKey)return;
       if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(detail.key))return;
       setLayoutState(prev=>({...prev,[detail.key]:detail.value}));
     };
     window.addEventListener('metadrive:page-local-state',listener);
     return()=>window.removeEventListener('metadrive:page-local-state',listener);
-  },[appId,page?.apiName]);
+  },[runtimeSessionKey]);
   useEffect(() => {
     // Draft previews never fetch the published revision or pollute the tenant-scoped page cache.
     if(previewPage)return;
@@ -1309,7 +1315,7 @@ function LightningAppRuntime({
   };
   const emitInteraction=(component:PageComponentMetadata,event:string,value:unknown)=>{
     window.dispatchEvent(new CustomEvent('metadrive:page-component-interaction',{
-      detail:{pageSessionKey:appId+':'+page.apiName,componentId:component.id,event,value}
+      detail:{pageSessionKey:runtimeSessionKey,componentId:component.id,event,value}
     }));
   };
   const renderComponent = (original: PageComponentMetadata): React.ReactNode => {
@@ -1334,7 +1340,7 @@ function LightningAppRuntime({
             onNavigate={onNavigate as never} onLaunchFlow={onLaunchFlow} children={nestedChildren}/>
         : needsMetadataComponentRuntime(component.properties)
         ? <MemoizedMetadataBoundPageComponent definition={definition} component={component} defaultObjectApiName={page.targetObject}
-            objects={objects} apps={apps} pages={pages} currentAppId={appId} pageSessionKey={appId + ':' + page.apiName} pageComponents={page.components} reports={reports} availableFlows={availableFlows} formFactor={formFactor}
+            objects={objects} apps={apps} pages={pages} currentAppId={appId} pageSessionKey={runtimeSessionKey} pageComponents={page.components} reports={reports} availableFlows={availableFlows} formFactor={formFactor}
             initialPageState={inScreenPage?inScreenContext?.values:undefined}
             sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}
             children={nestedChildren}
@@ -1355,7 +1361,7 @@ function LightningAppRuntime({
             },
             label: runtimeComponentLabel(component, component.properties.label),
             properties: component.properties,
-            pageSessionKey: appId + ':' + page.apiName, componentId: component.id,
+            pageSessionKey: runtimeSessionKey, componentId: component.id,
             device: layoutDevice, children: nestedChildren
           }} />;
       const rendered = nestedChildren?.length && definition.trustedBundled !== true
@@ -1391,7 +1397,7 @@ function LightningAppRuntime({
               flows={availableFlows} request={apiRequest}
               libraryComponents={libraryComponents}
               onFinished={()=>window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-                detail:{pageSessionKey:appId+':'+page.apiName}}))}/>
+                detail:{pageSessionKey:runtimeSessionKey}}))}/>
           </React.Suspense>;
     if (component.type === 'Dashboard') return <section className="record-fields-card surface" key={component.id}>
       <EmbeddedDashboard dashboardApiName={String(component.properties.dashboardApiName ?? '')}
@@ -1479,7 +1485,7 @@ function LightningAppRuntime({
       pageRecordId={typeof layoutState.recordId==='string'?layoutState.recordId:undefined}/></React.Suspense>:null;
   const withCompiledRuntime=(content:React.ReactElement)=>compiledPage?.apiName===page.apiName
     ?<CompiledPageProvider compiled={compiledPage} script={compiledScript??null} components={page.components} objects={objects} request={apiRequest}
-      pageSessionKey={appId+':'+page.apiName} initialState={inScreenPage?inScreenContext?.values:undefined}
+      pageSessionKey={runtimeSessionKey} initialState={inScreenPage?inScreenContext?.values:undefined}
       sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}>{content}</CompiledPageProvider>
     :content;
   if(page.layoutMode==='free-canvas')return withCompiledRuntime(<><ResponsivePageCanvas page={page}>

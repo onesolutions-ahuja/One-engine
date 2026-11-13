@@ -10,6 +10,24 @@ export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout:
   useDismissOnOutside(profileMenuRef, open, () => setOpen(false));
   const [editing, setEditing] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [pinPassword, setPinPassword] = useState('');
+  const [pin, setPin] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinMessage, setPinMessage] = useState('');
+  const resetPin = () => { setPinPassword(''); setPin(''); setPinConfirm(''); setPinMessage(''); };
+  // Till PIN: used by VERIFYPIN() in apps (till lock, manager approval, refunds).
+  const savePin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!/^[0-9]{4,8}$/.test(pin)) { setPinMessage('PIN must contain 4 to 8 digits'); return; }
+    if (pin !== pinConfirm) { setPinMessage('PINs do not match'); return; }
+    setBusy(true); setPinMessage('');
+    try {
+      await apiRequest('/me/till-pin', { method: 'POST', body: JSON.stringify({ password: pinPassword, pin }) });
+      resetPin(); setPinOpen(false);
+    } catch (failure) { setPinMessage(failure instanceof Error ? failure.message : 'Could not save PIN'); }
+    finally { setBusy(false); }
+  };
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -35,6 +53,7 @@ export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout:
     {open && <div className="profile-menu-panel">
       <button type="button" onClick={() => { setEditing(true); setOpen(false); reset(); }}>Change Password</button>
       <button type="button" onClick={() => { setPhoneOpen(true); setOpen(false); }}>Recovery Mobile</button>
+      <button type="button" onClick={() => { resetPin(); setPinOpen(true); setOpen(false); }}>Till PIN</button>
       <button type="button" onClick={() => void onLogout()}>Sign Out</button>
     </div>}
     {phoneOpen && <div className="profile-password-backdrop" role="presentation">
@@ -42,6 +61,23 @@ export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout:
         <div className="profile-password-heading"><h2>Recovery Mobile</h2>
           <button type="button" className="icon-button" aria-label="Close" onClick={() => setPhoneOpen(false)}><X size={18} /></button></div>
         <OwnRecoveryPhone />
+      </section>
+    </div>}
+    {pinOpen && <div className="profile-password-backdrop" role="presentation">
+      <section className="profile-password-dialog" role="dialog" aria-modal="true" aria-labelledby="till-pin-heading">
+        <div className="profile-password-heading"><h2 id="till-pin-heading">Till PIN</h2>
+          <button type="button" className="icon-button" aria-label="Close" onClick={() => { setPinOpen(false); resetPin(); }}><X size={18} /></button></div>
+        <form onSubmit={(event) => void savePin(event)}>
+          <label className="form-label">Current Password<input autoComplete="current-password" className="form-control" type="password" required value={pinPassword} onChange={(event) => setPinPassword(event.target.value)} /></label>
+          <label className="form-label">New PIN (4 to 8 digits)<input autoComplete="off" className="form-control" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required value={pin} onChange={(event) => setPin(event.target.value)} /></label>
+          <label className="form-label">Confirm PIN<input autoComplete="off" className="form-control" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required value={pinConfirm} onChange={(event) => setPinConfirm(event.target.value)} /></label>
+          <p className="settings-panel-copy">Used to unlock a till and to approve refunds or cleared sales.</p>
+          {pinMessage && <p role="alert" className="form-error">{pinMessage}</p>}
+          <div className="toolbar-actions">
+            <button type="button" className="btn" disabled={busy} onClick={() => { setPinOpen(false); resetPin(); }}>Cancel</button>
+            <button type="submit" className="btn btn-brand" disabled={busy}>{busy ? 'Saving…' : 'Save PIN'}</button>
+          </div>
+        </form>
       </section>
     </div>}
     {editing && <div className="profile-password-backdrop" role="presentation">

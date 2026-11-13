@@ -86,7 +86,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   // Which selections clear which (Category → Product): computed once for the page.
   const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
   const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
-  const data=createCompiledDataLayer(compiled,sourceLoader,store.get);
+  const data=createCompiledDataLayer(compiled,sourceLoader,store.get,objects);
   const stateNames=new Map([...componentInstanceNames(components)].map(([id,name])=>[id,componentStateName(name)]));
   const typing=new Map<string,number>();
   const publish=(name:string,value:ComponentState)=>{

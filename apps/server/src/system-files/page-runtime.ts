@@ -341,7 +341,12 @@ export class PageRuntime {
       throw new Error('Invalid in-screen page device');
     const exact=await this.findInScreenPage(tenantId,appId,pageApi,device==='Mobile'?'Phone':device,pageType);
     if(exact)return this.load(tenantId,exact,runtimeLayoutVariant(device));
-    if(device==='Custom')return null;
+    if(device==='Custom'){
+      // A Print Template is usually laid out once (Desktop): a Custom-layout app still prints it.
+      if(pageType!=='Print Template')return null;
+      const desktop=await this.findInScreenPage(tenantId,appId,pageApi,'Desktop',pageType);
+      return desktop?this.load(tenantId,desktop,runtimeLayoutVariant('Desktop')):null;
+    }
     const custom=await this.findInScreenPage(tenantId,appId,pageApi,'Custom',pageType);
     return custom?this.load(tenantId,custom,runtimeLayoutVariant('Custom')):null;
   }

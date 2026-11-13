@@ -779,7 +779,7 @@ onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:t
         </main>
       </div>
       <WorkspaceFormulaScreen key={JSON.stringify(route)} render={({appId,screen,frameDevice})=><LightningAppRuntime
-        appId={appId} pageApiName={screen.page} instanceKey={screen.instance} inScreenPage={screen.inScreen}
+        appId={appId} pageApiName={screen.page} instanceKey={screen.instance} inScreenPage={screen.inScreen||Boolean(screen.print)}
         printPreview={screen.print?screen:undefined} inScreenContext={{sessionId:screen.sessionId,values:{recordId:screen.recordId}}}
         objects={objects} apps={apps} pages={pages} reports={reports} libraryComponents={libraryComponents}
         availableFlows={flows} formFactor={frameDevice==='Phone'||frameDevice==='Tablet'?frameDevice:runtimeFormFactor} profileId={currentProfileId} pageDefinitionCache={pageDefinitionCache.current}

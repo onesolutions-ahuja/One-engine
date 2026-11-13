@@ -1150,6 +1150,7 @@ function LightningAppRuntime({
   inScreenPage=false,
   inScreenContext,
   instanceKey,
+  printPreview,
   previewPage,
   previewLayoutDevice,
   compiledPage:compiledPageProp,
@@ -1173,6 +1174,8 @@ function LightningAppRuntime({
   inScreenContext?: {sessionId?:string;values?:Record<string,unknown>};
   /** SCREEN(...,popup) instance: CLOSESCREEN() inside the popup closes this one. */
   instanceKey?: string;
+  /** PRINT(template, record): load the Print Template and report when it is shown. */
+  printPreview?: {ready?:()=>void;failed?:(reason:Error)=>void};
   /** Unpublished draft for the Page Builder. Uses this runtime without fetching/caching a published page. */
   previewPage?: LightningPageMetadata;
   /** Match the device selected in the builder instead of the admin window width. */
@@ -1266,7 +1269,9 @@ function LightningAppRuntime({
       return ()=>{active=false;};
     }
     setPageLoad({routeKey,appId,page:null,error:'',loading:true});
-    const endpoint = inScreenPage && pageApiName
+    const endpoint = printPreview && pageApiName
+      ? `/apps/${encodeURIComponent(appId)}/print-templates/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}`
+      : inScreenPage && pageApiName
       ? `/apps/${encodeURIComponent(appId)}/in-screen-pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}`
       : pageApiName
         ? `/apps/${encodeURIComponent(appId)}/pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}`
@@ -1288,6 +1293,12 @@ function LightningAppRuntime({
   useEffect(() => {
     setActiveTabs({});
   }, [page?.apiName]);
+  // PRINT() waits until the template is on screen (or reports why it is not).
+  useEffect(()=>{
+    if(!printPreview||loading)return;
+    if(page)printPreview.ready?.();
+    else if(error)printPreview.failed?.(Error(error));
+  },[printPreview,loading,page,error]);
   useEffect(() => {
     onStandaloneModeChange(isStandalonePagePresentation(page));
     return () => onStandaloneModeChange(false);

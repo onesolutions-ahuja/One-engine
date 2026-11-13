@@ -89,7 +89,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|LOCKSCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source)).parse();
@@ -134,9 +134,9 @@ export function compileActionPlan(source:string):ActionStep[] {
    args.forEach(arg=>add(steps,arg,guards,loop));
    return;
   }
-  if(node.name==='CLOSESCREEN'){
-   if(args.length)throw Error('CLOSESCREEN takes no arguments');
-   steps.push({name:'CLOSESCREEN',object:'',fields:new Map(),guards});
+  if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'){
+   if(args.length)throw Error(node.name+' takes no arguments');
+   steps.push({name:node.name,object:'',fields:new Map(),guards});
    return;
   }
   if(node.name==='WAIT'){
@@ -715,9 +715,9 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
       completed++;
       continue;
      }
-     if(step.name==='CLOSESCREEN'){
+     if(step.name==='CLOSESCREEN'||step.name==='LOCKSCREEN'){
       if(!runPageAction)throw Error('Page runtime unavailable');
-      await runPageAction('CLOSESCREEN','');
+      await runPageAction(step.name,'');
       completed++;
       continue;
      }

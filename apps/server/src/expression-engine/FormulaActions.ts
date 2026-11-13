@@ -18,6 +18,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'RECORDPAYMENT',parameters:['InvoiceId','Amount','Method','Note','AS(variable)']},
  {name:'FOREACH',parameters:['Object','Field1','Value1','AS(item)','Action']},
  {name:'CLOSESCREEN',parameters:[]},
+ {name:'LOCKSCREEN',parameters:[]},
  {name:'AS',parameters:['variable']}
 ] as const;
 export const ACTION_FORMULA_FUNCTIONS:ReadonlySet<string>=

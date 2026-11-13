@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { ChevronDown, X, Wifi, WifiOff } from 'lucide-react';
 import {useDismissOnOutside} from '../../accessibility/Dismiss/useDismissOnOutside';
 import { apiRequest, apiBase } from '../Client/authClient';
+import { tillPeople, lockTillScreen } from '../TillDevice/tillDevice';
 
 export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout: () => Promise<void> | void; onPasswordChanged: () => void }) {
   const [open, setOpen] = useState(false);
@@ -54,6 +55,7 @@ export function ProfilePasswordMenu({ onLogout, onPasswordChanged }: { onLogout:
       <button type="button" onClick={() => { setEditing(true); setOpen(false); reset(); }}>Change Password</button>
       <button type="button" onClick={() => { setPhoneOpen(true); setOpen(false); }}>Recovery Mobile</button>
       <button type="button" onClick={() => { resetPin(); setPinOpen(true); setOpen(false); }}>Till PIN</button>
+      {tillPeople().length>0&&<button type="button" onClick={() => { setOpen(false); lockTillScreen(); }}>Lock till</button>}
       <button type="button" onClick={() => void onLogout()}>Sign Out</button>
     </div>}
     {phoneOpen && <div className="profile-password-backdrop" role="presentation">

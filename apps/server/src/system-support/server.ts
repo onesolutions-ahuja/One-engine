@@ -2,6 +2,7 @@ import {recordInvoicePayment} from './record-payment-service.js';
 import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
+import {TillDeviceService,TILL_DEVICE_EXPIRED} from './till-device-service.js';
 import {withAuditContext,auditContext,setAuditActor} from './audit-context.js';
 import {ConnectedAppService} from './connected-app-service.js';
 import {SecurityMonitorService} from './security-monitor-service.js';
@@ -302,6 +303,8 @@ export function createSystemServer(db:SqlPersistence) {
   const dashboardSubscriptions=new DashboardSubscriptionService(db,rbac,systemDefinitions,namedCredentials,dashboardSnapshots);
   const oauth=new OAuthAuthorizationService(db,rbac,namedCredentials,integrationActivityWriter);
   const mfa=new MfaService(db,rbac,auth,namedCredentials);
+  const tillPins=new TillPinService(db);
+  const tillDevices=new TillDeviceService(db,auth);
   const federation=new FederationService(db,rbac,namedCredentials,integrationActivityWriter);
   const passkeys=new WebAuthnService(db,auth);
   const backups=new MfaBackupService(db,auth,mfa,rbac);
@@ -473,12 +476,24 @@ export function createSystemServer(db:SqlPersistence) {
     }
     try {
       const userId=await auth.verifyIdentity(tenantId,email,password,req.ip);
+      // "Save me on this till": the PIN is checked before any session is issued.
+      const tillDevice=req.body?.tillDevice===true;
+      const tillPin=tillDevice&&typeof req.body?.tillPin==='string'&&req.body.tillPin?req.body.tillPin:null;
+      if(tillPin!==null&&!/^[0-9]{4,8}$/.test(tillPin)){res.status(400).json({error:'PIN must contain 4 to 8 digits'});return;}
+      if(tillDevice&&tillPin===null&&!await tillPins.has(tenantId,userId)){
+        res.status(400).json({error:'Choose a till PIN (4 to 8 digits) to save yourself on this till'});return;}
       const challenge=await mfa.createChallenge(tenantId,userId,{ip:req.ip});
-      if(challenge){res.json(challenge);return;}
+      if(challenge){
+        // MFA still runs; the till is saved only after it passes (tillDevice is sent again with the code).
+        if(tillPin!==null)await tillPins.set(tenantId,userId,tillPin);
+        res.json(challenge);return;
+      }
       const session=await auth.issuePasswordSession(tenantId,userId,{ip:req.ip});
+      if(tillPin!==null)await tillPins.set(tenantId,userId,tillPin);
+      const tillDeviceKey=tillDevice?await tillDevices.enroll(tenantId,userId,false):undefined;
       res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
       if(req.query.landing==='1')res.setHeader('Cache-Control','no-store');
-      res.json({access_token:session.accessToken,expires_in:session.expiresIn,landingAppApi:await landingPreference(tenantId,userId),...(req.query.landing==='1'?await landingBootstrap(tenantId,userId):{})});
+      res.json({access_token:session.accessToken,expires_in:session.expiresIn,...(tillDeviceKey?{till_device:tillDeviceKey}:{}),landingAppApi:await landingPreference(tenantId,userId),...(req.query.landing==='1'?await landingBootstrap(tenantId,userId):{})});
     } catch(error) {
       // Distinguish rejected credentials from SQL/session failures. A successful
       // password check followed by a failed database write must not become 401.
@@ -525,8 +540,30 @@ export function createSystemServer(db:SqlPersistence) {
     const session=await mfa.verifyChallenge(req.body?.challenge_token,req.body?.code,{ip:req.ip});
     res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
     const actor=await auth.authenticate(session.accessToken);
+    const tillDeviceKey=req.body?.tillDevice===true&&await tillPins.has(actor.tenant_id,actor.user_id)
+      ?await tillDevices.enroll(actor.tenant_id,actor.user_id,true):undefined;
     if(req.query.landing==='1')res.setHeader('Cache-Control','no-store');
-    res.json({access_token:session.accessToken,expires_in:session.expiresIn,landingAppApi:await landingPreference(actor.tenant_id,actor.user_id),...(req.query.landing==='1'?await landingBootstrap(actor.tenant_id,actor.user_id):{})});
+    res.json({access_token:session.accessToken,expires_in:session.expiresIn,...(tillDeviceKey?{till_device:tillDeviceKey}:{}),landingAppApi:await landingPreference(actor.tenant_id,actor.user_id),...(req.query.landing==='1'?await landingBootstrap(actor.tenant_id,actor.user_id):{})});
+  }));
+  // Shared till: a saved device key + that person's PIN gives that person their own session.
+  app.post('/api/auth/till-device/unlock',route(async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    try{
+      const session=await tillDevices.unlock(req.body?.key,req.body?.pin,{ip:req.ip});
+      res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
+      const actor=await auth.authenticate(session.accessToken);
+      res.json({access_token:session.accessToken,expires_in:session.expiresIn,landingAppApi:await landingPreference(actor.tenant_id,actor.user_id)});
+    }catch(error){
+      const message=error instanceof Error?error.message:'';
+      if(message==='Wrong PIN')res.status(401).json({error:'Wrong PIN'});
+      else if(message===TILL_DEVICE_EXPIRED||message==='Invalid credentials')res.status(410).json({error:TILL_DEVICE_EXPIRED});
+      else if(message==='MFA required')res.status(410).json({error:TILL_DEVICE_EXPIRED});
+      else throw error;
+    }
+  }));
+  app.post('/api/auth/till-device/remove',route(async(req,res)=>{
+    await tillDevices.revoke(req.body?.key);
+    res.status(204).end();
   }));
   // Provider callback uses a one-time SQL state, never an unauthenticated tenant selector.
   app.get('/api/oauth/callback',route(async(req,res)=>{
@@ -2206,6 +2243,12 @@ export function createSystemServer(db:SqlPersistence) {
   }));
   // Self-service till PIN setup requires an authenticated session and current password.
   // The PIN is never served by Object CRUD or returned in responses.
+  app.delete('/api/users/:id/till-devices',route(async(req,res)=>{
+    const actor=req.actor!;
+    if(!/^[0-9a-f-]{36}$/i.test(req.params.id))throw new Error('Invalid user id');
+    if(req.params.id!==actor.user_id)await rbac.require(actor.tenant_id,actor.user_id,'User','edit');
+    res.json({removed:await tillDevices.revokeUser(actor.tenant_id,req.params.id)});
+  }));
   app.post('/api/me/till-pin',route(async(req,res)=>{
     const actor=req.actor!;
     const password=req.body?.password;
@@ -3017,7 +3060,7 @@ export function createSystemServer(db:SqlPersistence) {
       ||err.message.startsWith('Field definition changed after migration')
       ||err.message.startsWith('Field type is used by'))
       res.status(409).json({error:err.message});
-    else if(/^(Field datatype|Field datatype conversion|Existing value|Numeric value|Only ISO|Migration to Rich Text|Required field migration|Roll-Up Summary|SUM roll-ups|MIN\/MAX roll-ups|Invalid roll-up|Formula |Invalid formula|Unsupported formula)/.test(err.message))
+    else if(/^(Field datatype|Field datatype conversion|Existing value|Numeric value|Only ISO|Migration to Rich Text|Required field migration|Roll-Up Summary|SUM roll-ups|MIN\/MAX roll-ups|Invalid roll-up|Formula |Invalid formula|Unsupported formula|PIN must|Invalid user id)/.test(err.message))
       res.status(400).json({error:err.message});
     else if(err.message==='Page already exists'||err.message==='Page API name already exists (archived)'||err.message==='Field already exists'||err.message==='Object already exists'||err.message==='Page layout revision conflict'||err.message==='Page layout draft revision conflict'||err.message==='Page revision conflict'||err.message==='Record has changed since it was loaded')res.status(409).json({error:err.message});
     else if(err.message==='API Name already exists'||err.message==='API Name already exists for this language')res.status(409).json({error:err.message});

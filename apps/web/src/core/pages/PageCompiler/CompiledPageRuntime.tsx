@@ -11,6 +11,7 @@ import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjust
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
 import {isActionPlan,isScreenAction} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../PageRuntime/screenFormula';
+import {lockTillScreen} from '../../authentication/TillDevice/tillDevice';
 import {runSequenceFlow} from '../PageRuntime/formulaFlowSequence';
 import {flowActionFormulaTarget} from '../PageRuntime/actionFlowFormula';
 import {runtimeComponentLabel} from '../PageRuntime/smartComponentLabel';
@@ -445,6 +446,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      // SCREEN/CLOSESCREEN/FLOW steps inside an action plan (same as the standard runtime).
      async(name,target,mode,screenRecordId)=>{
       if(name==='CLOSESCREEN')return closeFormulaScreen(runtime.pageSessionKey);
+      if(name==='LOCKSCREEN')return lockTillScreen();
       if(name==='SCREEN')return openFormulaScreen('SCREEN('+target+(mode?','+mode:'')+')',navigationContext,
        onNavigate as never,runtime.pageSessionKey,session,
        screenRecordId??String(event.recordId??runtime.store.get().recordId??record?.Id??''));

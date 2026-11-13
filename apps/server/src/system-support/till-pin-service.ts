@@ -14,6 +14,12 @@ export class TillPinService {
   await this.db.query(`UPDATE md_users SET till_pin_hash=$3,till_pin_failures=0,till_pin_locked_until=NULL
     WHERE tenant_id=$1 AND id=$2 AND enabled=true`,[tenantId,userId,`scrypt:${salt}:${digest.toString('hex')}`]);
  }
+ /** True when the user has set a till PIN (the PIN itself is never read back). */
+ async has(tenantId:string,userId:string):Promise<boolean>{
+  const {rows}=await this.db.query<{has:boolean}>(
+   'SELECT till_pin_hash IS NOT NULL AS has FROM md_users WHERE tenant_id=$1 AND id=$2 AND enabled=true',[tenantId,userId]);
+  return rows[0]?.has===true;
+ }
  /** Verifies a user's PIN against its scrypt hash; the hash is never decrypted or returned.
   * actorUserId is who asked (e.g. a cashier requesting a manager override). */
  async verify(tenantId:string,userId:string,pin:unknown,actorUserId:string=userId):Promise<boolean>{

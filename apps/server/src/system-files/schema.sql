@@ -2890,3 +2890,18 @@ CREATE TABLE IF NOT EXISTS md_platform_deployment_owner_receipts (
  created_at timestamptz NOT NULL DEFAULT now(),
  FOREIGN KEY(tenant_id,user_id) REFERENCES md_users(tenant_id,id)
 );
+-- Shared-till saved sign-ins: only the hash of each device key is stored (also in system-migrations.ts).
+CREATE TABLE IF NOT EXISTS md_till_devices (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ tenant_id uuid NOT NULL REFERENCES md_tenants(id),
+ user_id uuid NOT NULL,
+ token_hash text NOT NULL UNIQUE,
+ mfa_verified boolean NOT NULL DEFAULT false,
+ failures integer NOT NULL DEFAULT 0,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ last_used_at timestamptz,
+ expires_at timestamptz NOT NULL,
+ revoked_at timestamptz,
+ FOREIGN KEY(tenant_id,user_id) REFERENCES md_users(tenant_id,id)
+);
+CREATE INDEX IF NOT EXISTS md_till_devices_user ON md_till_devices(tenant_id,user_id) WHERE revoked_at IS NULL;

@@ -3,6 +3,7 @@ import {readdirSync,readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import {applySmartIosKeyboardDock} from './smart-ios-keyboard-dock.js';
+import {TILL_DEVICE_DDL} from './till-device-service.js';
 
 /** Recover original migration files from the immutable SQL baseline.
  * The old runner accepted any subset of known versions and ran missing files
@@ -110,6 +111,8 @@ export async function applySystemMigrations(db:SqlPersistence) {
    appliedNewMigration=true;
    await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',[name,checksum]);
   }
+  // Upgrade-safe shared-till saved sign-ins (idempotent; the SQL baseline is immutable).
+  await client.query(TILL_DEVICE_DDL);
   // Upgrade-safe AppExchange publishing tables (idempotent; the SQL baseline is immutable).
   await client.query(`-- AppExchange publishing: a catalogue app published from a tenant-authored app.
 CREATE TABLE IF NOT EXISTS md_app_publications (

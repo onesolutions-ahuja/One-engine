@@ -5,6 +5,8 @@ import { apiRequest, setAccessToken } from '../Client/authClient';
 import LoginRecovery from './LoginRecovery';
 import { UneBrandLogo } from '../../branding/UneBrandLogo';
 import { Eye, EyeOff } from 'lucide-react';
+import { saveTillPerson, type TillPerson } from '../TillDevice/tillDevice';
+import '../TillDevice/tillLock.css';
 import './standaloneLogin.css';
 
 declare const __METADRIVE_WEB_RELEASE__: {commit:string|null;builtAt:string};
@@ -20,13 +22,16 @@ type LandingBootstrap = {
   };
 };
 type EntryTiming = { kind: 'login' | 'restore'; startedAt: number; authenticatedAt: number; landing?: LandingBootstrap; landingAppApi?: string };
-type LoginResult={access_token?:string;landing?:LandingBootstrap;landingAppApi?:string;mfa_required?:boolean;challenge_token?:string;setup_secret?:string;enrollment_required?:boolean};
+type LoginResult={till_device?:TillPerson;access_token?:string;landing?:LandingBootstrap;landingAppApi?:string;mfa_required?:boolean;challenge_token?:string;setup_secret?:string;enrollment_required?:boolean};
 let federationCompletion:Promise<LoginResult|undefined>|undefined;
 
 export type ProductLoginBrand = { label: string; eyebrow: string; tagline: string; accent: string; signInDescription: string };
 
 export function createLoginView(logoUrl: string) {
-  function Login({ error, onStart, onSuccess, onRetry, branding }: {
+  function Login({ error, onStart, onSuccess, onRetry, branding, tillDefault=false, onBackToTill }: {
+    /** Shared till: "Save me on this till" starts ticked (opened from the till lock screen). */
+    tillDefault?: boolean;
+    onBackToTill?: () => void;
     error?: string;
     onStart?: () => void;
     onSuccess?: (timing: EntryTiming) => void;
@@ -45,6 +50,8 @@ export function createLoginView(logoUrl: string) {
     });
     const [challenge,setChallenge]=useState<{challenge_token:string;setup_secret?:string;enrollment_required?:boolean}|null>(null);
     const [code,setCode]=useState('');
+    const [saveTill,setSaveTill]=useState(tillDefault);
+    const [tillPin,setTillPin]=useState('');
     const [providers,setProviders]=useState<Array<{id:string;label:string}>>([]);
     const [recovering,setRecovering]=useState(()=>{
       const query=new URLSearchParams(window.location.search);
@@ -67,9 +74,10 @@ export function createLoginView(logoUrl: string) {
       window.history.pushState(null,'',url.pathname+url.search+url.hash);
       setPasswordVisible(false);setPassword('');setFieldErrors({});setMessage('');setRecovering(false);
     };
-    const accept=(session:{access_token?:string;landing?:LandingBootstrap;landingAppApi?:string;mfa_required?:boolean;challenge_token?:string;setup_secret?:string;enrollment_required?:boolean},startedAt:number)=>{
+    const accept=(session:{till_device?:TillPerson;access_token?:string;landing?:LandingBootstrap;landingAppApi?:string;mfa_required?:boolean;challenge_token?:string;setup_secret?:string;enrollment_required?:boolean},startedAt:number)=>{
       if(session.mfa_required&&session.challenge_token){setPassword('');setChallenge({...session,challenge_token:session.challenge_token});return;}
       if(!session.access_token)throw Error('Authentication did not return an access token');
+      if(session.till_device)saveTillPerson(session.till_device);
       setAccessToken(session.access_token);onSuccess?.({kind:'login',startedAt,authenticatedAt:performance.now(),landing:session.landing,landingAppApi:session.landingAppApi});
     };
     useEffect(()=>{
@@ -109,7 +117,8 @@ export function createLoginView(logoUrl: string) {
         }>(challenge?'/auth/mfa/verify?landing=1':'/auth/login?landing=1', {
           method: 'POST',
           signal: controller.signal,
-          body: JSON.stringify(challenge?{challenge_token:challenge.challenge_token,code}:{ email: submittedEmail, password: submittedPassword })
+          body: JSON.stringify(challenge?{challenge_token:challenge.challenge_token,code,...(saveTill?{tillDevice:true}:{})}
+            :{ email: submittedEmail, password: submittedPassword,...(saveTill?{tillDevice:true,tillPin}:{}) })
         });
         accept(session,startedAt);
       } catch (failure) {
@@ -185,6 +194,16 @@ export function createLoginView(logoUrl: string) {
           aria-label={passwordVisible?'Hide password':'Show password'} aria-pressed={passwordVisible} onClick={()=>setPasswordVisible(value=>!value)}>{passwordVisible?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button>
         </div>
         {fieldErrors.password&&<small id="login-password-error" className="auth-field-error">{fieldErrors.password}</small>}
+        <label className="auth-till-save">
+          <input type="checkbox" checked={saveTill} onChange={event=>setSaveTill(event.target.checked)}/>
+          <span>Save me on this till (sign back in with a PIN)</span>
+        </label>
+        {saveTill&&<>
+          <label className="form-label" htmlFor="login-till-pin">Till PIN (4–8 digits; leave blank to keep your current PIN)</label>
+          <input className="form-control" id="login-till-pin" type="password" inputMode="numeric" autoComplete="off"
+            pattern="[0-9]{4,8}" maxLength={8} value={tillPin} onChange={event=>setTillPin(event.target.value.replace(/[^0-9]/g,''))}/>
+        </>}
+        {onBackToTill&&<button className="text-action" type="button" onClick={onBackToTill}>Back to the till</button>}
         <div className="auth-inline-actions auth-recovery-action">
           <button className="text-action" type="button" onClick={openRecovery}>Forgot password?</button>
         </div>

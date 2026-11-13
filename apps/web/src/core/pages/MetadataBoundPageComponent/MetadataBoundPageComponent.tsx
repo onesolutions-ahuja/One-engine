@@ -5,6 +5,7 @@ import {evaluateFieldExpressionDetailed} from '../../../component-libraries/shar
 import {shouldInvalidatePageComponent,pageComponentReadObjectNames,applyCompleteRecordMutation,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {isActionPlan,isScreenAction,PartialActionError} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../PageRuntime/screenFormula';
+import {lockTillScreen} from '../../authentication/TillDevice/tillDevice';
 import {useComponentFormulaState,publishComponentInput} from '../../components/RegisteredComponent/PageFormulaScope';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
@@ -521,6 +522,7 @@ export default function MetadataBoundPageComponent({
         pageState,objects,objectApiName,sessionId,(template,id)=>previewPrintTemplate(template,id,pageSessionKey,sessionId,currentAppId),
         async(name,target,mode,screenRecordId)=>{
           if(name==='CLOSESCREEN')return closeFormulaScreen(pageSessionKey);
+          if(name==='LOCKSCREEN')return lockTillScreen();
           if(name==='SCREEN')return openFormulaScreen('SCREEN('+target+(mode?','+mode:'')+')',{
             objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName
           },onNavigate,pageSessionKey,sessionId,

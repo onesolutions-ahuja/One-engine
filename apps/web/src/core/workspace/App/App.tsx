@@ -1,6 +1,8 @@
 import { loadPageBuilderFactory, loadObjectManagerFactory, LazyReportBuilder } from '../../builders/Entries/optionalBuilderEntries';
 import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
+import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
+import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
 import { apiBase, getAccessToken, setAccessToken, apiRequest, prefetchPageEditorDraft, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
 
@@ -119,6 +121,8 @@ function App() {
   const [authState, setAuthState] = useState<AuthState>('restoring');
   const [authError, setAuthError] = useState('');
   const [entryTiming, setEntryTiming] = useState<EntryTiming | null>(null);
+  /** Shared till: 'lock' shows the saved people's PIN screen, 'email' the normal sign-in. */
+  const [tillMode, setTillMode] = useState<'lock'|'email'>('lock');
   const sessionRestoreStarted = useRef(false);
   // Keep the Login form hidden until the refresh cookie has been checked.
   // Discard any in-flight refresh response after logout or another auth transition.
@@ -239,14 +243,44 @@ function App() {
     window.location.replace(destination);
   },[needsLandingRedirect,landingApp]);
 
+  const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillPeople().length>0;
+  // Lock (LOCKSCREEN(), the till's Lock button) or 5 idle minutes: the person's session ends,
+  // their open work is put aside, and the till shows the saved people's PIN screen.
   useEffect(()=>{
+    if(authState!=='authenticated')return;
+    let idle:number|undefined;
+    const lock=()=>{
+      const userId=activeTillUser();
+      stashTillWork(userId);
+      setActiveTillUser(null);
+      void apiRequest('/auth/logout',{method:'POST'}).catch(()=>{}).finally(()=>setAccessToken(undefined));
+      sessionGeneration.current += 1;
+      setEntryTiming(null);setTillMode('lock');setAuthState('anonymous');
+    };
+    const restart=()=>{
+      window.clearTimeout(idle);
+      if(activeTillUser())idle=window.setTimeout(lock,5*60*1000);
+    };
+    const events=['pointerdown','keydown','wheel','touchstart'] as const;
+    events.forEach(name=>window.addEventListener(name,restart,{passive:true}));
+    window.addEventListener(TILL_LOCK_EVENT,lock);
+    restart();
+    return ()=>{
+      window.clearTimeout(idle);
+      events.forEach(name=>window.removeEventListener(name,restart));
+      window.removeEventListener(TILL_LOCK_EVENT,lock);
+    };
+  },[authState]);
+  useEffect(()=>{
+    // On a shared till the sign-in opens where the till is, so the person returns to the same page.
+    if(showTillLock||tillMode==='email'&&tillPeople().length>0)return;
     if(authState==='anonymous'&&!standaloneEntry&&window.location.pathname!=='/login'&&window.location.pathname!=='/oauth/authorize'){
       if(window.location.pathname==='/mail-admin'||window.location.pathname==='/mail-admin/'){
         try{sessionStorage.setItem('md_auth_return_to','/mail-admin');}catch{/* The normal landing route remains available if storage is disabled. */}
       }
       window.location.replace('/login');
     }
-  },[authState,standaloneEntry]);
+  },[authState,standaloneEntry,showTillLock,tillMode]);
   const loginSuccess = (timing: EntryTiming) => {
     sessionGeneration.current += 1;
     try {
@@ -260,8 +294,11 @@ function App() {
   };
   const cancelRestore = () => { sessionGeneration.current += 1; };
   if (authState === 'restoring') return <div className="auth-loading" role="status">Restoring session…</div>;
-  if (authState === 'anonymous' && !standaloneEntry && window.location.pathname!=='/login') return <div role="status">Opening login…</div>;
-  if (authState === 'anonymous') return <Login branding={standaloneEntry??undefined} onStart={cancelRestore} onSuccess={loginSuccess} />;
+  if (showTillLock) return <TillLockScreen onUseEmail={()=>setTillMode('email')}
+    onUnlocked={session=>loginSuccess({kind:'login',startedAt:performance.now(),authenticatedAt:performance.now(),landingAppApi:session.landingAppApi})}/>;
+  if (authState === 'anonymous' && !standaloneEntry && window.location.pathname!=='/login' && !(tillMode==='email'&&tillPeople().length>0)) return <div role="status">Opening login…</div>;
+  if (authState === 'anonymous') return <Login branding={standaloneEntry??undefined} onStart={cancelRestore} onSuccess={loginSuccess}
+    tillDefault={tillPeople().length>0} onBackToTill={tillPeople().length?()=>setTillMode('lock'):undefined} />;
   if (authState === 'error') return <Login branding={standaloneEntry??undefined} error={authError} onStart={cancelRestore} onSuccess={loginSuccess} onRetry={() => { setAuthError(''); setAuthState('anonymous'); void restoreSession(); }} />;
   if(window.location.pathname==='/oauth/authorize')return <React.Suspense fallback={<div role="status">Loading consent…</div>}><LazyOAuthConsent/></React.Suspense>;
   const onLogout=()=>{

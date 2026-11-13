@@ -121,6 +121,14 @@ export class AuthenticationService {
     if(rows[0].required)throw new Error('MFA required');
     return this.issue(tenantId,userId,false,context);
   }
+  /** Shared-till PIN sign-in: the saved device key was created by a full sign-in, which
+   * already passed MFA when mfaVerified is true. Disabled or locked users are refused. */
+  async issueTrustedDeviceSession(tenantId:string,userId:string,mfaVerified:boolean,context:LoginContext={}) {
+    const {rows}=await this.db.query(`SELECT 1 FROM md_users WHERE tenant_id=$1 AND id=$2 AND enabled=true
+      AND (locked_until IS NULL OR locked_until<=now())`,[tenantId,userId]);
+    if(!rows[0])throw new Error('Invalid credentials');
+    return this.issue(tenantId,userId,mfaVerified,context);
+  }
   async issueMfaSession(tenantId:string,userId:string,context:LoginContext={}) {
     return this.issue(tenantId,userId,true,context);
   }

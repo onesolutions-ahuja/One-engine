@@ -1,0 +1,33 @@
+.till-lock{position:fixed;inset:0;z-index:2147483000;display:grid;grid-template-columns:1fr 1fr;align-items:center;
+ gap:48px;padding:48px 8vw;color:#fff;background:radial-gradient(circle at 15% 15%,#2f5fa8 0,transparent 45%),
+ radial-gradient(circle at 85% 20%,#b8545a 0,transparent 40%),radial-gradient(circle at 90% 95%,#6b3a8e 0,transparent 45%),#171a33}
+.till-lock h1{font-size:clamp(36px,5vw,64px);font-weight:800;margin:4px 0 28px;letter-spacing:-.02em}
+.till-lock h2{font-size:24px;font-weight:600;margin:0 0 18px;text-align:center}
+.till-lock-eyebrow{font-size:14px;font-weight:600;letter-spacing:.06em;opacity:.75}
+.till-lock-list{display:flex;flex-wrap:wrap;gap:22px;list-style:none;padding:0;margin:0 0 28px}
+.till-lock-list li{position:relative}
+.till-lock-person{display:grid;justify-items:center;gap:8px;background:none;border:0;color:inherit;cursor:pointer;padding:0}
+.till-lock-avatar{display:grid;place-items:center;width:84px;height:84px;border-radius:50%;font-size:26px;font-weight:700;
+ background:linear-gradient(135deg,#3b82f6,#6d28d9);border:3px solid transparent;opacity:.85}
+.till-lock-list li.is-chosen .till-lock-avatar{opacity:1;border-color:#fff;background:linear-gradient(135deg,#f97316,#e11d48)}
+.till-lock-name{font-size:17px;opacity:.85}
+.till-lock-list li.is-chosen .till-lock-name{opacity:1;font-weight:600}
+.till-lock-remove{position:absolute;top:-4px;right:-4px;width:26px;height:26px;border-radius:50%;border:0;display:grid;place-items:center;
+ background:rgb(255 255 255 / 22%);color:#fff;cursor:pointer}
+.till-lock-remove:hover,.till-lock-remove:focus-visible{background:#e11d48}
+.till-lock-email{background:rgb(255 255 255 / 14%);color:#fff;border:0;border-radius:14px;padding:14px 22px;font-size:17px;font-weight:600;cursor:pointer}
+.till-lock-pad{justify-self:center;display:grid;justify-items:center}
+.till-lock-dots{display:flex;gap:18px;margin-bottom:14px;min-height:20px}
+.till-lock-dots span{width:16px;height:16px;border-radius:50%;border:2px solid #fff}
+.till-lock-dots span.is-filled{background:#fff}
+.till-lock-message{margin:0 0 10px;color:#fecaca;font-weight:600;text-align:center}
+.till-lock-keys{display:grid;grid-template-columns:repeat(3,96px);gap:18px 22px;margin-top:8px}
+.till-lock-keys button{width:96px;height:96px;border-radius:50%;border:1px solid rgb(255 255 255 / 18%);background:rgb(255 255 255 / 14%);
+ color:#fff;font-size:36px;cursor:pointer;display:grid;place-items:center}
+.till-lock-keys button:disabled{opacity:.4;cursor:default}
+.till-lock-keys .till-lock-key-text{font-size:20px;font-weight:700;background:transparent;border-color:transparent}
+@media (max-width:900px){.till-lock{grid-template-columns:1fr;padding:24px;overflow:auto}.till-lock-keys{grid-template-columns:repeat(3,76px)}
+ .till-lock-keys button{width:76px;height:76px;font-size:28px}}
+/* "Save me on this till" on the email sign-in form */
+.auth-till-save{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:14px;cursor:pointer}
+.auth-till-save input{width:18px;height:18px}

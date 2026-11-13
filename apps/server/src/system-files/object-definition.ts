@@ -703,6 +703,9 @@ export class ObjectDefinitionService {
         INSERT INTO md_field_formulas(tenant_id,object_api,field_api,expression,return_type)
         VALUES($1,$2,$3,$4,$5)`,
         [tenantId,objectApi,fieldApi,formula.expression,formula.returnType]);
+      // A new Roll-Up Summary must show existing child rows straight away, not only after the next child write.
+      if(field.dataType==='rollup'&&this.migrationRuntime.recalculateRollup)
+        await this.migrationRuntime.recalculateRollup(client,tenantId,objectApi,fieldApi);
       if(persistSupplemental)await persistSupplemental(client);
       return inserted;
     });

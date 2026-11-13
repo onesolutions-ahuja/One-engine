@@ -304,6 +304,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.lightning .md-app-sidebar nav button { display: flex; align-items: center; gap: 10px; }
+.lightning .md-app-sidebar nav button .md-app-nav-icon { flex: none; }
 .lightning .md-app-sidebar nav button[aria-current="page"] {
   background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface));
   color: var(--md-primary);
@@ -319,19 +321,24 @@
   .lightning:has(.md-app-sidebar) .header-page-tabs { display: none; }
 }
 @media (min-width: 1024px) {
-  .lightning .md-app-sidebar-collapsed { flex-basis: 56px; width: 56px; }
-  .lightning .md-app-sidebar-collapsed .md-app-sidebar-heading strong,
-  .lightning .md-app-sidebar-collapsed nav button span { display: none; }
+  /* Collapsed app menu = slim icon rail: icon with a short caption, most space left for the page. */
+  .lightning .md-app-sidebar-collapsed { flex-basis: 72px; width: 72px; padding-inline: 6px; }
+  .lightning .md-app-sidebar-collapsed .md-app-sidebar-heading { justify-content: center; padding-inline: 0; }
+  .lightning .md-app-sidebar-collapsed .md-app-sidebar-heading strong { display: none; }
   .lightning .md-app-sidebar-collapsed nav button {
-    font-size: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 2px;
     text-align: center;
-    padding-inline: 3px;
   }
-  .lightning .md-app-sidebar-collapsed nav button::before {
-    content: attr(data-short-label);
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 600;
+  .lightning .md-app-sidebar-collapsed nav button span {
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 @media (min-width: 600px) and (max-width: 1023px) {

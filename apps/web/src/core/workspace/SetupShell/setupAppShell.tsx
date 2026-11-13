@@ -150,10 +150,20 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
     typeof window !== 'undefined' &&
       (window.matchMedia('(max-width: 1024px)').matches || readDesktopSidebarPreference())
   );
+  // App menus keep their own choice per app and start as a slim icon rail, so a
+  // till or kiosk page gets the screen; Setup keeps its separate preference.
+  const appNavKey = (route.kind === 'app-page' || route.kind === 'app-home') ? 'md.app.nav.collapsed.' + route.appId : '';
+  const readAppNavPreference = (key: string) => {
+    try { return window.localStorage.getItem(key) !== 'false'; } catch { return true; }
+  };
+  useEffect(() => {
+    if (appNavKey && !window.matchMedia('(max-width: 1024px)').matches) setSidebarCollapsedState(readAppNavPreference(appNavKey));
+    else if (!appNavKey && !window.matchMedia('(max-width: 1024px)').matches) setSidebarCollapsedState(readDesktopSidebarPreference());
+  }, [appNavKey]);
   const setSetupSidebarCollapsed = (value: React.SetStateAction<boolean>) => {
     const next = typeof value === 'function' ? value(setupSidebarCollapsed) : value;
     if (!window.matchMedia('(max-width: 1024px)').matches) {
-      try { window.localStorage.setItem('md.setup.sidebar.collapsed', String(next)); }
+      try { window.localStorage.setItem(appNavKey || 'md.setup.sidebar.collapsed', String(next)); }
       catch { /* Browsers may disable storage; keep the current session usable. */ }
     }
     setSidebarCollapsedState(next);
@@ -162,10 +172,10 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
     const compact = window.matchMedia('(max-width: 1024px)');
     // Compact mode always starts with a closed drawer; desktop restores the explicit user choice.
     const respond = (event: MediaQueryListEvent) =>
-      setSidebarCollapsedState(event.matches ? true : readDesktopSidebarPreference());
+      setSidebarCollapsedState(event.matches ? true : appNavKey ? readAppNavPreference(appNavKey) : readDesktopSidebarPreference());
     compact.addEventListener('change', respond);
     return () => compact.removeEventListener('change', respond);
-  }, []);
+  }, [appNavKey]);
   useEffect(() => {
     // Navigation and direct route changes dismiss the compact drawer without persisting.
     if (window.matchMedia('(max-width: 1023px)').matches) setSidebarCollapsedState(true);

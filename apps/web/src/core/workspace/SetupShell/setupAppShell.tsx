@@ -134,7 +134,14 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
     kind: entryTiming?.kind ?? 'navigation' as const,
     authMs: entryTiming ? entryTiming.authenticatedAt - entryTiming.startedAt : null
   }));
-  const [currentAppId, setCurrentAppId] = useState(() => new URLSearchParams(window.location.search).get('appId') || 'Records');
+  // A direct link or refresh of /apps/<APP>/pages/<page> must open that app's menu,
+  // not the first installed app (the app id is in the path, not only in ?appId=).
+  const [currentAppId, setCurrentAppId] = useState(() =>
+    (route.kind === 'app-page' || route.kind === 'app-home') && route.appId ? route.appId
+      : new URLSearchParams(window.location.search).get('appId') || 'Records');
+  useEffect(() => {
+    if ((route.kind === 'app-page' || route.kind === 'app-home') && route.appId) setCurrentAppId(route.appId);
+  }, [route.kind, route.kind === 'app-page' || route.kind === 'app-home' ? route.appId : '']);
   const [apps, setApps] = useState<LightningAppMetadata[]>([]);
   const runtimeFormFactor = useRuntimeFormFactor();
   const [workspace, setWorkspace] = useState<WorkspaceId>(() => route.kind === 'setup' ? route.workspace : 'home');

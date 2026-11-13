@@ -218,9 +218,12 @@ async function validateRollupWithin(client:Pick<PoolClient,'query'>,tenantId:str
      WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND deleted_at IS NULL`,
     [tenantId,rollup.childObject,rollup.relationshipField]);
   const relation=relationship.rows[0];
-  if(!relation||relation.data_type!=='reference'||relation.relationship_type!=='Master-Detail'
+  // Lookups roll up too (stock on hand = sold / purchased lines that point at a Product):
+  // the aggregation reads reference_record_id for either relationship type.
+  if(!relation||relation.data_type!=='reference'
+    ||!['Master-Detail','Lookup'].includes(relation.relationship_type)
     ||relation.related_object!==objectApi)
-    throw new Error('Roll-Up Summary requires an active Master-Detail field to this object');
+    throw new Error('Roll-Up Summary requires an active Master-Detail or Lookup field to this object');
   if(rollup.operation==='SUM'){
     const source=await client.query<{data_type:string}>(`SELECT data_type FROM md_field_definitions
       WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND deleted_at IS NULL`,

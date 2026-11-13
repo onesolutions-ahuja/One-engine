@@ -1,0 +1,36 @@
+{
+  "apiName": "smart_keyboard",
+  "label": "Smart Keyboard",
+  "category": "Inputs",
+  "description": "iOS-style on-screen keyboard that types into the text field the user taps, with Return and Dismiss actions.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_keyboard/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_keyboard/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 390,
+    "defaultHeight": 216,
+    "minWidth": 240,
+    "minHeight": 140
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Text Changed"
+    },
+    {
+      "apiName": "click",
+      "label": "Return / Submit"
+    },
+    {
+      "apiName": "dismiss",
+      "label": "Keyboard Hidden"
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 import SmartCart from "../../smart_cart/SmartCart.jsx";
 import SmartNumpad from "../../smart_numpad/SmartNumpad.jsx";
 import SmartScheduleCalendar from "../../smart_calendar/SmartScheduleCalendar.jsx";
+import SmartKeyboard from "../../smart_keyboard/SmartKeyboard.jsx";
+import SmartDock from "../../smart_dock/SmartDock.jsx";
 import icons from "../../smart_icon/iconCatalog.json";
 import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
@@ -669,6 +671,9 @@ export default function SmartRuntime(p){
  // Re-render when the tenant brand arrives so $session.tenant.name / .logo show without a reload.
  React.useSyncExternalStore(subscribeTenantBrand,getTenantBrand,getTenantBrand);
  const name=p.kind||"smart_text",record=recordOf(p),label=scopedExpression(p,"label",p.label||"",record);
+ // Style = iOS is saved on newly inserted components. Older saved components have
+ // no Style value and stay Classic. Configured properties always win over either.
+ const ios=p.visualStyle==="iOS";
  const style={fontSize:number(p.textSize,16),color:p.labelColor||undefined,textAlign:p.labelAlignment||"left",borderRadius:number(p.radius,12)};
  const buttonIcon=name==="smart_button"?icons.find(icon=>icon.id===p.shapeId):null;
  // Preserve selections when a data-driven category filter temporarily hides records.
@@ -715,7 +720,7 @@ export default function SmartRuntime(p){
     justifyContent:label?(p.labelAlignment==="right"?"flex-end":p.labelAlignment==="center"?"center":"flex-start"):"center",
     ...(p.wrapText===true?{textAlign:p.labelAlignment==="right"?"right":p.labelAlignment==="center"?"center":"left"}:{}),
     fontWeight:typeof p.headerBold==="boolean"?(p.headerBold?700:400):undefined,
-    background:p.backgroundColor||"#2267bc",color:p.labelColor||"#fff",borderColor:p.borderColor}}>
+    background:p.backgroundColor||(ios?"#007aff":"#2267bc"),color:p.labelColor||"#fff",borderColor:p.borderColor}}>
    {buttonIcon&&<span className="smart-button-glyph" aria-hidden="true" style={{
      backgroundColor:p.iconFillColor||p.labelColor||"#fff",
      WebkitMaskImage:'url(/smart-icons/'+buttonIcon.id+'.svg)',
@@ -843,10 +848,10 @@ export default function SmartRuntime(p){
     // A configured zero border width intentionally removes the visible outline.
     borderStyle:"solid",
     borderWidth:p.borderWidth===undefined||p.borderWidth===null||p.borderWidth===""?1:number(p.borderWidth,1,0,24),
-    borderColor:p.borderColor||"#b8c7d7",
+    borderColor:p.borderColor||(ios?"transparent":"#b8c7d7"),
     padding:inputRows>1?"8px 12px":"0 12px",lineHeight:inputRows>1?1.35:1.2,
     resize:inputRows>1?"none":undefined,overflowY:inputRows>1?"auto":undefined,
-    background:p.backgroundColor||"#fff",
+    background:p.backgroundColor||(ios?"#f2f2f7":"#fff"),
     textAlign:p.labelAlignment||"left","--smart-placeholder-color":p.labelColor||"#64748b"}}
   rows={inputRows} onValueChange={value=>fire("change",value)}/>;
  }
@@ -961,6 +966,9 @@ export default function SmartRuntime(p){
  else if(name==="smart_calendar")content=<SmartScheduleCalendar p={p} fire={fire}
    records={recordsOf(p)} resolve={(key,source,row)=>scopedExpression(p,key,source,row)}/>;
  else if(name==="smart_tabs")content=<SmartTabs p={p} record={record} fire={fire}/>;
+ else if(name==="smart_keyboard")content=<SmartKeyboard p={p} fire={fire}/>;
+ else if(name==="smart_dock")content=<SmartDock p={p} fire={fire}
+   resolve={(key,fallback)=>scopedExpression(p,key,p[key]??fallback,record)}/>;
  else if(name==="smart_navigation"){
   const items=Array.isArray(p.items)&&p.items.length?p.items:recordsOf(p);
   const entries=items.length?items:isBuilderEmpty(p)?["Home","Products","Settings"]:p.textSource?[record]:[];
@@ -979,9 +987,9 @@ export default function SmartRuntime(p){
       const src=item&&typeof item==="object"?item.imageSrc??item.imageUrl:null;
       const safeSrc=typeof src==="string"&&/^https:\/\//i.test(src)?src:null;
       return <button data-md-bind={p.builderPreview&&p.textSource&&!(item&&typeof item==="object"&&item.label)?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Navigation item text":undefined} key={item?.id??i} type="button" className="smart-navigation-item"
-        style={{flex:"0 0 auto",height:32,maxHeight:"100%",minHeight:0,color:p.labelColor||undefined,background:p.backgroundColor||"#fff",
+        style={{flex:"0 0 auto",height:32,maxHeight:"100%",minHeight:0,color:p.labelColor||undefined,background:p.backgroundColor||(ios?"rgb(255 255 255 / .82)":"#fff"),
           boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
-          borderColor:p.borderColor||undefined,borderRadius:number(p.radius,4),fontSize:number(p.textSize,16)}}
+          borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16)}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>
         {safeSrc&&<img data-design-area={p.builderPreview?"Image":undefined} src={safeSrc} alt="" style={{
          width:number(p.imageWidth,22,8,200),height:number(p.imageHeight,22,8,200),objectFit:fit,
@@ -995,7 +1003,8 @@ export default function SmartRuntime(p){
     borderRadius:number(p.radius,12),...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12))
  }}>{p.children||(p.builderPreview?<span className="smart-editor-container-placeholder">Drop components here</span>:null)}</div>;
  // Geometry-only technical host; the native Smart surface owns all visible styling.
- return <div className={"smart-runtime "+name} style={{
+ return <div className={"smart-runtime "+name+(ios?" smart-ios":"")}
+  data-builder-preview={p.builderPreview?"true":undefined} style={{
    display:"flex",flexDirection:"column",boxSizing:"border-box",border:0,
    background:"transparent",boxShadow:"none",padding:0,margin:0,
    minWidth:0,minHeight:0,width:p.canvasFrameSized===true?"100%":p.width!==undefined&&p.width!==''?number(parseFloat(p.width),undefined,0,10000):"100%",

@@ -1,6 +1,6 @@
 import type {PoolClient} from 'pg';
 /** Independent, upgrade-safe Smart component registrations; no app data is altered. */
-export const SMART_COMPONENTS=["smart_numpad","smart_button","smart_toggle","smart_lookup","smart_selector","smart_tabs","smart_text","smart_textbox","smart_label","smart_card_grid","smart_image","smart_calendar","smart_navigation","smart_container","smart_cart","smart_icon","smart_table"] as const;
+export const SMART_COMPONENTS=["smart_numpad","smart_button","smart_toggle","smart_lookup","smart_selector","smart_tabs","smart_text","smart_textbox","smart_label","smart_card_grid","smart_image","smart_calendar","smart_navigation","smart_container","smart_cart","smart_icon","smart_table","smart_keyboard","smart_dock"] as const;
 export async function seedFreshSmartComponents(client:Pick<PoolClient,'query'>,tenantId:string){
  for(const api of SMART_COMPONENTS)await client.query(
   'INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled) VALUES($1,$2,$3,true) ON CONFLICT(tenant_id,api_name) DO NOTHING',

@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import {
 CalendarDays, Grid2X2, Type, Square, Image as ImageIcon, MousePointer2, BarChart3, FormInput,
 ToggleRight, List, Puzzle, Search, Star, Layers3, ShoppingCart, PanelsTopLeft, MessageCircle,
-BadgeCheck, Table2, Menu, Repeat
+BadgeCheck, Table2, Menu, Repeat, Keyboard, PanelBottom
 } from 'lucide-react';
 import { isBuilderApi } from '../../builderPropertyInventory';
 import { layoutTypes } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
@@ -81,6 +81,8 @@ export function usePagePalette(
       case 'Custom:smart_container':return <Layers3 size={15}/>;
       case 'Custom:smart_icon':return <Star size={15}/>;
       case 'Custom:smart_toggle':return <ToggleRight size={15}/>;
+      case 'Custom:smart_keyboard':return <Keyboard size={15}/>;
+      case 'Custom:smart_dock':return <PanelBottom size={15}/>;
     }
     const name = `${component.label} ${component.type}`.toLowerCase();
     if (/\b(text|heading|paragraph|rich text|label)\b/.test(name)) return <Type size={15} />;

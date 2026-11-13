@@ -1,0 +1,136 @@
+/* Smart iOS look.
+   Applies only to components saved with Style = iOS (the default for newly
+   inserted Smart components). Components saved before this property existed
+   have no Style value and keep their Classic look.
+   Every colour, radius and shadow a builder configures is an inline style, so it
+   always wins over these defaults. These rules only fill in what was never
+   configured: hover lift, press, focus ring, transitions, fonts and the
+   CSS-only parts such as calendar cells and lookup menus. */
+.smart-runtime.smart-ios{
+ --smart-ios-accent:#007aff;
+ --smart-ios-fill:rgb(118 118 128 / .12);
+ --smart-ios-field:#f2f2f7;
+ --smart-ios-separator:rgb(60 60 67 / .14);
+ --smart-ios-secondary:#8e8e93;
+ --smart-ios-ease:cubic-bezier(.2,.8,.2,1);
+ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+ -webkit-font-smoothing:antialiased;
+ letter-spacing:-.005em;
+}
+
+/* Tap targets: smooth transitions and no grey flash on touch. */
+.smart-runtime.smart-ios :is(.smart-button,.smart-navigation-item,.smart-tabs button,.smart-card-button,
+ .smart-grid-action,.smart-numpad-key,.smart-calendar-header button,.smart-calendar-date-strip button,
+ .smart-calendar-grid button,.smart-cart-qty-button,.smart-lookup-menu button,.smart-switch-track,
+ .smart-switch-thumb,.smart-dock-item,.smart-keyboard-key){
+ transition:transform .18s var(--smart-ios-ease),filter .18s var(--smart-ios-ease),
+  background-color .18s ease,color .18s ease,opacity .18s ease;
+ -webkit-tap-highlight-color:transparent;
+}
+
+/* Raise on hover (mouse/trackpad only) and press on tap. Never on the
+   Page Builder canvas, where movement would fight selection and resizing. */
+@media (hover:hover){
+ .smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-button,.smart-card-button,.smart-numpad-key,
+  .smart-calendar-date-strip button,.smart-cart-qty-button):not(:disabled):hover{
+  transform:translateY(-1px);
+  filter:brightness(1.04) drop-shadow(0 4px 10px rgb(0 0 0 / .12));
+ }
+ .smart-runtime.smart-ios:not([data-builder-preview]) .smart-grid-action:hover>.smart-card{
+  transform:translateY(-2px);
+  filter:drop-shadow(0 8px 18px rgb(0 0 0 / .12));
+ }
+ .smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-navigation-item,.smart-tabs button,
+  .smart-calendar-grid button,.smart-calendar-header button):not(:disabled):hover{
+  filter:brightness(.96);
+ }
+}
+.smart-runtime.smart-ios .smart-grid-action>.smart-card{
+ transition:transform .2s var(--smart-ios-ease),filter .2s var(--smart-ios-ease);
+}
+.smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-button,.smart-navigation-item,.smart-tabs button,
+ .smart-card-button,.smart-numpad-key,.smart-calendar-header button,.smart-calendar-date-strip button,
+ .smart-calendar-grid button,.smart-cart-qty-button,.smart-dock-item,.smart-keyboard-key):not(:disabled):active{
+ transform:scale(.96);
+ filter:brightness(.92);
+}
+.smart-runtime.smart-ios:not([data-builder-preview]) .smart-grid-action:active>.smart-card{transform:scale(.98)}
+
+/* One soft accent focus ring for keyboard users. */
+.smart-runtime.smart-ios :is(button,input,textarea,[contenteditable="true"]):focus-visible{
+ outline:3px solid color-mix(in srgb,var(--smart-ios-accent) 45%,transparent);
+ outline-offset:2px;
+}
+
+/* Buttons */
+.smart-runtime.smart-ios .smart-button{border-color:transparent;font-weight:600}
+
+/* Text fields: filled grey field, white when focused. */
+.smart-runtime.smart-ios :is(.smart-input-box,.smart-search,.smart-field input,.smart-field textarea){
+ background-color:var(--smart-ios-field);
+ border-color:transparent;
+ transition:background-color .18s ease,box-shadow .18s ease;
+}
+.smart-runtime.smart-ios :is(.smart-input-box,.smart-search,.smart-field input,.smart-field textarea):focus{
+ outline:3px solid color-mix(in srgb,var(--smart-ios-accent) 35%,transparent);
+ outline-offset:0;
+}
+.smart-runtime.smart-ios .smart-textbox-pair{border-color:var(--smart-ios-separator)}
+
+/* Lookup menu: floating rounded sheet. */
+.smart-runtime.smart-ios .smart-lookup-menu{
+ border:0;border-radius:12px;padding:4px;
+ box-shadow:0 12px 32px rgb(0 0 0 / .16),0 0 0 .5px var(--smart-ios-separator);
+}
+.smart-runtime.smart-ios .smart-lookup-menu button{border-radius:8px;padding:9px 12px}
+.smart-runtime.smart-ios .smart-lookup-menu button:hover{background:var(--smart-ios-field)}
+
+/* Tabs: segmented control. */
+.smart-runtime.smart-ios .smart-tabs{
+ background:var(--smart-ios-fill);border-radius:10px;padding:2px;gap:2px;
+}
+.smart-runtime.smart-ios .smart-tabs button{border-color:transparent;border-radius:8px;font-weight:500}
+
+/* Navigation bar items: rounded, hairline border. */
+.smart-runtime.smart-ios .smart-navigation{gap:6px}
+.smart-runtime.smart-ios .smart-navigation-item{border-color:var(--smart-ios-separator);font-weight:500}
+
+/* Calendar */
+.smart-runtime.smart-ios .smart-calendar{border-color:var(--smart-ios-separator)}
+.smart-runtime.smart-ios .smart-calendar-header{border-bottom-color:var(--smart-ios-separator)}
+.smart-runtime.smart-ios .smart-calendar-header strong{font-weight:650;font-size:1.05em}
+.smart-runtime.smart-ios .smart-calendar-header button{
+ border:0;border-radius:8px;background:var(--smart-ios-fill);color:var(--smart-ios-accent);font-weight:600;
+}
+.smart-runtime.smart-ios .smart-calendar-header .smart-calendar-today{border-radius:999px;padding:0 12px}
+.smart-runtime.smart-ios .smart-calendar-date-strip button{
+ border:0;border-radius:12px;background:var(--smart-ios-field);
+}
+.smart-runtime.smart-ios .smart-calendar-grid b{
+ font-size:.72em;font-weight:600;color:var(--smart-ios-secondary);letter-spacing:.02em;
+}
+.smart-runtime.smart-ios .smart-calendar-grid :is(span,button){background:transparent;border-radius:10px}
+.smart-runtime.smart-ios .smart-calendar-grid .smart-calendar-is-today:not(.smart-calendar-selected-day){
+ color:var(--smart-ios-accent);font-weight:700;
+ box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--smart-ios-accent) 55%,transparent);
+}
+.smart-runtime.smart-ios .smart-calendar-grid .smart-calendar-selected-day{font-weight:700;
+ box-shadow:0 2px 6px color-mix(in srgb,var(--smart-ios-accent) 30%,transparent)}
+.smart-runtime.smart-ios .smart-calendar-day-heading{background:#f9f9fb;border-color:var(--smart-ios-separator);font-weight:600}
+.smart-runtime.smart-ios .smart-calendar-time-label{color:var(--smart-ios-secondary);border-bottom-color:var(--smart-ios-separator)}
+.smart-runtime.smart-ios .smart-calendar-slot{border-color:var(--smart-ios-separator)}
+.smart-runtime.smart-ios .smart-calendar-event{border-radius:8px;box-shadow:0 2px 6px rgb(0 0 0 / .14)}
+.smart-runtime.smart-ios .smart-calendar-count{border-radius:999px}
+
+/* Cards, cart and keypad */
+.smart-runtime.smart-ios .smart-card-button{border-color:transparent;border-radius:10px}
+.smart-runtime.smart-ios .smart-cart-qty-button{border-radius:999px}
+
+/* Toggle: iOS green track and soft thumb shadow. */
+.smart-runtime.smart-ios .smart-switch-thumb{box-shadow:0 2px 4px rgb(0 0 0 / .18),0 0 0 .5px rgb(0 0 0 / .04)}
+
+@media (prefers-reduced-motion:reduce){
+ .smart-runtime.smart-ios *{transition:none!important}
+ .smart-runtime.smart-ios :is(button,.smart-card):is(:hover,:active),
+ .smart-runtime.smart-ios .smart-grid-action:is(:hover,:active)>.smart-card{transform:none!important}
+}

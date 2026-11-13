@@ -1,0 +1,41 @@
+@import "../smart/shared/smart.css";
+
+/* iOS-style dock: frosted glass bar of icon tiles. Place one on each layout
+   (Mobile, Tablet, Desktop, Custom); each copy keeps its own size and items. */
+.smart-dock{box-sizing:border-box;display:flex;align-items:center;justify-content:space-around;
+ width:100%;height:100%;min-width:0;min-height:0;overflow:auto hidden;scrollbar-width:none;
+ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif}
+.smart-dock::-webkit-scrollbar{display:none}
+.smart-dock.is-vertical{overflow:hidden auto;justify-content:flex-start}
+.smart-dock.is-glass{background:rgb(250 250 252 / .72);
+ -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+ box-shadow:0 8px 30px rgb(0 0 0 / .12),0 0 0 .5px rgb(0 0 0 / .08)}
+@media (prefers-reduced-transparency:reduce){.smart-dock.is-glass{background:#f7f7f9;
+ -webkit-backdrop-filter:none;backdrop-filter:none}}
+.smart-dock-item{position:relative;flex:1 1 0;max-width:96px;min-height:0;height:100%;max-height:100%;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+ padding:4px 2px;border:0;background:transparent;cursor:pointer;font-family:inherit;
+ transform-origin:50% 100%;
+ transition:transform .2s cubic-bezier(.2,.8,.2,1),color .18s ease,background-color .18s ease;
+ -webkit-tap-highlight-color:transparent}
+.smart-dock.is-vertical .smart-dock-item{flex:0 0 auto;height:auto;max-width:none;width:100%;transform-origin:0 50%}
+@media (hover:hover){
+ .smart-runtime:not([data-builder-preview]) .smart-dock.is-magnify .smart-dock-item:hover{transform:scale(1.14) translateY(-2px)}
+ .smart-runtime:not([data-builder-preview]) .smart-dock.is-magnify .smart-dock-item:hover+.smart-dock-item,
+ .smart-runtime:not([data-builder-preview]) .smart-dock.is-magnify .smart-dock-item:has(+.smart-dock-item:hover){transform:scale(1.06)}
+}
+.smart-runtime:not([data-builder-preview]) .smart-dock-item:active{transform:scale(.92)}
+.smart-dock-item:focus-visible{outline:3px solid rgb(0 122 255 / .45);outline-offset:1px}
+.smart-dock-icon-wrap{position:relative;display:flex;align-items:center;justify-content:center;flex:none}
+.smart-dock-icon{display:block;width:100%;height:100%;
+ -webkit-mask-size:contain;mask-size:contain;-webkit-mask-position:center;mask-position:center;
+ -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;pointer-events:none}
+.smart-dock-icon-empty{display:flex;align-items:center;justify-content:center;width:100%;height:100%;
+ border-radius:30%;background:rgb(118 118 128 / .16);font-weight:700;font-size:.9em;text-transform:uppercase}
+.smart-dock-badge{position:absolute;top:-5px;right:-9px;min-width:17px;height:17px;padding:0 5px;
+ border-radius:999px;background:#ff3b30;color:#fff;font-size:11px;font-weight:600;line-height:17px;
+ text-align:center;box-shadow:0 0 0 2px #fff;pointer-events:none}
+.smart-dock-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
+.smart-dock-indicator{width:4px;height:4px;border-radius:50%;flex:none}
+@media (prefers-reduced-motion:reduce){.smart-dock-item{transition:none}
+ .smart-dock-item:is(:hover,:active){transform:none!important}}

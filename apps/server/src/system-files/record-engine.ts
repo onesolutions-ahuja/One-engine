@@ -474,7 +474,7 @@ export class RecordEngine {
       const row=byApi.get(field.api_name);
       if(!row)continue;
       if(field.data_type==='encryptedtext')record[field.api_name]=null;
-      else if(field.data_type==='reference')record[field.api_name]=row.reference_record_id;
+      else if(field.data_type==='reference')record[field.api_name]=row.reference_record_id??row.value_text;
       else if(field.data_type==='rollup')
         record[field.api_name]=readRollupSummaryField(field.rollup_source_data_type,row.value_date,row.value_datetime,row.value_number);
       else if(['number','currency','percent'].includes(field.data_type))
@@ -684,6 +684,9 @@ export class RecordEngine {
             enforceMasterDetailReparenting(previous.rows[0]?.reference_record_id,value,key,field.allow_reparenting);
           }
           await assertLookupTargetExists(client??this.db,tenantId,field.related_object,value,key,userId);
+          // md_record_values.reference_record_id has a foreign key to md_records; users live in
+          // md_users, so a User reference is kept as its validated id in value_text.
+          if(field.related_object==='User'){text=value;reference=null;break;}
           text='';reference=value;break;
         case 'geolocation': {
           if(!value||typeof value!=='object'||Array.isArray(value))

@@ -58,10 +58,10 @@ export default function FieldWizardModal({ context }: { context: any }) {
     return () => { active = false; };
   }, [showNewField, newFieldType]);
   const rollupChildren = objects.filter((candidate: any) => candidate.fields.some((field: any) =>
-    field.relationship?.type === 'Master-Detail' && field.relationship.targetObject === object.apiName));
+    (field.relationship?.type === 'Master-Detail' || field.relationship?.type === 'Lookup') && field.relationship.targetObject === object.apiName));
   const selectedRollupChild = rollupChildren.find((candidate: any) => candidate.apiName === rollupChildObject);
   const rollupRelationships = selectedRollupChild?.fields.filter((field: any) =>
-    field.relationship?.type === 'Master-Detail' && field.relationship.targetObject === object.apiName) ?? [];
+    (field.relationship?.type === 'Master-Detail' || field.relationship?.type === 'Lookup') && field.relationship.targetObject === object.apiName) ?? [];
   const rollupSources = selectedRollupChild?.fields.filter((field: any) => {
     const type = String(field.dataType);
     const numeric = /^(Number|Currency|Percent)(?:\(|$)/i.test(type);
@@ -71,7 +71,7 @@ export default function FieldWizardModal({ context }: { context: any }) {
   const rollupConfigurationError = newFieldType === 'Roll-Up Summary'
     && (!selectedRollupChild || !rollupRelationships.some((field: any) => field.apiName === rollupRelationshipField)
       || (rollupOperation !== 'COUNT' && !rollupSources.some((field: any) => field.apiName === rollupSourceField)))
-    ? 'Choose a child Master-Detail relationship and a compatible source field for this roll-up operation.'
+    ? 'Choose a child Master-Detail or Lookup relationship and a compatible source field for this roll-up operation.'
     : '';
   const autoNumberConfigurationError = newFieldType === 'Auto Number'
     && (!autoNumberFormat.trim() || autoNumberFormat.length > 80

@@ -5,6 +5,12 @@ import type {RbacEngine} from '../system-files/rbac-engine.js';
 export async function assertLookupTargetExists(db:SqlPersistence|PoolClient,tenantId:string,objectApi:string|null,recordId:string,fieldKey:string,actorUserId?:string){
  // When invoked by Record Engine, apply parent read access inside its current
  // transaction (not an RBAC side connection that cannot see new Flow records).
+ // Users live in md_users, not md_records: a User reference (CashLedger.User,
+ // Cart.HeldBy, User.ReportsToId) targets a person in this tenant.
+ if(objectApi==='User'){
+  const user=await db.query('SELECT id FROM md_users WHERE tenant_id=$1 AND id=$2',[tenantId,recordId]);
+  if(user.rowCount)return;
+ }
  const match=await db.query(actorUserId
   ?"SELECT id FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false AND md_record_access($1,$4,id,'read')"
   :'SELECT id FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false',

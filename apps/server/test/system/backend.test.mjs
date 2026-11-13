@@ -179,3 +179,15 @@ test('SQL validation path evaluates NOT and record lifecycle functions',async()=
   'issued total change is blocked');
  assert.equal(await run({InvoiceNumber:'INV-1',Total:3.7},{InvoiceNumber:'INV-1',Total:3.7},'update'),false);
 });
+
+test('User references resolve against tenant users, not md_records',async()=>{
+ const {assertLookupTargetExists}=await import('../../src/relationship-engine/LookupResolver.ts');
+ const calls=[];
+ const db={query:async(sql,params)=>{calls.push(sql);
+  if(sql.includes('md_users'))return {rowCount:params[1]==='u-1'?1:0,rows:[]};
+  return {rowCount:0,rows:[]};}};
+ await assertLookupTargetExists(db,'t-1','User','u-1','User','u-1');
+ assert.equal(calls.length,1);
+ await assert.rejects(assertLookupTargetExists(db,'t-1','User','u-2','User','u-1'),/Invalid relationship target: User/);
+ await assert.rejects(assertLookupTargetExists(db,'t-1','Customer','u-1','Customer','u-1'),/Invalid relationship target: Customer/);
+});

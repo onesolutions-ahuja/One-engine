@@ -53,10 +53,12 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
  close.current=onClose;
  React.useEffect(()=>{
   const dialog=ref.current;
-  if(!dialog||screen.print||inFrame)return;
+  // A print preview opened from a popup (Reprint receipt) must sit above that popup,
+  // so it is also shown as a modal (top layer) rather than a plain open dialog.
+  if(!dialog||inFrame)return;
   try{if(!dialog.open)dialog.showModal();}catch{dialog.setAttribute('open','');}
   return ()=>{try{dialog.close();}catch{/* already closed */}};
- },[screen.print,inFrame]);
+ },[inFrame]);
  React.useEffect(()=>{
   // Inside the Preview screen there is no native dialog: Escape closes it here.
   if(!inFrame||screen.print)return;
@@ -81,8 +83,9 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
   window.addEventListener('metadrive:close-formula-screen',closeRequest);
   return ()=>window.removeEventListener('metadrive:close-formula-screen',closeRequest);
  },[screen.instance]);
- if(screen.print)return <dialog open className="formula-print-preview" aria-label={screen.page}
-  style={{position:'fixed',inset:0,zIndex:1200,width:'85vw',height:'85vh',overflow:'auto'}}>
+ if(screen.print)return <dialog ref={inFrame?undefined:ref} open={inFrame||undefined} className="formula-print-preview" aria-label={screen.page}
+  onCancel={event=>{event.preventDefault();screen.failed?.(Error('Preview closed'));onClose();}}
+  style={{width:formulaScreenWidth(canvas),maxHeight:'90vh',overflow:'auto',padding:16,border:0,borderRadius:12,background:'#fff'}}>
   <button type="button" onClick={()=>{screen.failed?.(Error('Preview closed'));onClose();}}>Close</button>
   <button type="button" onClick={()=>window.print()}>Print / Save PDF</button>
   {children}

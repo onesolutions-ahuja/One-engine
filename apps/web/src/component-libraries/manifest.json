@@ -18,6 +18,8 @@
     "smart_cart/component.json",
     "smart_table/component.json",
     "smart_numpad/component.json",
-    "smart_icon/component.json"
+    "smart_icon/component.json",
+    "smart_keyboard/component.json",
+    "smart_dock/component.json"
   ]
 }

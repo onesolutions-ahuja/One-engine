@@ -1,3 +1,4 @@
+@import "./smart-ios.css";
 .smart-runtime{box-sizing:border-box;min-width:0;max-width:100%;font-family:system-ui,"Segoe UI",sans-serif}
 .smart-runtime *{box-sizing:border-box}.smart-button,.smart-search,.smart-field input{width:100%;min-height:38px;padding:8px 12px;border:1px solid #b8c7d7;border-radius:inherit}
 .smart-button{cursor:pointer}.smart-toggle{display:flex;align-items:center;gap:9px;padding:8px}.smart-field{display:flex;flex-direction:column;gap:4px}

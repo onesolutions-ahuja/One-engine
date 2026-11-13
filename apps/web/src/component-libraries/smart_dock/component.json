@@ -1,0 +1,31 @@
+{
+  "apiName": "smart_dock",
+  "label": "Smart Dock",
+  "category": "Navigation",
+  "description": "iOS-style dock of up to six icons. Each item has its own action (open a page or run a Flow); add one to each layout.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_dock/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_dock/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 360,
+    "defaultHeight": 72,
+    "minWidth": 64,
+    "minHeight": 44
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {"apiName": "click", "label": "Any item tapped"},
+    {"apiName": "dockItem1", "label": "Item 1 tapped"},
+    {"apiName": "dockItem2", "label": "Item 2 tapped"},
+    {"apiName": "dockItem3", "label": "Item 3 tapped"},
+    {"apiName": "dockItem4", "label": "Item 4 tapped"},
+    {"apiName": "dockItem5", "label": "Item 5 tapped"},
+    {"apiName": "dockItem6", "label": "Item 6 tapped"}
+  ]
+}

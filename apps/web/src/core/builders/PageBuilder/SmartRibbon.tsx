@@ -205,6 +205,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
  // Keep the global property inventory visible for every selected component.
  // Unsupported controls are disabled by the per-property `supported` check below.
  const compactDesign=true;
+ // These components declare exactly their editable areas through SQL mapping rows.
+ const fixedAreaComponents=new Set(['smart_numpad','smart_keyboard','smart_dock']);
  // Independent SQL-planned view over shared controls and persisted property keys.
  // A null property key displays the fallback glyph, always disabled.
  // SQL supplies the shared area order. Retired aliases cannot return from
@@ -217,7 +219,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    .filter(slot=>!retiredDesign2Areas.has(slot.area))
    .map(slot=>[slot.area,slot.areaOrder] as const)).entries()]
    .sort((a,b)=>a[1]-b[1]).map(([area])=>area)
-   .filter(area=>area==='Others'||api!=='smart_numpad'||design2SlotRules.some(rule=>
+   .filter(area=>area==='Others'||!fixedAreaComponents.has(api)||design2SlotRules.some(rule=>
      rule.componentApi===api&&rule.area===area));
  // Focused/Others/Extras are not places on the canvas; they live in Others.
  const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
@@ -475,7 +477,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    const enabled=supported&&(kind!=='position'||isSize||useCanvasPosition)&&
      (!condition||condition.in.includes(String(conditionValue??'')))&&
      (kind!=='choice'||!sharedPropertyIds||options.length>0);
-   const value=mixedPropertyIds?.includes(property.id)?'':properties[key]??property.defaultsOverrides?.[api]??property.default??'';
+   // Components saved before Style existed render Classic; show that, not the new-insert default.
+   const value=mixedPropertyIds?.includes(property.id)?'':properties[key]??
+    (property.id==='visualStyle'?'Classic':property.defaultsOverrides?.[api]??property.default??'');
    const write=(v:unknown)=>{
     if(!enabled)return;
     if(kind==='position'&&useCanvasPosition&&position&&onPositionChange&&typeof v==='number'){
@@ -518,7 +522,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      (isTextSize||isCorner||isWidth||isHeight||isCanvasAxis);
    const isTabIndex=property.id==='tabIndex';
    let editor;
-   if(property.id==='shapeId'||property.id==='numpadKeyShape'||(tab==='Design2'&&property.id==='footerShape'))editor=<SmartIconGallery value={String(value||'shape:rectangle')}
+   if(/^dockItem[1-6]Icon$/.test(property.id))editor=<SmartIconGallery value={String(value||'house')}
+     disabled={!enabled} allowIcons onChange={write}/>;
+   else if(property.id==='shapeId'||property.id==='numpadKeyShape'||(tab==='Design2'&&property.id==='footerShape'))editor=<SmartIconGallery value={String(value||'shape:rectangle')}
      disabled={!enabled} allowIcons={property.id==='footerShape'?false:(selectedApis?.length?selectedApis:[api]).every(member=>
        (property.choicesOverrides?.[member]??property.choices??[]).includes('icons'))}
      onChange={write}/>;

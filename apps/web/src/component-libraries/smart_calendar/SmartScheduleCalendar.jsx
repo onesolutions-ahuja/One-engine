@@ -58,6 +58,7 @@ export default function SmartScheduleCalendar({p,fire,records,resolve}){
  const allowed=Array.isArray(p.showDays)?p.showDays:weekdays;
  const showDays=new Set(allowed.map(value=>String(value).toLowerCase()));
  const selectedIso=iso(selected);
+ const todayIso=iso(new Date());
  const timeZone=String(p.calendarTimeZone??Intl.DateTimeFormat().resolvedOptions().timeZone??"UTC");
  const startHour=n(p.calendarStartHour,8,0,23);
  const endHour=n(p.calendarEndHour,18,startHour+1,24);
@@ -151,7 +152,10 @@ export default function SmartScheduleCalendar({p,fire,records,resolve}){
     const date=dayDate(selected.getFullYear(),selected.getMonth(),day),key=iso(date);
     const count=events.filter(item=>item.day===key).length;
     const chosen=key===selectedIso;
-    return <button type="button" key={cell} className={chosen?"smart-calendar-selected-day":""}
+    const isToday=key===todayIso;
+    return <button type="button" key={cell} className={[chosen?"smart-calendar-selected-day":"",
+      isToday?"smart-calendar-is-today":""].filter(Boolean).join(" ")||undefined}
+     aria-current={isToday?"date":undefined}
      aria-label={"Select "+key+(count?" · "+count+" appointments":"")} aria-pressed={chosen}
      style={chosen?{background:focusedColor,color:"#fff",borderColor:focusedColor}:undefined}
      onClick={()=>setDate(date)}>

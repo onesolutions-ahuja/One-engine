@@ -221,7 +221,8 @@ async function validateRollupWithin(client:Pick<PoolClient,'query'>,tenantId:str
   // Lookups roll up too (stock on hand = sold / purchased lines that point at a Product):
   // the aggregation reads reference_record_id for either relationship type.
   if(!relation||relation.data_type!=='reference'
-    ||!['Master-Detail','Lookup'].includes(relation.relationship_type)
+    // Older Lookup fields store no relationship_type (the API reports them as Lookup).
+    ||!['Master-Detail','Lookup'].includes(relation.relationship_type??'Lookup')
     ||relation.related_object!==objectApi)
     throw new Error('Roll-Up Summary requires an active Master-Detail or Lookup field to this object');
   if(rollup.operation==='SUM'){

@@ -2,7 +2,9 @@ import {parseScreenAction} from '../../../../../server/src/expression-engine/Act
 import {resolvePageActionRoute,type PageActionRoutingContext,type PageActionRoute} from './pageActionRouting';
 import {appRoutePath} from '../../workspace/Navigation/appRouting';
 
-export type PopupScreen={page:string;sessionId:string;recordId:string;instance:string;inScreen:boolean;print?:boolean;ready?:()=>void;failed?:(reason:Error)=>void};
+export type PopupScreen={page:string;sessionId:string;recordId:string;instance:string;inScreen:boolean;
+ /** Page session that opened the popup: refreshed when the popup closes. */
+ parentKey?:string;print?:boolean;ready?:()=>void;failed?:(reason:Error)=>void};
 /** SCREEN(Page[,mode[,record]]). The optional record (for example
  * $component.Cart2.recordId) is evaluated by the caller's resolveRecord with the
  * page's own formula context; the popup reads it as $state.recordId. The popup
@@ -25,7 +27,7 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   item.apiName===page&&item.pageType==='In-Screen Page'&&item.status==='Active');
  const route=inScreen?null:resolvePageActionRoute({navigationTargetType:'App Page',navigationPageApiName:page},context);
  if(mode==='popup'){
-  const screen:PopupScreen={page,sessionId,recordId,instance:crypto.randomUUID(),inScreen};
+  const screen:PopupScreen={page,sessionId,recordId,instance:crypto.randomUUID(),inScreen,parentKey};
   const handled=!window.dispatchEvent(new CustomEvent('metadrive:open-formula-screen',{
    detail:{parentKey,screen},cancelable:true
   }));

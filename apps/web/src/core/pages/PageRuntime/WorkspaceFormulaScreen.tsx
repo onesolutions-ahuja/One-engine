@@ -19,7 +19,13 @@ export default function WorkspaceFormulaScreen({render}:{render:(request:RenderR
  },[]);
  return <>{requests.map(request=>{
   const {screen}=request;
-  const close=()=>setRequests(current=>current.filter(item=>item!==request));
+  const close=()=>{
+   setRequests(current=>current.filter(item=>item!==request));
+   // The popup saved records under its own page session; reload the page that
+   // opened it (cart totals, lists) so it shows what the popup changed.
+   if(screen.parentKey&&!screen.print)window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',
+    {detail:{pageSessionKey:screen.parentKey,sessionId:screen.sessionId}}));
+  };
   // Builder Preview of a Phone/Tablet layout: open inside the device screen.
   const host=typeof document!=='undefined'
    ?document.querySelector<HTMLElement>('[data-formula-screen-host]'):null;

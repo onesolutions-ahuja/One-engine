@@ -20,7 +20,9 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   ??parsed.page;
  if(record!==undefined){
   if(!resolveRecord)throw Error('SCREEN record Id needs a page formula context');
-  const value=resolveRecord(record);
+  // The parser drops the @ of a mention (@recordId, @value): restore it, or the
+  // bare name is read as text and the popup opens with record "=recordId".
+  const value=resolveRecord(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$/.test(record)?'@'+record:record);
   recordId=value===null||value===undefined?'':String(value);
  }
  const inScreen=mode==='popup'&&context.pages.some(item=>

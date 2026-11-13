@@ -1,6 +1,7 @@
 // @ts-nocheck
 import WorkspaceFormulaScreen from '../../pages/PageRuntime/WorkspaceFormulaScreen';
 import SetupLoadingState from './SetupLoadingState';
+import AppPageIcon from '../Navigation/AppPageIcon';
 import { UneBrandLogo } from '../../branding/UneBrandLogo';
 import CompanySettingsWorkspace from '../../settings/CompanySettingsWorkspace/CompanySettingsWorkspace';
 import SettingsNavigationIcon from '../../settings/SettingsNavigationIcon';
@@ -211,7 +212,7 @@ export function renderSetupShell(ctx: any) {
                   onClick={() => {
                     navigateRoute({kind:'app-page',appId:route.appId,pageApiName:appPage.apiName});
                     if (window.matchMedia('(min-width: 600px) and (max-width: 1023px)').matches) setSetupSidebarCollapsed(true);
-                  }}><span>{appPage.label}</span></button>
+                  }}><AppPageIcon label={appPage.label} /><span>{appPage.label}</span></button>
               ))}
             </nav>
           </aside>

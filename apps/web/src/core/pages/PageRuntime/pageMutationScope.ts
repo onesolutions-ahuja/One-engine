@@ -75,6 +75,31 @@ export type LoadedRecordListScope={
  * Returns null whenever the result could differ from a fresh server read;
  * the caller then refreshes as before.
  */
+type DependencyObject={apiName:string;fields?:ReadonlyArray<{apiName?:string;dataType?:string;
+ rollup?:{childObject?:string};formula?:{expression?:string};relationship?:{targetObject?:string}}>};
+/** Objects whose values the server recalculates when `written` change: Roll-Up Summary parents
+ * (and their parents), and objects with formula fields that read a written object across a lookup.
+ * A save reloads only these extra readers; nothing else is refreshed. */
+export function withDependentObjects(written:readonly string[]|undefined,
+ objects:readonly DependencyObject[]|undefined):readonly string[]|undefined{
+ if(!written||!written.length||!objects?.length)return written;
+ const out=new Set(written);
+ for(let grew=true;grew;){
+  grew=false;
+  for(const object of objects){
+   if(out.has(object.apiName))continue;
+   const depends=(object.fields??[]).some(field=>{
+    if(field.rollup?.childObject&&out.has(field.rollup.childObject))return true;
+    const expression=field.formula?.expression;
+    if(!expression)return false;
+    return (object.fields??[]).some(lookup=>lookup.relationship?.targetObject&&out.has(lookup.relationship.targetObject)
+     &&lookup.apiName&&new RegExp('(^|[^A-Za-z0-9_])'+lookup.apiName+'\\.').test(expression));
+   });
+   if(depends){out.add(object.apiName);grew=true;}
+  }
+ }
+ return out.size===written.length?written:[...out];
+}
 export function applySavedRecordMutations(
  rows:ReadonlyArray<Record<string,unknown>>,objectApiName:string,
  detail:PageMutationDetail|undefined,scope:LoadedRecordListScope

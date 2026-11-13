@@ -56,6 +56,11 @@ const contextValue=(source:object|null|undefined,key:string):unknown=>{
     ?descriptor.value??null:null;
 };
 
+/** One list read: formula fields share the user/tenant context and field-access checks across rows. */
+type FormulaBatch={shared?:Promise<{rows:unknown[];tenants:Array<{id:string;name:string}>;
+  currencyRates:Record<string,number>;actor:{id:string;email:string;display_name:string;time_zone:string;locale:string;
+  user_currency_iso_code:string|null;profile_id:string|null;profile_name:string|null;profile_api:string|null};
+  fields:Record<string,boolean>;permissions:Record<string,boolean>}>;visible:Map<string,boolean>};
 export class RecordEngine {
   private recordTrigger?:RecordTriggerHandler;
   private get declarativeRules(){return new DeclarativeRules(this.rbac);}
@@ -127,12 +132,14 @@ export class RecordEngine {
   }
   private async formulaContext(tenantId:string,userId:string,objectApi:string,
     record:Record<string,unknown>,definitions:readonly FieldDefinition[],
-    client?:PoolClient,now:Date|string=new Date()):Promise<FormulaEvaluationContext>{
+    client?:PoolClient,now:Date|string=new Date(),batch?:FormulaBatch):Promise<FormulaEvaluationContext>{
     const executor=client??this.db;
     const formulas=definitions.filter(field=>field.data_type==='formula'
       &&typeof field.formula_expression==='string');
     const references=[...new Set(formulas.flatMap(field=>
       flowFormulaReferences(field.formula_expression!)))];
+    // The user, tenant and field-access part does not depend on the row: a list read loads it once.
+    const loadShared=async()=>{
     const [{rows},{rows:tenants}]=await Promise.all([
       executor.query<{
       id:string;email:string;display_name:string;time_zone:string;locale:string;
@@ -191,6 +198,10 @@ export class RecordEngine {
         fields[field]=await this.rbac.allowed(tenantId,userId,objectApi+'.'+field,'read');
       }
     }
+    return {rows,tenants,currencyRates,actor,fields,permissions};
+    };
+    const {tenants,currencyRates,actor,fields,permissions}=
+      await (batch?(batch.shared??=loadShared()):loadShared());
     let organization:FormulaEvaluationContext['organization'];
     if(references.some(reference=>reference.startsWith('$Organization.'))){
       if(!tenants[0])throw new Error('Formula organization context is unavailable');
@@ -259,13 +270,13 @@ export class RecordEngine {
   }
   private async applyFormulaFields(tenantId:string,userId:string,objectApi:string,
     record:Record<string,unknown>,definitions:readonly FieldDefinition[],client?:PoolClient,
-    migrationMode=false,formulaContext:FormulaEvaluationContext={}) {
+    migrationMode=false,formulaContext:FormulaEvaluationContext={},batch?:FormulaBatch) {
     const formulas=new Map(definitions.filter(field=>field.data_type==='formula'
       &&typeof field.formula_expression==='string').map(field=>[field.api_name,field]));
     const calculated=new Map<string,unknown>();
     const calculating=new Set<string>();
     const referenceCache=new Map<string,unknown>();
-    const visible=new Map<string,boolean>();
+    const visible=batch?.visible??new Map<string,boolean>();
     const canRead=async(targetObject:string,fieldApi:string)=>{
       if(migrationMode)return true;
       const key=targetObject+'.'+fieldApi;
@@ -1308,10 +1319,11 @@ export class RecordEngine {
     const records=[...collected.values()];
     if(definitions.some(field=>field.data_type==='formula')){
       const formulaNow=new Date();
+      const batch:FormulaBatch={visible:new Map()};
       for(const record of records){
         const formulaContext=await this.formulaContext(
-          tenantId,userId,objectApi,record,definitions,undefined,formulaNow);
-        await this.applyFormulaFields(tenantId,userId,objectApi,record,definitions,undefined,false,formulaContext);
+          tenantId,userId,objectApi,record,definitions,undefined,formulaNow,batch);
+        await this.applyFormulaFields(tenantId,userId,objectApi,record,definitions,undefined,false,formulaContext,batch);
       }
     }
     for(const record of records)delete record.__isClone;

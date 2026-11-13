@@ -1,5 +1,5 @@
 import type {CompiledPage,CompiledDataSource} from './compilePage';
-import {applySavedRecordMutations,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
+import {applySavedRecordMutations,withDependentObjects,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {applyPageSelection,changedPageStateNames,type PageStateDependencies} from '../PageRuntime/pageStateDependencies';
 
 /**
@@ -105,7 +105,8 @@ const API_LIMIT=100;
 const emptySnapshot:SourceSnapshot=Object.freeze({records:[],total:0,loading:true,error:'',hasMore:false,
  loadingMore:false,predictable:false,version:0}) as SourceSnapshot;
 
-export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,getState:()=>State){
+export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,getState:()=>State,
+ objects?:Parameters<typeof withDependentObjects>[1]){
  const snapshots=new Map<string,SourceSnapshot>();
  const listeners=new Map<string,Set<Listener>>();
  const requests=new Map<string,number>();
@@ -217,7 +218,9 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   },
   /** A save (or a prediction of one): patch rows in place when exact, else reload only readers. */
   saved(detail:PageMutationDetail):Promise<void>{
-   const written=detail.objectApiNames;
+   // Roll-up and cross-object formula parents change on the server too: their readers reload.
+   const written=withDependentObjects(detail.objectApiNames,objects);
+   if(written!==detail.objectApiNames)detail={...detail,objectApiNames:written};
    const work:Promise<void>[]=[];
    // A new or deleted parent (a cart) is rediscovered on the next read.
    if(!detail.optimistic)load.invalidate?.(written);

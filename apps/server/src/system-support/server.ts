@@ -3017,7 +3017,7 @@ export function createSystemServer(db:SqlPersistence) {
       ||err.message.startsWith('Field definition changed after migration')
       ||err.message.startsWith('Field type is used by'))
       res.status(409).json({error:err.message});
-    else if(/^(Field datatype|Field datatype conversion|Existing value|Numeric value|Only ISO|Migration to Rich Text|Required field migration|Roll-Up Summary|SUM roll-ups|MIN\/MAX roll-ups|Invalid roll-up)/.test(err.message))
+    else if(/^(Field datatype|Field datatype conversion|Existing value|Numeric value|Only ISO|Migration to Rich Text|Required field migration|Roll-Up Summary|SUM roll-ups|MIN\/MAX roll-ups|Invalid roll-up|Formula |Invalid formula|Unsupported formula)/.test(err.message))
       res.status(400).json({error:err.message});
     else if(err.message==='Page already exists'||err.message==='Page API name already exists (archived)'||err.message==='Field already exists'||err.message==='Object already exists'||err.message==='Page layout revision conflict'||err.message==='Page layout draft revision conflict'||err.message==='Page revision conflict'||err.message==='Record has changed since it was loaded')res.status(409).json({error:err.message});
     else if(err.message==='API Name already exists'||err.message==='API Name already exists for this language')res.status(409).json({error:err.message});

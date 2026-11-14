@@ -797,10 +797,10 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             return <div className="smart-others-groups">
               {['Spacing','Calendar','Input Settings','Text','Selection','Additional'].map(group=>{
                 const members=list.filter(property=>category(property.id)===group);
-                return members.length>0&&<div className="smart-others-property-group" key={group} role="group" aria-label={group}>
+                return members.length>0&&<div className="smart-others-property-group" key={group} role="group" aria-label={group} data-others-group={group}>
                   <div className="smart-others-property-heading">{group}</div>
                   <div className="smart-design2-supplemental">
-                    {members.map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
+                    {members.map(property=><div className="smart-design2-supplemental-setting" key={property.id} data-others-property={property.id}>
                       <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
                       {controls(property)}
                     </div>)}

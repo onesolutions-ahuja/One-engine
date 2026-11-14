@@ -45,7 +45,7 @@ export async function buildBundledComponent(definition) {
   const formulaEngineRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),
     '../apps/server/src/expression-engine');
   const sharedFormulaModules=new Set([
-    'ActionFormulas.ts','FormulaCategories.ts','FormulaActions.ts','FormulaData.ts','FormulaUniversal.ts','FormulaDate.ts','FormulaFunctionRegistry.ts','FormulaCollection.ts','FormulaWildcard.ts','FormulaComponentState.ts','FormulaNumeric.ts','FormulaParser.ts','FormulaTokenizer.ts'
+    'ActionFormulas.ts','FormulaCategories.ts','FormulaActions.ts','FormulaData.ts','FormulaUniversal.ts','FormulaDate.ts','FormulaFunctionRegistry.ts','FormulaCollection.ts','FormulaWildcard.ts','FormulaComponentState.ts','FormulaNumeric.ts','FormulaConnections.ts','FormulaParser.ts','FormulaTokenizer.ts'
   ]);
   const boundary = {
     name: 'local-component-sources',

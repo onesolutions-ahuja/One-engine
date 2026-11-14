@@ -318,9 +318,7 @@
 .component-panel-resize { position: absolute; top: 0; right: 0; bottom: 0; z-index: 4; width: 8px; padding: 0; border: 0; background: transparent; cursor: col-resize; touch-action: none; }
 .component-panel-resize:hover, .component-panel-resize:focus-visible { background: linear-gradient(90deg,transparent,rgb(21 62 64 / 16%)); }
 .component-rendered-preview { min-width: 0; min-height: 0; padding: 0; border: 1px solid #e5e5df; border-radius: 5px; background: #fff; text-align: left; cursor: default; }
-/* Running an app hides the platform header (logo, app switcher, profile).
-   Phones keep it because the mobile app launcher lives there. */
-@media (min-width: 768px) {
-  .lightning.md-app-runtime > .salesforce-header { display: none; }
-  .lightning.md-app-runtime > .setup-layout { height: 100vh; height: 100dvh; min-height: 100vh; min-height: 100dvh; }
-}
+/* Running an app hides the platform header (logo, app switcher, profile) on
+   every device: users are assigned the app, they don't switch from inside it. */
+.lightning.md-app-runtime > .salesforce-header { display: none !important; }
+.lightning.md-app-runtime > .setup-layout { height: 100vh; height: 100dvh; min-height: 100vh; min-height: 100dvh; }

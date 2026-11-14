@@ -11,7 +11,6 @@ import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../s
 import {useSqlFormulaDisplay,isSelectedSqlFormula} from "../../shared/useSqlFormulaDisplay";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
 import {getTenantBrand,subscribeTenantBrand} from "../../shared/TenantBrand.js";
-import {uploadTenantImageFile} from "../../../core/builders/ComponentProperties/TenantMediaPicker";
 const number=(v,f,min=0,max=2000)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
 const text=(v)=>v===null||v===undefined?"":String(v);
 const formulaSourceFields=objects=>Array.isArray(objects)?Object.fromEntries(objects
@@ -655,7 +654,7 @@ function SmartToggle({p,fire}){
 }
 // An editable Smart Input stays focused while its authorised formula/default
 // value changes asynchronously. Do not key/remount the native input on changes.
-function SmartReactiveInput({value,onValueChange,rows=1,type="text",allowImageUpload=false,...props}){
+function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=null,...props}){
  const [draft,setDraft]=React.useState(value);
  const [upload,setUpload]=React.useState({busy:false,error:""});
  const fileRef=React.useRef(null);
@@ -668,7 +667,7 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",allowImageUp
  const field=rows>1
   ?<textarea {...props} rows={rows} value={draft} onChange={change}/>
   :<input {...props} type={type} value={draft} onChange={change}/>;
- if(!allowImageUpload)return field;
+ if(typeof uploadImage!=="function")return field;
  // The field keeps holding a URL. Uploading stores the file as a tenant media
  // asset and puts its asset: URL in the field, so typing a URL still works.
  const pick=async event=>{
@@ -677,7 +676,7 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",allowImageUp
   if(!file)return;
   setUpload({busy:true,error:""});
   try{
-   const ref=await uploadTenantImageFile(file);
+   const ref=await uploadImage(file);
    setDraft(ref);onValueChange(ref);setUpload({busy:false,error:""});
   }catch(error){setUpload({busy:false,error:error instanceof Error?error.message:"Upload failed"});}
  };
@@ -881,7 +880,7 @@ export default function SmartRuntime(p){
     resize:inputRows>1?"none":undefined,overflowY:inputRows>1?"auto":undefined,
     background:p.backgroundColor||(ios?"#f2f2f7":"#fff"),
     textAlign:p.labelAlignment||"left","--smart-placeholder-color":p.labelColor||"#64748b"}}
-  rows={inputRows} allowImageUpload={p.allowImageUpload===true&&!p.builderPreview} onValueChange={value=>fire("change",value)}/>;
+  rows={inputRows} uploadImage={p.allowImageUpload===true&&!p.builderPreview?p.uploadImage:null} onValueChange={value=>fire("change",value)}/>;
  }
  else if(name==="smart_selector")content=<SmartSelector p={p} fire={fire}/>;
  else if(name==="smart_lookup")content=<SmartLookup p={p} fire={fire}

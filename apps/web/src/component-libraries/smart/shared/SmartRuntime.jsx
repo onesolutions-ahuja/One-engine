@@ -11,6 +11,7 @@ import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../s
 import {useSqlFormulaDisplay,isSelectedSqlFormula} from "../../shared/useSqlFormulaDisplay";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
 import {getTenantBrand,subscribeTenantBrand} from "../../shared/TenantBrand.js";
+import {uploadTenantImageFile} from "../../../core/builders/ComponentProperties/TenantMediaPicker";
 const number=(v,f,min=0,max=2000)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
 const text=(v)=>v===null||v===undefined?"":String(v);
 const formulaSourceFields=objects=>Array.isArray(objects)?Object.fromEntries(objects
@@ -654,17 +655,43 @@ function SmartToggle({p,fire}){
 }
 // An editable Smart Input stays focused while its authorised formula/default
 // value changes asynchronously. Do not key/remount the native input on changes.
-function SmartReactiveInput({value,onValueChange,rows=1,type="text",...props}){
+function SmartReactiveInput({value,onValueChange,rows=1,type="text",allowImageUpload=false,...props}){
  const [draft,setDraft]=React.useState(value);
+ const [upload,setUpload]=React.useState({busy:false,error:""});
+ const fileRef=React.useRef(null);
  React.useEffect(()=>{setDraft(value);},[value]);
  const change=event=>{
   const next=event.target.value;
   setDraft(next);
   onValueChange(next);
  };
- return rows>1
+ const field=rows>1
   ?<textarea {...props} rows={rows} value={draft} onChange={change}/>
   :<input {...props} type={type} value={draft} onChange={change}/>;
+ if(!allowImageUpload)return field;
+ // The field keeps holding a URL. Uploading stores the file as a tenant media
+ // asset and puts its asset: URL in the field, so typing a URL still works.
+ const pick=async event=>{
+  const file=event.target.files?.[0];
+  event.target.value="";
+  if(!file)return;
+  setUpload({busy:true,error:""});
+  try{
+   const ref=await uploadTenantImageFile(file);
+   setDraft(ref);onValueChange(ref);setUpload({busy:false,error:""});
+  }catch(error){setUpload({busy:false,error:error instanceof Error?error.message:"Upload failed"});}
+ };
+ return <div className="smart-input-upload" style={{position:"relative",width:"100%",height:"100%"}}>
+  {React.cloneElement(field,{style:{...field.props.style,paddingRight:52}})}
+  <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={pick}/>
+  <button type="button" aria-label="Upload image" title={upload.error||"Upload image"} disabled={upload.busy}
+   onClick={()=>fileRef.current?.click()}
+   style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",width:40,height:40,maxHeight:"calc(100% - 8px)",
+    border:0,borderRadius:10,cursor:"pointer",background:upload.error?"#FFEBEA":"#E5F0FF",
+    color:upload.error?"#FF3B30":"#007AFF",fontSize:18,lineHeight:1,opacity:upload.busy?.6:1}}>
+   {upload.busy?"…":"⇪"}
+  </button>
+ </div>;
 }
 export default function SmartRuntime(p){
  const sqlLookup=useSqlFormulaDisplay(p,React);
@@ -854,7 +881,7 @@ export default function SmartRuntime(p){
     resize:inputRows>1?"none":undefined,overflowY:inputRows>1?"auto":undefined,
     background:p.backgroundColor||(ios?"#f2f2f7":"#fff"),
     textAlign:p.labelAlignment||"left","--smart-placeholder-color":p.labelColor||"#64748b"}}
-  rows={inputRows} onValueChange={value=>fire("change",value)}/>;
+  rows={inputRows} allowImageUpload={p.allowImageUpload===true&&!p.builderPreview} onValueChange={value=>fire("change",value)}/>;
  }
  else if(name==="smart_selector")content=<SmartSelector p={p} fire={fire}/>;
  else if(name==="smart_lookup")content=<SmartLookup p={p} fire={fire}

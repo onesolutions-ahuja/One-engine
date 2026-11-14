@@ -187,6 +187,35 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     VALUES('smart_text','Others','extra_inputRows','inputRows')
     ON CONFLICT(component_api,area,slot_key) DO NOTHING
   `);
+  // Smart Text "Upload image": the field still stores only a URL; an uploaded
+  // file is saved as a tenant media asset and its asset: URL fills the field.
+  await client.query(`
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,
+      default_value,min_value,max_value,choices,scope)
+    SELECT 'allowImageUpload','Upload image','Design2','Others','boolean',
+      COALESCE(MAX(sort_order),0)+1,'false'::jsonb,NULL,NULL,'[]'::jsonb,'component'
+    FROM md_builder_shared_properties
+    ON CONFLICT(property_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    VALUES('smart_text','allowImageUpload',true)
+    ON CONFLICT(component_api,property_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slots
+     (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+    SELECT 'Others',COALESCE(MAX(area_order),0)+1,'extra_allowImageUpload',
+      2,2,58,26,'allowImageUpload','allowImageUpload'
+    FROM md_builder_design2_slots
+    ON CONFLICT(area,slot_key) DO NOTHING
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    VALUES('smart_text','Others','extra_allowImageUpload','allowImageUpload')
+    ON CONFLICT(component_api,area,slot_key) DO NOTHING
+  `);
   // Usage targets include storage_bytes, which routinely exceed the original
   // 1,000,000,000 ceiling (1 GB). Widen once to the API's own limit; idempotent.
   await client.query(`

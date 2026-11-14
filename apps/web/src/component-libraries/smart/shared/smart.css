@@ -214,3 +214,10 @@
  white-space:pre-line;text-overflow:clip;overflow-wrap:anywhere;
 }
 .smart-runtime.smart_button>.smart-button.is-wrapped .smart-button-label{text-align:inherit}
+
+/* Wrap Text on Tabs / Navigation: items share the width and long captions wrap. */
+.smart-runtime.smart_tabs.smart-wrap-text>.smart-tabs-shell .smart-tabs{width:100%;min-width:0}
+.smart-runtime.smart_tabs.smart-wrap-text>.smart-tabs-shell .smart-tabs>button,
+.smart-runtime.smart_navigation.smart-wrap-text .smart-navigation-item{
+ flex:1 1 0!important;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
+.smart-runtime.smart_navigation.smart-wrap-text>.smart-navigation{flex-wrap:nowrap!important}

@@ -1030,7 +1030,7 @@ export default function SmartRuntime(p){
     borderRadius:number(p.radius,12),...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12))
  }}>{p.children||(p.builderPreview?<span className="smart-editor-container-placeholder">Drop components here</span>:null)}</div>;
  // Geometry-only technical host; the native Smart surface owns all visible styling.
- return <div className={"smart-runtime "+name+(ios?" smart-ios":"")}
+ return <div className={"smart-runtime "+name+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}
   data-builder-preview={p.builderPreview?"true":undefined} style={{
    display:"flex",flexDirection:"column",boxSizing:"border-box",border:0,
    background:"transparent",boxShadow:"none",padding:0,margin:0,

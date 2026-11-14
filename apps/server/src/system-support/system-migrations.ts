@@ -594,6 +594,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await client.query(`
     WITH specs(component_api,area,slot_key,property_key) AS (VALUES
      ('smart_button','Body','wrap','wrapText'),
+     ('smart_tabs','Body','wrap','wrapText'),
+     ('smart_navigation','Body','wrap','wrapText'),
      ('smart_card_grid','Button 3','wrap','cardButtonWrapText'),
      ('smart_card_grid','Button','wrap','customButton1WrapText'),
      ('smart_card_grid','Button 2','wrap','customButton2WrapText'),
@@ -616,7 +618,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   // Existing buttons are single-line; show Wrap Text as off for them.
   await client.query(`
     UPDATE md_builder_ribbon_component_rules SET default_value_override='false'::jsonb
-    WHERE component_api='smart_button' AND property_key='wrapText'
+    WHERE component_api IN('smart_button','smart_tabs','smart_navigation') AND property_key='wrapText'
       AND default_value_override IS NULL
   `);
   // Smart iOS Style, Smart Keyboard and Smart Dock (additive, idempotent).

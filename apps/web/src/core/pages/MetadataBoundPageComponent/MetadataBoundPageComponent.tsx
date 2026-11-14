@@ -15,6 +15,7 @@ import {useState,useEffect,useRef,useMemo} from 'react';
 import {ensureTenantBrand} from '../../branding/tenantBrandLoader';
 import {pageStateDependencies,applyPageSelection} from '../PageRuntime/pageStateDependencies';
 import {loadFlowScreenRecordPage,getAccessToken} from '../../authentication/Client/authClient';
+import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {requestPageMediaAsset} from '../PageRuntime/pageMediaAssetCoalescer';
 // Load the browser API client only during the mounted effect, not on SSR import.
 import {presentPageRecords,type ChannelGrant} from '../../records/RecordWorkspace/recordPresentationAdapters';
@@ -743,6 +744,8 @@ export default function MetadataBoundPageComponent({
       device: formFactor, onNavigate, onLaunchFlow, onAction, actionError,
       disabled:behaviorAction(properties,'click',behaviorContext??{formFactor})!=='enabled',
       loadAsset: (id:string) => requestPageMediaAsset<{contentType:string;contentBase64:string}>(apiRequest,id,getAccessToken()??''),
+      // Smart Text "Upload image": stores a tenant media asset, returns its asset: URL.
+      uploadImage: (file:File) => uploadTenantImageFile(file),
       loadCompanySettings: () => apiRequest('/metadata/currencies'),
       // Search is independent of the list's existing 100-row pagination.
       // Never widen unsupported/client-only filters into an unfiltered query.

@@ -353,5 +353,155 @@
     "id": "timer",
     "label": "Timer",
     "category": "Productivity & files"
+  },
+  {
+    "id": "scan-barcode",
+    "label": "Scan barcode",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "barcode",
+    "label": "Barcode",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "id-card",
+    "label": "ID card",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "banknote",
+    "label": "Banknote",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "coins",
+    "label": "Coins",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "hand-coins",
+    "label": "Cashback",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "split",
+    "label": "Split",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "pause",
+    "label": "Hold",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "percent",
+    "label": "Percent",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "wine",
+    "label": "Wine",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "beer",
+    "label": "Beer",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "cigarette",
+    "label": "Tobacco",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "camera",
+    "label": "Camera",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "chart-pie",
+    "label": "Pie chart",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "chart-line",
+    "label": "Line chart",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "chart-bar",
+    "label": "Bar chart",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "layout-grid",
+    "label": "Grid",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "list",
+    "label": "List",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "panel-left",
+    "label": "Sidebar",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "delete",
+    "label": "Backspace",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "scan-face",
+    "label": "Face scan",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "badge-check",
+    "label": "Verified",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "circle-check",
+    "label": "Success",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "triangle-alert",
+    "label": "Warning",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "ban",
+    "label": "Refuse",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "archive",
+    "label": "Archive",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "store",
+    "label": "Store",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "calculator",
+    "label": "Calculator",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "undo-2",
+    "label": "Refund",
+    "category": "Retail & POS"
+  },
+  {
+    "id": "history",
+    "label": "History",
+    "category": "Retail & POS"
   }
 ]

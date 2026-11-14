@@ -1,0 +1,23 @@
+{
+  "apiName": "smart_chart",
+  "label": "Smart Chart",
+  "category": "Data",
+  "description": "Bar, horizontal bar, line or donut chart for Object records and TABLE() Items-source datasets. Label and value use the shared Formula Bar.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_chart/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_chart/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 560,
+    "defaultHeight": 320,
+    "minWidth": 200,
+    "minHeight": 140
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": []
+}

@@ -83,6 +83,7 @@ export function usePagePalette(
       case 'Custom:smart_toggle':return <ToggleRight size={15}/>;
       case 'Custom:smart_keyboard':return <Keyboard size={15}/>;
       case 'Custom:smart_dock':return <PanelBottom size={15}/>;
+      case 'Custom:smart_chart':return <BarChart3 size={15}/>;
     }
     const name = `${component.label} ${component.type}`.toLowerCase();
     if (/\b(text|heading|paragraph|rich text|label)\b/.test(name)) return <Type size={15} />;

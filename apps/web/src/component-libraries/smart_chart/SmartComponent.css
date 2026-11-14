@@ -1,0 +1,32 @@
+.smart-chart-root{box-sizing:border-box;display:flex;flex-direction:column;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;padding:14px 16px;font-family:inherit}
+.smart-chart-title{flex:0 0 auto;margin:0 0 10px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smart-chart-body{position:relative;flex:1 1 auto;min-height:0;min-width:0;display:flex;flex-direction:column}
+.smart-chart-body.smart-chart-with-grid>.smart-chart-bars,.smart-chart-body.smart-chart-with-grid>.smart-chart-line{margin-left:52px}
+.smart-chart-grid{position:absolute;inset:20px 0 22px 0;pointer-events:none}
+.smart-chart-grid-line{position:absolute;left:52px;right:0;border-top:1px solid #e5e5ea}
+.smart-chart-grid-line span{position:absolute;right:calc(100% + 6px);top:-0.6em;white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1.2}
+.smart-chart-bars{flex:1 1 auto;min-height:0;display:flex;align-items:stretch}
+.smart-chart-bar-column{flex:1 1 0;min-width:0;display:flex;flex-direction:column}
+.smart-chart-bar-track{position:relative;flex:1 1 auto;margin-top:20px;min-height:0}
+.smart-chart-bar{position:absolute;left:0;right:0;bottom:0;min-height:2px;transition:height .25s ease}
+.smart-chart-value{position:absolute;left:0;right:0;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1.2}
+.smart-chart-axis-label{flex:0 0 22px;height:22px;line-height:22px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smart-chart-rows{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center;overflow:auto}
+.smart-chart-row{display:flex;align-items:center;gap:10px;min-height:18px}
+.smart-chart-row-label{flex:0 0 32%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smart-chart-row-track{flex:1 1 auto;height:20px;background:#f2f2f7;border-radius:6px;overflow:hidden}
+.smart-chart-row-bar{height:100%;min-width:2px;transition:width .25s ease}
+.smart-chart-row-value{flex:0 0 auto;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+.smart-chart-line{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.smart-chart-line-svg{flex:1 1 auto;width:100%;min-height:0;margin-top:20px;overflow:visible}
+.smart-chart-line-labels{flex:0 0 22px;display:flex;justify-content:space-between}
+.smart-chart-line-labels .smart-chart-axis-label{flex:0 1 auto}
+.smart-chart-donut{flex:1 1 auto;min-height:0;display:flex;align-items:center;gap:18px}
+.smart-chart-donut-ring{position:relative;flex:0 0 auto;height:100%;max-height:220px;aspect-ratio:1}
+.smart-chart-donut-ring svg{width:100%;height:100%;transform:none}
+.smart-chart-donut-total{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.smart-chart-legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.smart-chart-legend li{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.smart-chart-legend i{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.smart-chart-legend b{margin-left:auto;padding-left:10px;font-weight:600;font-variant-numeric:tabular-nums}
+.smart-chart-empty{margin:auto;text-align:center}

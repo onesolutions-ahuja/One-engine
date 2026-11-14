@@ -92,6 +92,16 @@ test('Smart Keyboard and Dock are registered like every Smart component',()=>{
  assert.match(events,/event==='dismiss'\?api==='smart_keyboard'/);
 });
 
+test('Smart Table and Smart Icon also support iOS Style',()=>{
+ const table=read('../src/component-libraries/smart_table/SmartTable.jsx');
+ assert.match(table,/const ios=p\.visualStyle==="iOS"/);
+ assert.match(table,/colour\(p\.headerBodyColor,ios\?"#f9f9fb":"#f3f6fb"\)/,'configured colour still first');
+ assert.match(read('../src/component-libraries/smart_table/SmartComponent.css'),/^@import "\.\.\/smart\/shared\/smart-ios\.css";/);
+ const icon=read('../src/component-libraries/smart_icon/SmartComponent.jsx');
+ assert.match(icon,/p\.iconFillColor:ios\?"#007aff":"#000000"/);
+ assert.match(read('../../server/src/system-support/smart-ios-keyboard-dock.ts'),/const STYLED=\['smart_table','smart_icon'/);
+});
+
 test('iOS Style is opt-in per saved component and never overrides configured values',()=>{
  const runtime=read('../src/component-libraries/smart/shared/SmartRuntime.jsx');
  assert.match(runtime,/const ios=p\.visualStyle==="iOS"/);

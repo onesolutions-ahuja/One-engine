@@ -33,17 +33,20 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   {event:"customButton2",label:p.customButton2Label||"View",enabled:p.customButton2Visible!==false}
  ].filter(action=>action.enabled);
  const [selected,setSelected]=React.useState(null);
+ // Style = iOS (saved on new inserts). Configured colours still win; this only
+ // changes the defaults used when nothing was set. Older tables stay Classic.
+ const ios=p.visualStyle==="iOS";
  const border=value=>value?"1px solid "+value:"1px solid transparent";
  const headingStyle={
-  backgroundColor:colour(p.headerBodyColor,"#f3f6fb"),
+  backgroundColor:colour(p.headerBodyColor,ios?"#f9f9fb":"#f3f6fb"),
   // Default Value Color is retired for Smart Table; Header Label Color owns this.
-  color:colour(p.headerTextColor,"#172a45"),
+  color:colour(p.headerTextColor,ios?"#6e6e73":"#172a45"),
   borderBottom:border(p.headerBorderColor),
   textAlign:p.headerAlignment||p.labelAlignment||"left",
   fontSize:finite(p.headerTextSize??p.textSize,13,9,96),
   height:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==""
    ?finite(p.headerBoxHeight,0,0,2000):undefined,
-  fontWeight:p.headerBold===false?400:700,
+  fontWeight:p.headerBold===false?400:ios?600:700,
   whiteSpace:p.wrapText===false?"nowrap":"pre-line"
  };
  const rowHeight=finite(p.rowHeight,40,22,300);
@@ -56,7 +59,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   whiteSpace:p.rowWrapText===false?"nowrap":undefined,
   // A selected row keeps its selected colour; otherwise the Row fill applies.
   background:selected!==null&&String(row.Id??row.id)===selected
-   ?colour(p.selectedRowColor,"#e7f1ff"):p.rowBackgroundColor?colour(p.rowBackgroundColor,undefined):undefined
+   ?colour(p.selectedRowColor,ios?"#e5f0ff":"#e7f1ff"):p.rowBackgroundColor?colour(p.rowBackgroundColor,undefined):undefined
  });
  const value=(row,column)=>{
   if(!column.override)return plain(row?.[column.key]);
@@ -76,8 +79,8 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
  const footerText=total>shown
   ?shown+" of "+total+" records":total===1?"1 record":total+" records";
  const footerStyle={
-  backgroundColor:colour(p.footerBackgroundColor??p.summaryBackgroundColor,"#f5f7fa"),
-  color:colour(p.footerTextColor??p.summaryTextColor,"#33445d"),
+  backgroundColor:colour(p.footerBackgroundColor??p.summaryBackgroundColor,ios?"#f9f9fb":"#f5f7fa"),
+  color:colour(p.footerTextColor??p.summaryTextColor,ios?"#8e8e93":"#33445d"),
   height:finite(p.footerHeight??p.summaryHeight,36,22,300),
   minHeight:finite(p.footerHeight??p.summaryHeight,36,22,300),
   fontSize:finite(p.footerTextSize??p.summaryTextSize,12,9,96),
@@ -93,7 +96,8 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    p.summaryWidth?finite(p.summaryWidth,200,20,2000)+"px":"100%",
   maxWidth:"100%"
  };
- return <section className="smart-table-root" aria-label={p.label||"Smart Table"}
+ return <section className={"smart-table-root"+(ios?" smart-ios":"")} aria-label={p.label||"Smart Table"}
+  data-builder-preview={p.builderPreview?"true":undefined}
   style={{background:colour(p.backgroundColor,"#fff"),border:border(p.borderColor),
    boxShadow:shadow(p.shadow),borderRadius:finite(p.radius,10,0,100),
    padding:0}}>
@@ -123,7 +127,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
         event.preventDefault();pick(row);
        }}}>
        {columns.map((col,i)=><td key={col.key}
-         style={{borderBottom:border(borderColor),
+         style={{borderBottom:border(borderColor??(ios?"rgb(60 60 67 / .12)":undefined)),
           borderTop:active?border(borderColor):undefined,
           borderTopLeftRadius:i===0?finite(p.rowRadius,0,0,100):undefined,
           borderBottomLeftRadius:i===0?finite(p.rowRadius,0,0,100):undefined,
@@ -132,7 +136,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
           textAlign:p.rowAlignment||"left",height:rowHeight}}>
          {value(row,col)}</td>)}
        {actions.length>0&&<td className="smart-table-actions"
-         style={{borderBottom:border(borderColor),
+         style={{borderBottom:border(borderColor??(ios?"rgb(60 60 67 / .12)":undefined)),
           borderTopRightRadius:finite(p.rowRadius,0,0,100),
           borderBottomRightRadius:finite(p.rowRadius,0,0,100)}}>
          {actions.map(action=><button type="button" key={action.event}

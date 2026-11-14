@@ -92,4 +92,16 @@ nginx -t
 trap - ERR
 report_oci_progress 'Full stack deployed; local health checks passed'
 echo "Full stack deployed and local health checks passed at $SHA"
+# Keep the read-only operations helper (deploy_status/logs) in step with the
+# release, only after a fully healthy deploy. Atomic replace; a failure here
+# never undoes the deploy. The deploy runner itself is not self-updated.
+ops_helper="$SOURCE/scripts/oracle/metadrive-mcp-operations"
+if [[ -f "$ops_helper" ]] && bash -n "$ops_helper" &&
+  install -o root -g root -m 0755 "$ops_helper" /usr/local/sbin/.metadrive-mcp-operations.new &&
+  mv -f /usr/local/sbin/.metadrive-mcp-operations.new /usr/local/sbin/metadrive-mcp-operations; then
+  echo "Operations helper updated from $SHA"
+else
+  rm -f /usr/local/sbin/.metadrive-mcp-operations.new
+  echo "Operations helper not updated (deploy itself succeeded)" >&2
+fi
 # Keep backup_dir and previous releases for audited recovery.

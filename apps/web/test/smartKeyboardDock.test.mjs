@@ -49,9 +49,10 @@ test('Smart Keyboard shift and auto-capitals behave like iOS',()=>{
  assert.equal(keyboardSettings({}).showOnFocus,false);
 });
 
-test('Smart Dock shows 1–6 items with labels, badges, visibility and active item',()=>{
+test('Smart Dock shows 1–12 items with labels, badges, visibility and active item',()=>{
  assert.equal(dockSettings({}).count,4);
- assert.equal(dockSettings({dockItemCount:9}).count,6);
+ assert.equal(dockSettings({dockItemCount:9}).count,9);
+ assert.equal(dockSettings({dockItemCount:20}).count,12);
  assert.equal(dockSettings({dockItemCount:0}).count,4);
  const p={dockItemCount:3,dockItem1Icon:'house',dockItem1Label:'Home',dockItem2Icon:'receipt',
   dockItem2Label:'Orders',dockItem2Badge:'1200',dockItem3Label:'Hidden',dockItem3Visible:'false'};
@@ -60,7 +61,7 @@ test('Smart Dock shows 1–6 items with labels, badges, visibility and active it
  assert.equal(items[1].badge,'99+');
  assert.equal(dockItems({dockItem1Badge:'0'})[0].badge,'');
  assert.equal(dockSettings({__dockActiveItem:'3'}).activeItem,3);
- assert.equal(dockSettings({__dockActiveItem:'7'}).activeItem,null);
+ assert.equal(dockSettings({__dockActiveItem:'13'}).activeItem,null);
  assert.equal(dockSettings({navigationDirection:'vertical'}).direction,'vertical');
  // Builder preview fills blank items with sample icons so the dock is visible.
  assert.equal(dockItems({builderPreview:true})[0].label,'Home');
@@ -80,7 +81,7 @@ test('Smart Keyboard and Dock are registered like every Smart component',()=>{
  }
  const dock=JSON.parse(read('../src/component-libraries/smart_dock/component.json'));
  assert.deepEqual(dock.eventDefinitions.map(e=>e.apiName),
-  ['click','dockItem1','dockItem2','dockItem3','dockItem4','dockItem5','dockItem6']);
+  ['click',...Array.from({length:12},(_,i)=>'dockItem'+(i+1))]);
  const seeder=read('../../server/src/app-seeders/smart-components.ts');
  assert.match(seeder,/"smart_keyboard","smart_dock"/);
  const migration=read('../../server/src/system-support/system-migrations.ts');

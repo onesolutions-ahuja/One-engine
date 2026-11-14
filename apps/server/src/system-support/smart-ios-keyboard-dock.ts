@@ -12,8 +12,10 @@
  */
 type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>};
 
-const DOCK_ICONS=['house','search','receipt','settings','bell','user-round'];
-const DOCK_LABELS=['Home','Search','Orders','Settings','Alerts','Profile'];
+const DOCK_ICONS=['house','search','receipt','settings','bell','user-round',
+ 'package','users-round','chart-bar','calculator','store','layout-grid'];
+const DOCK_LABELS=['Home','Search','Orders','Settings','Alerts','Profile',
+ 'Products','Customers','Reports','Cash','Store','More'];
 
 /** [property_key,label,tab,group,kind,default json|null,choices json,min,max] */
 type Spec=[string,string,'Design2'|'Data',string,string,string|null,string,number|null,number|null];
@@ -26,7 +28,7 @@ export const SMART_IOS_PROPERTY_SPECS:Spec[]=[
  ['keyboardShowOnFocus','Show on focus','Design2','Others','boolean','false','[]',null,null],
  ['keyboardHideDeviceKeyboard','Hide phone keyboard','Design2','Others','boolean','true','[]',null,null],
  ['keyboardAutoCapitalize','Auto capitals','Design2','Others','boolean','true','[]',null,null],
- ['dockItemCount','Items','Design2','Others','number','4','[]',1,6],
+ ['dockItemCount','Items','Design2','Others','number','4','[]',1,12],
  ['dockShowLabels','Show labels','Design2','Others','boolean','true','[]',null,null],
  ['dockShowIndicator','Active dot','Design2','Others','boolean','false','[]',null,null],
  ['dockMagnify','Magnify on hover','Design2','Others','boolean','true','[]',null,null],
@@ -134,6 +136,9 @@ export async function applySmartIosKeyboardDock(client:Query){
    26,0,'buttons'
   FROM missing m CROSS JOIN last_order
   ON CONFLICT(property_key) DO NOTHING`);
+  // Smart Dock grew from 6 to 12 items.
+  await client.query(`UPDATE md_builder_shared_properties SET max_value=12
+   WHERE property_key='dockItemCount' AND COALESCE(max_value,0)<12`);
 
  // 3) Which component uses which property. Defaults apply to new inserts only.
  const rules=[

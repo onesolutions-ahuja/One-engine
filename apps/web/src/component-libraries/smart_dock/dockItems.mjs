@@ -1,10 +1,13 @@
 // Pure Smart Dock item rules, shared by the runtime, Builder preview and tests.
 
-export const DOCK_MAX_ITEMS=6;
+export const DOCK_MAX_ITEMS=12;
 const sample=[
  {icon:"house",label:"Home"},{icon:"search",label:"Search"},
  {icon:"receipt",label:"Orders"},{icon:"settings",label:"Settings"},
- {icon:"bell",label:"Alerts"},{icon:"user-round",label:"Profile"}
+ {icon:"bell",label:"Alerts"},{icon:"user-round",label:"Profile"},
+ {icon:"package",label:"Products"},{icon:"users-round",label:"Customers"},
+ {icon:"chart-bar",label:"Reports"},{icon:"calculator",label:"Cash"},
+ {icon:"store",label:"Store"},{icon:"layout-grid",label:"More"}
 ];
 
 const text=value=>value===null||value===undefined?"":String(value).trim();

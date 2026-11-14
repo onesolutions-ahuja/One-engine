@@ -71,14 +71,13 @@ if [[ ! -d "$RELEASE" ]]; then
   # Migration entrypoints must be readable by the metadrive service account.
   # The self-hosted runner checkout under /home/ubuntu is not a runtime path.
   mkdir -p "$RELEASE/scripts"
-  cp -a "$SOURCE/scripts/cart" "$SOURCE/scripts/codextill" "$RELEASE/scripts/"
+  cp -a "$SOURCE/scripts/cart" "$RELEASE/scripts/"
   chown -R metadrive:metadrive "$RELEASE"
 fi
 test -f "$RELEASE/apps/server/dist-system/system-support/entrypoint.js"
 test -f "$RELEASE/apps/server/dist-system/system-support/job-worker-entrypoint.js"
 # Fail before switching services if a migration dependency is absent or unreadable.
 runuser -u metadrive -- test -r "$RELEASE/scripts/cart/migrate-cart-session-to-cart.mjs"
-runuser -u metadrive -- test -r "$RELEASE/scripts/codextill/ensure-smart-till-cart-flows.mjs"
 
 # Stamp the code we are about to activate, not the latest main branch.
 # On rollback the previous systemd overrides (and their stamps) are restored.

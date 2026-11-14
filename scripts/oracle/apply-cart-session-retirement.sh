@@ -13,7 +13,6 @@ for script in migrate-cart-session-to-cart.mjs migrate-cart-formulas.mjs migrate
     exit 1
   }
 done
-runuser -u metadrive -- test -r "$SOURCE/scripts/codextill/ensure-smart-till-cart-flows.mjs"
 (
  set -a
  source /etc/metadrive/production.env

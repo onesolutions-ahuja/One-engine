@@ -120,7 +120,7 @@ builder git -C "$workspace" checkout --quiet --force --detach "$sha"
 # types, symlinks, and permissions.
 deployment_script_digest() {
   tar -C "$workspace" --sort=name --mtime='@0' --owner=0 --group=0 \
-    --numeric-owner --format=gnu -cf - scripts/oracle scripts/cart scripts/codextill \
+    --numeric-owner --format=gnu -cf - scripts/oracle scripts/cart \
     | sha256sum | awk '{print $1}'
 }
 script_digest=$(deployment_script_digest)
@@ -172,9 +172,9 @@ updated_digest=$(deployment_script_digest)
   exit 1
 }
 chown root:root "$workspace" "$workspace/scripts"
-chown -R root:root "$workspace/scripts/oracle" "$workspace/scripts/cart" "$workspace/scripts/codextill"
-chmod 0755 "$workspace" "$workspace/scripts" "$workspace/scripts/oracle" "$workspace/scripts/cart" "$workspace/scripts/codextill"
-find "$workspace/scripts/oracle" "$workspace/scripts/cart" "$workspace/scripts/codextill" -type f -exec chmod a-w {} +
+chown -R root:root "$workspace/scripts/oracle" "$workspace/scripts/cart"
+chmod 0755 "$workspace" "$workspace/scripts" "$workspace/scripts/oracle" "$workspace/scripts/cart"
+find "$workspace/scripts/oracle" "$workspace/scripts/cart" -type f -exec chmod a-w {} +
 stage=deploying
 write_status running "$stage"
 append_trail deploying "Full-stack backup + API + frontend"

@@ -13,6 +13,7 @@ const WorkspaceShortcutHelp = React.lazy(() => import('../Navigation/WorkspaceSh
 const GlobalQuickActionLauncher=React.lazy(()=>import('./GlobalQuickActionLauncher'));
 import { MobileAppNavigation, MobileAppLauncher } from './MobileAppNavigation';
 import { resolvePageToolbarActions } from '../../pages/PageRuntime/pageToolbarActions';
+import { appPageOpensOn } from './appPageDevices';
 import { type ObjectMetadata, type LightningPageMetadata, type LightningAppMetadata } from '../../metadata/Definitions/metadata';
 import type { RecordData } from '../../records/RecordWorkspace/recordMetadataUtils';
 const UniversalDataLoaderWorkspace=React.lazy(()=>import('./UniversalDataLoaderWorkspace'));
@@ -30,7 +31,7 @@ export function renderSetupShell(ctx: any) {
     ? currentAppNavigation.filter((entry: any) => entry.type === 'App Page')
         .map((entry: any) => pages.find((page: LightningPageMetadata) =>
           page.apiName === entry.apiName && page.pageType === 'App Page' && page.status === 'Active'))
-        .filter(Boolean)
+        .filter((page: LightningPageMetadata | undefined) => Boolean(page) && appPageOpensOn(page, runtimeFormFactor))
     : [];
   const installedAppValue=route.kind==='record-list'||route.kind==='record-detail'?'__records__'
     : route.kind==='app-page'||route.kind==='app-home'?(route.appId==='Records'?'__records__':route.appId)
@@ -53,7 +54,8 @@ export function renderSetupShell(ctx: any) {
     if (!selectedApp) return;
     const firstPage = selectedApp.navigationOrder.find((item: any) => item.type === 'App Page' &&
       selectedApp.navigationPageApiNames.includes(item.apiName) &&
-      pages.some((page: LightningPageMetadata) => page.apiName === item.apiName && page.pageType === 'App Page' && page.status === 'Active'));
+      pages.some((page: LightningPageMetadata) => page.apiName === item.apiName && page.pageType === 'App Page' && page.status === 'Active'
+        && appPageOpensOn(page, runtimeFormFactor)));
     navigateRoute(firstPage ? { kind: 'app-page', appId: selectedApp.apiName, pageApiName: firstPage.apiName }
       : { kind: 'app-home', appId: selectedApp.apiName });
   };

@@ -31,6 +31,13 @@ case "$action" in
   else
     printf 'state=idle\n'
   fi
+  # Typed in a terminal: keep the short answer (state, sha, stage) unless the
+  # deploy failed. The app's Deploy screen calls through the broker (not a
+  # terminal) and always receives the full log sections it parses.
+  if [[ -t 1 ]] && ! grep -qx 'state=failed' "$status_file" 2>/dev/null; then
+    printf 'Showing the short status. Full log is shown when a deploy fails.\n'
+    exit 0
+  fi
   # Versioned collector marker lets the UI distinguish old installed agents
   # from an empty log (and makes installed-vs-repository drift visible).
   printf 'log_collector=v2\n'

@@ -1111,9 +1111,12 @@ function MetadataBoundPageComponent({
 type PageDefinitionCache = Map<string,{page:LightningPageMetadata;fetchedAt:number}>;
 const PAGE_DEFINITION_CACHE_TTL_MS=30_000;
 const PAGE_DEFINITION_CACHE_MAX=100;
-function pageDefinitionCacheKey(appId:string,pageApiName:string|undefined,layout:string,viewportWidth:number,profileId:string|undefined):string{
-  // Even Desktop requests can resolve to a width-targeted Custom page.
-  return JSON.stringify([appId,pageApiName??'__home__',layout,viewportWidth,profileId??'']);
+function pageDefinitionCacheKey(appId:string,pageApiName:string|undefined,layout:string,viewportWidth:number):string{
+  // Even Desktop requests can resolve to a width-targeted Custom page. The
+  // profile is not part of the key: the server picks the page from the signed-in
+  // user's own profile, so the profile arriving later must not fetch it again.
+  // The cache itself belongs to one signed-in session.
+  return JSON.stringify([appId,pageApiName??'__home__',layout,viewportWidth]);
 }
 function readPageDefinitionCache(cache:PageDefinitionCache,key:string):LightningPageMetadata|null{
   const hit=cache.get(key);
@@ -1209,7 +1212,7 @@ function LightningAppRuntime({
   const openedWith=useRef<{width:number;layout:typeof liveLayout}>({width:liveViewportWidth,layout:liveLayout});
   const viewportWidth=inScreenPage?openedWith.current.width:liveViewportWidth;
   const requestedLayout=inScreenPage?openedWith.current.layout:liveLayout;
-  const cacheKey=pageDefinitionCacheKey(appId,inScreenPage?'window:'+pageApiName:pageApiName,requestedLayout,viewportWidth,profileId);
+  const cacheKey=pageDefinitionCacheKey(appId,inScreenPage?'window:'+pageApiName:pageApiName,requestedLayout,viewportWidth);
   const routeKey=cacheKey;
   // The same page at another width (zoom in/out, resize) or once the user's
   // profile has loaded: keep it on screen while the server checks whether a

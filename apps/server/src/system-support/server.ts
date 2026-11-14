@@ -2310,7 +2310,9 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     await rbac.require(actor.tenant_id,actor.user_id,'AppExchange','manage');
     if(req.body?.pageSeed)await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','create');
-    const result=await appPublishing.install(actor,req.params.apiName,req.body?.pageSeed);
+    // installPrerequisites: also install the connectors this app needs ("Install both").
+    const result=await appPublishing.install(actor,req.params.apiName,req.body?.pageSeed,
+      {installPrerequisites:req.body?.installPrerequisites===true});
     if(!result.packaged){res.status(204).end();return;}
     res.json(result);
   }));

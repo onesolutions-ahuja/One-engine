@@ -17,6 +17,8 @@ export type FormulaBindingContext={
   user?:Record<string,unknown>;
   profile?:Record<string,unknown>;
   organization?:Record<string,unknown>;
+  /** Connected connector/callout names for CONNECTED(); never secrets. */
+  connections?:{systemAvailable:readonly string[];systemConnected:readonly string[];customConnected:readonly string[]}|null;
   recordType?:Record<string,unknown>;
   permissions?:Readonly<Record<string,boolean>>;
   collectionSources?:Readonly<Record<string,ReadonlyArray<Record<string,unknown>>>>;

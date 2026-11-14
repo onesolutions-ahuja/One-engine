@@ -599,7 +599,9 @@ export function renderSetupShell(ctx: any) {
               await apiRequest('/connector-apps/'+encodeURIComponent(appKey)+'/licence',{method:'POST',body:'{}'});
             }}
             installApp={async(appKey:string)=>{
-              const result=await apiRequest<unknown>('/apps/'+encodeURIComponent(appKey)+'/install',{method:'POST',body:'{}'});
+              // The install preview lists any connector installed alongside the app.
+              const result=await apiRequest<unknown>('/apps/'+encodeURIComponent(appKey)+'/install',
+                {method:'POST',body:JSON.stringify({installPrerequisites:true})});
               const [installed,published]=await Promise.all([
                 apiRequest<{apps:LightningAppMetadata[]}>('/metadata/apps'),
                 apiRequest<{pages:LightningPageMetadata[]}>('/metadata/pages')]);

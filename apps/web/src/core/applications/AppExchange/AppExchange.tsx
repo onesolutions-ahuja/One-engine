@@ -13,6 +13,17 @@ export type AppInstallPreview = { packaged: false } | {
   missingDependencies: Array<{type: string; apiName: string}>;
   conflicts: Array<{type: string; apiName: string; reason: string}>;
   activateFlows: string[];
+  /** Connectors and HTTP callouts this app uses, found when it was published. */
+  prerequisites?: AppPrerequisiteStatus[];
+};
+export type AppPrerequisiteStatus = {
+  kind: 'connector'|'callout'; label: string; name: string; optional: boolean;
+  status: 'connected'|'needs-keys'|'will-install'|'needs-licence'|'optional-missing'|'missing';
+  blocking: boolean; message: string; appApi?: string;
+};
+const prerequisiteTone: Record<AppPrerequisiteStatus['status'], string> = {
+  'connected': 'Connected', 'needs-keys': 'Keys needed', 'will-install': 'Installs with app',
+  'needs-licence': 'Licence needed', 'optional-missing': 'Optional', 'missing': 'Set up first'
 };
 const plural = (count: number, word: string) => count + ' ' + word + (count === 1 ? '' : 's');
 
@@ -91,8 +102,15 @@ export default function AppExchange(props: Props) {
     if (busy) return;
     setBusy(true); setError(''); setNotice('');
     const report = (result: unknown) => {
-      const warnings = (result as {flowWarnings?: string[]} | undefined)?.flowWarnings ?? [];
-      if (warnings.length) setNotice(app.Name + ' installed. Some flows stayed inactive: ' + warnings.join('; '));
+      const value = result as {flowWarnings?: string[]; installedConnectors?: string[]; needsKeys?: string[]} | undefined;
+      const parts: string[] = [];
+      const warnings = value?.flowWarnings ?? [];
+      const connectors = value?.installedConnectors ?? [];
+      const keys = [...connectors, ...(value?.needsKeys ?? []).filter((name) => !connectors.includes(name))];
+      if (connectors.length) parts.push('Also installed ' + connectors.join(', ') + '.');
+      if (keys.length) parts.push('Enter the keys for ' + keys.join(', ') + ' in App Exchange to turn those features on.');
+      if (warnings.length) parts.push('Some flows stayed inactive: ' + warnings.join('; '));
+      if (parts.length) setNotice(app.Name + ' installed. ' + parts.join(' '));
     };
     try {
       if (operation === 'install') {
@@ -226,8 +244,20 @@ export default function AppExchange(props: Props) {
             {plan.create.flows.length > 0 && <li>Adds {plural(plan.create.flows.length, 'flow')}{plan.activateFlows.length ? ' (' + plan.activateFlows.length + ' activated after install)' : ''}</li>}
             {plan.create.permissionSets.length > 0 && <li>Adds permission sets: {plan.create.permissionSets.join(', ')}</li>}
           </ul>}
-          {plan?.packaged && plan.missingDependencies.length > 0 && <div className="form-error" role="alert"><strong>Set up first:</strong><ul>
-            {plan.missingDependencies.map((item) => <li key={item.type + item.apiName}>{item.type === 'named-credential'
+          {plan?.packaged && (plan.prerequisites?.length ?? 0) > 0 && <div className="exchange-prerequisites">
+            <h3>Connections this app uses</h3>
+            <ul>{plan.prerequisites!.map((item: AppPrerequisiteStatus) => <li key={item.kind + item.name}
+              className={'exchange-prerequisite is-' + item.status} role={item.blocking ? 'alert' : undefined}>
+              <strong>{item.label}</strong> <span className="exchange-prerequisite-tag">
+                {prerequisiteTone[item.status]}{item.optional ? '' : ' · required'}</span>
+              <div>{item.message}</div></li>)}</ul>
+          </div>}
+          {plan?.packaged && plan.missingDependencies.filter((item) => !(item.type === 'named-credential'
+            && plan.prerequisites?.some((need: AppPrerequisiteStatus) => need.name.toLowerCase() === item.apiName.toLowerCase()))).length > 0 &&
+            <div className="form-error" role="alert"><strong>Set up first:</strong><ul>
+            {plan.missingDependencies.filter((item) => !(item.type === 'named-credential'
+              && plan.prerequisites?.some((need: AppPrerequisiteStatus) => need.name.toLowerCase() === item.apiName.toLowerCase())))
+              .map((item) => <li key={item.type + item.apiName}>{item.type === 'named-credential'
               ? 'Named Credential "' + item.apiName + '" (install the matching connector, e.g. WhatsApp Connector, and enter your own credentials)'
               : item.type + ' ' + item.apiName}</li>)}</ul></div>}
           {plan?.packaged && plan.conflicts.length > 0 && <div className="form-error" role="alert"><strong>Cannot install yet:</strong><ul>
@@ -247,7 +277,8 @@ export default function AppExchange(props: Props) {
                 (details.LicenceStatus__c !== 'ACTIVE' && !props.canManageLicences)}
                 onClick={() => void action(details,details.LicenceStatus__c === 'ACTIVE' ? 'install' : 'grant-install')}>
                 {busy ? 'Installing…' : details.LicenceStatus__c === 'ACTIVE'
-                  ? 'Confirm install' : props.canManageLicences ? 'Grant licence & install' : 'Licence required'} <ArrowRight size={14}/></button>}
+                  ? (plan?.packaged && plan.prerequisites?.some((item) => item.status === 'will-install') ? 'Install both' : 'Confirm install')
+                  : props.canManageLicences ? 'Grant licence & install' : 'Licence required'} <ArrowRight size={14}/></button>}
         </div>
       </section>
     </div></PlatformPageSlot>}

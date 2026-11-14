@@ -139,6 +139,9 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
  FOREIGN KEY(app_id,version) REFERENCES md_app_package_versions(app_id,version) ON DELETE CASCADE
 );
 `);
+  // App prerequisites (connectors / tenant callouts) detected at publish time.
+  await client.query(`ALTER TABLE md_app_package_manifests
+    ADD COLUMN IF NOT EXISTS prerequisites jsonb NOT NULL DEFAULT '[]'::jsonb`);
   // Upgrade-safe account recovery additions (idempotent; the SQL baseline is immutable).
   // platform_default: the platform tenant offers its SMS/WhatsApp callout to all tenants.
   // delivery_channel 'admin': audited set-password links issued by an admin or platform support.

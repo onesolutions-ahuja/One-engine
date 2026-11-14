@@ -29,7 +29,7 @@ export function formulaSignatureAt(source:string,caret:number,actions=false){
    GETRECORD:['Object','Field','Value'],STATE:['Key','Value'],COUNTIFS:['Object','Field','Value'],
    SUMIFS:['Object','ValueField','Field','Value'],AVERAGEIFS:['Object','ValueField','Field','Value'],
    MINIFS:['Object','ValueField','Field','Value'],MAXIFS:['Object','ValueField','Field','Value'],
-   VERIFYPIN:['UserId','Pin'],FOREACH:['Object','Field','Value','AS(item)','Action'],CLOSESCREEN:[],LOCKSCREEN:[],LOCATION:['AS(variable)'],RECORDPAYMENT:['InvoiceId','Amount','Method','Note','AS(variable)'],AS:['variable']
+   VERIFYPIN:['UserId','Pin'],CONNECTED:['ConnectorName'],FOREACH:['Object','Field','Value','AS(item)','Action'],CLOSESCREEN:[],LOCKSCREEN:[],LOCATION:['AS(variable)'],RECORDPAYMENT:['InvoiceId','Amount','Method','Note','AS(variable)'],AS:['variable']
   };
   const signature=Object.prototype.hasOwnProperty.call(signatures,active.name)?signatures[active.name]:undefined;
   if(signature){

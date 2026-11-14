@@ -26,7 +26,7 @@ const ribbonFunctions=new Set([
   'ROUNDUP','ROUNDDOWN','MIN','MAX','DATE','DATEVALUE','TODAY','NOW',
   'DAY','MONTH','YEAR','HOUR','MINUTE','SECOND','WEEKDAY','ADDDAYS',
   'ADDMONTHS','TIMEVALUE','TIMENOW','GEOLOCATION','DISTANCE','COLLECTION','SUM','TABLE',
-  'COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS','VERIFYPIN'
+  'COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS','VERIFYPIN','CONNECTED'
 ]);
 const numberFunctions=new Set([
   'VALUE','LEN','COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS','SUM',
@@ -38,7 +38,7 @@ const textFunctions=new Set([
 ]);
 const checkboxFunctions=new Set([
   'AND','OR','NOT','ISBLANK','ISNULL','ISNUMBER','CONTAINS','BEGINS',
-  'ISPICKVAL','INCLUDES','VERIFYPIN','ISNEW','ISCHANGED'
+  'ISPICKVAL','INCLUDES','VERIFYPIN','ISNEW','ISCHANGED','CONNECTED'
 ]);
 const explicitParameters=new Map<string,FormulaValueKind[]>([
   ['COLLECTION',['Text','Any']],['TABLE',['Collection','Any']],['SUM',['Collection']],['IF',['Checkbox','Any','Any']],['IFERROR',['Any','Any']],['NOT',['Checkbox']],
@@ -55,7 +55,7 @@ const explicitParameters=new Map<string,FormulaValueKind[]>([
   ['DATE',['Number','Number','Number']],['ADDDAYS',['Date','Number']],
   ['ADDMONTHS',['Date','Number']],['DATEVALUE',['Text']],
   ['TIMEVALUE',['Text']],['GEOLOCATION',['Number','Number']],
-  ['DISTANCE',['Geolocation','Geolocation','Text']]
+  ['DISTANCE',['Geolocation','Geolocation','Text']],['CONNECTED',['Text']]
 ]);
 const returnType=(name:string):FormulaValueKind=>numberFunctions.has(name)?'Number':
   textFunctions.has(name)?'Text':checkboxFunctions.has(name)?'Checkbox':
@@ -92,6 +92,9 @@ const inputs:DefinitionInput[]=[
   ['MINIFS',2,42,['ribbon_binding']],['MAXIFS',2,42,['ribbon_binding']],
   // Server-side hashed PIN comparison: VERIFYPIN(Pin) or VERIFYPIN(UserId, Pin).
   ['VERIFYPIN',1,2,['ribbon_binding']],
+  // CONNECTED("whatsapp") / CONNECTED("my_api"): TRUE when that connector or tenant
+  // callout is installed and has keys. Page formulas only (Visible, Disabled, actions).
+  ['CONNECTED',1,1,['ribbon_binding','component_visibility']],
   // Record save lifecycle; validation rules only (current and prior record).
   ['ISNEW',0,0,['validation_rule']],['ISCHANGED',1,1,['validation_rule']],
   ['PRIORVALUE',1,1,['validation_rule']]

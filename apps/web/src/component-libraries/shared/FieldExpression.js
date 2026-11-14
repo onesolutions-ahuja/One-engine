@@ -11,6 +11,7 @@ import {createNamedFormulaCollection,createCriteriaFormulaCollection,deriveFormu
 import {isExcelWildcardDataReference,matchesExcelWildcard,hasExcelWildcardCriteria} from '../../../../server/src/expression-engine/FormulaWildcard.js';
 import {validateFormulaFunctions} from '../../../../server/src/expression-engine/FormulaFunctionRegistry.js';
 import {roundFormulaNumber} from '../../../../server/src/expression-engine/FormulaNumeric.js';
+import {isConnected} from '../../../../server/src/expression-engine/FormulaConnections.js';
 import {parseComponentStateReference,readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
 import {
  evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
@@ -27,8 +28,15 @@ export function setAuthenticatedFormulaSession(context){
   &&typeof organization.Id==='string'
   ?Object.freeze({user:Object.freeze({Id:user.Id,Name:user.Name,Email:user.Email,
       TimeZone:user.TimeZone,Locale:user.Locale,CurrencyIsoCode:user.CurrencyIsoCode}),
-    organization:Object.freeze({Id:organization.Id,Name:organization.Name})}):null;
+    organization:Object.freeze({Id:organization.Id,Name:organization.Name}),
+    connections:freezeConnections(context.connections)}):null;
 }
+// Connection names only (never secrets); see FormulaConnections.ts.
+const freezeConnections=value=>value&&typeof value==='object'?Object.freeze({
+ systemAvailable:Object.freeze((Array.isArray(value.systemAvailable)?value.systemAvailable:[]).map(String)),
+ systemConnected:Object.freeze((Array.isArray(value.systemConnected)?value.systemConnected:[]).map(String)),
+ customConnected:Object.freeze((Array.isArray(value.customConnected)?value.customConnected:[]).map(String))
+}):null;
 const authenticatedSessionIdentity=context=>
  context?.user&&context?.organization
   ?{user:context.user,organization:context.organization}
@@ -130,6 +138,8 @@ const evaluateCall=(name,args,context)=>{
    if(unit==='mi')return kilometers/1.609344;
    throw Error('DISTANCE unit must be km or mi');
   }
+  case 'CONNECTED':arity(1);
+   return isConnected(context?.connections??globalThis[SESSION_IDENTITY_KEY]?.connections,args[0]);
   case 'TODAY':arity(0);return formulaDateText(formulaDateParts(context.now,context.timeZone));
   case 'NOW':arity(0);return formulaNowIsoDateTime(context.now);
   case 'TIMENOW':arity(0);return formulaTimeText(context.now,context.timeZone);
@@ -620,7 +630,7 @@ export function evaluateFieldExpressionDetailed(expression,record,options={}){
    collectionRows:options.collectionRows,
    readComponent:options.readComponent??options.pageState?.[componentReaderKey],
    pageState:options.pageState,sessionId:options.sessionId,tenant:options.tenant,
-    user:options.user,organization:options.organization,
+    user:options.user,organization:options.organization,connections:options.connections,
    flowReferences:options.flowReferences,
    rootObjectApiName:options.rootObjectApiName});
   if(options.collectionResult===true){

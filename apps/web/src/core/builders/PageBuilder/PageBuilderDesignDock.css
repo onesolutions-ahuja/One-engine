@@ -1215,6 +1215,13 @@
  >.smart-design2-supplemental-label{
   white-space:nowrap!important;
 }
+/* Fit the one longer dock toggle caption in an equal third without
+ * reducing the entire inspector's font size or truncating its label. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="dockMagnify"]
+ >.smart-design2-supplemental-label{
+  font-size:10px!important;
+}
 /* A remaining long formula field gets a full row without reflowing peers. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  .smart-design2-others-section [data-others-group="Additional"]

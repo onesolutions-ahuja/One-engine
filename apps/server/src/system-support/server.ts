@@ -96,7 +96,7 @@ import {sendActionCommunication} from './action-formula-communication-service.js
 import {tenantServerFormulaEnabled,executeServerDataAction} from './formula-data-action-runtime.js';
 import {evaluateFormulaSql,evaluateFormulaSqlMany} from './formula-sql-runtime.js';
 import {splitServerDataActionPlan} from '../expression-engine/ActionFormulas.js';
-import {registerPageScriptPublicRoute,registerPageScriptRoutes} from '../api/PageScriptController.js';
+import {registerPageScriptPublicRoute,registerPageScriptRoutes,issueAppPageScript} from '../api/PageScriptController.js';
 import {PageScriptService} from '../page-compiler/pageScriptService.js';
 import {registerSeederManagerRoutes} from './seeder-manager-routes.js';
 import {registerPlatformDeploymentRoutes} from './platform-deployment-routes.js';
@@ -1450,6 +1450,15 @@ export function createSystemServer(db:SqlPersistence) {
     const configuration=await objectManagerMetadata.load(actor.tenant_id,actor.user_id,req.params.apiName);
     res.json({object:{...object,...configuration}});
   }));
+  // ?script=1: also convert the page and hand back its script ticket in the same
+  // answer, so the browser does not wait for a second round trip before it runs.
+  const withPageScript=async(req:{query:Request['query'];actor?:{tenant_id:string;user_id:string}},appId:string,page:unknown)=>{
+    if(req.query.script!=='1'||!req.actor||!page||typeof page!=='object')return undefined;
+    try{
+      return await issueAppPageScript(pageScriptDeps,req.actor,appId,page,
+        (page as {layoutVariant?:unknown}).layoutVariant??'Desktop');
+    }catch{return undefined;}
+  };
   app.get('/api/apps/:appId/home-page',route(async(req,res)=>{
     const actor=req.actor!;
     const viewportWidth=Number(req.query.viewportWidth??0);
@@ -1493,9 +1502,10 @@ export function createSystemServer(db:SqlPersistence) {
       ?customPage:null;
     if(!targeted&&assignedResult.error)throw assignedResult.error;
     const page=targeted??assignedResult.page;
+    const script=await withPageScript(req,req.params.appId,page);
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Vary','Authorization, Cookie');
-    res.json({page});
+    res.json(script?{page,script}:{page});
   }));
   app.get(['/api/apps/:appId/in-screen-pages/:pageApiName','/api/apps/:appId/print-templates/:pageApiName'],route(async(req,res)=>{
     const actor=req.actor!;
@@ -1504,9 +1514,11 @@ export function createSystemServer(db:SqlPersistence) {
       req.params.pageApiName,String(req.query.formFactor??'Desktop'),
       req.path.split('/').at(-2)==='print-templates'?'Print Template':'In-Screen Page');
     if(!page)throw new Error('In-Screen Page not found');
+    const script=req.path.split('/').at(-2)==='print-templates'?undefined
+      :await withPageScript(req,req.params.appId,page.page);
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Vary','Authorization, Cookie');
-    res.json({page:page.page});
+    res.json(script?{page:page.page,script}:{page:page.page});
   }));
   app.get('/api/apps/:appId/pages/:pageApiName',route(async(req,res)=>{
     const actor=req.actor!;
@@ -1516,9 +1528,10 @@ export function createSystemServer(db:SqlPersistence) {
     const page=await pages.resolveAppPage(actor.tenant_id,req.params.appId,
       req.params.pageApiName,factor,viewportWidth);
     if(!page)throw new Error('Page not found');
+    const script=await withPageScript(req,req.params.appId,page.page);
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Vary','Authorization, Cookie');
-    res.json({page:page.page});
+    res.json(script?{page:page.page,script}:{page:page.page});
   }));
   app.get('/api/metadata/relationships',route(async(req,res)=>{
     const actor=req.actor!;

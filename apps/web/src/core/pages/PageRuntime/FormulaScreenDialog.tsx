@@ -33,6 +33,54 @@ export function formulaScreenWidth(canvas?:{canvasWidth?:number;canvasHeight?:nu
  return `min(94vw, ${Math.round(width)}px, calc(94vh * ${(width/height).toFixed(4)}))`;
 }
 
+/** Below this a popup scrolls instead of shrinking further (long lists stay readable). */
+const MIN_FIT_SCALE=0.5;
+/**
+ * A popup keeps its designed layout and simply zooms in or out to fit the window
+ * (browser zoom, resize, small laptop screens) instead of reflowing or showing
+ * scrollbars. The page inside is laid out once at its canvas width; only the
+ * zoom changes, so nothing reloads.
+ */
+function FitToScreen({canvas,available,children}:{canvas?:{canvasWidth?:number;canvasHeight?:number};
+ available:()=>{width:number;height:number};children:React.ReactNode}){
+ const inner=React.useRef<HTMLDivElement>(null);
+ const [content,setContent]=React.useState<{width:number;height:number}|null>(null);
+ const [room,setRoom]=React.useState(available);
+ const measureRoom=React.useRef(available);
+ measureRoom.current=available;
+ React.useEffect(()=>{
+  const node=inner.current;
+  if(!node)return;
+  const update=()=>{
+   // Layout size (offset*) ignores the transform, so this is the unzoomed design size.
+   const width=node.offsetWidth,height=node.offsetHeight;
+   setContent(previous=>previous&&previous.width===width&&previous.height===height?previous:{width,height});
+   const next=measureRoom.current();
+   setRoom(previous=>previous.width===next.width&&previous.height===next.height?previous:next);
+  };
+  update();
+  const observer=typeof ResizeObserver==='function'?new ResizeObserver(update):null;
+  observer?.observe(node);
+  if(node.parentElement?.parentElement)observer?.observe(node.parentElement.parentElement);
+  window.addEventListener('resize',update,{passive:true});
+  return ()=>{observer?.disconnect();window.removeEventListener('resize',update);};
+ },[]);
+ const designWidth=Number(canvas?.canvasWidth);
+ const width=Number.isFinite(designWidth)&&designWidth>0?Math.round(designWidth)+'px':'85vw';
+ const fit=content&&content.width>0&&content.height>0
+  ?Math.min(1,room.width/content.width,room.height/content.height):1;
+ const scale=Math.max(MIN_FIT_SCALE,fit);
+ const scrolls=fit<MIN_FIT_SCALE;
+ return <div className="formula-screen-fit" style={{
+   width:content?Math.floor(content.width*scale):width,
+   height:content?(scrolls?Math.floor(room.height):Math.floor(content.height*scale)):undefined,
+   overflow:scrolls?'auto':'hidden'}}>
+  <div style={scrolls?undefined:{height:content?content.height*scale:undefined}}>
+   <div ref={inner} style={{width,transform:scale===1?undefined:`scale(${scale})`,transformOrigin:'0 0'}}>{children}</div>
+  </div>
+ </div>;
+}
+
 /**
  * Formula SCREEN(...,popup) host. Popups are true modals: the rest of the page is
  * blurred and inert until the popup closes (Close button, Escape or CLOSESCREEN()).
@@ -100,18 +148,22 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
   :<div ref={frameRef} data-formula-screen-frame="" className="formula-screen-frame-backdrop" role="presentation">
     <style>{modalStyles}</style>
     <div className="formula-screen-card" role="dialog" aria-modal="true" aria-label={screen.page}
-     style={{width:formulaScreenWidth(canvas)}}>
+     style={{width:'fit-content',overflow:'hidden'}}>
      <button type="button" className="formula-screen-close" aria-label="Close" onClick={onClose}>×</button>
-     {children}
+     <FitToScreen canvas={canvas} available={()=>{
+      const box=frameRef.current;
+      return {width:(box?.clientWidth??window.innerWidth)*0.94,height:(box?.clientHeight??window.innerHeight)*0.94};
+     }}>{children}</FitToScreen>
     </div>
    </div>;
  return <dialog ref={ref} className={'formula-screen-modal'+(fullPage?' formula-screen-page':'')}
   aria-label={screen.page} aria-modal="true"
-  style={fullPage?undefined:{width:formulaScreenWidth(canvas)}}
+  style={fullPage?undefined:{width:'fit-content',overflow:'hidden'}}
   onCancel={event=>{event.preventDefault();onClose();}}>
   <style>{modalStyles}</style>
   {fullPage?<>{back}<div className="formula-screen-body">{children}</div></>:<>
    <button type="button" className="formula-screen-close" aria-label="Close" onClick={onClose}>×</button>
-   {children}</>}
+   <FitToScreen canvas={canvas} available={()=>({width:window.innerWidth*0.94,height:window.innerHeight*0.94})}>
+    {children}</FitToScreen></>}
  </dialog>;
 }

@@ -58,12 +58,27 @@ export async function loadPreviewPageScript(request:Request,page:{apiName:string
  return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,previewId,
   actions:module.createActions(host),formulas:module.createFormulas(host)};
 }
+/** Ticket the server already issued with the page itself (?script=1): no extra round trip. */
+export type IssuedAppPageScript={ticket:string;buildId:string};
+export function issuedAppPageScript(value:unknown):IssuedAppPageScript|null{
+ const item=value as Partial<IssuedAppPageScript>|null;
+ return item&&typeof item.ticket==='string'&&ticketPattern.test(item.ticket)&&typeof item.buildId==='string'
+  ?{ticket:item.ticket,buildId:item.buildId}:null;
+}
 /** Published app page: convert the page this user was served, then run it. */
-export async function loadAppPageScript(request:Request,appId:string,page:{apiName:string},variant:string):Promise<LoadedPageScript>{
+export async function loadAppPageScript(request:Request,appId:string,page:{apiName:string},variant:string,
+ issued?:IssuedAppPageScript|null):Promise<LoadedPageScript>{
+ if(issued){
+  try{return await importAppPageScript(appId,page,variant,issued);}
+  catch{/* ticket expired or already used: convert again below */}
+ }
  const answer=await request<{ticket?:string;buildId?:string}>('/apps/'+encodeURIComponent(appId)+'/page-script',
   {method:'POST',body:JSON.stringify({variant,page})});
- if(typeof answer.ticket!=='string'||!ticketPattern.test(answer.ticket)||typeof answer.buildId!=='string')
-  throw Error('The server did not convert this page');
+ const fresh=issuedAppPageScript(answer);
+ if(!fresh)throw Error('The server did not convert this page');
+ return importAppPageScript(appId,page,variant,fresh);
+}
+async function importAppPageScript(appId:string,page:{apiName:string},variant:string,answer:IssuedAppPageScript):Promise<LoadedPageScript>{
  const module=await import(/* @vite-ignore */ apiBase+'/page-scripts/'+answer.ticket+'.js') as Partial<PageScriptModule>;
  const plan=module.plan;
  if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')

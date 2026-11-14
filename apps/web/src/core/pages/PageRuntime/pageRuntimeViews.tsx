@@ -122,8 +122,8 @@ const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
 import { inspectPageDependencies } from './pageDependencies';
 import {CompiledPageProvider,MemoizedCompiledComponentNode} from '../PageCompiler/CompiledPageRuntime';
 import type {CompiledPage} from '../PageCompiler/compilePage';
-import type {LoadedPageScript} from '../PageCompiler/serverPageScript';
-import {useAppPageScript} from '../PageCompiler/useAppPageScript';
+import {issuedAppPageScript,type LoadedPageScript} from '../PageCompiler/serverPageScript';
+import {primeAppPageScript,useAppPageScript} from '../PageCompiler/useAppPageScript';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1119,6 +1119,16 @@ function readPageDefinitionCache(cache:PageDefinitionCache,key:string):Lightning
   const hit=cache.get(key);
   return hit&&Date.now()-hit.fetchedAt<PAGE_DEFINITION_CACHE_TTL_MS?hit.page:null;
 }
+/** An expired entry is still shown while the page is checked again. */
+function readStalePageDefinition(cache:PageDefinitionCache,key:string):LightningPageMetadata|null{
+  return cache.get(key)?.page??null;
+}
+/** Same definition as before: keep the old object so nothing on screen reloads. */
+function samePageDefinition(a:LightningPageMetadata|null,b:LightningPageMetadata|null):boolean{
+  if(!a||!b)return false;
+  if(a===b)return true;
+  try{return JSON.stringify(a)===JSON.stringify(b);}catch{return false;}
+}
 function writePageDefinitionCache(cache:PageDefinitionCache,key:string,page:LightningPageMetadata|null):void{
   if(!page)return;
   cache.delete(key);
@@ -1190,21 +1200,35 @@ function LightningAppRuntime({
 }) {
   const detectedLayoutDevice = usePageLayoutDevice();
   const layoutDevice = previewLayoutDevice ?? detectedLayoutDevice;
-  const viewportWidth=useViewportWidth();
-  const requestedLayout = typeof window !== 'undefined'
+  const liveViewportWidth=useViewportWidth();
+  const liveLayout = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('pageLayout') === 'Custom'
       ? 'Custom' : layoutDevice === 'Tablet' ? 'Tablet' : formFactor === 'Phone' ? 'Mobile' : 'Desktop';
+  // An open popup keeps the layout it opened with: zooming or resizing only
+  // scales it (FormulaScreenDialog), it never reloads or switches layout.
+  const openedWith=useRef<{width:number;layout:typeof liveLayout}>({width:liveViewportWidth,layout:liveLayout});
+  const viewportWidth=inScreenPage?openedWith.current.width:liveViewportWidth;
+  const requestedLayout=inScreenPage?openedWith.current.layout:liveLayout;
   const cacheKey=pageDefinitionCacheKey(appId,inScreenPage?'window:'+pageApiName:pageApiName,requestedLayout,viewportWidth,profileId);
   const routeKey=cacheKey;
+  // The same page at another width (zoom in/out, resize) or once the user's
+  // profile has loaded: keep it on screen while the server checks whether a
+  // different page applies; only a changed page replaces it.
+  const pageIdentity=JSON.stringify([appId,inScreenPage?'window:'+pageApiName:pageApiName??'__home__',requestedLayout]);
   const [pageLoad,setPageLoad]=useState<{
     routeKey:string;
+    identity:string;
     appId:string;
     page:LightningPageMetadata|null;
     error:string;
     loading:boolean;
-  }>({routeKey:'',appId:'',page:null,error:'',loading:true});
+  }>({routeKey:'',identity:'',appId:'',page:null,error:'',loading:true});
+  const pageLoadRef=useRef(pageLoad);
+  pageLoadRef.current=pageLoad;
   const routePending=pageLoad.routeKey!==routeKey;
-  const cached=routePending?readPageDefinitionCache(pageDefinitionCache,cacheKey):null;
+  const shownBefore=pageLoad.identity===pageIdentity?pageLoad.page:null;
+  const cached=routePending?readPageDefinitionCache(pageDefinitionCache,cacheKey)
+    ??readStalePageDefinition(pageDefinitionCache,cacheKey)??shownBefore:null;
   // Never run components from the previous route while navigating. Cached
   // definitions render immediately; uncached routes show the loading state.
   const page=previewPage??(routePending?cached:pageLoad.page);
@@ -1267,31 +1291,37 @@ function LightningAppRuntime({
     let active = true;
     const cachedPage=readPageDefinitionCache(pageDefinitionCache,cacheKey);
     if(cachedPage){
-      setPageLoad({routeKey,appId,page:cachedPage,error:'',loading:false});
+      setPageLoad({routeKey,identity:pageIdentity,appId,page:cachedPage,error:'',loading:false});
       return ()=>{active=false;};
     }
-    setPageLoad({routeKey,appId,page:null,error:'',loading:true});
+    // Expired or other-width copy stays on screen; only a changed page replaces it.
+    const showing=readStalePageDefinition(pageDefinitionCache,cacheKey)
+      ??(pageLoadRef.current.identity===pageIdentity?pageLoadRef.current.page:null);
+    setPageLoad({routeKey,identity:pageIdentity,appId,page:showing,error:'',loading:!showing});
     const endpoint = printPreview && pageApiName
       ? `/apps/${encodeURIComponent(appId)}/print-templates/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}`
       : inScreenPage && pageApiName
-      ? `/apps/${encodeURIComponent(appId)}/in-screen-pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}`
+      ? `/apps/${encodeURIComponent(appId)}/in-screen-pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}&script=1`
       : pageApiName
-        ? `/apps/${encodeURIComponent(appId)}/pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}`
-        : `/apps/${encodeURIComponent(appId)}/home-page?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}`;
-    void apiRequest<{ page: LightningPageMetadata | null }>(endpoint).then((payload) => {
+        ? `/apps/${encodeURIComponent(appId)}/pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}&script=1`
+        : `/apps/${encodeURIComponent(appId)}/home-page?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}&script=1`;
+    void apiRequest<{ page: LightningPageMetadata | null; script?: unknown }>(endpoint).then((payload) => {
       if(active){
-        writePageDefinitionCache(pageDefinitionCache,cacheKey,payload.page);
-        setPageLoad({routeKey,appId,page:payload.page,error:'',loading:false});
+        const next=samePageDefinition(showing,payload.page)?showing:payload.page;
+        // The converted page file came with the page: no second round trip.
+        if(next&&next!==showing)primeAppPageScript(next,issuedAppPageScript(payload.script));
+        writePageDefinitionCache(pageDefinitionCache,cacheKey,next);
+        setPageLoad({routeKey,identity:pageIdentity,appId,page:next,error:'',loading:false});
       }
     }).catch((failure: unknown) => {
-      if(active)setPageLoad({
-        routeKey,appId,page:null,
+      if(active)setPageLoad(showing?{routeKey,identity:pageIdentity,appId,page:showing,error:'',loading:false}:{
+        routeKey,identity:pageIdentity,appId,page:null,
         error:failure instanceof Error?failure.message:'Unable to load Lightning page',
         loading:false
       });
     });
     return ()=>{active=false;};
-  },[routeKey,appId,pageApiName,inScreenPage,requestedLayout,viewportWidth,pageDefinitionCache,cacheKey,previewPage]);
+  },[routeKey,pageIdentity,appId,pageApiName,inScreenPage,requestedLayout,viewportWidth,pageDefinitionCache,cacheKey,previewPage]);
   useEffect(() => {
     setActiveTabs({});
   }, [page?.apiName]);

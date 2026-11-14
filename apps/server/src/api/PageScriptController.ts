@@ -73,6 +73,32 @@ export function registerPageScriptPublicRoute(app:Express,deps:PageScriptDeps){
  }));
 }
 
+/** How long a converted page is reused before Object definitions are re-read. */
+const APP_INPUT_REUSE_MS=120_000;
+/** Convert a published app page the user was served and issue its one-time ticket.
+ * Used by POST /api/apps/:appId/page-script and by the page routes themselves
+ * (?script=1), which saves the browser a whole round trip before the page runs. */
+export async function issueAppPageScript(deps:PageScriptDeps,actor:{tenant_id:string;user_id:string},
+ appId:string,page:unknown,variantInput:unknown,timing?:string[]):Promise<{ticket:string;buildId:string}>{
+ if(!page||typeof page!=='object'||Array.isArray(page)||!Array.isArray((page as {components?:unknown}).components)
+   ||(page as {components:unknown[]}).components.length>500)throw new Error('Invalid page');
+ const variant=pageLayoutVariant(variantInput??'Desktop');
+ const inputKey=PageScriptService.appInputKey(actor.tenant_id,appId,variant,page);
+ let result=deps.scripts.recentAppBuild(inputKey,APP_INPUT_REUSE_MS);
+ if(result)timing?.push('build;desc="reused";dur=0');
+ else{
+  const started=performance.now();
+  const objects=asCompilerObjects(await deps.definitions.list(actor.tenant_id));
+  const loaded=performance.now();
+  result=deps.scripts.buildAppPage(actor.tenant_id,appId,asCompilerPage(page),objects);
+  deps.scripts.rememberAppInput(inputKey,result.buildId);
+  timing?.push('objects;dur='+(loaded-started).toFixed(1),'compile;dur='+(performance.now()-loaded).toFixed(1));
+ }
+ const ticket=deps.scripts.issueTicket(actor.tenant_id,actor.user_id,result.built.compiled.apiName,variant,undefined,
+  {buildId:result.buildId,appId});
+ return {ticket,buildId:result.buildId};
+}
+
 export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  app.post('/api/pages/:apiName/script-ticket',wrap(async(req,res)=>{
   const actor=authenticated(req);
@@ -89,15 +115,10 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const actor=authenticated(req);
   if(!api.test(req.params.appId))throw new Error('Invalid app');
   await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+req.params.appId,'read');
-  const page=req.body?.page;
-  if(!page||typeof page!=='object'||Array.isArray(page)||!Array.isArray((page as {components?:unknown}).components)
-    ||(page as {components:unknown[]}).components.length>500)throw new Error('Invalid page');
-  const variant=pageLayoutVariant(req.body?.variant??'Desktop');
-  const {buildId,built}=deps.scripts.buildAppPage(actor.tenant_id,req.params.appId,asCompilerPage(page),
-   asCompilerObjects(await deps.definitions.list(actor.tenant_id)));
+  const timing:string[]=[];
+  const {ticket,buildId}=await issueAppPageScript(deps,actor,req.params.appId,req.body?.page,req.body?.variant,timing);
   res.setHeader('Cache-Control','private, no-store');
-  const ticket=deps.scripts.issueTicket(actor.tenant_id,actor.user_id,built.compiled.apiName,variant,undefined,
-   {buildId,appId:req.params.appId});
+  if(timing.length)res.setHeader('Server-Timing',timing.join(', '));
   res.json({ticket,buildId,url:'/api/page-scripts/'+ticket+'.js'});
  }));
  app.post('/api/apps/:appId/compiled-actions/execute',wrap(async(req,res)=>{

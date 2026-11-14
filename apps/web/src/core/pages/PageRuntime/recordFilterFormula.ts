@@ -160,7 +160,10 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    if(typeof truth==='boolean')return {truth,filters:[],logic:''};
   }
   if(!field||!op)throw Error('Formula comparisons require a direct readable @Field and $state or literal');
-  if(/^Formula\(/i.test(field.dataType)||/^(Geolocation|Address|EncryptedText)/i.test(field.dataType))
+  // Numeric formula fields (e.g. stock = opening + purchased - sold) are compiled to SQL by the
+  // server; other formula types still cannot be filtered there.
+  const numericFormula=/^Formula\s*\(\s*(Number|Currency|Percent)\s*\)/i.test(field.dataType);
+  if(!numericFormula&&/^Formula\s*\(/i.test(field.dataType)||/^(Geolocation|Address|EncryptedText)/i.test(field.dataType))
    throw Error('This field cannot be filtered reliably by the server');
   if(field.apiName.startsWith('@'))throw Error('Related formula fields are not directly server-filterable');
   const value=asState(valueNode,state,sessionId);

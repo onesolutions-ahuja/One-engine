@@ -1,5 +1,5 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
-import {timeSqlTrip} from '../system-support/audit-context.js';
+import {timeSqlTrip,clearRequestRbacMemo} from '../system-support/audit-context.js';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import {auditContext,setSqlAuditContext} from '../system-support/audit-context.js';
 export function resolveSqlConnection(databaseUrl:string,env:NodeJS.ProcessEnv) {
@@ -52,6 +52,7 @@ export class SqlPersistence {
     const context=auditContext();
     if(context?.actorUser&&/^\s*(INSERT|UPDATE|DELETE|WITH|ALTER|CREATE|DROP|TRUNCATE)\b/i.test(sql))
       return this.transaction(client=>client.query<T>(sql,[...params]));
+    if(/^\s*(INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE|CALL|DO)\b/i.test(sql))clearRequestRbacMemo();
     return timeSqlTrip(this.pool.query<T>(sql, [...params]));
   }
   /** One statement on a table with no setup-audit trigger: send it directly (1 round
@@ -61,6 +62,7 @@ export class SqlPersistence {
     if(active)return active.query<T>(sql,[...params]);
     return timeSqlTrip(this.pool.query<T>(sql, [...params]));
   }
+  inTransaction():boolean{return Boolean(this.activeTransaction.getStore());}
   async transaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
     const active=this.activeTransaction.getStore();
     if(active){
@@ -78,6 +80,8 @@ export class SqlPersistence {
         throw error;
       }
     }
+    // A transaction may change permissions: decisions are checked afresh.
+    clearRequestRbacMemo();
     const client=await timeSqlTrip(this.pool.connect());
     // Every statement on this connection is one round trip to the database.
     const query=client.query.bind(client) as (...args:unknown[])=>unknown;

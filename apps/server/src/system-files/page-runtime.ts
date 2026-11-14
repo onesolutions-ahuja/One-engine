@@ -29,11 +29,39 @@ export class PageRuntime {
     for(const key of this.publishedLoadCache.keys())
       if(key.startsWith(prefix))this.publishedLoadCache.delete(key);
   }
-  async list(tenantId:string) {
+  /** Every page of the tenant, with all components. Building it is ~10 database
+   * trips PER PAGE (1,500 for this tenant) and it is read on every app open
+   * (landing bootstrap, offline publication): it is kept per tenant and rebuilt
+   * only when any page table row of that tenant changed (one cheap stamp query). */
+  private readonly listCache=new Map<string,{stamp:string;value:Promise<Awaited<ReturnType<PageRuntime['metadata']>>[]>}>();
+  private async pagesStamp(tenantId:string):Promise<string>{
+    const part=(table:string)=>`(SELECT count(*)::text||'.'||COALESCE(max(xmin::text::bigint),0)::text FROM ${table} WHERE tenant_id=$1)`;
+    const {rows}=await this.db.query<{stamp:string}>(`SELECT concat_ws('|',${[
+      'md_page_definitions','md_lightning_page_details','md_lightning_page_nodes',
+      'md_lightning_page_node_properties','md_lightning_page_activation','md_page_layout_heads',
+      'md_page_layout_versions'].map(part).join(',')}) AS stamp`,[tenantId]);
+    return rows[0]?.stamp??'';
+  }
+  private async listUncached(tenantId:string) {
     const {rows}=await this.db.query<{api_name:string}>(`SELECT p.api_name FROM md_page_definitions p
       JOIN md_lightning_page_details d ON d.tenant_id=p.tenant_id AND d.page_id=p.id
       WHERE p.tenant_id=$1 AND p.enabled=true ORDER BY p.title,p.api_name`,[tenantId]);
     return Promise.all(rows.map(row=>this.metadata(tenantId,row.api_name)));
+  }
+  async list(tenantId:string) {
+    // Inside a transaction the caller may see its own uncommitted page changes.
+    if(this.db.inTransaction?.())return this.listUncached(tenantId);
+    const stamp=await this.pagesStamp(tenantId);
+    let entry=this.listCache.get(tenantId);
+    if(!entry||entry.stamp!==stamp){
+      const value=this.listUncached(tenantId);
+      entry={stamp,value};
+      this.listCache.set(tenantId,entry);
+      if(this.listCache.size>500)this.listCache.delete(this.listCache.keys().next().value!);
+      value.catch(()=>{if(this.listCache.get(tenantId)?.value===value)this.listCache.delete(tenantId);});
+    }
+    // Callers get their own copy (some adjust the pages they receive).
+    return structuredClone(await entry.value);
   }
   private async loadLegacy(tenantId:string,pageApi:string) {
     const page=await this.db.query<{id:string;title:string}>(

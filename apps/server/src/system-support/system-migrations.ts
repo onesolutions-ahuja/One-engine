@@ -615,6 +615,13 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     SELECT component_api,area,slot_key,property_key FROM usable
     ON CONFLICT(component_api,area,slot_key) DO NOTHING
   `);
+  // Navigation items use Tab width as their width when Wrap Text is on.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    SELECT 'smart_navigation','tabWidth',true
+    WHERE EXISTS(SELECT 1 FROM md_builder_shared_properties WHERE property_key='tabWidth')
+    ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
+  `);
   // Existing buttons are single-line; show Wrap Text as off for them.
   await client.query(`
     UPDATE md_builder_ribbon_component_rules SET default_value_override='false'::jsonb

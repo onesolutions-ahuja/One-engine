@@ -1142,9 +1142,12 @@ export class ObjectDefinitionService {
       await this.purgeExpiredDeletedFields(client,tenantId);
       const restored=await client.query(`UPDATE md_field_definitions SET deleted_at=NULL
         WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3
-          AND deleted_at>now()-interval '15 days' RETURNING id`,
+          AND deleted_at>now()-interval '15 days' RETURNING id,data_type`,
       [tenantId,objectApi,fieldApi]);
       if(!restored.rowCount)throw new Error('Field not found or recovery period expired');
+      // Child rows changed while the Roll-Up Summary was deleted: bring its stored totals up to date.
+      if(restored.rows[0]?.data_type==='rollup'&&this.migrationRuntime.recalculateRollup)
+        await this.migrationRuntime.recalculateRollup(client,tenantId,objectApi,fieldApi);
     });
     return this.get(tenantId,objectApi);
   }
@@ -1164,7 +1167,7 @@ export class ObjectDefinitionService {
       if(controllerUse.rowCount)throw new Error('Field is used as a controlling field');
       const formulaUse=await client.query(`
         SELECT 1 FROM md_field_definitions WHERE tenant_id=$1 AND deleted_at IS NULL
-          AND formula_expression LIKE '%'||'@'||$2||'.'||$3||'%' LIMIT 1
+          AND formula_expression ~ ('(^|[^A-Za-z0-9_.])@?'||$2||'\\.'||$3||'([^A-Za-z0-9_]|$)') LIMIT 1
       `,[tenantId,objectApi,fieldApi]);
       if(formulaUse.rowCount)throw new Error('Field is referenced by an active formula');
       const validationRefs=await client.query<{expression:string;error_field_api:string|null}>(`

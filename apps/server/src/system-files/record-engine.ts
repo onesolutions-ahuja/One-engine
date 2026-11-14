@@ -33,7 +33,7 @@ import {evaluateFlowFormula,flowFormulaReferences,isFormulaImageResult,validateF
 import {decryptFieldValue,encryptFieldValue,maskEncryptedFieldValue} from './encrypted-field.js';
 import {evaluateResolvedFormulaSql} from '../system-support/formula-sql-runtime.js';
 import {sanitizeRichText} from './rich-text.js';
-import {compileRecordFilters,type QueryField,type RecordCursor,type RecordFilter} from '../object-engine/QueryBuilder.js';
+import {formulaFieldReferences,compileRecordFilters,type QueryField,type RecordCursor,type RecordFilter} from '../object-engine/QueryBuilder.js';
 import {computeFilteredNumericAggregate} from '../object-engine/FilteredNumericAggregate.js';
 type FieldDefinition={api_name:string;data_type:string;related_object:string|null;relationship_type:string|null;allow_reparenting:boolean;required:boolean;max_length:number|null;precision:number|null;scale:number|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;default_value:string|null;auto_number_format:string|null;rollup_child_object?:string|null;rollup_relationship_field?:string|null;rollup_operation?:string|null;rollup_source_field?:string|null;rollup_source_data_type?:string|null;formula_expression?:string|null;formula_return_type?:string|null;picklist_restricted?:boolean;controller_field_api_name?:string|null;global_value_set_api?:string|null};
 type EncryptedValueVault={
@@ -1118,6 +1118,11 @@ export class RecordEngine {
         if(!path){
           // Id is the record's system key; its visibility follows record read access.
           if(filter.field!=='Id'&&!await canRead(filter.field))throw new Error('Field is not readable');
+          // A formula filter reads its source fields: each must be readable too.
+          const formulaField=byApi.get(filter.field);
+          if(formulaField?.data_type==='formula'&&formulaField.formula_expression)
+            for(const source of formulaFieldReferences(formulaField.formula_expression))
+              if(byApi.has(source)&&!await canRead(source))throw new Error('Field is not readable');
           continue;
         }
         const lookup=byApi.get(path[1]);

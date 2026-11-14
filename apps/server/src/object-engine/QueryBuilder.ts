@@ -14,6 +14,9 @@ export type QueryField = {
   api_name: string;
   data_type: string;
   rollup_source_data_type?: string | null;
+  /** Formula fields: simple numeric formulas can be filtered in SQL (see numericFormulaSql). */
+  formula_expression?: string | null;
+  formula_return_type?: string | null;
   /** Set for a one-level lookup path filter such as Product.AgeRestricted:
    * api_name is the related object's field and access is the caller's
    * record-access predicate for the related record (alias rel). */
@@ -42,6 +45,75 @@ const typedColumns: Record<string, { column: string; cast: string }> = {
   datetime: { column: 'value_datetime', cast: 'timestamptz' },
   boolean: { column: 'value_boolean', cast: 'boolean' },
 };
+
+const numericTypes=new Set(['number','currency','percent']);
+/** Field api names a formula reads, without the object prefix (Product.SoldQty -> SoldQty). */
+export function formulaFieldReferences(expression:string):string[]{
+  return [...new Set((expression.match(/[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?/g)??[])
+    .filter(token=>!/^(BLANKVALUE|ROUND|ABS|MIN|MAX|TRUE|FALSE|NULL)$/i.test(token))
+    .map(token=>token.includes('.')?token.split('.')[1]!:token))];
+}
+/**
+ * SQL for a simple numeric formula over the record's own number fields (stored roll-ups
+ * included): numbers, + - * /, brackets, BLANKVALUE, ROUND, ABS, MIN, MAX. Anything else
+ * returns null, so the filter is refused exactly as before. Field values use one indexed
+ * lookup each; no formula is evaluated per row in JavaScript.
+ */
+export function numericFormulaSql(expression:string,fields:ReadonlyMap<string,QueryField>,
+  bind:(value:string)=>string):string|null{
+  const tokens=expression.match(/\s+|[0-9]+(?:\.[0-9]+)?|[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?|[-+*/(),]/g);
+  if(!tokens||tokens.join('')!==expression)return null;
+  const list=tokens.filter(token=>!/^\s+$/.test(token));
+  let position=0;
+  const peek=()=>list[position];
+  const take=(token?:string)=>{const next=list[position];if(token!==undefined&&next!==token)throw 0;position++;return next;};
+  const fieldSql=(name:string)=>{
+    // Object.Field is the record's own field; Lookup.Field (another record) is not compiled.
+    if(name.includes('.')&&fields.has(name.split('.')[0]!))throw 0;
+    const api=name.includes('.')?name.split('.')[1]!:name;
+    const field=fields.get(api);
+    const type=field?.data_type==='rollup'?field.rollup_source_data_type??'number':field?.data_type;
+    if(!field||field.via||!numericTypes.has(type??''))throw 0;
+    return `(SELECT fx.value_number FROM md_record_values fx WHERE fx.tenant_id=r.tenant_id AND fx.record_id=r.id
+      AND fx.object_api=r.object_api AND fx.field_api=${bind(api)})`;
+  };
+  const args=()=>{take('(');const out=[expr()];while(peek()===','){take(',');out.push(expr());}take(')');return out;};
+  const primary=():string=>{
+    const token=take();
+    if(token===undefined)throw 0;
+    if(token==='-')return '(-'+primary()+')';
+    if(token==='(') {const inner=expr();take(')');return '('+inner+')';}
+    if(/^[0-9]/.test(token))return token+'::numeric';
+    const fn=token.toUpperCase();
+    if(peek()==='('){
+      const a=args();
+      if(fn==='BLANKVALUE'&&a.length===2)return `COALESCE(${a[0]},${a[1]})`;
+      if(fn==='ROUND'&&(a.length===1||a.length===2))return `ROUND(${a[0]},${a.length===2?`(${a[1]})::integer`:'0'})`;
+      if(fn==='ABS'&&a.length===1)return `ABS(${a[0]})`;
+      if(fn==='MIN'&&a.length>=2)return `LEAST(${a.join(',')})`;
+      if(fn==='MAX'&&a.length>=2)return `GREATEST(${a.join(',')})`;
+      throw 0;
+    }
+    return fieldSql(token);
+  };
+  const term=():string=>{
+    let left=primary();
+    while(peek()==='*'||peek()==='/'){
+      const op=take();const right=primary();
+      left=op==='*'?`(${left}*${right})`:`(${left}/NULLIF(${right},0))`;
+    }
+    return left;
+  };
+  const expr=():string=>{
+    let left=term();
+    while(peek()==='+'||peek()==='-'){const op=take();left=`(${left}${op}${term()})`;}
+    return left;
+  };
+  try{
+    const sql=expr();
+    return position===list.length?sql:null;
+  }catch{return null;}
+}
 
 export function parseFilterLogic(logic: string | undefined, count: number): string {
   if (!Number.isInteger(count) || count < 0 || count > 20)
@@ -211,6 +283,20 @@ export function compileRecordFilters(
           AND ${inner.predicate.replace(/\br\./g, 'rel.')})`;
     }
     if (filter.field.includes('.')) throw new Error('Invalid list field');
+    if (field?.data_type==='formula'&&field.formula_expression&&numericTypes.has(String(field.formula_return_type).toLowerCase())) {
+      // Numeric formula over the record's own number fields (e.g. stock = opening + purchased - sold).
+      const sqlOperators: Record<string, string> = { eq: '=', ne: '<>', lt: '<', lte: '<=', gt: '>', gte: '>=' };
+      const formula=numericFormulaSql(field.formula_expression,fields,value=>{
+        parameters.push(value);return `$${firstParameter + parameters.length - 1}`;});
+      if(!formula)throw new Error('Invalid list field');
+      if(filter.operator==='isBlank'||filter.operator==='isNotBlank')
+        return `(${formula}) IS ${filter.operator==='isBlank'?'':'NOT '}NULL`;
+      const sqlOperator=sqlOperators[filter.operator];
+      if(!sqlOperator||typeof filter.value!=='string'||!/^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(filter.value))
+        throw new Error('Invalid numeric list filter');
+      parameters.push(filter.value);
+      return `COALESCE((${formula})${sqlOperator}$${firstParameter + parameters.length - 1}::numeric,FALSE)`;
+    }
     if (!field || ['formula', 'geolocation', 'address', 'encryptedtext'].includes(field.data_type))
       throw new Error('Invalid list field');
     if (!operators.has(filter.operator))

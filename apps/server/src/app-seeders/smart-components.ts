@@ -2,8 +2,14 @@ import type {PoolClient} from 'pg';
 /** Independent, upgrade-safe Smart component registrations; no app data is altered. */
 export const SMART_COMPONENTS=["smart_numpad","smart_button","smart_toggle","smart_lookup","smart_selector","smart_tabs","smart_text","smart_textbox","smart_label","smart_card_grid","smart_image","smart_calendar","smart_navigation","smart_container","smart_cart","smart_icon","smart_table","smart_keyboard","smart_dock","smart_chart"] as const;
 export async function seedFreshSmartComponents(client:Pick<PoolClient,'query'>,tenantId:string){
+ // Re-enable a current Smart component that only the system switched off: an
+ // older API's cleanup disables bundled renderers missing from ITS list, so a
+ // rollback during a release can leave new components (Keyboard, Dock, Chart)
+ // disabled. Only the exact system renderer is touched, never tenant ones.
  for(const api of SMART_COMPONENTS)await client.query(
-  'INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled) VALUES($1,$2,$3,true) ON CONFLICT(tenant_id,api_name) DO NOTHING',
+  `INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled) VALUES($1,$2,$3,true)
+   ON CONFLICT(tenant_id,api_name) DO UPDATE SET enabled=true
+   WHERE md_component_definitions.enabled=false AND md_component_definitions.renderer_key=EXCLUDED.renderer_key`,
   [tenantId,api,'smart-bundled:'+api]);
 }
 

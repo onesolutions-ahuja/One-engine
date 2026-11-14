@@ -1068,7 +1068,7 @@
 }
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  .smart-design2-others-section [data-others-group="Additional"] .smart-design2-supplemental-setting{
-  grid-column:span 2!important;
+  grid-column:span 2!important;order:250!important;
 }
 /* Group settings in rows rather than relying on SQL insertion order. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content

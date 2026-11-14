@@ -1206,7 +1206,7 @@ function LightningAppRuntime({
       ? 'Custom' : layoutDevice === 'Tablet' ? 'Tablet' : formFactor === 'Phone' ? 'Mobile' : 'Desktop';
   // An open popup keeps the layout it opened with: zooming or resizing only
   // scales it (FormulaScreenDialog), it never reloads or switches layout.
-  const openedWith=useRef({width:liveViewportWidth,layout:liveLayout});
+  const openedWith=useRef<{width:number;layout:typeof liveLayout}>({width:liveViewportWidth,layout:liveLayout});
   const viewportWidth=inScreenPage?openedWith.current.width:liveViewportWidth;
   const requestedLayout=inScreenPage?openedWith.current.layout:liveLayout;
   const cacheKey=pageDefinitionCacheKey(appId,inScreenPage?'window:'+pageApiName:pageApiName,requestedLayout,viewportWidth,profileId);

@@ -69,16 +69,16 @@ export function issuedAppPageScript(value:unknown):IssuedAppPageScript|null{
 export async function loadAppPageScript(request:Request,appId:string,page:{apiName:string},variant:string,
  issued?:IssuedAppPageScript|null):Promise<LoadedPageScript>{
  if(issued){
-  try{return await importAppPageScript(appId,page,issued);}
+  try{return await importAppPageScript(appId,page,variant,issued);}
   catch{/* ticket expired or already used: convert again below */}
  }
  const answer=await request<{ticket?:string;buildId?:string}>('/apps/'+encodeURIComponent(appId)+'/page-script',
   {method:'POST',body:JSON.stringify({variant,page})});
  const fresh=issuedAppPageScript(answer);
  if(!fresh)throw Error('The server did not convert this page');
- return importAppPageScript(appId,page,fresh);
+ return importAppPageScript(appId,page,variant,fresh);
 }
-async function importAppPageScript(appId:string,page:{apiName:string},answer:IssuedAppPageScript):Promise<LoadedPageScript>{
+async function importAppPageScript(appId:string,page:{apiName:string},variant:string,answer:IssuedAppPageScript):Promise<LoadedPageScript>{
  const module=await import(/* @vite-ignore */ apiBase+'/page-scripts/'+answer.ticket+'.js') as Partial<PageScriptModule>;
  const plan=module.plan;
  if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')

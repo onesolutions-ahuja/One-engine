@@ -134,3 +134,19 @@
  .smart-runtime.smart-ios :is(button,.smart-card):is(:hover,:active),
  .smart-runtime.smart-ios .smart-grid-action:is(:hover,:active)>.smart-card{transform:none!important}
 }
+
+/* Smart Table (renders outside SmartRuntime): grouped-list look. */
+.smart-table-root.smart-ios{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+ -webkit-font-smoothing:antialiased}
+.smart-table-root.smart-ios .smart-table-native th{font-size:.78em;letter-spacing:.02em;text-transform:uppercase}
+.smart-table-root.smart-ios .smart-table-native tbody tr{transition:background-color .15s ease}
+@media (hover:hover){
+ .smart-table-root.smart-ios:not([data-builder-preview]) .smart-table-native tbody tr:not([aria-selected="true"]):hover td{
+  background:rgb(118 118 128 / .06)}
+}
+.smart-table-root.smart-ios .smart-table-native tr:focus-visible{outline:3px solid rgb(0 122 255 / .4);outline-offset:-3px}
+.smart-table-root.smart-ios .smart-table-actions button{border:0;border-radius:999px;padding:3px 12px;
+ background:rgb(118 118 128 / .12);color:#007aff;font-weight:600;transition:transform .15s ease,filter .15s ease}
+.smart-table-root.smart-ios:not([data-builder-preview]) .smart-table-actions button:not(:disabled):active{transform:scale(.95)}
+.smart-table-root.smart-ios .smart-table-empty{color:#8e8e93;text-align:center}
+@media (prefers-reduced-motion:reduce){.smart-table-root.smart-ios *{transition:none!important}}

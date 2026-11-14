@@ -93,8 +93,8 @@ const DOCK_DESIGN:Array<[string,string,string]>=[...BODY,
  ['Button','size','numpadKeyTextSize'],['Button','bold','numpadKeyBold'],
  ['Focused','fill','numpadFocusedFill'],['Focused','text','numpadFocusedTextColor']
 ];
-/** Components that render through SmartRuntime and so honour Style. */
-const STYLED=['smart_button','smart_toggle','smart_lookup','smart_selector','smart_tabs','smart_text',
+/** Components that honour Style (SmartRuntime ones, plus Smart Table and Smart Icon). */
+const STYLED=['smart_table','smart_icon','smart_button','smart_toggle','smart_lookup','smart_selector','smart_tabs','smart_text',
  'smart_textbox','smart_label','smart_card_grid','smart_image','smart_calendar','smart_navigation',
  'smart_container','smart_cart','smart_numpad','smart_keyboard','smart_dock'];
 

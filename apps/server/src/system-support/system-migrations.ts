@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import {applySmartIosKeyboardDock} from './smart-ios-keyboard-dock.js';
 import {TILL_DEVICE_DDL} from './till-device-service.js';
+import {applySmartChart} from './smart-chart.js';
 
 /** Recover original migration files from the immutable SQL baseline.
  * The old runner accepted any subset of known versions and ran missing files
@@ -591,6 +592,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   `);
   // Smart iOS Style, Smart Keyboard and Smart Dock (additive, idempotent).
   await applySmartIosKeyboardDock(client);
+  await applySmartChart(client);
   // Tenant developer mailboxes live on the platform-owned mail domain but
   // belong to the new tenant. The baseline's (tenant_id,domain) foreign key
   // made every such insert fail, leaving new tenants suspended without a

@@ -123,7 +123,7 @@ import { inspectPageDependencies } from './pageDependencies';
 import {CompiledPageProvider,MemoizedCompiledComponentNode} from '../PageCompiler/CompiledPageRuntime';
 import type {CompiledPage} from '../PageCompiler/compilePage';
 import {issuedAppPageScript,type LoadedPageScript} from '../PageCompiler/serverPageScript';
-import {primeAppPageScript,useAppPageScript} from '../PageCompiler/useAppPageScript';
+import {preloadAppPageScript,primeAppPageScript,useAppPageScript} from '../PageCompiler/useAppPageScript';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1126,6 +1126,59 @@ function readPageDefinitionCache(cache:PageDefinitionCache,key:string):Lightning
 function readStalePageDefinition(cache:PageDefinitionCache,key:string):LightningPageMetadata|null{
   return cache.get(key)?.page??null;
 }
+function appPageEndpoint(appId:string,pageApiName:string|undefined,inScreen:boolean,print:boolean,
+  layout:string,viewportWidth:number):string{
+  const app=encodeURIComponent(appId);
+  return print && pageApiName
+    ? `/apps/${app}/print-templates/${encodeURIComponent(pageApiName)}?formFactor=${layout}`
+    : inScreen && pageApiName
+    ? `/apps/${app}/in-screen-pages/${encodeURIComponent(pageApiName)}?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`
+    : pageApiName
+      ? `/apps/${app}/pages/${encodeURIComponent(pageApiName)}?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`
+      : `/apps/${app}/home-page?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`;
+}
+/** Pages this page can open (navigation targets, SCREEN popups), fetched and
+ * converted in the background once it has loaded, so moving to them shows the
+ * next screen at once instead of a loading gap. */
+const prefetchedPages=new WeakMap<PageDefinitionCache,Set<string>>();
+function prefetchLinkedPages(page:LightningPageMetadata,pages:readonly LightningPageMetadata[],appId:string,
+  layout:string,viewportWidth:number,cache:PageDefinitionCache,navigationPageApiNames:readonly string[]):void{
+  let text='';
+  try{text=JSON.stringify(page.components);}catch{return;}
+  const done=prefetchedPages.get(cache)??new Set<string>();
+  prefetchedPages.set(cache,done);
+  const word=(name:string)=>new RegExp('(^|[^A-Za-z0-9_])'+name+'([^A-Za-z0-9_]|$)').test(text);
+  const targets=pages.filter(item=>item.apiName!==page.apiName
+    &&(item.pageType==='App Page'||item.pageType==='Home Page'||item.pageType==='In-Screen Page')
+    &&(navigationPageApiNames.includes(item.apiName)||word(item.apiName))).slice(0,30);
+  const queue=targets.map(item=>{
+    const inScreen=item.pageType==='In-Screen Page';
+    const key=pageDefinitionCacheKey(appId,inScreen?'window:'+item.apiName:item.apiName,layout,viewportWidth);
+    return {item,inScreen,key};
+  }).filter(entry=>!done.has(entry.key)&&!readPageDefinitionCache(cache,entry.key));
+  let running=0;
+  const next=()=>{
+    while(running<3&&queue.length){
+      const {item,inScreen,key}=queue.shift()!;
+      done.add(key);running++;
+      void apiRequest<{page:LightningPageMetadata|null;script?:unknown}>(
+        appPageEndpoint(appId,item.apiName,inScreen,false,layout,viewportWidth)).then(payload=>{
+        if(!payload.page)return;
+        if(!readPageDefinitionCache(cache,key))writePageDefinitionCache(cache,key,payload.page);
+        const stored=cache.get(key)?.page??payload.page;
+        if(stored===payload.page)primeAppPageScript(stored,issuedAppPageScript(payload.script));
+        preloadAppPageScript(apiRequest,appId,stored);
+      }).catch(()=>{done.delete(key);}).finally(()=>{running--;next();});
+    }
+  };
+  next();
+}
+/** A short wait shows nothing; only a wait that is noticeable says "Loading". */
+function DelayedPageLoading(){
+  const [visible,setVisible]=useState(false);
+  useEffect(()=>{const timer=window.setTimeout(()=>setVisible(true),600);return()=>window.clearTimeout(timer);},[]);
+  return <div className="records-page" aria-busy="true">{visible&&<div className="records-loading">Loading Lightning page…</div>}</div>;
+}
 /** Same definition as before: keep the old object so nothing on screen reloads. */
 function samePageDefinition(a:LightningPageMetadata|null,b:LightningPageMetadata|null):boolean{
   if(!a||!b)return false;
@@ -1301,13 +1354,7 @@ function LightningAppRuntime({
     const showing=readStalePageDefinition(pageDefinitionCache,cacheKey)
       ??(pageLoadRef.current.identity===pageIdentity?pageLoadRef.current.page:null);
     setPageLoad({routeKey,identity:pageIdentity,appId,page:showing,error:'',loading:!showing});
-    const endpoint = printPreview && pageApiName
-      ? `/apps/${encodeURIComponent(appId)}/print-templates/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}`
-      : inScreenPage && pageApiName
-      ? `/apps/${encodeURIComponent(appId)}/in-screen-pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}&script=1`
-      : pageApiName
-        ? `/apps/${encodeURIComponent(appId)}/pages/${encodeURIComponent(pageApiName)}?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}&script=1`
-        : `/apps/${encodeURIComponent(appId)}/home-page?formFactor=${requestedLayout}&viewportWidth=${viewportWidth}&script=1`;
+    const endpoint=appPageEndpoint(appId,pageApiName,Boolean(inScreenPage),Boolean(printPreview),requestedLayout,viewportWidth);
     void apiRequest<{ page: LightningPageMetadata | null; script?: unknown }>(endpoint).then((payload) => {
       if(active){
         const next=samePageDefinition(showing,payload.page)?showing:payload.page;
@@ -1328,6 +1375,16 @@ function LightningAppRuntime({
   useEffect(() => {
     setActiveTabs({});
   }, [page?.apiName]);
+  // Once this page runs, get the pages it can open ready in the background.
+  const pageReady=Boolean(page)&&appScript.status!=='loading';
+  useEffect(()=>{
+    if(!page||!pageReady||previewPage||printPreview||compiledPageProp)return;
+    const navigation=apps.find(item=>item.apiName===appId)?.navigationPageApiNames??[];
+    const run=()=>prefetchLinkedPages(page,pages,appId,requestedLayout,viewportWidth,pageDefinitionCache,navigation);
+    const idle=(globalThis as {requestIdleCallback?:(run:()=>void,options?:{timeout:number})=>number}).requestIdleCallback;
+    const timer=window.setTimeout(()=>idle?idle(run,{timeout:3000}):run(),800);
+    return()=>window.clearTimeout(timer);
+  },[page,pageReady,pages,apps,appId,requestedLayout,viewportWidth,pageDefinitionCache,previewPage,printPreview,compiledPageProp]);
   // PRINT() waits until the template is on screen (or reports why it is not).
   useEffect(()=>{
     if(!printPreview||loading)return;
@@ -1339,8 +1396,8 @@ function LightningAppRuntime({
     return () => onStandaloneModeChange(false);
   }, [page?.layoutMode, onStandaloneModeChange]);
   if(error&&!page)return <div className="records-page"><div className="records-message" role="alert">{error}</div></div>;
-  if(loading&&!page)return <div className="records-page"><div className="records-loading">Loading Lightning page…</div></div>;
-  if(page&&appScript.status==='loading')return <div className="records-page"><div className="records-loading">Loading Lightning page…</div></div>;
+  if(loading&&!page)return <DelayedPageLoading/>;
+  if(page&&appScript.status==='loading')return <DelayedPageLoading/>;
   if (!page) return <main className="records-page"><section className="records-empty records-home-unassigned" aria-labelledby="records-home-empty-heading"><h1 id="records-home-empty-heading">Home page is not configured</h1><p>This app has no active Home Page assigned for your current profile and device.</p><p>Ask an administrator to activate and assign a Home Page in the Lightning App Builder. Existing app pages and records remain available from navigation.</p></section></main>;
   const isStandaloneRuntime = isStandalonePagePresentation(page);
   const regions: Array<'header' | 'main' | 'sidebar'> = ['header', 'main', 'sidebar'];

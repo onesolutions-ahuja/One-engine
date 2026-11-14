@@ -216,7 +216,7 @@ export class AppPublishingService{
    this.connectorLabels()
   ]);
   const publisherBindings=new Map<string,string>();
-  for(const row of bindings){
+  for(const row of bindings as Array<{credential_name:string;api_name:string}>){
    const code=connectorApps[row.api_name as keyof typeof connectorApps];
    if(code)publisherBindings.set(row.credential_name.toLowerCase(),connectionKey(code));
   }
@@ -230,7 +230,7 @@ export class AppPublishingService{
  private async connectorLabels(){
   const {rows}=await this.db.query<{api_name:string;label:string}>(`SELECT api_name,label FROM md_apps
    WHERE app_type='ConnectorApp' AND tenant_owner_id IS NULL`);
-  return new Map(rows.map(row=>[row.api_name,row.label]));
+  return new Map<string,string>(rows.map((row:{api_name:string;label:string})=>[row.api_name,row.label]));
  }
 
  /**
@@ -261,8 +261,9 @@ export class AppPublishingService{
     WHERE tenant_id=$1 AND enabled=true`,[actor.tenant_id]),
    connectors.length?this.rbac.allowed(actor.tenant_id,actor.user_id,'Licence','manage'):Promise.resolve(false)
   ]);
-  const byApp=new Map(apps.map(row=>[row.api_name,row]));
-  const existing=new Set(credentials.map(row=>connectionKey(row.name)).filter(Boolean));
+  type AppRow={api_name:string;installed:boolean;licensed:boolean;credential_name:string|null};
+  const byApp=new Map<string,AppRow>((apps as AppRow[]).map((row:AppRow)=>[row.api_name,row]));
+  const existing=new Set((credentials as Array<{name:string}>).map((row:{name:string})=>connectionKey(row.name)).filter(Boolean));
   const aliases:Record<string,string>={};
   const rows:Row[]=items.map(item=>{
    if(item.kind==='connector'){

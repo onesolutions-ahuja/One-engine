@@ -246,17 +246,17 @@ export default function AppExchange(props: Props) {
           </ul>}
           {plan?.packaged && (plan.prerequisites?.length ?? 0) > 0 && <div className="exchange-prerequisites">
             <h3>Connections this app uses</h3>
-            <ul>{plan.prerequisites!.map((item) => <li key={item.kind + item.name}
+            <ul>{plan.prerequisites!.map((item: AppPrerequisiteStatus) => <li key={item.kind + item.name}
               className={'exchange-prerequisite is-' + item.status} role={item.blocking ? 'alert' : undefined}>
               <strong>{item.label}</strong> <span className="exchange-prerequisite-tag">
                 {prerequisiteTone[item.status]}{item.optional ? '' : ' · required'}</span>
               <div>{item.message}</div></li>)}</ul>
           </div>}
           {plan?.packaged && plan.missingDependencies.filter((item) => !(item.type === 'named-credential'
-            && plan.prerequisites?.some((need) => need.name.toLowerCase() === item.apiName.toLowerCase()))).length > 0 &&
+            && plan.prerequisites?.some((need: AppPrerequisiteStatus) => need.name.toLowerCase() === item.apiName.toLowerCase()))).length > 0 &&
             <div className="form-error" role="alert"><strong>Set up first:</strong><ul>
             {plan.missingDependencies.filter((item) => !(item.type === 'named-credential'
-              && plan.prerequisites?.some((need) => need.name.toLowerCase() === item.apiName.toLowerCase())))
+              && plan.prerequisites?.some((need: AppPrerequisiteStatus) => need.name.toLowerCase() === item.apiName.toLowerCase())))
               .map((item) => <li key={item.type + item.apiName}>{item.type === 'named-credential'
               ? 'Named Credential "' + item.apiName + '" (install the matching connector, e.g. WhatsApp Connector, and enter your own credentials)'
               : item.type + ' ' + item.apiName}</li>)}</ul></div>}

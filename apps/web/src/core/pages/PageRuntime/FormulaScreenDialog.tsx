@@ -44,7 +44,7 @@ const MIN_FIT_SCALE=0.5;
 function FitToScreen({canvas,available,children}:{canvas?:{canvasWidth?:number;canvasHeight?:number};
  available:()=>{width:number;height:number};children:React.ReactNode}){
  const inner=React.useRef<HTMLDivElement>(null);
- const [content,setContent]=React.useState<{width:number;height:number}|null>(null);
+ const [measured,setMeasured]=React.useState<{width:number;height:number}|null>(null);
  const [room,setRoom]=React.useState(available);
  const measureRoom=React.useRef(available);
  measureRoom.current=available;
@@ -53,30 +53,40 @@ function FitToScreen({canvas,available,children}:{canvas?:{canvasWidth?:number;c
   if(!node)return;
   const update=()=>{
    // Layout size (offset*) ignores the transform, so this is the unzoomed design size.
+   // A popup that is not on screen yet measures 0: never fit to that.
    const width=node.offsetWidth,height=node.offsetHeight;
-   setContent(previous=>previous&&previous.width===width&&previous.height===height?previous:{width,height});
+   if(width>0&&height>0)
+    setMeasured(previous=>previous&&previous.width===width&&previous.height===height?previous:{width,height});
    const next=measureRoom.current();
    setRoom(previous=>previous.width===next.width&&previous.height===next.height?previous:next);
   };
   update();
   const observer=typeof ResizeObserver==='function'?new ResizeObserver(update):null;
   observer?.observe(node);
-  if(node.parentElement?.parentElement)observer?.observe(node.parentElement.parentElement);
+  // The dialog opens and the page inside loads after this mounts: check again
+  // for a short while (a ResizeObserver does not always report that first size).
+  let checks=0;
+  const timer=window.setInterval(()=>{update();if(++checks>=20)window.clearInterval(timer);},150);
   window.addEventListener('resize',update,{passive:true});
-  return ()=>{observer?.disconnect();window.removeEventListener('resize',update);};
+  return ()=>{observer?.disconnect();window.clearInterval(timer);window.removeEventListener('resize',update);};
  },[]);
- const designWidth=Number(canvas?.canvasWidth);
- const width=Number.isFinite(designWidth)&&designWidth>0?Math.round(designWidth)+'px':'85vw';
- const fit=content&&content.width>0&&content.height>0
-  ?Math.min(1,room.width/content.width,room.height/content.height):1;
+ const canvasWidth=Number(canvas?.canvasWidth),canvasHeight=Number(canvas?.canvasHeight);
+ const designed=Number.isFinite(canvasWidth)&&canvasWidth>0;
+ const width=designed?Math.round(canvasWidth)+'px':'85vw';
+ // Before the first real measurement, use the designed canvas size.
+ const content=measured??(designed&&Number.isFinite(canvasHeight)&&canvasHeight>0
+  ?{width:Math.round(canvasWidth),height:Math.round(canvasHeight)}:null);
+ const fit=content?Math.min(1,room.width/content.width,room.height/content.height):1;
  const scale=Math.max(MIN_FIT_SCALE,fit);
  const scrolls=fit<MIN_FIT_SCALE;
- return <div className="formula-screen-fit" style={{
-   width:content?Math.floor(content.width*scale):width,
-   height:content?(scrolls?Math.floor(room.height):Math.floor(content.height*scale)):undefined,
-   overflow:scrolls?'auto':'hidden'}}>
-  <div style={scrolls?undefined:{height:content?content.height*scale:undefined}}>
-   <div ref={inner} style={{width,transform:scale===1?undefined:`scale(${scale})`,transformOrigin:'0 0'}}>{children}</div>
+ // Same element tree in every case (the measured node must stay the same).
+ // Nothing known yet: the page shows as it is (never a 0 x 0 popup).
+ return <div className="formula-screen-fit" style={content?{
+   width:Math.floor(content.width*scale),
+   height:scrolls?Math.floor(room.height):Math.floor(content.height*scale),
+   overflow:scrolls?'auto':'hidden'}:undefined}>
+  <div style={content&&!scrolls?{height:content.height*scale}:undefined}>
+   <div ref={inner} style={{width,transform:!content||scale===1?undefined:`scale(${scale})`,transformOrigin:'0 0'}}>{children}</div>
   </div>
  </div>;
 }

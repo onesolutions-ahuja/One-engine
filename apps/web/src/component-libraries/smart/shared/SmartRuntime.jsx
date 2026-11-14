@@ -615,7 +615,10 @@ function SmartTabs({p,record,fire}){
     aria-selected={selectedTabIndex===index} style={{height:number(p.tabHeight,44),
      maxHeight:vertical?undefined:"100%",minHeight:vertical?number(p.tabHeight,44):0,
      flex:vertical?"0 0 auto":"1 1 auto",
-     width:vertical?"100%":undefined,minWidth:vertical?0:number(p.tabWidth,120),
+     width:vertical?"100%":p.wrapText===true?number(p.tabWidth,120):undefined,
+     minWidth:vertical?0:number(p.tabWidth,120),
+     // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
+     maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
      borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||"#2563eb"):"transparent"):undefined,
      borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:p.labelColor||undefined,
      background:selectedTabIndex===index?p.selectedTabColor||"#eaf2ff":p.tabColor||"#fff",
@@ -1014,7 +1017,9 @@ export default function SmartRuntime(p){
       const src=item&&typeof item==="object"?item.imageSrc??item.imageUrl:null;
       const safeSrc=typeof src==="string"&&/^https:\/\//i.test(src)?src:null;
       return <button data-md-bind={p.builderPreview&&p.textSource&&!(item&&typeof item==="object"&&item.label)?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Navigation item text":undefined} key={item?.id??i} type="button" className="smart-navigation-item"
-        style={{flex:"0 0 auto",height:32,maxHeight:"100%",minHeight:0,color:p.labelColor||undefined,background:p.backgroundColor||(ios?"rgb(255 255 255 / .82)":"#fff"),
+        style={{flex:"0 0 auto",height:p.wrapText===true?"auto":32,maxHeight:"100%",minHeight:p.wrapText===true?32:0,
+          width:p.wrapText===true?number(p.tabWidth,140):undefined,maxWidth:p.wrapText===true?number(p.tabWidth,140):undefined,
+          color:p.labelColor||undefined,background:p.backgroundColor||(ios?"rgb(255 255 255 / .82)":"#fff"),
           boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
           borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16)}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>

@@ -12,6 +12,7 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import { presentPageRecords, type ChannelGrant } from '../../records/RecordWorkspace/recordPresentationAdapters';
 import TemplatePageRuntimeLayout from '../TemplatePageRuntime/TemplatePageRuntimeLayout';
 import { loadFlowScreenRecordPage, loadFlowScreenRecords, getAccessToken } from '../../authentication/Client/authClient';
+import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {shouldInvalidatePageComponent,pageComponentReadObjectNames,applySavedRecordMutations,
   type PageMutationDetail,type LoadedRecordListScope} from './pageMutationScope';
 import {requestPageMediaAsset} from './pageMediaAssetCoalescer';
@@ -1052,6 +1053,7 @@ function MetadataBoundPageComponent({
       loadAsset: (id:string) => requestPageMediaAsset<{contentType:string;contentBase64:string}>(
         apiRequest,id,getAccessToken()??''), viewRevision: revision,
       loadCompanySettings: () => apiRequest('/metadata/currencies'),
+      uploadImage: (file:File) => uploadTenantImageFile(file),
       // Search is independent of the list's existing 100-row pagination.
       // Never widen unsupported/client-only filters into an unfiltered query.
       searchRecords: async (search:string) => {

@@ -14,7 +14,7 @@ type Row = Record<string,unknown>;
 const namePattern=/^[A-Za-z][A-Za-z0-9_]{0,127}$/;
 const denied=new Set(['__proto__','prototype','constructor','pagePropertyContract',
   'actionFlows','stateBindings','filters','objectApiName','records','onAction','onChange',
-  'children','sessionId','pageSessionKey','componentId','key','ref','loadAsset',
+  'children','sessionId','pageSessionKey','componentId','key','ref','loadAsset','uploadImage',
   'loadCompanySettings','onLaunchFlow','onNavigate','preview','previewOnly']);
 const colorPattern=/^(?:#[a-f0-9]{3}(?:[a-f0-9]{3})?(?:[a-f0-9]{2})?|transparent)$/i;
 const asRows=(value:unknown):Row[]=>Array.isArray(value)?value.filter(isPropertyRecord):[];

@@ -20,6 +20,7 @@ import {requestPageMediaAsset} from '../PageRuntime/pageMediaAssetCoalescer';
 import type {PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {scopedFieldAllows} from '../PageRuntime/fieldScopedRecordFilters';
 import {loadFlowScreenRecordPage,loadFlowScreenRecords,getAccessToken} from '../../authentication/Client/authClient';
+import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {presentPageRecords,type ChannelGrant} from '../../records/RecordWorkspace/recordPresentationAdapters';
 import {resolveFlowOutputBindings,resolveStructuredFlowInput} from '../../automation/FlowScreen/flowInputBindings';
 import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChannel';
@@ -671,6 +672,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(runtime.request,id,getAccessToken()??''),
    viewRevision:source.version,
    loadCompanySettings:()=>runtime.request('/metadata/currencies'),
+   uploadImage:(file:File)=>uploadTenantImageFile(file),
    searchRecords:(query:string)=>compiled.dataSourceId
     ?runtime.searchRecords(compiled.dataSourceId,query)
     :Promise.reject(new Error('Search Box requires an Object data source')),

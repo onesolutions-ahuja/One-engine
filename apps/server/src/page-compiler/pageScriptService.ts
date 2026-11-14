@@ -110,6 +110,23 @@ export class PageScriptService{
  }
  /** Published app pages: one build per tenant + app + page content, shared by its users. */
  private readonly appBuilds=new Map<string,Built&{tenantId:string;appId:string;apiName:string}>();
+ /** Same page content converted recently: reuse its build without reloading every
+  * Object definition and compiling again (the slow part of opening a page). */
+ private readonly recentAppInputs=new Map<string,{buildId:string;at:number}>();
+ static appInputKey(tenantId:string,appId:string,variant:string,page:unknown):string{
+  return createHash('sha256').update([tenantId,appId,variant,JSON.stringify(page)].join('\u0000')).digest('base64url');
+ }
+ recentAppBuild(inputKey:string,maxAgeMs:number):{buildId:string;built:Built}|null{
+  const recent=this.recentAppInputs.get(inputKey);
+  if(!recent||this.now()-recent.at>maxAgeMs)return null;
+  const built=this.appBuilds.get(recent.buildId);
+  return built?{buildId:recent.buildId,built}:null;
+ }
+ rememberAppInput(inputKey:string,buildId:string):void{
+  this.recentAppInputs.delete(inputKey);
+  if(this.recentAppInputs.size>=MAX_BUILT*2)this.recentAppInputs.delete(this.recentAppInputs.keys().next().value!);
+  this.recentAppInputs.set(inputKey,{buildId,at:this.now()});
+ }
  buildAppPage(tenantId:string,appId:string,page:CompilerPage,objects:readonly CompilerObject[]):{buildId:string;built:Built}{
   if(!apiNamePattern.test(page.apiName??''))throw new Error('Invalid page API name');
   const compiled=compilePage(page,objects,{strictLegacy:true});

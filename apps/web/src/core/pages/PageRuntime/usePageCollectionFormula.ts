@@ -244,8 +244,9 @@ export function namedCollectionRows(collection:PageNamedCollection):Row[]{
     ?entry.record as Row:{};
    // A collection's criterion label is not the record title. Preserve the
    // authorised source record so Cards and Lists render the actual row fields.
-   return {...record,Name:typeof record.Name==='string'&&record.Name.trim()
-     ?record.Name:String(entry.label??''),Id:record.Id??record.id??entry.value??'',
+   // A record-backed row keeps its own (possibly blank) Name; only a manual
+   // item without a source record uses the label as its title.
+   return {...record,Name:entry.record?record.Name??null:String(entry.label??''),Id:record.Id??record.id??entry.value??'',
      __collectionLabel:String(entry.label??''),__collectionValue:entry.value,
      __collectionCriteriaField:typeof (item as Row).criteriaField==='string'?(item as Row).criteriaField:'',
      __collectionCriteria:typeof (item as Row).criteria==='string'?(item as Row).criteria:'',

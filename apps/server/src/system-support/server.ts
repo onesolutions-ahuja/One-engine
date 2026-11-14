@@ -244,7 +244,26 @@ export function createSystemServer(db:SqlPersistence) {
     if(String(res.getHeader('Content-Type')??'').includes('text/event-stream'))return false;
     return compression.filter(req,res);
   }}));
-  app.use((_req,res,next)=>withAuditContext({},()=>{res.setHeader('X-Correlation-ID',auditContext()!.correlationId);next();}));
+  app.use((_req,res,next)=>withAuditContext({timing:{dbTrips:0,dbMs:0,started:performance.now()}},()=>{
+    const context=auditContext()!;
+    res.setHeader('X-Correlation-ID',context.correlationId);
+    // Server-Timing: where the time of each request goes (database trips, sign-in check, total).
+    const writeHead=res.writeHead;
+    res.writeHead=function(this:typeof res,...args:unknown[]){
+      const timing=context.timing;
+      if(timing&&!res.headersSent)try{
+        res.setHeader('Server-Timing',[
+          ...(res.getHeader('Server-Timing')?[String(res.getHeader('Server-Timing'))]:[]),
+          'db;dur='+timing.dbMs.toFixed(1)+';desc="'+timing.dbTrips+' trips"',
+          ...(timing.authMs!==undefined?['auth;dur='+timing.authMs.toFixed(1)]:[]),
+          'app;dur='+(performance.now()-timing.started).toFixed(1)
+        ].join(', '));
+        res.setHeader('Timing-Allow-Origin','*');
+      }catch{/* headers already final */}
+      return (writeHead as (...a:unknown[])=>typeof res).apply(this,args);
+    } as typeof res.writeHead;
+    next();
+  }));
   // Log webhook ingress and response status without logging query tokens, signatures,
   // request bodies, or credential material. This distinguishes delivery from processing failures.
   app.use((req,res,next)=>{
@@ -395,11 +414,14 @@ export function createSystemServer(db:SqlPersistence) {
       const bearer=req.get('authorization')??'';
       if(!/^Bearer [a-zA-Z0-9_-]+$/.test(bearer)) {res.status(401).json({error:'Bearer access token required'});return;}
       const path=req.originalUrl.split('?')[0],started=Date.now();
+      const authStarted=performance.now();
       req.actor=await auth.authenticate(bearer.slice(7),{ip:req.ip,path,method:req.method});
       setAuditActor(req.actor.tenant_id,req.actor.user_id);
       const event=await securityMonitor.enforce({actor:req.actor,correlationId:auditContext()!.correlationId,eventType:path.startsWith('/api/metadata/')?'metadata':'api',path,method:req.method,ip:normalizedLoginIp(req.ip)});
       res.once('finish',()=>{void securityMonitor.complete(req.actor!.tenant_id,event.id,res.statusCode,Date.now()-started).catch(()=>console.error('Security monitoring completion failed'));});
       if(event.blocked){res.status(403).json({error:'Blocked by transaction security policy'});return;}
+      const timing=auditContext()?.timing;
+      if(timing)timing.authMs=performance.now()-authStarted;
       next();
     } catch(error) {if(error instanceof Error&&error.message==='Invalid session')res.status(401).json({error:'Invalid session'});else next(error);}
   };

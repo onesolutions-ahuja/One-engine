@@ -20,7 +20,10 @@ export class SecurityMonitorService{
   // the original transactional path below enforces it (the event is already logged).
   // Every value has its own parameter so Postgres infers each type from its single use, exactly as
   // the separate statements did (no cross-statement type conflicts on enum or domain columns).
-  const quick=await this.db.query<{rule_count:number}>(`WITH settings AS (
+  // md_monitor_events has no setup-audit trigger, so this needs no audit transaction
+  // (that wrapper cost 4 extra database round trips on every API request).
+  const direct=typeof this.db.queryUnaudited==='function'?this.db.queryUnaudited.bind(this.db):this.db.query.bind(this.db);
+  const quick=await direct<{rule_count:number}>(`WITH settings AS (
      SELECT enabled FROM md_monitor_settings WHERE tenant_id=$1
     ), logged AS (
      INSERT INTO md_monitor_events(id,tenant_id,actor_user_id,correlation_id,event_type,resource,method,status_code,elapsed_ms,source_ip)

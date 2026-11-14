@@ -1,4 +1,5 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
+import {timeSqlTrip} from '../system-support/audit-context.js';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import {auditContext,setSqlAuditContext} from '../system-support/audit-context.js';
 export function resolveSqlConnection(databaseUrl:string,env:NodeJS.ProcessEnv) {
@@ -51,7 +52,14 @@ export class SqlPersistence {
     const context=auditContext();
     if(context?.actorUser&&/^\s*(INSERT|UPDATE|DELETE|WITH|ALTER|CREATE|DROP|TRUNCATE)\b/i.test(sql))
       return this.transaction(client=>client.query<T>(sql,[...params]));
-    return this.pool.query<T>(sql, [...params]);
+    return timeSqlTrip(this.pool.query<T>(sql, [...params]));
+  }
+  /** One statement on a table with no setup-audit trigger: send it directly (1 round
+   * trip) instead of BEGIN + SET LOCAL audit context + statement + COMMIT. */
+  queryUnaudited<T extends QueryResultRow = QueryResultRow>(sql: string, params: readonly unknown[] = []) {
+    const active=this.activeTransaction.getStore();
+    if(active)return active.query<T>(sql,[...params]);
+    return timeSqlTrip(this.pool.query<T>(sql, [...params]));
   }
   async transaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
     const active=this.activeTransaction.getStore();
@@ -70,7 +78,13 @@ export class SqlPersistence {
         throw error;
       }
     }
-    const client=await this.pool.connect();
+    const client=await timeSqlTrip(this.pool.connect());
+    // Every statement on this connection is one round trip to the database.
+    const query=client.query.bind(client) as (...args:unknown[])=>unknown;
+    (client as unknown as {query:(...args:unknown[])=>unknown}).query=(...args:unknown[])=>{
+      const result=query(...args);
+      return result instanceof Promise?timeSqlTrip(result):result;
+    };
     try{
       await client.query('BEGIN');
       const context=auditContext();
@@ -85,7 +99,10 @@ export class SqlPersistence {
         console.error('SQL rollback failed',rollbackError);
       }
       throw error;
-    }finally{client.release();}
+    }finally{
+      (client as unknown as {query:unknown}).query=query;
+      client.release();
+    }
   }
   async verifySchema() {
     const names=["md_rbac_revisions","md_permission_set_groups","md_permission_group_sets","md_permission_group_mutes","md_user_permission_groups","md_access_groups","md_access_group_members","md_queue_objects","md_sharing_settings","md_record_policies","md_policy_owner_roles","md_policy_conditions","md_policy_condition_values","md_tenants","md_users","md_tenant_domains","md_sessions","md_refresh_sessions","md_roles","md_user_roles","md_permission_sets","md_permission_assignments","md_role_permission_sets","md_permission_rules","md_object_definitions","md_field_definitions","md_field_picklist_values","md_records","md_record_values","md_component_definitions","md_component_properties","md_page_definitions","md_page_components","md_page_properties","md_flow_definitions","md_flow_nodes","md_flow_edges","md_flow_runs","md_flow_editor_values","md_flow_interview_state","md_flow_interview_values","md_apps","md_tenant_app_metadata","md_tenant_app_navigation","md_tenant_app_utilities","md_app_installations","md_app_entitlements","md_app_home_pages","md_flow_node_properties","md_flow_run_inputs","md_initial_password_rotations","md_page_component_properties","md_app_seed_pages","md_system_definitions","md_platform_event_details","md_platform_event_fields","md_platform_event_picklist_values","md_named_credentials","md_app_route_aliases","md_tenant_settings","md_tenant_lifecycle_audit","md_object_layout_versions","md_object_page_layouts","md_object_page_layout_sections","md_object_page_layout_fields","md_object_page_layout_actions","md_object_page_layout_related_lists","md_object_page_layout_links","md_object_page_layout_assignments","md_lightning_page_details","md_lightning_page_nodes","md_lightning_page_node_properties","md_lightning_page_activation","md_page_layout_versions","md_page_layout_heads","md_page_layout_version_nodes","md_page_layout_version_properties","md_page_layout_version_activation","md_page_layout_audit","md_profiles","md_user_profiles","md_profile_permission_sets","md_object_record_types","md_object_record_type_values","md_bootstrap_password_repairs","md_tenant_provisioning_requests","md_notifications","md_approval_requests","md_record_activities","md_record_chatter_posts","md_record_chatter_comments","md_password_recovery_settings","md_security_events","md_record_history","md_component_library_versions","md_component_library_heads","md_dashboard_snapshots","md_dashboard_subscriptions","md_tenant_developer_accounts","md_tenant_recovery_contacts","md_tenant_recovery_cases","md_tenant_recovery_case_proofs","md_tenant_recovery_approvals","md_field_dependencies","md_field_dependency_values","md_auto_number_counters","md_record_multi_values","md_flow_interview_records","md_flow_interview_record_fields","md_flow_interview_loop_state","md_http_callout_jobs","md_http_callout_job_values","md_object_manager_settings","md_object_field_sets","md_object_field_set_items","md_object_actions","md_global_value_sets","md_global_value_set_values","md_global_value_set_audit","md_field_global_value_sets","md_custom_labels","md_custom_metadata_types","md_custom_metadata_fields","md_custom_metadata_records","md_custom_metadata_values","md_custom_settings","md_custom_setting_fields","md_custom_setting_entries","md_custom_setting_values","md_encrypted_field_access_audit"];

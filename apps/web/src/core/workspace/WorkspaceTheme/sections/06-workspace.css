@@ -437,3 +437,10 @@
 .exchange-install-plan h3 { margin: 0 0 6px; font-size: 0.95rem; }
 .exchange-install-plan ul { margin: 4px 0 0; padding-left: 18px; }
 .exchange-install-plan .form-error { margin-top: 8px; }
+.exchange-prerequisites { margin-top: 8px; }
+.exchange-prerequisites ul { list-style: none; padding-left: 0; display: grid; gap: 6px; }
+.exchange-prerequisite { border-left: 3px solid #94a3b8; padding: 4px 8px; background: #f8fafc; border-radius: 4px; }
+.exchange-prerequisite.is-connected { border-left-color: #16a34a; }
+.exchange-prerequisite.is-will-install, .exchange-prerequisite.is-needs-keys { border-left-color: #2563eb; }
+.exchange-prerequisite.is-needs-licence, .exchange-prerequisite.is-missing { border-left-color: #dc2626; background: #fef2f2; }
+.exchange-prerequisite-tag { font-size: 0.75rem; color: #475569; margin-left: 4px; }

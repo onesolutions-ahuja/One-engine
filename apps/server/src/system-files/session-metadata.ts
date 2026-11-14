@@ -1,6 +1,7 @@
 import type {SqlPersistence} from './sql-persistence.js';
 import {RbacEngine, type PermissionCheck} from './rbac-engine.js';
 import {systemPermissionBindings} from '../system-support/permission-resource-map.js';
+import {loadConnectionSnapshot} from '../system-support/tenant-connections.js';
 
 /** Session capabilities are derived exclusively from the shared OneEngine RBAC evaluator. */
 const capabilities:readonly (PermissionCheck&{capability:string})[]=[
@@ -38,6 +39,8 @@ export async function sessionMetadata(db:SqlPersistence,tenantId:string,userId:s
        FROM md_users WHERE tenant_id=$1 AND id=$2 AND enabled=true`,[tenantId,userId])
   ]);
   const sessionUser=identity.rows[0];
+  // Connector/callout names for CONNECTED() in page formulas. Names only, never secrets.
+  const connections=await loadConnectionSnapshot(db,tenantId);
   if(!sessionUser)throw new Error('Authenticated formula context is unavailable');
   const checks:PermissionCheck[]=[
     ...capabilities,
@@ -66,6 +69,7 @@ export async function sessionMetadata(db:SqlPersistence,tenantId:string,userId:s
     displayName:sessionUser.display_name,email:sessionUser.email,
     timeZone:sessionUser.time_zone,locale:sessionUser.locale,
     currencyIsoCode:sessionUser.currency_iso_code,
-    landingAppApi:landing.rows[0]?.landing_app_api??'Setup',permissions,fieldAccess,recordTypeAccess
+    landingAppApi:landing.rows[0]?.landing_app_api??'Setup',permissions,fieldAccess,recordTypeAccess,
+    connections
   }};
 }

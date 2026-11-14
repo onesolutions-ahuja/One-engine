@@ -31,9 +31,19 @@ export function setAuthenticatedFormulaBindingContext(user:unknown):void {
       Id:session.profileId??null,Name:session.profileName??null,
       DeveloperName:session.profileApi??null
     }),
-    organization:Object.freeze({Id:session.tenantId,Name:session.tenantName})
+    organization:Object.freeze({Id:session.tenantId,Name:session.tenantName}),
+    connections:sessionConnections(session.connections)
   });
   setAuthenticatedFormulaSession(authenticatedFormulaBindingContext);
+}
+/** Connector names from the session for CONNECTED(); names only, never secrets. */
+function sessionConnections(value:unknown):FormulaBindingContext['connections']{
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const source=value as Record<string,unknown>;
+  const names=(key:string)=>Object.freeze((Array.isArray(source[key])?source[key] as unknown[]:[])
+    .filter((item):item is string=>typeof item==='string'));
+  return Object.freeze({systemAvailable:names('systemAvailable'),systemConnected:names('systemConnected'),
+    customConnected:names('customConnected')});
 }
 export function getAuthenticatedFormulaBindingContext():FormulaBindingContext|null {
   return authenticatedFormulaBindingContext;
@@ -44,7 +54,7 @@ function isFieldExpression(value:string):boolean{
   return /^(?:TRUE|FALSE|NULL|PI)$/i.test(input)||input.startsWith('(')||/^[+-]\d/.test(input)
     ||input.startsWith('@')||input.startsWith('{!')||/^\$(?:component|state|session)(?:\.|$)/.test(input)||/^"(?:[^"]|"")*"\s*&/.test(input)
     ||/^(?:\d+(?:\.\d+)?\s*[+\-*/%^<>]|"(?:[^"]|"")*"\s*(?:&|=|<>|!=|<=|>=|<|>))/.test(input)
-    ||/^(?:IF|IFERROR|CASE|AND|OR|NOT|XOR|ISBLANK|ISNULL|ISNUMBER|BLANKVALUE|NULLVALUE|TEXT|VALUE|ASCII|LOWER|UPPER|PROPER|INITCAP|LEN|TRIM|LEFT|RIGHT|MID|FIND|BEGINS|CONTAINS|EXACT|ISPICKVAL|INCLUDES|CONCATENATE|SUBSTITUTE|REPT|REVERSE|ENCODEURL|URLENCODE|URLDECODE|LPAD|RPAD|REPLACE|CHAR|CASESAFEID|T|COLLECTION|COLLECTIONCOUNT|COLLECTIONSUM|SUM|VLOOKUP|ABS|ROUND|ROUNDUP|ROUNDDOWN|TRUNC|SIGN|MIN|MAX|MOD|SQRT|POWER|CEILING|FLOOR|MCEILING|MFLOOR|EXP|LN|LOG|SIN|COS|TAN|ASIN|ACOS|ATAN|ATAN2|SINH|COSH|TANH|DEGREES|RADIANS|DATE|DATEVALUE|DATETIMEVALUE|TODAY|NOW|DAY|MONTH|YEAR|HOUR|MINUTE|SECOND|TIMEVALUE|TIMENOW|TZOFFSET|WEEKDAY|ISOWEEK|ISOYEAR|ADDDAYS|ADDMONTHS|GEOLOCATION|DISTANCE)\s*\(/i.test(input);
+    ||/^(?:IF|IFERROR|CASE|AND|OR|NOT|XOR|ISBLANK|ISNULL|ISNUMBER|CONNECTED|BLANKVALUE|NULLVALUE|TEXT|VALUE|ASCII|LOWER|UPPER|PROPER|INITCAP|LEN|TRIM|LEFT|RIGHT|MID|FIND|BEGINS|CONTAINS|EXACT|ISPICKVAL|INCLUDES|CONCATENATE|SUBSTITUTE|REPT|REVERSE|ENCODEURL|URLENCODE|URLDECODE|LPAD|RPAD|REPLACE|CHAR|CASESAFEID|T|COLLECTION|COLLECTIONCOUNT|COLLECTIONSUM|SUM|VLOOKUP|ABS|ROUND|ROUNDUP|ROUNDDOWN|TRUNC|SIGN|MIN|MAX|MOD|SQRT|POWER|CEILING|FLOOR|MCEILING|MFLOOR|EXP|LN|LOG|SIN|COS|TAN|ASIN|ACOS|ATAN|ATAN2|SINH|COSH|TANH|DEGREES|RADIANS|DATE|DATEVALUE|DATETIMEVALUE|TODAY|NOW|DAY|MONTH|YEAR|HOUR|MINUTE|SECOND|TIMEVALUE|TIMENOW|TZOFFSET|WEEKDAY|ISOWEEK|ISOYEAR|ADDDAYS|ADDMONTHS|GEOLOCATION|DISTANCE)\s*\(/i.test(input);
 }
 
 /** Resolve text-property bindings against the already authorised record supplied to the component.

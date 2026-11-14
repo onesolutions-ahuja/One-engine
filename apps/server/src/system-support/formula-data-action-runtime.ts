@@ -5,6 +5,8 @@ import {evaluateFormulaSql} from './formula-sql-runtime.js';
 import {parseRecordFilters,parseRecordCursor} from '../object-engine/QueryBuilder.js';
 import {executeActionPlan,splitServerDataActionPlan,PartialActionError} from '../expression-engine/ActionFormulas.js';
 import {evaluateFlowFormulaNode} from '../system-files/flow-formula-runtime.js';
+import {resolveConnectedCalls,type ConnectionSnapshot} from '../expression-engine/FormulaConnections.js';
+import {loadConnectionSnapshot} from './tenant-connections.js';
 import type {Expression} from '../expression-engine/FormulaParser.js';
 import {parseComponentStateReference,readComponentState} from '../expression-engine/FormulaComponentState.js';
 
@@ -50,7 +52,8 @@ async function trustedFormulaSession(db:Sql,actor:Actor):Promise<TrustedFormulaS
 }
 function evaluateDataNode(node:Expression,scope:Record<string,unknown>,
  _aliases?:readonly string[],state?:Readonly<Record<string,unknown>>,
- authenticated?:TrustedFormulaSession):unknown{
+ authenticated?:TrustedFormulaSession,connections?:ConnectionSnapshot):unknown{
+ if(connections)node=resolveConnectedCalls(node,connections);
  const resolve=(path:string):unknown=>{
   if(path==='$session')return scope.sessionId??'';
   if(path==='$session.id')return scope.sessionId??'';
@@ -207,13 +210,16 @@ export async function executeServerDataAction(
  };
  const authenticated=/\$session\.(?:user|tenant)\./.test(formula)
   ?await trustedFormulaSession(db,actor):undefined;
+ // CONNECTED("x") is answered from the tenant's own credentials, never the browser.
+ const connections=/\bCONNECTED\s*\(/i.test(formula)
+  ?await loadConnectionSnapshot(db,actor.tenant_id):undefined;
  // A caught interpreter failure must not cause the outer transaction to roll
  // back its already confirmed actions. Each failing API operation uses a
  // savepoint; no external side effects or browser operations run in this scope.
  return db.transaction(async()=>{
   try{
    const result=await executeActionPlan(formula,scope,
-     (node,values,aliases,state)=>evaluateDataNode(node,values,aliases,state,authenticated),{
+     (node,values,aliases,state)=>evaluateDataNode(node,values,aliases,state,authenticated,connections),{
     request,useSqlAggregates:true,
     sqlContext:rbac&&!/\bFOREACH\s*\(/i.test(formula)?{state:scope.state as Record<string,unknown>}:undefined,
     planWindow:{start:0,end:dataSteps,includeVariables:true}

@@ -32,6 +32,11 @@ type PackageContent={
 type PackageSelection={apiName:string;label:string;version:number;type:'Managed'|'Unlocked';
  objects:unknown;pages:unknown;components:unknown;flows?:unknown;objectConfigurations?:unknown;permissionSets?:unknown};
 type PortableProfile={id:string;apiName:string};
+/** credentialAliases: package credential name → this tenant's name for the same
+ * connector (set by app install from connector bindings). */
+export type InstallOptions={credentialAliases?:Readonly<Record<string,string>>};
+const credentialAlias=(options:InstallOptions,name:string)=>
+ options.credentialAliases&&Object.hasOwn(options.credentialAliases,name)?options.credentialAliases[name]:name;
 export type MetadataPackage={
  format:'metadrive-metadata-package';
  schemaVersion:1;
@@ -332,7 +337,7 @@ export class MetadataPackageService{
   document.tests=[];
   return flowProjection(document as PackageFlow);
  }
- private async localizeFlow(tenant:string,flow:PackageFlow){
+ private async localizeFlow(tenant:string,flow:PackageFlow,options:InstallOptions={}){
   const clone=(value:unknown):unknown=>Array.isArray(value)?value.map(clone)
    :value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,clone(item)]))
    :value;
@@ -342,9 +347,11 @@ export class MetadataPackageService{
    const config=element.config&&typeof element.config==='object'&&!Array.isArray(element.config)
     ?element.config as Record<string,unknown>:undefined;
    if(typeof config?.namedCredentialApiName==='string'){
+    // A connector credential can have another name in this tenant (legacy names).
+    const name=credentialAlias(options,config.namedCredentialApiName);
     const {rows}=await this.db.query<{id:string}>(`
      SELECT id FROM md_named_credentials WHERE tenant_id=$1 AND name=$2 AND enabled=true`,
-     [tenant,config.namedCredentialApiName]);
+     [tenant,name]);
     if(!rows[0])throw Error('Flow requires a configured tenant Named Credential: '+config.namedCredentialApiName);
     config.namedCredentialId=rows[0].id;
     delete config.namedCredentialApiName;
@@ -363,13 +370,16 @@ export class MetadataPackageService{
   }
   return [...names].sort();
  }
- private async missingCredentials(tenant:string,contents:PackageContent):Promise<MissingDependency[]>{
+ private async missingCredentials(tenant:string,contents:PackageContent,
+  options:InstallOptions={}):Promise<MissingDependency[]>{
   const names=this.credentialNames(contents);
   if(!names.length)return [];
   const {rows}=await this.db.query<{name:string}>(`SELECT name FROM md_named_credentials
-   WHERE tenant_id=$1 AND enabled=true AND name=ANY($2::text[])`,[tenant,names]);
+   WHERE tenant_id=$1 AND enabled=true AND name=ANY($2::text[])`,
+   [tenant,names.map(name=>credentialAlias(options,name))]);
   const present=new Set(rows.map(row=>row.name));
-  return names.filter(name=>!present.has(name)).map(apiName=>({type:'named-credential' as const,apiName}));
+  return names.filter(name=>!present.has(credentialAlias(options,name)))
+   .map(apiName=>({type:'named-credential' as const,apiName}));
  }
  private dependencies(contents:PackageContent):Dependency[]{
   const internalObjects=new Set(contents.objects.map(item=>item.apiName));
@@ -527,7 +537,7 @@ export class MetadataPackageService{
    [tenant,packageApi]);
   return rows;
  }
- async preview(tenant:string,user:string,raw:unknown):Promise<Preview>{
+ async preview(tenant:string,user:string,raw:unknown,options:InstallOptions={}):Promise<Preview>{
   await this.readGrants(tenant,user);
   const pkg=validatePackage(raw);
   if(pkg.contents.flows?.length)await this.rbac.require(tenant,user,'FlowDefinition','read');
@@ -571,7 +581,7 @@ export class MetadataPackageService{
   const preserved:Array<{type:string;apiName:string}>=[];
   const reused:Array<{type:string;apiName:string}>=[];
   const addedFields:string[]=[];
-  missing.push(...await this.missingCredentials(tenant,pkg.contents));
+  missing.push(...await this.missingCredentials(tenant,pkg.contents,options));
   const profileNames=new Set((rbacSnapshot?.profiles??[]).map(profile=>profile.apiName));
   for(const config of pkg.contents.objectConfigurations??[]){
    const layoutLabels=new Set(config.pageLayouts.map(layout=>String(
@@ -658,9 +668,9 @@ export class MetadataPackageService{
   action:'create'|'manage'|'read'){
   await this.rbac.require(tenant,user,resource,action);
  }
- async install(tenant:string,user:string,raw:unknown){
+ async install(tenant:string,user:string,raw:unknown,options:InstallOptions={}){
   const pkg=validatePackage(raw);
-  const preview=await this.preview(tenant,user,pkg);
+  const preview=await this.preview(tenant,user,pkg,options);
   if(!preview.canInstall)throw Error('Package cannot be installed: '+JSON.stringify({
    missingDependencies:preview.missingDependencies,conflicts:preview.conflicts
   }));
@@ -815,7 +825,7 @@ export class MetadataPackageService{
      const existingFlow=old?await flowRuntime.loadEditor(tenant,flow.apiName):undefined;
      if(!old&&currentFlows.has(flow.apiName))
       throw Error('Package Flow is not owned by this package: '+flow.apiName);
-     const localized=await this.localizeFlow(tenant,flow);
+     const localized=await this.localizeFlow(tenant,flow,options);
      await flowRuntime.saveEditor(tenant,user,flow.apiName,{
       ...localized,apiName:flow.apiName,status:'Draft',
       ...(existingFlow?{versionNumber:existingFlow.versionNumber}:{}),

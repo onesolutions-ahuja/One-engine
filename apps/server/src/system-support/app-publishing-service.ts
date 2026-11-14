@@ -7,6 +7,11 @@ import type {FlowRuntime} from '../system-files/flow-runtime.js';
 import type {ComponentLibraryService} from './component-library-service.js';
 import type {MetadataPackage,MetadataPackageService} from './metadata-package-service.js';
 import {PlatformTenantService} from '../system-files/platform-tenant-service.js';
+import {connectorApps} from '../app-seeders/connector-apps.js';
+import {connectionKey} from '../expression-engine/FormulaConnections.js';
+import {loadConnectionSnapshot,systemConnectorKeys,connectorAppForKey} from './tenant-connections.js';
+import {detectAppPrerequisites,parsePrerequisites,connectorInstallNeeded,
+ type AppPrerequisite,type ConnectorPrerequisite} from './app-prerequisites.js';
 
 /**
  * AppExchange publishing for tenant-authored apps.
@@ -18,6 +23,10 @@ import {PlatformTenantService} from '../system-files/platform-tenant-service.js'
  * everything else is created, and nothing the tenant owns is overwritten.
  * Credentials are never published: flow callouts resolve to the installing
  * tenant's own Named Credential by name (for example from the WhatsApp Connector).
+ *
+ * Prerequisites are detected at publish (see app-prerequisites.ts). On install,
+ * a missing system connector is installed together with the app when the user
+ * confirms ("Install both"); optional ones (guarded by CONNECTED()) never block.
  */
 type Actor={tenant_id:string;user_id:string};
 type Selection={objects:string[];pages:string[];components:string[];flows:string[];
@@ -36,7 +45,7 @@ const packageApiFor=(appApi:string)=>('App_'+appApi).slice(0,128);
 
 export class AppPublishingService{
  private readonly platform:PlatformTenantService;
- constructor(private readonly db:SqlPersistence,rbac:RbacEngine,
+ constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine,
   private readonly apps:AppRuntime,private readonly packages:MetadataPackageService,
   private readonly definitions:ObjectDefinitionService,private readonly pages:PageRuntime,
   private readonly library:ComponentLibraryService,private readonly flows:FlowRuntime){
@@ -145,6 +154,7 @@ export class AppPublishingService{
   const manifest=await this.packages.export(actor.tenant_id,actor.user_id,{
    apiName:packageApi,label:app.label,version,type:'Unlocked',...selection
   },{portablePages:true});
+  const prerequisites=await this.detectPrerequisites(actor.tenant_id,manifest.contents);
   return this.db.transaction(async client=>{
    let appId=existing?.app_id;
    if(!appId){
@@ -163,16 +173,17 @@ export class AppPublishingService{
     [appId,version,n.entry_type,n.api_name,n.sort_order]);
    // Home pages are packaged pages, applied after install (not legacy page templates).
    await client.query(`INSERT INTO md_app_package_manifests
-    (app_id,version,metadata_package,activate_flows,home_pages,published_by)
-    VALUES($1,$2,$3::jsonb,$4::text[],$5::jsonb,$6)`,[appId,version,JSON.stringify(manifest),
+    (app_id,version,metadata_package,activate_flows,home_pages,published_by,prerequisites)
+    VALUES($1,$2,$3::jsonb,$4::text[],$5::jsonb,$6,$7::jsonb)`,[appId,version,JSON.stringify(manifest),
     activeFlows.rows.map(r=>r.api_name),
-    JSON.stringify(homes.rows.map(h=>({pageApi:h.api_name,formFactor:h.form_factor}))),actor.user_id]);
+    JSON.stringify(homes.rows.map(h=>({pageApi:h.api_name,formFactor:h.form_factor}))),actor.user_id,
+    JSON.stringify(prerequisites)]);
    await client.query(`INSERT INTO md_security_events(tenant_id,actor_user_id,action,details)
     VALUES($1,$2,'app-exchange.published',$3::jsonb)`,[actor.tenant_id,actor.user_id,JSON.stringify({
      app:app.api_name,version,packageApi,digest:manifest.digest,
      counts:Object.fromEntries(KEYS.map(k=>[k,selection[k].length]))})]);
    return {appExchangeApiName:app.api_name,version,packageApi,digest:manifest.digest,
-    activateFlows:activeFlows.rows.map(r=>r.api_name)};
+    activateFlows:activeFlows.rows.map(r=>r.api_name),prerequisites};
   });
  }
 
@@ -180,8 +191,8 @@ export class AppPublishingService{
  private async manifest(tenant:string,appApi:string){
   if(!API.test(appApi))throw new Error('Invalid app');
   const {rows}=await this.db.query<{app_id:string;version:number;metadata_package:MetadataPackage;
-   activate_flows:string[];home_pages:Array<{pageApi:string;formFactor:string}>}>(`
-   SELECT a.id AS app_id,v.version,mf.metadata_package,mf.activate_flows,mf.home_pages FROM md_apps a
+   activate_flows:string[];home_pages:Array<{pageApi:string;formFactor:string}>;prerequisites:unknown}>(`
+   SELECT a.id AS app_id,v.version,mf.metadata_package,mf.activate_flows,mf.home_pages,mf.prerequisites FROM md_apps a
    LEFT JOIN md_tenant_app_metadata m ON m.tenant_id=$1 AND m.app_id=a.id
    JOIN LATERAL (SELECT version FROM md_app_package_versions
     WHERE app_id=a.id AND published=true ORDER BY version DESC LIMIT 1) v ON true
@@ -195,24 +206,134 @@ export class AppPublishingService{
   return !!rows[0]?.active&&rows[0].version>=pkg.package.version;
  }
 
+ /** Prerequisites found in the publisher's pages and flows (nothing ticked by hand). */
+ private async detectPrerequisites(tenant:string,contents:MetadataPackage['contents']){
+  const [{rows:bindings},labels]=await Promise.all([
+   this.db.query<{credential_name:string;api_name:string}>(`
+    SELECT b.credential_name,a.api_name FROM md_connector_app_credentials b
+    JOIN md_apps a ON a.id=b.app_id AND a.app_type='ConnectorApp' AND a.tenant_owner_id IS NULL
+    WHERE b.tenant_id=$1`,[tenant]),
+   this.connectorLabels()
+  ]);
+  const publisherBindings=new Map<string,string>();
+  for(const row of bindings){
+   const code=connectorApps[row.api_name as keyof typeof connectorApps];
+   if(code)publisherBindings.set(row.credential_name.toLowerCase(),connectionKey(code));
+  }
+  return detectAppPrerequisites(contents as Parameters<typeof detectAppPrerequisites>[0],{
+   systemKeys:systemConnectorKeys(),publisherBindings,
+   connectorFor:key=>{
+    const appApi=connectorAppForKey(key);
+    return appApi?{appApi,label:labels.get(appApi)??appApi}:undefined;
+   }});
+ }
+ private async connectorLabels(){
+  const {rows}=await this.db.query<{api_name:string;label:string}>(`SELECT api_name,label FROM md_apps
+   WHERE app_type='ConnectorApp' AND tenant_owner_id IS NULL`);
+  return new Map(rows.map(row=>[row.api_name,row.label]));
+ }
+
+ /**
+  * Where each prerequisite stands in the installing tenant, in plain words.
+  * Status: connected | needs-keys | will-install | needs-licence | optional-missing | missing.
+  * Also returns credential aliases so packaged flows find this tenant's
+  * connector credential even when it has a different (legacy) name.
+  */
+ private async prerequisiteStatus(actor:Actor,items:AppPrerequisite[]){
+  type Status='connected'|'needs-keys'|'will-install'|'needs-licence'|'optional-missing'|'missing';
+  type Row={kind:AppPrerequisite['kind'];label:string;name:string;optional:boolean;status:Status;
+   blocking:boolean;message:string;appApi?:string;licensed?:boolean;credentialNames:string[]};
+  if(!items.length)return {items:[] as Row[],aliases:{} as Record<string,string>};
+  const connectors=items.filter((item):item is ConnectorPrerequisite=>item.kind==='connector');
+  const [snapshot,{rows:apps},{rows:credentials},canGrant]=await Promise.all([
+   loadConnectionSnapshot(this.db,actor.tenant_id),
+   this.db.query<{api_name:string;installed:boolean;licensed:boolean;credential_name:string|null}>(`
+    SELECT a.api_name,(i.app_id IS NOT NULL) AS installed,
+     (COALESCE(e.active,false) AND (e.expires_at IS NULL OR e.expires_at>now())) AS licensed,
+     b.credential_name
+    FROM md_apps a
+    LEFT JOIN md_app_installations i ON i.tenant_id=$1 AND i.app_id=a.id
+    LEFT JOIN md_app_entitlements e ON e.tenant_id=$1 AND e.app_id=a.id
+    LEFT JOIN md_connector_app_credentials b ON b.tenant_id=$1 AND b.app_id=a.id
+    WHERE a.api_name=ANY($2::text[]) AND a.enabled=true AND a.tenant_owner_id IS NULL`,
+    [actor.tenant_id,connectors.map(item=>item.appApi)]),
+   this.db.query<{name:string}>(`SELECT name FROM md_named_credentials
+    WHERE tenant_id=$1 AND enabled=true`,[actor.tenant_id]),
+   connectors.length?this.rbac.allowed(actor.tenant_id,actor.user_id,'Licence','manage'):Promise.resolve(false)
+  ]);
+  const byApp=new Map(apps.map(row=>[row.api_name,row]));
+  const existing=new Set(credentials.map(row=>connectionKey(row.name)).filter(Boolean));
+  const aliases:Record<string,string>={};
+  const rows:Row[]=items.map(item=>{
+   if(item.kind==='connector'){
+    const app=byApp.get(item.appApi);
+    const what=item.optional?'Optional: turns on the '+item.label.replace(/\s*Connector$/i,'')+' features in this app.'
+     :'Required by this app.';
+    if(app?.installed){
+     // Point the app's credential names at this tenant's own connector credential.
+     if(app.credential_name)for(const name of item.credentialNames)
+      if(name!==app.credential_name)aliases[name]=app.credential_name;
+     const connected=snapshot.systemConnected.includes(item.key);
+     return {kind:'connector',label:item.label,name:item.key,optional:item.optional,appApi:item.appApi,
+      credentialNames:item.credentialNames,status:connected?'connected':'needs-keys',blocking:false,
+      message:connected?item.label+' is connected.':item.label+' is installed. Enter its keys to use it. '+what};
+    }
+    if(!connectorInstallNeeded(item))return {kind:'connector',label:item.label,name:item.key,optional:true,
+     appApi:item.appApi,credentialNames:item.credentialNames,status:'optional-missing',blocking:false,
+     message:item.label+' is not installed. '+what+' Install it any time.'};
+    // Installed with this app: its new credential uses the reserved onesys_ name.
+    const fresh='onesys_'+connectionKey(connectorApps[item.appApi as keyof typeof connectorApps]??item.key);
+    for(const name of item.credentialNames)if(name!==fresh)aliases[name]=fresh;
+    const licensed=!!app?.licensed;
+    if(!app||(!licensed&&!canGrant))return {kind:'connector',label:item.label,name:item.key,optional:item.optional,
+     appApi:item.appApi,credentialNames:item.credentialNames,licensed,status:'needs-licence',blocking:true,
+     message:item.label+' needs a licence before it can be installed with this app. '+what};
+    return {kind:'connector',label:item.label,name:item.key,optional:item.optional,appApi:item.appApi,
+     credentialNames:item.credentialNames,licensed,status:'will-install',blocking:false,
+     message:'Also installs '+item.label+'. Enter its keys afterwards. '+what};
+   }
+   const key=connectionKey(item.name);
+   const label='HTTP callout "'+item.name+'"';
+   if(snapshot.customConnected.includes(key))return {kind:'callout',label,name:item.name,optional:item.optional,
+    credentialNames:[item.name],status:'connected',blocking:false,message:label+' is connected.'};
+   if(existing.has(key))return {kind:'callout',label,name:item.name,optional:item.optional,
+    credentialNames:[item.name],status:'needs-keys',blocking:false,message:label+' exists. Enter its keys to use it.'};
+   const required=!item.optional||item.usedByFlows;
+   return {kind:'callout',label,name:item.name,optional:!required,credentialNames:[item.name],
+    status:required?'missing':'optional-missing',blocking:required,
+    message:required?'Create '+label+' (your own API connection) before installing this app.'
+     :label+' is not set up. Optional: the matching features stay hidden until you create it.'};
+  });
+  return {items:rows,aliases};
+ }
+
  /** What installing this app will do in the actor's tenant. */
  async preview(actor:Actor,appApi:string){
   const found=await this.manifest(actor.tenant_id,appApi);
   if(!found)return {packaged:false as const};
   const pkg=found.metadata_package;
   const upToDate=await this.packageCurrent(actor.tenant_id,pkg);
-  const preview=upToDate?null:await this.packages.preview(actor.tenant_id,actor.user_id,pkg);
+  const prerequisites=await this.prerequisiteStatus(actor,parsePrerequisites(found.prerequisites));
+  const preview=upToDate?null:await this.packages.preview(actor.tenant_id,actor.user_id,pkg,
+   {credentialAliases:prerequisites.aliases});
+  // Credentials of connectors installed together with the app are not "missing".
+  const covered=new Set(prerequisites.items.filter(item=>item.status==='will-install')
+   .flatMap(item=>item.credentialNames));
+  const missingDependencies=(preview?.missingDependencies??[])
+   .filter(item=>!(item.type==='named-credential'&&covered.has(item.apiName)));
   const owned=new Set(preview?[...preview.reused].map(r=>r.type+':'+r.apiName):[]);
   const create=(type:string,names:string[])=>names.filter(n=>!owned.has(type+':'+n));
   const c=pkg.contents;
+  const prerequisitesBlock=prerequisites.items.some(item=>item.blocking);
   return {packaged:true as const,version:found.version,upToDate,
-   canInstall:upToDate||!!preview?.canInstall,
+   canInstall:!prerequisitesBlock&&(upToDate||!!preview&&missingDependencies.length===0&&preview.conflicts.length===0),
    create:{objects:create('object',c.objects.map(o=>o.apiName)),pages:create('page',c.pages.map(p=>p.apiName)),
     components:create('component',c.components.map(x=>x.apiName)),flows:create('flow',(c.flows??[]).map(f=>f.apiName)),
     permissionSets:create('permission-set',(c.permissionSets??[]).map(p=>p.apiName))},
    reused:preview?.reused??[],addedFields:preview?.addedFields??[],
-   missingDependencies:preview?.missingDependencies??[],conflicts:preview?.conflicts??[],
-   activateFlows:found.activate_flows};
+   missingDependencies,conflicts:preview?.conflicts??[],
+   activateFlows:found.activate_flows,
+   prerequisites:prerequisites.items.map(({credentialNames:_names,licensed:_licensed,...item})=>item)};
  }
 
  /**
@@ -220,15 +341,42 @@ export class AppPublishingService{
   * metadata upserted first, then the app (navigation, home pages, version) is
   * installed and the publisher's active flows are activated, all in one SQL
   * transaction. Apps without a manifest keep the existing install path.
+  * With installPrerequisites, missing system connectors the app needs are
+  * licensed (when the user may grant licences) and installed first, in the
+  * same transaction. Their keys are entered afterwards by the user.
   */
- async install(actor:Actor,appApi:string,seed?:Parameters<AppRuntime['install']>[2]){
+ async install(actor:Actor,appApi:string,seed?:Parameters<AppRuntime['install']>[2],
+  options:{installPrerequisites?:boolean}={}){
   const found=await this.manifest(actor.tenant_id,appApi);
   if(!found){await this.apps.install(actor.tenant_id,appApi,seed);return {packaged:false,flowWarnings:[]};}
   return this.db.transaction(async()=>{
    const pkg=found.metadata_package;
+   const items=parsePrerequisites(found.prerequisites);
+   let prerequisites=await this.prerequisiteStatus(actor,items);
+   const blocking=prerequisites.items.filter(item=>item.blocking);
+   if(blocking.length)throw new Error(blocking.map(item=>item.message).join(' '));
+   const pending=prerequisites.items.filter(item=>item.status==='will-install');
+   if(pending.length&&!options.installPrerequisites)
+    throw new Error('Install '+pending.map(item=>item.label).join(', ')+' first, or confirm installing it with this app.');
+   for(const item of pending){
+    if(!item.appApi)continue;
+    if(!item.licensed){
+     await this.rbac.require(actor.tenant_id,actor.user_id,'Licence','manage');
+     await this.db.query(`INSERT INTO md_app_entitlements(tenant_id,app_id,active,expires_at)
+      SELECT $1,a.id,true,NULL FROM md_apps a
+      WHERE a.api_name=$2 AND a.app_type='ConnectorApp' AND a.tenant_owner_id IS NULL AND a.enabled=true
+      ON CONFLICT(tenant_id,app_id) DO UPDATE SET active=true,expires_at=NULL`,[actor.tenant_id,item.appApi]);
+     await this.db.query(`INSERT INTO md_security_events(tenant_id,actor_user_id,action,details)
+      VALUES($1,$2,'ConnectorLicenceGranted',$3::jsonb)`,[actor.tenant_id,actor.user_id,
+      JSON.stringify({connector:item.appApi,reason:'app-prerequisite',app:appApi})]);
+    }
+    await this.apps.install(actor.tenant_id,item.appApi);
+   }
+   if(pending.length)prerequisites=await this.prerequisiteStatus(actor,items);
    let result:Record<string,unknown>|null=null;
    if(!(await this.packageCurrent(actor.tenant_id,pkg)))
-    result=await this.packages.install(actor.tenant_id,actor.user_id,pkg) as unknown as Record<string,unknown>;
+    result=await this.packages.install(actor.tenant_id,actor.user_id,pkg,
+     {credentialAliases:prerequisites.aliases}) as unknown as Record<string,unknown>;
    await this.apps.install(actor.tenant_id,appApi,seed);
    // Keep a home page the tenant already chose; otherwise use the publisher's.
    for(const home of found.home_pages)await this.db.query(`
@@ -248,7 +396,9 @@ export class AppPublishingService{
     }
    }
    return {packaged:true,version:found.version,reused:result?.reused??[],
-    addedFields:result?.addedFields??[],flowWarnings};
+    addedFields:result?.addedFields??[],flowWarnings,
+    installedConnectors:pending.map(item=>item.label),
+    needsKeys:prerequisites.items.filter(item=>item.status==='needs-keys').map(item=>item.label)};
   });
  }
 }

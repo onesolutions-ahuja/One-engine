@@ -95,13 +95,21 @@ echo "Full stack deployed and local health checks passed at $SHA"
 # Keep the read-only operations helper (deploy_status/logs) in step with the
 # release, only after a fully healthy deploy. Atomic replace; a failure here
 # never undoes the deploy. The deploy runner itself is not self-updated.
-ops_helper="$SOURCE/scripts/oracle/metadrive-mcp-operations"
-if [[ -f "$ops_helper" ]] && bash -n "$ops_helper" &&
-  install -o root -g root -m 0755 "$ops_helper" /usr/local/sbin/.metadrive-mcp-operations.new &&
-  mv -f /usr/local/sbin/.metadrive-mcp-operations.new /usr/local/sbin/metadrive-mcp-operations; then
-  echo "Operations helper updated from $SHA"
-else
-  rm -f /usr/local/sbin/.metadrive-mcp-operations.new
-  echo "Operations helper not updated (deploy itself succeeded)" >&2
-fi
+# Same for the deploy runner (what install-oci-deploy-control.sh installs), so
+# server tooling follows git without a manual SSH step. mv swaps the inode, so
+# the runner executing this deploy keeps reading its old copy safely.
+refresh_tool() {
+  local source_file=$1 target=$2 label=$3
+  local staged
+  staged="$(dirname "$target")/.$(basename "$target").new"
+  if [[ -f "$source_file" ]] && bash -n "$source_file" &&
+    install -o root -g root -m 0755 "$source_file" "$staged" && mv -f "$staged" "$target"; then
+    echo "$label updated from $SHA"
+  else
+    rm -f "$staged"
+    echo "$label not updated (deploy itself succeeded)" >&2
+  fi
+}
+refresh_tool "$SOURCE/scripts/oracle/metadrive-mcp-operations" /usr/local/sbin/metadrive-mcp-operations "Operations helper"
+refresh_tool "$SOURCE/scripts/oracle/metadrive-oci-deploy-latest" /usr/local/libexec/metadrive-oci-deploy-latest "Deploy runner"
 # Keep backup_dir and previous releases for audited recovery.

@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import {isStandalonePagePresentation,pageCanvasPresentationStyle} from './pageRuntimePresentation';
 
@@ -16,7 +16,9 @@ export default function ResponsivePageCanvas({
   // both width and height so nothing drops below the window. Taller canvases
   // are scrolling pages and keep fitting width only.
   const screenShaped=page.canvasHeight<=page.canvasWidth;
-  useEffect(()=>{
+  // Measured before the first paint: the page appears at its final size instead
+  // of showing full size for a moment and then jumping to fit the screen.
+  useLayoutEffect(()=>{
     const target=frame.current;
     if(!target)return;
     // A popup is already sized to the canvas shape inside the window

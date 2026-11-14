@@ -36,6 +36,13 @@ function loadScript(request:Request,appId:string,page:PageInput,variant:string,k
  return entry;
 }
 
+/** Load a page's converted file ahead of time (pages the user is likely to open
+ * next), so opening it later runs straight away. Failures are ignored here. */
+export function preloadAppPageScript(request:Request,appId:string,page:PageInput):void{
+ const variant=page.layoutVariant??'Desktop';
+ loadScript(request,appId,page,variant,scriptKey(appId,page,variant)).promise.catch(()=>undefined);
+}
+
 /** Published pages run their converted file. Anything that fails (old server,
  * network, a page the compiler rejects) falls back to the classic engine.
  * Add ?pageEngine=classic to a page URL to force the classic engine. */

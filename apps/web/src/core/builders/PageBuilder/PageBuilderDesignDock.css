@@ -1035,3 +1035,24 @@
   margin:0!important;padding:0 3px!important;border:1px solid #c4d2e4!important;
   border-radius:4px!important;background:#fff!important;
 }
+
+/* Calendar layout follows the approved visual pairs regardless of the SQL
+   registration order. These CSS order rules never change persisted values. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarView"]{
+  order:1!important;grid-column:1!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarShowDateStrip"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarShowEvents"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarShowHeader"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarStartHour"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarEndHour"]{order:6!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarSlotMinutes"]{order:7!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-property="calendarTimeZone"]{order:8!important;}

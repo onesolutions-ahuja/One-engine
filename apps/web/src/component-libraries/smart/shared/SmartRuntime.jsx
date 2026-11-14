@@ -63,8 +63,7 @@ const scopedExpression=(p,key,source,record)=>fieldAllows(p,key,record)
     (/(?:^|[=(,])\s*COLLECTION\s*\(/i.test(String(source??""))
      ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??"")))
     ?text(p.kind==="smart_card_grid"&&record.__collectionManual===false
-      &&typeof record.Name==="string"&&record.Name.trim()
-      ?record.Name:record.__collectionLabel??record.Name??"")
+      ?record.Name??"":record.__collectionLabel??record.Name??"")
     :expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup)):"";
 const scopedDisplayExpression=(p,key,source,record)=>{
  if(!fieldAllows(p,key,record))return {value:""};
@@ -283,6 +282,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
     whiteSpace:p.wrapText===false?"nowrap":"pre-line",
     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
+    // A caption can still scroll by wheel/touch, but never shows native scroll arrows.
+    scrollbarWidth:fixedGridHeader||p.wrapText===false?"none":undefined,
     padding:fixedGridHeader
       ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
       :cardPadding===null?"4px 10px":cardPadding+"px"

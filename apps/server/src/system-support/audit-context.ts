@@ -2,7 +2,11 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {randomUUID} from 'node:crypto';
 export type AuditContext={correlationId:string;actorTenant?:string;actorUser?:string;
  /** Per-request measurements for the Server-Timing header (round trips to the SQL database). */
- timing?:{dbTrips:number;dbMs:number;authMs?:number;started:number}};
+ timing?:{dbTrips:number;dbMs:number;authMs?:number;started:number};
+ /** Permission decisions already made in this request (cleared by any database write). */
+ rbacMemo?:Map<string,boolean>};
+/** Forget this request's remembered permission decisions (after a write). */
+export function clearRequestRbacMemo(){storage.getStore()?.rbacMemo?.clear();}
 /** Count one SQL round trip and its time against the current request. */
 export function timeSqlTrip<T>(promise:Promise<T>):Promise<T>{
  const timing=storage.getStore()?.timing;

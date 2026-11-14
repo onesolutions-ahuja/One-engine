@@ -994,9 +994,11 @@ export class RecordEngine {
       filterValue?:string;filterOperator?:'Equals'|'Includes'|'Excludes';
       relatedField?:string;relatedId?:string;filters?:RecordFilter[];filterLogic?:string;
       cursor?:RecordCursor;scope?:'my'|'all'|'my_team'|'queue'}={}) {
-    await this.rbac.require(tenantId,userId,objectApi,'read');
+    // Object permission and field definitions are independent reads: one round trip, not two.
+    const [,definitions]=await Promise.all([
+      this.rbac.require(tenantId,userId,objectApi,'read'),
+      this.fields(tenantId,objectApi)]);
     const pageSize=Math.min(Math.max(limit,1),100),start=options.cursor?0:Math.max(offset,0);
-    const definitions=await this.fields(tenantId,objectApi);
     const byApi=new Map(definitions.map(field=>[field.api_name,field]));
     const fieldFor=(name:string|undefined)=>{
       if(name===undefined)return undefined;
@@ -1038,7 +1040,14 @@ export class RecordEngine {
     }
     if(options.sortDirection!==undefined&&!['asc','desc'].includes(options.sortDirection))
       throw new Error('Invalid sort direction');
+    // Every field's read permission in ONE query (it was one query per field, in turn).
     const readable=new Map<string,boolean>();
+    {
+      const names=definitions.map(field=>field.api_name);
+      const answers=await this.rbac.allowedMany(tenantId,userId,
+        names.map(name=>({resource:objectApi+'.'+name,action:'read'})));
+      names.forEach((name,index)=>readable.set(name,answers[index]===true));
+    }
     const canRead=async(fieldApi:string)=>{
       if(!readable.has(fieldApi))readable.set(fieldApi,
         await this.rbac.allowed(tenantId,userId,objectApi+'.'+fieldApi,'read'));

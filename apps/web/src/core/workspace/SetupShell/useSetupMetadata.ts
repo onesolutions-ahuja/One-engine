@@ -335,11 +335,16 @@ export function useSetupMetadata(ctx: any) {
         if(window.isSecureContext&&globalThis.indexedDB&&globalThis.crypto?.subtle
           &&typeof tenantId==='string'&&typeof userId==='string'
           &&sessionPayload.user.permissions.includes('metadata:read')){
-          void apiRequest<MetadataPublicationResponse>('/metadata/offline-publication')
+          // The offline copy is large and not needed to show the first screen: fetch
+          // it once the page has loaded and the browser is idle, so it never competes
+          // with the page's own data requests.
+          const fetchOffline=()=>void apiRequest<MetadataPublicationResponse>('/metadata/offline-publication')
             .then(publication=>saveVerifiedMetadata(
               {tenantId,userId},publication.content,publication.publication))
             .catch((cause:unknown)=>setToast('Offline metadata publication unavailable: '
               +(cause instanceof Error?cause.message:String(cause))));
+          const idle=(globalThis as {requestIdleCallback?:(run:()=>void,options?:{timeout:number})=>number}).requestIdleCallback;
+          window.setTimeout(()=>idle?idle(fetchOffline,{timeout:10_000}):fetchOffline(),15_000);
         }
         if (failures.length) setToast(`Some metadata could not load: ${failures.join('; ')}`);
       } catch (error) {

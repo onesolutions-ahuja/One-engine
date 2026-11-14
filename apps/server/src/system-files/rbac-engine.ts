@@ -1,4 +1,5 @@
-import type {SqlPersistence} from './sql-persistence.js';
+import {SqlPersistence} from './sql-persistence.js';
+import {auditContext} from '../system-support/audit-context.js';
 import {readRbac} from '../system-support/rbac-description.js';
 export type PermissionCheck={resource:string;action:string};
 /** One central SQL RBAC evaluator. OneEngine is an ordinary configurable permission set. */
@@ -6,6 +7,24 @@ export class RbacEngine{
  constructor(private readonly db:SqlPersistence){}
  async allowedMany(tenantId:string,userId:string,checks:readonly PermissionCheck[]):Promise<boolean[]>{
   if(!checks.length)return [];
+  // Within ONE request the same decision is asked many times (object, then each
+  // field, again by nested services). Remember it for this request only; any
+  // database write in the request clears it. Not used inside a transaction.
+  const context=auditContext();
+  const memo=this.db instanceof SqlPersistence&&!this.db.inTransaction()&&context
+   ?(context.rbacMemo??=new Map<string,boolean>()):undefined;
+  const keyOf=(check:PermissionCheck)=>tenantId+'\u0000'+userId+'\u0000'+check.resource+'\u0000'+check.action;
+  if(memo){
+   const missing=checks.filter(check=>!memo.has(keyOf(check)));
+   if(missing.length){
+    const answers=await this.decide(tenantId,userId,missing);
+    missing.forEach((check,index)=>memo.set(keyOf(check),answers[index]));
+   }
+   return checks.map(check=>memo.get(keyOf(check))===true);
+  }
+  return this.decide(tenantId,userId,checks);
+ }
+ private async decide(tenantId:string,userId:string,checks:readonly PermissionCheck[]):Promise<boolean[]>{
   const {rows}=await this.db.query<{ordinal:number;allow_granted:boolean;deny_granted:boolean}>(
    'SELECT q.ordinal::integer AS ordinal,d.allow_granted,d.deny_granted FROM unnest($3::text[],$4::text[]) WITH ORDINALITY AS q(resource,action,ordinal) CROSS JOIN LATERAL md_rbac_decision($1,$2,q.resource,q.action) d ORDER BY q.ordinal',
    [tenantId,userId,checks.map(c=>c.resource),checks.map(c=>c.action)]);

@@ -26,6 +26,12 @@
     {"apiName": "dockItem3", "label": "Item 3 tapped"},
     {"apiName": "dockItem4", "label": "Item 4 tapped"},
     {"apiName": "dockItem5", "label": "Item 5 tapped"},
-    {"apiName": "dockItem6", "label": "Item 6 tapped"}
+    {"apiName": "dockItem6", "label": "Item 6 tapped"},
+    {"apiName": "dockItem7", "label": "Item 7 tapped"},
+    {"apiName": "dockItem8", "label": "Item 8 tapped"},
+    {"apiName": "dockItem9", "label": "Item 9 tapped"},
+    {"apiName": "dockItem10", "label": "Item 10 tapped"},
+    {"apiName": "dockItem11", "label": "Item 11 tapped"},
+    {"apiName": "dockItem12", "label": "Item 12 tapped"}
   ]
 }

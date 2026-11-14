@@ -1452,10 +1452,10 @@ export function createSystemServer(db:SqlPersistence) {
   }));
   // ?script=1: also convert the page and hand back its script ticket in the same
   // answer, so the browser does not wait for a second round trip before it runs.
-  const withPageScript=async(req:Request,appId:string,page:unknown)=>{
-    if(req.query.script!=='1'||!page||typeof page!=='object')return undefined;
+  const withPageScript=async(req:{query:Request['query'];actor?:{tenant_id:string;user_id:string}},appId:string,page:unknown)=>{
+    if(req.query.script!=='1'||!req.actor||!page||typeof page!=='object')return undefined;
     try{
-      return await issueAppPageScript(pageScriptDeps,req.actor!,appId,page,
+      return await issueAppPageScript(pageScriptDeps,req.actor,appId,page,
         (page as {layoutVariant?:unknown}).layoutVariant??'Desktop');
     }catch{return undefined;}
   };

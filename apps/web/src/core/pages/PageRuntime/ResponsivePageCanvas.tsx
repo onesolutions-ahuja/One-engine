@@ -19,10 +19,14 @@ export default function ResponsivePageCanvas({
   useEffect(()=>{
     const target=frame.current;
     if(!target)return;
+    // A popup is already sized to the canvas shape inside the window
+    // (formulaScreenWidth): fitting its width zooms the whole page in or out, with
+    // no scrollbar. Its top edge says nothing about the room left below it.
+    const inPopup=Boolean(target.closest('.formula-screen-card,dialog.formula-screen-modal:not(.formula-screen-page)'));
     const update=()=>{
       const box=target.getBoundingClientRect();
       setSize({width:box.width||page.canvasWidth,
-        height:screenShaped&&typeof window!=='undefined'
+        height:screenShaped&&!inPopup&&typeof window!=='undefined'
           ?Math.max(200,window.innerHeight-Math.max(0,box.top)):Number.POSITIVE_INFINITY});
     };
     update();

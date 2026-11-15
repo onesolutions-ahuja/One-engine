@@ -2,7 +2,7 @@
  * On Change fires with the typed text once it has at least 3 letters (and once
  * with "" when it drops below 3), 250 ms after the last key, so typing "coca"
  * runs one query. On Enter fires at once with the text, for barcode scanners;
- * a scanned code (digits only) is then cleared, ready for the next scan. */
+ * a scanned code (no spaces, contains a digit) is then cleared for the next scan. */
 const MIN_LETTERS=3;
 const DEBOUNCE_MS=250;
 export default function SmartSearch({p,fire,placeholder,style}){
@@ -28,7 +28,9 @@ export default function SmartSearch({p,fire,placeholder,style}){
   const value=query.trim();
   if(!value)return;
   fire("enter",value);
-  if(/^\d{4,}$/.test(value))clear();else publish(query);
+  // A scanned code (no spaces, has a digit, e.g. 5012345678900 or DEMO10001) is
+  // cleared for the next scan; typed words stay as the search.
+  if(/^(?=\S*\d)\S{4,}$/.test(value))clear();else publish(query);
  };
  return <div className="smart-search-box" data-design-area={p.builderPreview?"Body":undefined}
   style={{...style,"--smart-placeholder-color":p.labelColor||undefined}}>

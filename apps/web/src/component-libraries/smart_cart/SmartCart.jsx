@@ -109,7 +109,6 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  // table edge to the first and last column (header and every row), e.g. 5px.
  // Default 6px, the value the Padding control shows when nothing is set.
  const sidePaddingSet=true;
- const rowLimit=Math.floor(n(p.cardsPerRow,5,1,50));
  const visible=Array.isArray(p.columnVisibility)
    ?names.flatMap((name,index)=>p.columnVisibility.includes(name)?[index]:[])
    :[0,1,2,3,4];
@@ -135,8 +134,6 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
   rows.reduce((sum,row)=>sum+Number(row.Quantity||0),0)+' items';
  const supportingText=displayFormula('cartSupportingSource',p.cartSupportingSource,supportingDefault);
  // The visible row count measures actual cell content, not just the configured min-height.
- const effectiveRowHeight=Math.max(rowHeight,visible.includes(0)?n(p.imageHeight,44,16)+14:0,
-   visible.includes(2)?40:0);
  const sources=[null,p.column2Source,p.column3Source,p.column4Source,p.column5Source];
  const object=Array.isArray(p.objects)?p.objects.find(item=>item.apiName===p.objectApiName):null;
  const quantityField=directField(p.column3Source);
@@ -216,8 +213,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
      })}
     </div>
     <div className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows"
-     style={{maxHeight:rowLimit*(effectiveRowHeight+6)}}>
-     {rows.map((record,i)=>{
+         {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
       const src=p.imageSource?fieldExpression('imageSource',p.imageSource,record):"";
       const rowSupporting=!demo&&p.rowSupportingSource

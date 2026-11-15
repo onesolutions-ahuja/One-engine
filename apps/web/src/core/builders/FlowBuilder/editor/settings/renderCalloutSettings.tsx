@@ -42,6 +42,7 @@ export function renderCalloutSettings(
             setConfig('operation', '');
             setConfig('method', 'GET');
             setConfig('path', '');
+            setConfig('headers', '');
           }
         }}><option value="">Use a Named Credential instead</option>{integrationConnections.filter((connection) => connection.status === 'ACTIVE').map((connection) => {
           const provider = connectorProviders.find((item) => item.connectorKey === connection.connectorKey);
@@ -54,6 +55,7 @@ export function renderCalloutSettings(
           if (operation) {
             setConfig('method', operation.method);
             setConfig('path', operation.path);
+            setConfig('headers', operation.headers ?? '');
           }
         }}><option value="">Choose an operation (or configure a path below)</option>{Object.entries(selectedProvider.operations).map(([name, operation]) => <option key={name} value={name}>{name} · {operation.method} {operation.path}</option>)}</select></label>}
         <label className="form-label">Method<select className="form-control" value={displayValue(selected.config.method) || 'GET'} onChange={(event) => setConfig('method', event.target.value)}>{['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((method) => <option key={method}>{method}</option>)}</select></label>

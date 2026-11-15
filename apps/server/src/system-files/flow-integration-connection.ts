@@ -92,10 +92,15 @@ export async function resolveFlowIntegrationCallout(db:SqlExecutor,rbac:RbacEngi
  }
  if(config.path&&config.path!==operation.path||config.method&&config.method!==operation.method)
   throw new Error('Integration operation has been modified outside provider metadata');
+ // Installed connector headers are authoritative: a saved Flow cannot omit
+ // required API-version headers or replace them with another value.
+ const headers=typeof operation.headers==='string'?operation.headers:config.headers;
+ if(typeof operation.headers==='string'&&config.headers&&config.headers!==operation.headers)
+  throw new Error('Integration operation headers have been modified');
  // Classification and safe payload selectors come from the installed connector.
  const details=communicationFor(provider,operationName);
  return {...config,namedCredentialId:credentialId,
-  method:operation.method,path:operation.path,
+  method:operation.method,path:operation.path,headers,
   ...(details?{systemChannelId:details.provider,connectorApi:connectorKey,
    communicationLog:{...object(config.communicationLog),...details}}:{})};
 }

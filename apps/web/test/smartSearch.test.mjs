@@ -50,3 +50,7 @@ test('Tabs keep their configured background; segmented look only without one',()
 test('A component mostly inside the right column moves with it on wide screens',()=>{
  assert.match(read('../src/core/pages/PageRuntime/runtimeCanvasSizing.ts'),/p\.x \+ p\.width \/ 2 >= rightColumnStart/);
 });
+
+test('Cart Padding also insets the totals box left and right',()=>{
+ assert.match(read('../src/component-libraries/smart_cart/SmartCart.jsx'),/paddingLeft:n\(p\.tableSidePadding,6,0,80\),paddingRight:n\(p\.tableSidePadding,6,0,80\)/);
+});

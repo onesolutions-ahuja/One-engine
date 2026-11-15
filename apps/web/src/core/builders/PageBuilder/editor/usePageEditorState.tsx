@@ -54,7 +54,7 @@ export function usePageEditorState(
   const pageTypeComponents = page.pageType === 'Record Page'
     ? standardPageComponents.map((component) => component.apiName)
     : standardPageComponents
-      .filter((component) => ['Accordion', 'Tabs', 'Report Chart', 'Dashboard', 'Rich Text', 'List View', 'Screen Flow', 'Items to Approve'].includes(component.apiName))
+      .filter((component) => ['Accordion', 'Tabs', 'Report Chart', 'Dashboard', 'Rich Text', 'List View', 'Screen Flow', 'Items to Approve', 'Revolut Checkout'].includes(component.apiName))
       .map((component) => component.apiName);
   const relatedListOptions = useMemo(() => [...new Map(
     relatedListRelationships(objects, page.targetObject)

@@ -534,6 +534,13 @@ export function renderSetupShell(ctx: any) {
             onSave={saveNamedCredential}
             onDelete={deleteNamedCredential}
             onTest={testNamedCredential}
+            registerRevolutWebhook={async(credentialId:string)=>{
+              const result=await apiRequest<{callbackUrl:string}>('/revolut/checkout/webhook/register',
+               {method:'POST',body:JSON.stringify({credentialId})});
+              const snapshot=await apiRequest<{credentials:typeof namedCredentials}>('/named-credentials',{cache:'no-store'});
+              if(Array.isArray(snapshot.credentials))setNamedCredentials(snapshot.credentials);
+              return result;
+            }}
             onRotate={rotateNamedCredential}
             onTest={testNamedCredential}
             canTest={canManageNamedCredentials}

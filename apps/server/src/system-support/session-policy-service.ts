@@ -66,5 +66,5 @@ export class SessionPolicyService{
 }
 export function browserSecurityHeaders(p:{frame_policy:string;csp_enabled:boolean}){
  return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','X-Frame-Options':p.frame_policy,
-  ...(p.csp_enabled?{'Content-Security-Policy':`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https:; frame-ancestors ${p.frame_policy==='DENY'?"'none'":"'self'"}`}:{})};
+  ...(p.csp_enabled?{'Content-Security-Policy':`default-src 'self'; script-src 'self' https://*.revolut.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.revolut.com; frame-src https://*.revolut.com; object-src 'none'; base-uri 'self'; form-action 'self' https:; frame-ancestors ${p.frame_policy==='DENY'?"'none'":"'self'"}`}:{})};
 }

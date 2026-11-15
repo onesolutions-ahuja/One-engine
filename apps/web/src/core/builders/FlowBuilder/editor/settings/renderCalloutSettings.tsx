@@ -21,36 +21,40 @@ export function renderCalloutSettings(
   const { selected } = editorState;
   const { setConfig } = configuration;
   const { selectedObject } = graphActions;
-  // Save related provider settings in one update. Repeated setConfig calls
-  // use the same Flow snapshot and otherwise overwrite one another.
-  const setCalloutConfig = (patch: Record<string, unknown>) => onFlowChange({
-    ...flow, elements:flow.elements.map(item=>item.id===selected.id
-      ?{...item,config:{...item.config,...patch}}:item)
-  });
 
       const selectedConnection = integrationConnections.find((item) => item.id === displayValue(selected.config.integrationConnectionId));
       const selectedProvider = connectorProviders.find((item) => item.connectorKey === selectedConnection?.connectorKey);
       return <>
         <label className="form-label">Named Credential<select className="form-control" value={displayValue(selected.config.namedCredentialId)} onChange={(event) => {
-          if (event.target.value) setCalloutConfig({namedCredentialId:event.target.value,
-            namedCredentialResource:'',integrationConnectionId:'',integrationConnectionResource:'',
-            operation:'',method:'GET',path:'',headers:''});
-          else setConfig('namedCredentialId','');
+          setConfig('namedCredentialId', event.target.value);
+          if (event.target.value) {
+            setConfig('namedCredentialResource', '');
+            setConfig('integrationConnectionId', '');
+            setConfig('integrationConnectionResource', '');
+          }
         }}><option value="">Select a credential</option>{namedCredentials.filter((credential) => credential.protocol === 'HTTPS').map((credential) => <option key={credential.id} value={credential.id}>{credential.label} · {credential.baseUrl}</option>)}</select></label>
         <label className="form-label">Provider / Integration Connection<select className="form-control" value={displayValue(selected.config.integrationConnectionId)} onChange={(event) => {
-          if(event.target.value)setCalloutConfig({integrationConnectionId:event.target.value,
-            integrationConnectionResource:'',namedCredentialId:'',namedCredentialResource:'',
-            operation:'',method:'GET',path:'',headers:''});
-          else setConfig('integrationConnectionId','');
+          setConfig('integrationConnectionId', event.target.value);
+          if (event.target.value) {
+            setConfig('integrationConnectionResource', '');
+            setConfig('namedCredentialId', '');
+            setConfig('namedCredentialResource', '');
+            setConfig('operation', '');
+            setConfig('method', 'GET');
+            setConfig('path', '');
+          }
         }}><option value="">Use a Named Credential instead</option>{integrationConnections.filter((connection) => connection.status === 'ACTIVE').map((connection) => {
           const provider = connectorProviders.find((item) => item.connectorKey === connection.connectorKey);
           return <option key={connection.id} value={connection.id}>{connection.name} · {provider?.name ?? connection.connectorKey}</option>;
         })}</select></label>
         {selectedProvider && <label className="form-label">Operation<select className="form-control" value={displayValue(selected.config.operation)} onChange={(event) => {
           const operationName = event.target.value;
+          setConfig('operation', operationName);
           const operation = selectedProvider.operations[operationName];
-          setCalloutConfig(operation?{operation:operationName,method:operation.method,
-            path:operation.path,headers:operation.headers??''}:{operation:'',method:'GET',path:'',headers:''});
+          if (operation) {
+            setConfig('method', operation.method);
+            setConfig('path', operation.path);
+          }
         }}><option value="">Choose an operation (or configure a path below)</option>{Object.entries(selectedProvider.operations).map(([name, operation]) => <option key={name} value={name}>{name} · {operation.method} {operation.path}</option>)}</select></label>}
         <label className="form-label">Method<select className="form-control" value={displayValue(selected.config.method) || 'GET'} onChange={(event) => setConfig('method', event.target.value)}>{['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((method) => <option key={method}>{method}</option>)}</select></label>
         <label className="form-label">Relative Path<FlowReferenceInput ariaLabel="Relative path" value={displayValue(selected.config.path)}

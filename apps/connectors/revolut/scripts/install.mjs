@@ -11,7 +11,11 @@ export default Object.freeze({
   "header": "",
   "fields": [
     {"apiName":"public_testPath","label":"Connection test path (read-only)","required":true,"defaultValue":"api/orders"},
-    {"apiName":"public_testHeaders","label":"Connection test headers","required":true,"defaultValue":"Revolut-Api-Version: 2026-08-17"}
+    {"apiName":"public_testHeaders","label":"Connection test headers","required":true,"defaultValue":"Revolut-Api-Version: 2026-08-17"},
+    {"apiName":"public_checkoutPublishable","label":"Merchant public key (pk_...) for embedded checkout","required":true,"defaultValue":""},
+    {"apiName":"public_checkoutRecordObject","label":"Payment source Object API name (for example Invoice)","required":true,"defaultValue":""},
+    {"apiName":"public_checkoutAmountField","label":"Amount field API name in major units (for example Total)","required":true,"defaultValue":""},
+    {"apiName":"public_checkoutCurrency","label":"Payment currency ISO code","required":true,"defaultValue":"GBP"}
   ],
   "operations": {
     "ListOrders":{"method":"GET","path":"api/orders","headers":"Revolut-Api-Version: 2026-08-17"},

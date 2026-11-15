@@ -46,6 +46,7 @@ type Props = {
   onSave: (value: CredentialInput) => Promise<{credential: NamedCredentialMetadata; webhookVerifyToken?: string}>;
   onDelete: (id: string) => Promise<void>;
   onTest?: (id: string, path?: string) => Promise<{connected:boolean;status?:number;message:string}>;
+  registerRevolutWebhook?: (credentialId:string)=>Promise<{callbackUrl:string}>;
   loadHistory: (objectName: string, field: string, source: string, offset: number, search: string) => Promise<CommunicationPage>;
   onOpenRecord: (objectName: string, id: string) => void;
   onOpenFlow: (apiName: string) => void;
@@ -147,6 +148,7 @@ export default function AppExchange(props: Props) {
     canInstall={props.canInstall}
     canManageFlows={props.canManageFlows} encryptionReady={props.encryptionReady}
     onSave={props.onSave} onDelete={props.onDelete} onTest={props.onTest}
+    registerRevolutWebhook={props.registerRevolutWebhook}
     loadHistory={props.loadHistory} onOpenRecord={props.onOpenRecord} onOpenFlow={props.onOpenFlow}
     onLifecycle={(app, operation) => action(app, operation)}
     onBack={() => {setOpenedKey(null);void refresh().catch(()=>{});}}/></Suspense>;

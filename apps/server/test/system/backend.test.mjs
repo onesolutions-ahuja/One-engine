@@ -209,36 +209,35 @@ test('Revolut connector exposes verified Merchant API operations without package
  assert.equal(JSON.stringify(manifest).includes('sk_'),false,'no secret is bundled');
 });
 
-test('Revolut Flow operation enforces version header and only approved Merchant origins',async()=>{
+test('Revolut signed webhook accepts raw payload, timestamp and rotated signatures only',async()=>{
+ const {verifyRevolutWebhook,revolutEventState,revolutMinorAmount}=await import(
+  '../../src/system-support/revolut-checkout-service.ts');
+ const {createHmac}=await import('node:crypto');
+ const timestamp=String(Date.now());
+ const secret='wsk_test_secret_very_long';
+ const body=Buffer.from('{"event":"ORDER_COMPLETED","order_id":"6634c172-3398-ac93-aee9-50de0282e3ac"}');
+ const sign=raw=>'v1='+createHmac('sha256',secret).update('v1.'+timestamp+'.').update(raw).digest('hex');
+ assert.equal(verifyRevolutWebhook(body,timestamp,sign(body),secret),true);
+ assert.equal(verifyRevolutWebhook(body,timestamp,'v1='+('0'.repeat(64))+','+sign(body),secret),true);
+ assert.equal(verifyRevolutWebhook(Buffer.from(body.toString().replace('ORDER_COMPLETED','ORDER_FAILED')),
+  timestamp,sign(body),secret),false);
+ assert.equal(verifyRevolutWebhook(body,String(Date.now()-300001),sign(body),secret),false);
+ assert.equal(verifyRevolutWebhook(body,timestamp,'sha256='+('a'.repeat(64)),secret),false);
+ assert.equal(verifyRevolutWebhook(body,timestamp,sign(body),'different-secret'),false);
+ assert.equal(revolutEventState('ORDER_COMPLETED'),'completed');
+ assert.equal(revolutEventState('ORDER_AUTHORISED'),'authorised');
+ assert.equal(revolutEventState('ORDER_PAYMENT_FAILED'),'failed');
+ assert.equal(revolutEventState('INVALID'),null);
+ assert.equal(revolutMinorAmount(5,'GBP'),500);
+ assert.throws(()=>revolutMinorAmount(-1,'GBP'),/Invalid payment/);
+ assert.throws(()=>revolutMinorAmount(0.001,'GBP'),/precision/);
+});
+
+test('Revolut checkout is a Page Builder block without an installed application Flow',async()=>{
+ const {standardPageComponents}=await import('../../../web/src/core/components/Catalog/catalog.ts');
+ assert.ok(standardPageComponents.some(block=>block.apiName==='Revolut Checkout'));
  const {default:manifest}=await import('../../../connectors/revolut/scripts/install.mjs');
- const {resolveFlowIntegrationCallout}=await import('../../src/system-files/flow-integration-connection.ts');
- const id='00000000-0000-4000-8000-000000000001';
- let origin='https://sandbox-merchant.revolut.com/';
- const db={query:async sql=>{
-  if(sql.includes("kind='integration-connections'"))
-   return {rows:[{properties:{status:'ACTIVE',connectorKey:'RevolutConnector',
-    configuration:{namedCredentialId:id}}}]};
-  if(sql.includes("kind='connector-providers'"))
-   return {rows:[{properties:{status:'ACTIVE',baseUrl:manifest.url,
-    approvedOrigins:[manifest.url,...manifest.allowedUrls].map(url=>new URL(url).origin),
-    operations:manifest.operations}}]};
-  if(sql.includes('SELECT base_url FROM md_named_credentials'))
-   return {rows:[{base_url:origin}]};
-  throw Error('Unexpected mock query');
- }};
- const rbac={require:async()=>{}};
- const input={integrationConnectionId:'RevolutConnector',operation:'CreateOrder'};
- const result=await resolveFlowIntegrationCallout(db,rbac,'tenant','user',input);
- assert.equal(result.namedCredentialId,id);
- assert.equal(result.method,'POST');
- assert.equal(result.path,'api/orders');
- assert.equal(result.headers,'Revolut-Api-Version: 2026-08-17');
- await assert.rejects(resolveFlowIntegrationCallout(db,rbac,'tenant','user',{
-  ...input,headers:'X-Other: malicious'
- }),/headers have been modified/);
- origin='https://merchant.revolut.com/';
- assert.equal((await resolveFlowIntegrationCallout(db,rbac,'tenant','user',input)).method,'POST');
- origin='https://other.example.com/';
- await assert.rejects(resolveFlowIntegrationCallout(db,rbac,'tenant','user',input),
-  /origin differs from provider/);
+ assert.ok(manifest.fields.some(field=>field.apiName==='public_checkoutPublishable'));
+ assert.ok(manifest.fields.some(field=>field.apiName==='public_checkoutAmountField'));
+ assert.equal(manifest.operations.CreateOrder.method,'POST');
 });

@@ -55,6 +55,7 @@ import {StandardRecordList,StandardRichText,StandardRecordPath,StandardFlowLaunc
 import ResponsivePageCanvas from '../../pages/PageRuntime/ResponsivePageCanvas';
 const EmbeddedScreenFlow=React.lazy(()=>import('../../pages/PageRuntime/EmbeddedScreenFlow'));
 const StandardApprovals=React.lazy(()=>import('../../pages/PageRuntime/StandardApprovals'));
+const RevolutEmbeddedCheckout=React.lazy(()=>import('../../pages/PageRuntime/RevolutEmbeddedCheckout'));
 import { inspectPageDependencies } from '../../pages/PageRuntime/pageDependencies';
 import {
   canvasDimensionsForOrientation,
@@ -2134,6 +2135,10 @@ function RecordWorkspace({
             }}>{name}</a>})}
         </nav>;
       }
+      if(component.type==='Revolut Checkout')
+        return <React.Suspense key={component.id} fallback={<p role="status">Loading checkout…</p>}>
+          <RevolutEmbeddedCheckout recordId={String(record.Id)}/>
+        </React.Suspense>;
       if(component.type==='Items to Approve')
         return <React.Suspense key={component.id} fallback={<p role="status">Loading approvals…</p>}>
           <StandardApprovals request={apiRequest} appId={route.appId??''} onNavigate={onNavigate}/>

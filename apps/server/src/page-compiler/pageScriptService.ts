@@ -1,6 +1,7 @@
 import {createHash,randomBytes} from 'node:crypto';
 import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} from './compilePage.js';
 import {generatePageScript} from './generatePageScript.js';
+import {buildPageCode,pageCodeModule,serverPageCode,type PageCode,type ServerPageCode} from './code/pageCode.js';
 
 /**
  * Server-built page scripts.
@@ -24,7 +25,14 @@ export type PageScriptTicket={tenantId:string;userId:string;apiName:string;varia
 export type PageScriptKey={tenantId:string;apiName:string;variant:string};
 export type CompiledServerAction={formula:string;serverDataSteps:number;totalSteps:number};
 type Built={revision:number|null;code:string;etag:string;objectStamp:string;compiled:CompiledPage;
- actions:ReadonlyMap<string,CompiledServerAction>};
+ actions:ReadonlyMap<string,CompiledServerAction>;
+ /** The page as real code (v2): display formulas, action functions, record sets. */
+ pageCode:PageCode;serverCode:ServerPageCode};
+/** Page script text + the page code built from the same compiled page. */
+function generate(compiled:CompiledPage):{code:string;pageCode:PageCode;serverCode:ServerPageCode}{
+ const pageCode=buildPageCode(compiled);
+ return {code:generatePageScript(compiled,'js')+pageCodeModule(pageCode),pageCode,serverCode:serverPageCode(pageCode)};
+}
 
 const TICKET_MS=60_000;
 const MAX_TICKETS=2_000;
@@ -72,14 +80,14 @@ export class PageScriptService{
   const objectStamp=createHash('sha256').update(JSON.stringify(objects)).digest('base64url');
   if(hit&&hit.objectStamp===objectStamp)return hit;
   const compiled=compilePage(page,objects,{strictLegacy:true});
-  const code=generatePageScript(compiled,'js');
+  const {code,pageCode,serverCode}=generate(compiled);
   const actions=new Map<string,CompiledServerAction>();
   for(const component of compiled.components)for(const action of component.actions)
    if(action.kind==='ActionPlan'&&!action.error&&action.formula)
     actions.set(component.id+':'+action.event,{formula:action.formula,
      serverDataSteps:action.serverDataSteps,totalSteps:action.totalSteps});
   const etag='"'+createHash('sha256').update(code).digest('base64url').slice(0,24)+'.'+objectStamp.slice(0,12)+'"';
-  const entry:Built={revision,code,etag,objectStamp,compiled,actions};
+  const entry:Built={revision,code,etag,objectStamp,compiled,actions,pageCode,serverCode};
   this.built.delete(cacheKey);
   if(this.built.size>=MAX_BUILT)this.built.delete(this.built.keys().next().value!);
   this.built.set(cacheKey,entry);
@@ -92,7 +100,7 @@ export class PageScriptService{
   objects:readonly CompilerObject[]):{previewId:string;built:Built}{
   if(!apiNamePattern.test(apiName)||page.apiName!==apiName)throw new Error('Preview page does not match');
   const compiled=compilePage(page,objects,{strictLegacy:true});
-  const code=generatePageScript(compiled,'js');
+  const {code,pageCode,serverCode}=generate(compiled);
   const actions=new Map<string,CompiledServerAction>();
   for(const component of compiled.components)for(const action of component.actions)
    if(action.kind==='ActionPlan'&&!action.error&&action.formula)
@@ -102,7 +110,7 @@ export class PageScriptService{
   // Same user + same draft → same id (repeat Previews reuse it).
   const previewId=createHash('sha256').update([tenantId,userId,apiName,variant,hash].join('\u0000')).digest('base64url').slice(0,32);
   const built={revision:compiled.revision,code,etag:'"p.'+hash.slice(0,24)+'"',objectStamp:'',compiled,actions,
-   tenantId,userId,apiName,variant};
+   pageCode,serverCode,tenantId,userId,apiName,variant};
   this.previews.delete(previewId);
   if(this.previews.size>=MAX_BUILT)this.previews.delete(this.previews.keys().next().value!);
   this.previews.set(previewId,built);
@@ -130,7 +138,7 @@ export class PageScriptService{
  buildAppPage(tenantId:string,appId:string,page:CompilerPage,objects:readonly CompilerObject[]):{buildId:string;built:Built}{
   if(!apiNamePattern.test(page.apiName??''))throw new Error('Invalid page API name');
   const compiled=compilePage(page,objects,{strictLegacy:true});
-  const code=generatePageScript(compiled,'js');
+  const {code,pageCode,serverCode}=generate(compiled);
   const hash=createHash('sha256').update(code).digest('base64url');
   const buildId=createHash('sha256').update([tenantId,appId,hash].join('\u0000')).digest('base64url').slice(0,32);
   const hit=this.appBuilds.get(buildId);
@@ -141,7 +149,7 @@ export class PageScriptService{
     actions.set(component.id+':'+action.event,{formula:action.formula,
      serverDataSteps:action.serverDataSteps,totalSteps:action.totalSteps});
   const built={revision:compiled.revision,code,etag:'"a.'+hash.slice(0,24)+'"',objectStamp:'',compiled,actions,
-   tenantId,appId,apiName:page.apiName};
+   pageCode,serverCode,tenantId,appId,apiName:page.apiName};
   if(this.appBuilds.size>=MAX_BUILT)this.appBuilds.delete(this.appBuilds.keys().next().value!);
   this.appBuilds.set(buildId,built);
   return {buildId,built};

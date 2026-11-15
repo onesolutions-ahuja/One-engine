@@ -708,7 +708,22 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=
 }
 export default function SmartRuntime(p){
  const sqlLookup=useSqlFormulaDisplay(p,React);
- p={...p,__sqlLookup:sqlLookup};
+ // Page code: the page converter turned this component's formulas into plain
+ // functions. They run first; a formula without one keeps the shared library path.
+ const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
+ const lookup=code?(v,record)=>{
+  const run=code.get(typeof v==="string"?v.trim():v);
+  if(run){
+   try{return {value:run(record||{})};}
+   catch(error){
+    // Rows still loading: the shared path answers until they arrive.
+    if(error&&error.notHeld===true)return sqlLookup(v,record);
+    return {value:"",error:error instanceof Error?error.message:"Formula failed"};
+   }
+  }
+  return sqlLookup(v,record);
+ }:sqlLookup;
+ p={...p,__sqlLookup:lookup};
  // Re-render when the tenant brand arrives so $session.tenant.name / .logo show without a reload.
  React.useSyncExternalStore(subscribeTenantBrand,getTenantBrand,getTenantBrand);
  const name=p.kind||"smart_text",record=recordOf(p),label=scopedExpression(p,"label",p.label||"",record);

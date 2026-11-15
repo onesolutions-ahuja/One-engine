@@ -27,12 +27,12 @@ const own=(value:unknown,key:string):unknown=>
  value&&typeof value==='object'&&!Array.isArray(value)&&Object.hasOwn(value,key)
   ?(value as Record<string,unknown>)[key]:undefined;
 
-type TrustedFormulaSession={
+export type TrustedFormulaSession={
  user:{id:string;name:string;email:string;timeZone:string;locale:string;currencyIsoCode:string};
  tenant:{id:string;name:string;logo:string};
 };
 /** Server formulas derive identity from the authenticated actor, never browser scope. */
-async function trustedFormulaSession(db:Sql,actor:Actor):Promise<TrustedFormulaSession>{
+export async function trustedFormulaSession(db:Sql,actor:Actor):Promise<TrustedFormulaSession>{
  const [users,tenants,profiles]=await Promise.all([
   db.query<{email:string;display_name:string;time_zone:string;locale:string;currency_iso_code:string|null}>(
    'SELECT email,display_name,time_zone,locale,currency_iso_code FROM md_users WHERE tenant_id=$1 AND id=$2 AND enabled=true',

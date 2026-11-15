@@ -29,6 +29,7 @@ import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type Co
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import type {LoadedPageScript} from './serverPageScript';
+import {createPageCodeRuntime,type PageCodeRuntime,type Effect} from './pageCodeRuntime';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
 import {componentStateFromEvent,componentStateName,type ComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState';
@@ -52,6 +53,8 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  /** The server-built page file this page runs from (null: the browser-compiled plan). */
  script:LoadedPageScript|null;
  data:CompiledDataLayer;request:Request;objects:ObjectMetadata[];pageSessionKey:string;recordId:string;
+ /** The page as real code (v2), when the page file carries it. */
+ code:PageCodeRuntime|null;
  searchRecords(sourceId:string,query:string):Promise<Record<string,unknown>[]>;
  /** Remember what the user picked/typed/toggled in a component, under its page
   * name, so any formula, filter or action reads @Name.state.Id / Value / Text. */
@@ -89,6 +92,12 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
   const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
   const data=createCompiledDataLayer(compiled,sourceLoader,store.get,objects);
+  // Published app pages and Builder Preview run their generated code.
+  const endpoint=script?.app?'/apps/'+encodeURIComponent(script.app.appId)
+   :script?.previewId?'/pages/'+encodeURIComponent(compiled.apiName):'';
+  const code=script?.code&&endpoint?createPageCodeRuntime(script.code,{request,endpoint,
+   build:script.app?{buildId:script.app.buildId}:{previewId:script.previewId},
+   sessionId:()=>sessionId,state:store.get}):null;
   const stateNames=new Map([...componentInstanceNames(components)].map(([id,name])=>[id,componentStateName(name)]));
   const typing=new Map<string,number>();
   const publish=(name:string,value:ComponentState)=>{
@@ -104,7 +113,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
     // Typed text (Search Box) waits for a short pause, so lists reload once, not per key.
     if(typeof value==='string')typing.set(componentId,window.setTimeout(()=>publish(name,next),250));
     else publish(name,next);
-   },compiled,script,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
+   },compiled,script,code,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
    searchRecords:async(sourceId:string,query:string)=>{
     const source=compiled.dataSources.find(item=>item.id===sourceId);
     if(!source)throw Error('Search Box has no configured Object data source');
@@ -119,6 +128,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
     store.reset({});
     sessionListeners.forEach(listener=>listener());
     void data.start();
+    void code?.loadSets().catch(()=>undefined);
    },
    broadcastState(changes){
     for(const change of changes)window.dispatchEvent(new CustomEvent('metadrive:page-local-state',{
@@ -132,6 +142,14 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
  },[compiled,script,components,objects,request,pageSessionKey,sessionIdOverride,recordId]);
  useEffect(()=>{
   void runtime.data.start();
+  // Rows for instant taps and totals: one request with the first data.
+  void runtime.code?.loadSets().catch(error=>console.warn('[PageCode] record sets:',error instanceof Error?error.message:error));
+  // A state value the held rows depend on ($state.x in their criteria) reloads them.
+  const setStateKeys=new Set((runtime.code?.code.recordSets??[]).flatMap(set=>
+   [...String(set.criteria).matchAll(/\$\.state\("([A-Za-z0-9_]+)"\)/g)].map(match=>match[1].toLowerCase())));
+  const unsubscribeState=setStateKeys.size?runtime.store.subscribeKeys([...setStateKeys],()=>{
+   void runtime.code?.loadSets().catch(()=>undefined);
+  }):undefined;
   // Flows and screens speak window events: fold them into the one store.
   const onState=(event:Event)=>{
    const detail=(event as CustomEvent<{pageSessionKey?:string;key?:string;value?:unknown;origin?:string}>).detail;
@@ -146,6 +164,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    // A Flow that started a new page session moves the whole page to it.
    if(detail.sessionId&&detail.sessionId!==runtime.sessionId()){runtime.resetSession(detail.sessionId);return;}
    void runtime.data.saved(detail);
+   // Another page part (a popup, a Flow) saved: the held rows are read again.
+   void runtime.code?.loadSets().catch(()=>undefined);
   };
   const onSelected=(event:Event)=>{
    const detail=(event as CustomEvent<{pageSessionKey?:string;name?:string;value?:unknown}>).detail;
@@ -158,6 +178,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   window.addEventListener('metadrive:page-flow-mutated',onSaved);
   window.addEventListener('metadrive:page-collection-selected',onSelected);
   return ()=>{
+   unsubscribeState?.();
    window.removeEventListener('metadrive:page-local-state',onState);
    window.removeEventListener('metadrive:page-flow-mutated',onSaved);
    window.removeEventListener('metadrive:page-collection-selected',onSelected);
@@ -269,6 +290,13 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const source=useSourceSnapshot(runtime,compiled.dataSourceId);
  const sessionId=useSyncExternalStore(runtime.subscribeSession,runtime.sessionId,runtime.sessionId);
  const [actionError,setActionError]=useState('');
+ // Page code: this component's formulas as plain functions; redraw when held rows change.
+ const codeVersion=useSyncExternalStore(listener=>runtime.code?runtime.code.subscribe(listener):()=>{},
+  ()=>runtime.code?.version()??0,()=>runtime.code?.version()??0);
+ const formulaCode=useMemo(()=>{
+  const map=runtime.code?.formulasFor(component.id);
+  return map&&map.size?{functions:map,version:codeVersion}:null;
+ },[runtime.code,component.id,codeVersion]);
  const properties=useMemo(()=>resolveMetadataProperties({...component.properties,objectApiName},runtime.objects,availableFlows),
   [component.properties,objectApiName,runtime.objects,availableFlows]);
  const actionFlows=(properties.actionFlows&&typeof properties.actionFlows==='object'&&!Array.isArray(properties.actionFlows)
@@ -592,6 +620,40 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    runFlow:(settings:Record<string,unknown>,event:Record<string,unknown>)=>runBinding(settings,event)
   };
   setActionError('');
+  // Page code (v2): the action's own function. The screen changes first; one request saves.
+  const codeKey=component.id+':'+action.event;
+  if(runtime.code?.hasAction(codeKey)&&binding.actionType==='Formula'){
+   const runEffects=async(effects:Effect[])=>{
+    for(const effect of effects){
+     const [first,second,third]=effect.args.map(value=>value===null||value===undefined?'':String(value));
+     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+')',navigationContext,
+      onNavigate as never,runtime.pageSessionKey,session,third||String(payload.recordId??runtime.store.get().recordId??record?.Id??''));
+     else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
+     else if(effect.name==='LOCKSCREEN')await lockTillScreen();
+     else if(effect.name==='PRINT')await previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId);
+     else if(effect.name==='FLOW')await runSequenceFlow(first,availableFlows,runtime.request,onLaunchFlow);
+    }
+   };
+   try{
+    await runtime.code.run(codeKey,payload,objectApiName,{
+     show:update=>{
+      const stateChanges=Object.entries(update.state).map(([key,value])=>({key,value}));
+      if(stateChanges.length)applyState(stateChanges);
+      const objectApiNames=[...new Set(update.changes.map(change=>change.objectApiName))];
+      // Failed: every list reads SQL again, so the predicted change disappears.
+      if(update.failed){saved({});return;}
+      if(update.optimistic)saved({objectApiNames,recordChanges:update.changes,optimistic:update.optimistic});
+      else if(update.changes.length||update.replaces)saved({objectApiNames:objectApiNames.length?objectApiNames:undefined,
+       recordChanges:update.changes,replacesOptimistic:update.replaces});
+     },
+     effects:runEffects
+    });
+    return {updated:true};
+   }catch(error){
+    setActionError(error instanceof Error?error.message:'Action failed');
+    throw error;
+   }
+  }
   try{
    return compiledAction?await compiledAction(compiledContext,payload):await runBinding(binding);
   }catch(error){
@@ -667,6 +729,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    ...(definition.apiName.startsWith('smart_')&&component.position?{canvasFrameSized:true}:{}),
    label:runtimeComponentLabel(component,resolved.label),
    properties:resolved,objects:runtime.objects,reports:reports??[],flows:availableFlows,pageState:state,children,
+   ...(formulaCode?{__formulaCode:formulaCode}:{}),
    dataCollection,formulaCollectionSources:namedSource.formulaSources,namedCollections:namedSource.namedCollections,
    fieldAllowed:(key:string,row:Record<string,unknown>)=>scopedFieldAllows(properties.dataFieldFilters,key,row,fields,
     {pageState:state,recordId:runtime.recordId,sessionId}),

@@ -9,6 +9,7 @@ import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {tenantServerFormulaEnabled,executeServerDataAction} from '../system-support/formula-data-action-runtime.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
+import {executePageCodeAction,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 
 /**
  * Compiled page scripts (Page Builder Preview).
@@ -22,7 +23,8 @@ import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js'
  * becomes code. Every request re-checks the user's permissions.
  */
 export type PageScriptDeps={db:SqlPersistence;rbac:RbacEngine;records:RecordEngine;pages:PageRuntime;
- definitions:ObjectDefinitionService;scripts:PageScriptService};
+ definitions:ObjectDefinitionService;scripts:PageScriptService;
+ verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>};
 
 const scopeKey=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
 /** Same scope rules as /api/action-formulas/execute-data. */
@@ -100,6 +102,45 @@ export async function issueAppPageScript(deps:PageScriptDeps,actor:{tenant_id:st
 }
 
 export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
+ // Page code (v2). The build is the server's own copy of the saved/published page
+ // (or this user's own Preview of unsaved edits); the browser names only the action.
+ const codeBuild=async(actor:{tenant_id:string;user_id:string},appId:string,body:Record<string,unknown>)=>{
+  if(appId){
+   if(!api.test(appId))throw new Error('Invalid app');
+   await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
+   return deps.scripts.appBuild(actor.tenant_id,appId,String(body.buildId??''));
+  }
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');
+  return typeof body.previewId==='string'?deps.scripts.preview(actor.tenant_id,actor.user_id,body.previewId):null;
+ };
+ const codeRoutes=(prefix:string,appParam:boolean)=>{
+  app.post(prefix+'/page-code/execute',wrap(async(req,res)=>{
+   const actor=authenticated(req);
+   res.setHeader('Cache-Control','private, no-store');
+   const body=(req.body??{}) as Record<string,unknown>;
+   const build=await codeBuild(actor,appParam?String(req.params.appId):'',body);
+   const key=String(body.key??'');
+   if(!build||!compiledActionKeyPattern.test(key)){res.json({ok:false,stale:true,error:'This page was republished; reload it'});return;}
+   const started=performance.now();
+   const source=build.pageCode.actions.find(item=>item.key===key)?.js??'';
+   const result=await executePageCodeAction(deps,actor,build.serverCode,key,parsePageCodeRequest(body.request),source);
+   res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1));
+   res.json(result);
+  }));
+  app.post(prefix+'/page-code/sets',wrap(async(req,res)=>{
+   const actor=authenticated(req);
+   res.setHeader('Cache-Control','private, no-store');
+   const body=(req.body??{}) as Record<string,unknown>;
+   const build=await codeBuild(actor,appParam?String(req.params.appId):'',body);
+   if(!build){res.json({ok:false,stale:true,sets:{}});return;}
+   const started=performance.now();
+   const sets=await loadPageRecordSets(deps,actor,build.serverCode,parsePageCodeRequest(body.request));
+   res.setHeader('Server-Timing','sets;dur='+(performance.now()-started).toFixed(1));
+   res.json({ok:true,sets});
+  }));
+ };
+ codeRoutes('/api/apps/:appId',true);
+ codeRoutes('/api/pages/:apiName',false);
  app.post('/api/pages/:apiName/script-ticket',wrap(async(req,res)=>{
   const actor=authenticated(req);
   if(!api.test(req.params.apiName))throw new Error('Invalid page API name');

@@ -46,8 +46,8 @@ export default function PreviewDeviceFrame({ device, width, height, layoutVarian
   }, [kind]);
 
   // A wide authored canvas stays at its intended CSS width. Only its on-screen
-  // presentation is scaled: responsive breakpoints, fixed bars and popups all
-  // continue to use the authored dimensions inside the device viewport.
+  // presentation is scaled; component geometry stays in authored CSS pixels.
+  // Fixed bars and popups are contained by the simulated screen.
   const scale = Math.min(1, Math.max(0.02,
     (space.width - FRAME_HORIZONTAL_PADDING) / (screenWidth + border * 2)));
   const viewportHeight = Math.max(240, Math.min(idealHeight,

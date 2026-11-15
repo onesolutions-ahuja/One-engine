@@ -71,7 +71,7 @@ export function revolutMinorAmount(amount:unknown,currency:string):number{
  if(typeof amount!=='number'||!Number.isFinite(amount)||amount<=0||amount>1e8
    ||!/^[A-Z]{3}$/.test(currency))throw Error('Invalid payment amount or currency');
  let places:number;
- try{places=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits;}
+ try{places=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits??2;}
  catch{throw Error('Unsupported currency');}
  if(places<0||places>3)throw Error('Unsupported currency precision');
  const multiplier=10**places,minor=Math.round(amount*multiplier);

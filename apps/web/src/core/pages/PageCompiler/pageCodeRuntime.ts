@@ -197,8 +197,10 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   event:{recordId:ev.recordId,value:ev.value,index:ev.index,label:ev.label},
   timeZone:typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:undefined});
 
- return {
+ const api={
   code,
+  /** Lookups the held rows could not answer (shown by the till speed test). */
+  misses:[] as string[],
   subscribe(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};},
   version:()=>version,
   /** A compiled display formula for this component property, or null. */
@@ -247,6 +249,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     predicted=true;
    }catch(error){
     if(!(error instanceof NotHeld))throw error;
+    api.misses.push(key+': '+error.message);
+    if(api.misses.length>20)api.misses.shift();
    }
    if(!action.data){
     // Screen-only action (STATE, SCREEN, LOCKSCREEN): nothing to save.
@@ -274,5 +278,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    await io.effects(result.effects);
   }
  };
+ // Debug handle for the speed test script (window.__unePageCode).
+ try{(globalThis as Record<string,unknown>).__unePageCode=api;}catch{/* frozen global */}
+ return api;
 }
 export type PageCodeRuntime=ReturnType<typeof createPageCodeRuntime>;

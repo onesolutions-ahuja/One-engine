@@ -248,8 +248,17 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const sqlRecord=props.record&&typeof props.record==='object'&&!Array.isArray(props.record)
     ?props.record as Record<string,unknown>:Array.isArray(props.records)&&props.records.length
       ?props.records[0] as Record<string,unknown>:undefined;
+  // Page code: formulas the page converter turned into plain functions.
+  const formulaCode=(props.__formulaCode as {functions?:unknown}|undefined)?.functions;
+  const codeFunctions=formulaCode instanceof Map?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
   for(const [key,source] of Object.entries(sqlProps)){
     if(!isSelectedSqlFormula(source))continue;
+    const run=codeFunctions&&typeof source==='string'?codeFunctions.get(source.trim()):undefined;
+    if(run){
+      try{sqlProps[key]=run(sqlRecord??{});}
+      catch(error){sqlProps[key]=(error as {notHeld?:boolean})?.notHeld?'':'FORMULAERROR';}
+      continue;
+    }
     if(typeof props.fieldAllowed==='function'&&
       !(props.fieldAllowed as (key:string,row:Record<string,unknown>)=>boolean)(key,sqlRecord??{}))
       continue;
@@ -279,6 +288,7 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
     : null;
   if(!hydratedDefinition)return <div role="alert" className="registered-component-error">Bundled renderer is unavailable.</div>;
   return <div {...accessibility} style={layoutTransparent?{display:'contents'}:undefined}>{published}<ComponentRenderBoundary key={`${definition.apiName}-${definition.version}`}>
-    <RegisteredComponentBody definition={hydratedDefinition} props={{...effectiveProps,readComponent:formulaScope?.read,onFormulaDisplay:setRendered}} appearanceProps={props} layoutTransparent={layoutTransparent} />
+    <RegisteredComponentBody definition={hydratedDefinition} props={{...effectiveProps,readComponent:formulaScope?.read,onFormulaDisplay:setRendered,
+      ...(codeFunctions?{__formulaCode:props.__formulaCode}:{})}} appearanceProps={props} layoutTransparent={layoutTransparent} />
   </ComponentRenderBoundary></div>;
 }

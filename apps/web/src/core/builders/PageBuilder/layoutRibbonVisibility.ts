@@ -4,8 +4,8 @@ import type {Design2Slot,Design2SlotRule} from './builderPropertyInventory';
 export const HIDDEN_RIBBON_PROPERTY_KEYS=new Set(['imageBorderColor','iconFillColor','defaultCheck','columnVisibility','badgeVisible','tabIndex']);
 
 /** A Layout control may disappear only if every selected component can edit that
- * exact property through an enabled Design 2 control. Different keys (for example,
- * tabWidth vs width, or imageBorderColor vs borderColor) are not interchangeable.
+ * same value through an enabled Design 2 control. Unlike unrelated width keys,
+ * Smart Tabs explicitly remaps Body Width/Height to tabWidth/tabHeight.
  */
 export const hasDesign2LayoutEquivalent=(
   propertyKey:string,
@@ -20,6 +20,16 @@ export const hasDesign2LayoutEquivalent=(
   if(propertyKey==='x'||propertyKey==='y')return true;
   // The Badge context selector renders a separate visibility button.
   if(propertyKey==='badgeVisible')return slots.some(slot=>slot.area==='Badge');
+
+  // Smart Tabs Body Width/Height already edit each tab's width/height.
+  // Hide only those redundant Layout editors, never the container's width/height.
+  if(propertyKey==='tabWidth'||propertyKey==='tabHeight'){
+    if(!selectedApis.every(api=>api==='smart_tabs'))return false;
+    const slotKey=propertyKey==='tabWidth'?'width':'height';
+    return slots.some(slot=>slot.area==='Body'&&slot.slotKey===slotKey)&&
+      rules.some(rule=>rule.componentApi==='smart_tabs'&&rule.area==='Body'&&
+        rule.slotKey===slotKey&&(rule.propertyKey===slotKey||rule.propertyKey===propertyKey));
+  }
 
   // SmartRibbon renders the fixed Body scaffold plus two Image controls.
   // A SQL rule with no actual area slot (or no matching scaffold key) is not

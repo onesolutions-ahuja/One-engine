@@ -17,6 +17,9 @@ import {useSqlFormulaDisplay,isSelectedSqlFormula} from '../../../component-libr
 import {validatePrimitiveMetadata, primitiveAccessibilityProps} from './sharedPrimitiveMetadata';
 import {loadSharedSmartRenderer} from './sharedSmartRenderer';
 
+/** Set once the shared Smart runtime fails to load in this tab: use full renderers. */
+let sharedSmartFailed=false;
+
 type ComponentBoundaryState = { error?: string };
 
 class ComponentRenderBoundary extends React.Component<{ children: ReactNode }, ComponentBoundaryState> {
@@ -155,13 +158,16 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const assetApiName=definition.apiName;
   // Session storage is origin/tenant-domain scoped. Shared runtime pilots are
   // explicitly OFF until the tenant operator opts in on that tenant origin.
-  let sharedOptIn=false;
+  // The shared Smart runtime (one download for every Smart component) is the
+  // default; sessionStorage 'metadrive:shared-smart-runtime'='0' turns it off.
+  let sharedOptIn=true;
   if(typeof window!=='undefined'){
-   try{sharedOptIn=window.sessionStorage.getItem('metadrive:shared-smart-runtime')==='1';}
-   catch{/* Storage can be blocked; use the existing renderer. */}
+   try{sharedOptIn=window.sessionStorage.getItem('metadrive:shared-smart-runtime')!=='0';}
+   catch{/* Storage can be blocked; keep the default. */}
   }
   const sharedPath=(definition as LibraryComponentMetadata & {sharedAssetPath?:unknown}).sharedAssetPath;
-  const selectedPath=sharedOptIn&&typeof sharedPath==='string'&&assetApiName.startsWith('smart_')
+  const [sharedRetry,setSharedRetry]=useState(0);
+  const selectedPath=sharedOptIn&&!sharedSmartFailed&&typeof sharedPath==='string'&&assetApiName.startsWith('smart_')
     ?sharedPath:(definition as LibraryComponentMetadata & {assetPath?:unknown}).assetPath;
   useEffect(() => {
     if (!definition.trustedBundled || definition.compiledJs || deferRenderer&&!enteredViewport) {
@@ -208,11 +214,14 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
           defaultProps?:Record<string,unknown>;sharedSmartRuntime?:boolean;sharedRuntimePath?:string};
       }),true).then(value=>{if(active)setAsset(value);})
       .catch((error:unknown)=>{
-        if(active)setAssetError(error instanceof Error?error.message:'Renderer load failed');
+        if(!active)return;
+        // The shared runtime failed: use the component's own full renderer instead.
+        if(selectedPath===sharedPath&&!sharedSmartFailed){sharedSmartFailed=true;setSharedRetry(n=>n+1);return;}
+        setAssetError(error instanceof Error?error.message:'Renderer load failed');
       });
     return()=>{active=false;};
   }, [definition.apiName,assetApiName,definition.version,definition.trustedBundled,
-    definition.compiledJs,selectedPath,deferRenderer,enteredViewport]);
+    definition.compiledJs,selectedPath,deferRenderer,enteredViewport,sharedRetry]);
   if (definition.status === 'Draft') return <div role="status" className="registered-component-error">Component is a draft. Publish it before use.</div>;
   if(deferRenderer&&!enteredViewport)return <div ref={placeholderRef}
     className="registered-component-lazy-placeholder"

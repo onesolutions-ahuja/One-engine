@@ -1392,7 +1392,9 @@ function LightningAppRuntime({
     const navigation=apps.find(item=>item.apiName===appId)?.navigationPageApiNames??[];
     const run=()=>prefetchLinkedPages(page,pages,appId,requestedLayout,viewportWidth,pageDefinitionCache,navigation);
     const idle=(globalThis as {requestIdleCallback?:(run:()=>void,options?:{timeout:number})=>number}).requestIdleCallback;
-    const timer=window.setTimeout(()=>idle?idle(run,{timeout:3000}):run(),800);
+    // Wait until this page's own components and data have loaded: preloading ~14
+    // popup pages at 0.8 s competed with them and slowed the first screen.
+    const timer=window.setTimeout(()=>idle?idle(run,{timeout:3000}):run(),4000);
     return()=>window.clearTimeout(timer);
   },[page,pageReady,pages,apps,appId,requestedLayout,viewportWidth,pageDefinitionCache,previewPage,printPreview,compiledPageProp]);
   // PRINT() waits until the template is on screen (or reports why it is not).

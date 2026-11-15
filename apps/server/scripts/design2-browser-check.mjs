@@ -467,6 +467,15 @@ export async function runDesign2BrowserCheck({page,origin,db,tenantId,token}){
  assert.equal(await countInput.getAttribute('type'),'number');
  assert.equal(await countInput.getAttribute('step'),'1');
  assert.equal(await page.locator('.smart-design2-extras-fixed > .smart-design2-extras-cell').count(),2);
+ // Same fixed count and padding controls; the formerly duplicated Spacing,
+ // Dock Items and Card Gap fields now have one visible editor each.
+ await chooseArea('Others');
+ const spacing=page.locator('.smart-design2-others-section [data-others-group="Spacing"]');
+ assert.equal(await spacing.locator('.smart-design2-supplemental-setting').count(),1,
+  'One Gap editor must replace Key Gap and Card Gap');
+ assert.equal(await spacing.locator('[data-others-property="gap"]').count(),1);
+ assert.equal(await page.locator('.smart-design2-others-section [data-others-property="numpadPadding"]').count(),0);
+ assert.equal(await page.locator('.smart-design2-others-section [data-others-property="dockItemCount"]').count(),0);
  await chooseArea('Body');
 
  assert.ok(template.every(item=>item.visible&&item.hasEditor),

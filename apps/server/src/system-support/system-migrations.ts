@@ -235,11 +235,14 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     INSERT INTO md_builder_design2_slots
      (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
     SELECT 'Cart columns',COALESCE((SELECT MAX(area_order) FROM md_builder_design2_slots),0)+1,
-     keys.slot_key,2,keys.display_order,
+     keys.slot_key,2,(keys.column_number-1)*8+keys.display_order,
      CASE WHEN keys.property_key LIKE '%Width' OR keys.property_key LIKE '%TextSize' THEN 58 ELSE 40 END,
      26,keys.property_key,'radius'
     FROM keys
-    ON CONFLICT(area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+    ON CONFLICT(area,slot_key) DO UPDATE SET
+     area_order=EXCLUDED.area_order,row_no=EXCLUDED.row_no,order_no=EXCLUDED.order_no,
+     width_px=EXCLUDED.width_px,height_px=EXCLUDED.height_px,
+     property_key=EXCLUDED.property_key,fallback_key=EXCLUDED.fallback_key;
     INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
     SELECT 'smart_cart','Cart columns',slot_key,property_key
     FROM md_builder_design2_slots WHERE area='Cart columns'

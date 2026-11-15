@@ -172,7 +172,8 @@ export default function SmartKeyboard({p,fire}){
  const pressedStyle={
   background:p.numpadFocusedFill||"#d1d5db",color:p.numpadFocusedTextColor||undefined
  };
- const gap=size(p.numpadGap,6,0,24);
+ // Legacy pages keep their prior spacing until Gap is explicitly edited.
+ const gap=size(p.gap??p.numpadGap,6,0,24);
  const body={
   background:p.backgroundColor||"#d1d4d9",border:p.borderColor?"1px solid "+p.borderColor:"0",
   borderRadius:size(p.radius,12,0,64),boxShadow:shadow(p.shadow),

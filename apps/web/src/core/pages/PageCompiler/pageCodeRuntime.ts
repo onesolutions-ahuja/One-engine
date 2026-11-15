@@ -98,6 +98,12 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    const value=fieldValue(row as Row,field);
    return value===undefined||value===null?'':value;
   }
+  /** Related value the page read for this row (@Product.ImageUrl on a cart line). */
+  m(row:unknown,path:string){
+   const values=(row as {__mentionValues?:Record<string,unknown>}|null)?.__mentionValues;
+   const value=values&&typeof values==='object'?values['@'+path]:undefined;
+   return value===undefined||value===null?'':value;
+  }
   connected(name:unknown){return isConnected(identity()?.connections as never,name);}
   verifyPin():never{return notHeld('VERIFYPIN is checked on the server');}
   /** Rows of `object` matching `criteria`, from a held set that has ALL of them. */

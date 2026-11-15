@@ -97,14 +97,22 @@ function reference(path:string,scope:Scope):string{
  const parts=path.split('.');
  if(parts.some(part=>!/^[A-Za-z_][A-Za-z0-9_]*$/.test(part)))fail('Invalid reference @'+path);
  if(parts[0]==='record'&&parts.length===2)return '$.f($.event("record"), '+q(parts[1])+')';
+ // @event.value, @event.recordId, @event.record.Name: the event of the action being run.
+ if(parts[0]==='event'&&!scope.aliases.has('event')){
+  if(parts.length===2)return '$.event('+q(parts[1])+')';
+  if(parts.length===3&&parts[1]==='record')return '$.f($.event("record"), '+q(parts[2])+')';
+  fail('Invalid event reference @'+path);
+ }
  if(scope.aliases.has(parts[0])){
   if(parts.length===1)return 'v['+q(parts[0])+']';
   return '$.f(v['+q(parts[0])+'], '+q(parts.slice(1).join('.'))+')';
  }
  if(parts.length===1)fail('Bare @'+path+' is not supported; use @Object.Field');
  if(parts[0]===scope.rowObject&&parts.length<=3)return '$.f('+scope.row+', '+q(parts.slice(1).join('.'))+')';
- if(!scope.rowObject)fail('@'+path+' needs a component Object');
- return fail('@'+path+' is not the component Object ('+scope.rowObject+')');
+ // Another Object's field (@Product.ImageUrl in a cart line): the related value the
+ // page already read for this row (permission-checked lookup), blank if none.
+ if(parts.length===2||parts.length===3)return '$.m('+scope.row+', '+q(path)+')';
+ return fail('Invalid reference @'+path);
 }
 function aggregateCall(node:Extract<Expression,{kind:'call'}>,scope:Scope):string{
  const args=node.args;

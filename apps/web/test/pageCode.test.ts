@@ -42,7 +42,16 @@ test('display formulas become plain functions that match the formula language', 
   assert.equal(String(compiled),String(interpreted.value),source);
  }
  assert.equal(fn(compileDisplayFormula('=RIGHT("0" & TEXT(HOUR(NOW())), 2)').js)({},display()),'21');
+ assert.equal(fn(compileDisplayFormula('=LPAD(7, 3, "0") & RPAD("a", 3, "-")').js)({},display()),'007a--');
  assert.equal(fn(compileDisplayFormula('=$state.category & ":" & $session').js)({},display({category:'beer'})),'beer:s-1');
+});
+
+test('event and related references convert', ()=>{
+ const action=compileActionFormula('=ACTIONS(STATE(pick, @event.value), STATE(name, @event.record.Name), SCREEN(edit, popup, @event.recordId))','Product');
+ assert.match(action.js,/\$\.event\("value"\)/);
+ assert.match(action.js,/\$\.f\(\$\.event\("record"\), "Name"\)/);
+ const image=compileDisplayFormula('=@Product.ImageUrl','CartLine');
+ assert.equal(fn(image.js)({__mentionValues:{'@Product.ImageUrl':'a.png'}},{...display(),m:(row:Row,p:string)=>(row.__mentionValues as Row)['@'+p]}),'a.png');
 });
 
 test('unknown functions are save errors, not run-time interpretation', ()=>{

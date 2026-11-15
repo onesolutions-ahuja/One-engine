@@ -132,6 +132,22 @@ export const F={
  SUBSTITUTE:(value:unknown,old:unknown,replacement:unknown)=>text(old)===''?text(value)
   :text(value).split(text(old)).join(text(replacement)),
  TRIM:(value:unknown)=>text(value).trim().replace(/\s+/g,' '),
+ LPAD(value:unknown,length:unknown,pad:unknown=' '){
+  const size=Math.max(0,Math.min(1000,Math.trunc(num(length)))),fill=points(pad).length?points(pad):[' '];
+  const chars=points(value);
+  if(chars.length>=size)return chars.slice(0,size).join('');
+  const out:string[]=[];
+  while(out.length<size-chars.length)out.push(fill[out.length%fill.length]);
+  return out.join('')+chars.join('');
+ },
+ RPAD(value:unknown,length:unknown,pad:unknown=' '){
+  const size=Math.max(0,Math.min(1000,Math.trunc(num(length)))),fill=points(pad).length?points(pad):[' '];
+  const chars=points(value);
+  if(chars.length>=size)return chars.slice(0,size).join('');
+  const out:string[]=[];
+  while(out.length<size-chars.length)out.push(fill[out.length%fill.length]);
+  return chars.join('')+out.join('');
+ },
  CONTAINS:(value:unknown,part:unknown)=>text(value).includes(text(part)),
  BEGINS:(value:unknown,part:unknown)=>text(value).startsWith(text(part)),
  CONCAT:(...values:unknown[])=>values.map(text).join(''),

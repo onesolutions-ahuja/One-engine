@@ -128,6 +128,12 @@ class ServerScope{
   const value=fieldValue(row as Row,field);
   return value===undefined||value===null?'':value;
  }
+ /** Related values are read by the page for display; actions use GETRECORD for them. */
+ m(row:unknown,path:string){
+  const values=(row as {__mentionValues?:Record<string,unknown>}|null)?.__mentionValues;
+  const value=values&&typeof values==='object'?values['@'+path]:undefined;
+  return value===undefined||value===null?'':value;
+ }
  connected(name:unknown){return isConnected(this.connections,name);}
  async verifyPin(first:unknown,second?:unknown){
   if(!this.verify)throw Error('VERIFYPIN is unavailable');

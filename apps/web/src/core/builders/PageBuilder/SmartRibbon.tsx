@@ -545,9 +545,10 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
          title="Upload image from this computer" aria-label="Upload image" disabled={uploadBusy||!enabled}
          onClick={()=>uploadInput.current?.click()}><ImagePlus size={16}/></button>}
      </div>;
-   }else if(tab==='Design2'&&property.id==='numpadPlaceholder')editor=
+   }else if(tab==='Design2'&&['numpadPlaceholder','calendarTimeZone'].includes(property.id))editor=
      <input type="text" className="smart-simple-text-input" aria-label={title}
-       disabled={!enabled} value={String(value??'')} placeholder="Enter placeholder"
+       disabled={!enabled} value={String(value??'')}
+       placeholder={property.id==='calendarTimeZone'?'e.g. Europe/London':'Enter placeholder'}
        onChange={event=>write(event.target.value)}/>;
    else if(kind==='expression')editor=<div className="smart-formula-filter">
      {summaryLabel?<input type="text" className="smart-summary-label"
@@ -793,7 +794,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
      .filter(property=>!['numpadGap','numpadPadding','dockItemCount',
        'numpadPrefix','numpadSuffix'].includes(property.id))
-     .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
+     .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)))
+     .map(property=>property.id==='gap'?{...property,label:'Gap'}:property);
  })();
  const designOtherCategory=(id:string)=>{
    if(id.startsWith('calendar')||id==='showDays'||id==='firstDay')return 'Calendar';

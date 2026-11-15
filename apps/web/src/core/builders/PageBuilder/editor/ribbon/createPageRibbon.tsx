@@ -252,9 +252,9 @@ export function createPageRibbon(
       }}
       position={selected.position} layoutMode={page.layoutMode}/>
   ) : null;
-  const smartRibbonElement = (selected && ribbonCatalog && ((selectedBuilderComponent && (ribbonTab==='Component Design 2'||ribbonTab==='Component Layout')) ||(!selectedBuilderComponent && ribbonTab==='Component Design 2'))) ? (<>
-              {ribbonTab==='Component Design 2'&&dataRibbon('source')}
-              <SmartRibbon
+  const renderSmartRibbon = (part?:'designTail') => (selected && ribbonCatalog && ((selectedBuilderComponent && (ribbonTab==='Component Design 2'||ribbonTab==='Component Layout')) ||(!selectedBuilderComponent && ribbonTab==='Component Design 2'))) ? (<>
+              {part!=='designTail'&&ribbonTab==='Component Design 2'&&dataRibbon('source')}
+              <SmartRibbon part={part}
                 tab={ribbonTab==='Component Layout'?'Layout':
                   ribbonTab==='Component Design 2'?'Design2':'Design'}
                 api={selected.type.startsWith('Custom:')?selected.type.slice(7):selected.type}
@@ -305,6 +305,7 @@ export function createPageRibbon(
                   else updateComponent(selected.id,{position});
                 }}/>
   </>) : null;
+  const smartRibbonElement=renderSmartRibbon();
   const insertRibbon = (<SmartInsertRibbon
             items={paletteComponents}
             onInsert={addPaletteComponent}
@@ -506,10 +507,6 @@ export function createPageRibbon(
             </button>
             {openDesignSection==='Conditional Visibility'&&<div className="page-builder-dock-section-body">
               <div className="page-builder-visibility-controls">
-                <label className="ribbon-small-checkbox"><input type="checkbox"
-                  checked={selected?.visible??false} disabled={!selected}
-                  onChange={event=>{if(selected)updateComponent(selected.id,{visible:event.target.checked});}}/>
-                  Visible on this page</label>
                 <button type="button" className="office-ribbon-icon-button" aria-label="Edit conditional visibility"
                   title="Edit conditional visibility" disabled={!selected} onClick={openVisibilityEditor}>
                   <Filter size={17} aria-hidden="true"/></button>
@@ -517,6 +514,7 @@ export function createPageRibbon(
               </div>
             </div>}
           </section>}
+          {ribbonTab==='Component Design 2'&&renderSmartRibbon('designTail')}
         </div>);
 
   return {

@@ -4,7 +4,7 @@
  width:100%;height:100%;min-height:0;padding:8px 8px 3px;overflow:auto}
 .smart-cart-header{display:block;flex-shrink:0;background:#255d9d;padding:12px;font-size:18px;line-height:1.3}
 .smart-cart-supporting{display:block;flex-shrink:0;padding:8px 12px;font-size:13px;line-height:1.2}
-.smart-cart-table{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;padding:6px;overflow-x:auto;overflow-y:hidden}
+.smart-cart-table{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;padding:6px var(--smart-cart-side-padding,6px);overflow-x:auto;overflow-y:hidden}
 .smart-cart-rows{flex:1 1 auto;min-width:max-content;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
 .smart-cart-no-columns{margin:6px;padding:8px;color:#6b7a8e}
 .smart-cart-cell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -63,6 +63,9 @@
 .smart-cart-row-wrap .smart-cart-row{margin:0}
 .smart-cart-row[role="button"]{cursor:pointer}
 .smart-cart-row[role="button"]:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}
+.smart-runtime[data-builder-preview] .smart-cart-columns>span[data-md-cart-column-active="true"]{
+ outline:2px solid #2563eb;outline-offset:-2px;border-radius:4px
+}
 .smart-cart-expanded-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:5px 8px 10px}
 .smart-cart-custom-action{box-sizing:border-box;max-width:100%;min-height:30px;padding:5px 12px;
  border:1px solid #8badd8;border-radius:6px;background:#fff;color:#245d9f;

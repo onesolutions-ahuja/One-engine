@@ -48,6 +48,7 @@ export function createPageCanvasRenderer(
     ribbonTab, previewMode, selectedId, device, targetObject, builderAppApiName, stringList,
     openBuilderTabs, suppressCanvasClickRef, selectionIds, setGroupEditId, setSelectionIds,
     setSelectedRegion, setSelectedId, setFocusedCardMapping, setPageSettingsOpen,
+    setSelectedCartColumn, openDesignSection, toggleDesignSection,
     setComponentMenuId, setRibbonTab, openComponentInspector, componentNeedsData, dragOverId,
     selectRibbonTab, isPhoneBuilder, setDragOverId, canvasMoveStart, pagePreviewAreaRef,
     componentMenuId, componentClipboard, applyPage, fields, previewFieldValue, defaultRelatedLists,
@@ -145,9 +146,21 @@ export function createPageCanvasRenderer(
         const host=event.currentTarget;
         const under=typeof document.elementsFromPoint==='function'
           ?document.elementsFromPoint(event.clientX,event.clientY):[];
+        const cartColumnNode=component.type==='Custom:smart_cart'
+          ?under.find(node=>node instanceof HTMLElement&&node.dataset.mdCartColumn
+            &&host.contains(node)&&node.closest('[data-component-id]')===host) as HTMLElement|undefined
+          :undefined;
+        const cartColumn=Number(cartColumnNode?.dataset.mdCartColumn);
+        if(cartColumnNode&&Number.isInteger(cartColumn)&&cartColumn>=1&&cartColumn<=5){
+          setSelectedCartColumn(cartColumn);
+          chooseCanvasDesignArea('Cart columns');
+          if(openDesignSection!=='Properties')toggleDesignSection('Properties');
+        }else{
+          setSelectedCartColumn(null);
         const areaNode=under.find(node=>node instanceof HTMLElement&&node.dataset.designArea
           &&host.contains(node)&&node.closest('[data-component-id]')===host) as HTMLElement|undefined;
         chooseCanvasDesignArea(areaNode?.dataset.designArea??'Body');
+        }
       }
       if(component.type==='Custom:ui_item_grid'){
         const target=event.target as HTMLElement;

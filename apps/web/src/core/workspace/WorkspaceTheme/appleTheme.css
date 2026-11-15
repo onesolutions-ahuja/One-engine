@@ -132,7 +132,10 @@
 .lightning :is(.btn, .icon-button, .quick-find-input, .object-search, .component-search, .mini-search) {
   border-radius: var(--md-radius-md);
 }
-.lightning :is(.modal, [role="dialog"], .app-utility-popover) { border-radius: var(--md-radius-xl); }
+.lightning :is(.modal, [role="dialog"], .app-utility-popover) {
+ border-radius:var(--md-radius-xl);background-clip:padding-box;
+}
+.lightning :is(.modal, [role="dialog"][aria-modal="true"]) {overflow-x:hidden;overflow-y:auto}
 .lightning :is(.surface, .setup-card, .records-card, .records-list-card) { border-radius: var(--md-radius-lg); }
 .lightning :is(.tree-item.selected, .object-list-item.active, .permission-list-item.selected) {
   color: var(--md-primary);

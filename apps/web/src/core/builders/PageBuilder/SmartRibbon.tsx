@@ -478,7 +478,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      (!condition||condition.in.includes(String(conditionValue??'')))&&
      (kind!=='choice'||!sharedPropertyIds||options.length>0);
    // Components saved before Style existed render Classic; show that, not the new-insert default.
-   const value=mixedPropertyIds?.includes(property.id)?'':properties[key]??
+   // Legacy Key Gap values remain readable for pages not yet edited with shared Gap.
+   const legacyGap=property.id==='gap'&&
+     ['smart_numpad','smart_keyboard','smart_dock'].includes(api)
+       ?properties.numpadGap:undefined;
+   const value=mixedPropertyIds?.includes(property.id)?'':properties[key]??legacyGap??
     (property.id==='visualStyle'?'Classic':property.defaultsOverrides?.[api]??property.default??'');
    const write=(v:unknown)=>{
     if(!enabled)return;
@@ -787,7 +791,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             // Every existing property stays within Others, grouped for readability.
             // Each retains its SQL binding and existing control/disabled behaviour.
             const category=(id:string)=>{
-              if(['numpadPadding','numpadGap','gap'].includes(id))return 'Spacing';
+              if(['numpadPadding','gap'].includes(id))return 'Spacing';
               if(id.startsWith('calendar')||id==='showDays'||id==='firstDay')return 'Calendar';
               if(id==='inputRows')return 'Text';
               if(id==='selectionMode')return 'Selection';

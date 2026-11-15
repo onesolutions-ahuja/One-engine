@@ -137,6 +137,17 @@
 }
 .office-builder-ribbon .office-ribbon-quick-preview,
 .office-builder-ribbon .office-ribbon-quick-exitPreview{flex:0 0 30px;width:30px}
+/* Make the only enabled exit-preview control conspicuous while previewing. */
+.office-builder-ribbon.is-interactive-preview .office-ribbon-quick-exitPreview .office-ribbon-icon-button:not(:disabled){
+  color:#b91c1c!important;background:#fee2e2!important;
+  border:1px solid #fca5a5!important;border-radius:5px;
+}
+.office-builder-ribbon.is-interactive-preview .office-ribbon-quick-exitPreview .office-ribbon-icon-button:not(:disabled):hover{
+  background:#fecaca!important;color:#991b1b!important;
+}
+.office-builder-ribbon.is-interactive-preview .office-ribbon-quick-exitPreview .office-ribbon-icon-button:focus-visible{
+  outline:2px solid #b91c1c;outline-offset:2px;
+}
 .office-builder-ribbon .preview-visibility-group{min-width:max-content!important;max-width:none!important}
 .office-builder-ribbon .preview-visibility-controls{display:flex;align-items:flex-start;gap:8px;min-width:max-content}
 .office-builder-ribbon .preview-visibility-controls>.ribbon-small-checkbox{

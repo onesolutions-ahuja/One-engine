@@ -27,9 +27,15 @@ export default function ResponsivePageCanvas({
     const inPopup=Boolean(target.closest('.formula-screen-card,dialog.formula-screen-modal:not(.formula-screen-page)'));
     const update=()=>{
       const box=target.getBoundingClientRect();
-      setSize({width:box.width||page.canvasWidth,
+      // Preview frames can be visually scaled. Read layout dimensions, not the
+      // transformed bounding box, or a wide Custom preview scales twice.
+      const previewScreen=target.closest<HTMLElement>('.preview-device-scroll');
+      setSize({width:target.clientWidth||box.width||page.canvasWidth,
         height:screenShaped&&!inPopup&&typeof window!=='undefined'
-          ?Math.max(200,window.innerHeight-Math.max(0,box.top)):Number.POSITIVE_INFINITY});
+          ?previewScreen
+            ?Math.max(200,previewScreen.clientHeight)
+            :Math.max(200,window.innerHeight-Math.max(0,box.top))
+          :Number.POSITIVE_INFINITY});
     };
     update();
     const observer=new ResizeObserver(update);

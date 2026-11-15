@@ -42,6 +42,7 @@ test('display formulas become plain functions that match the formula language', 
   assert.equal(String(compiled),String(interpreted.value),source);
  }
  assert.equal(fn(compileDisplayFormula('=RIGHT("0" & TEXT(HOUR(NOW())), 2)').js)({},display()),'21');
+ assert.equal(fn(compileDisplayFormula('=LPAD(7, 3, "0") & RPAD("a", 3, "-")').js)({},display()),'007a--');
  assert.equal(fn(compileDisplayFormula('=$state.category & ":" & $session').js)({},display({category:'beer'})),'beer:s-1');
 });
 

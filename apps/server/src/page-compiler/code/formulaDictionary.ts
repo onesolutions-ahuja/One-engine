@@ -57,6 +57,8 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  LEFT:pure(1,2,'LEFT(text, n)'),RIGHT:pure(1,2,'RIGHT(text, n)'),MID:pure(3,3,'MID(text, start, n)'),
  FIND:pure(2,3,'FIND(find, text, [start]): position or 0'),
  SUBSTITUTE:pure(3,3,'SUBSTITUTE(text, old, new)'),TRIM:pure(1,1,'TRIM(text)'),
+ LPAD:pure(2,3,'LPAD(text, length, [pad]): pad on the left, e.g. LPAD(5, 3, "0") = "005"'),
+ RPAD:pure(2,3,'RPAD(text, length, [pad]): pad on the right'),
  CONTAINS:pure(2,2,'CONTAINS(text, part)'),BEGINS:pure(2,2,'BEGINS(text, start)'),
  CONCAT:pure(1,20,'CONCAT(a, b, ...)'),CONCATENATE:pure(1,20,'CONCATENATE(a, b, ...)'),
  ISPICKVAL:pure(2,2,'ISPICKVAL(picklist, option)'),INCLUDES:pure(2,2,'INCLUDES(multi-picklist, option)'),

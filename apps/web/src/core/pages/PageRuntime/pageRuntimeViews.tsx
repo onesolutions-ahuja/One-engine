@@ -116,6 +116,7 @@ import EmbeddedDashboard from '../EmbeddedDashboard/EmbeddedDashboard';
 import {StandardRecordList,StandardRichText,StandardFlowLauncher} from './StandardPageBlocks';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import ResponsivePageCanvas from './ResponsivePageCanvas';
+import { runtimeRightColumnStart, runtimeResponsiveComponentStyle } from './runtimeCanvasSizing';
 const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));
 const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
@@ -1559,6 +1560,7 @@ function LightningAppRuntime({
     }
     return <div className="records-message" role="status" key={component.id}>{component.label} is not supported on app pages.</div>;
   };
+  const runtimeRightColumn = page.layoutMode === 'free-canvas' ? runtimeRightColumnStart(page) : null;
   const renderCanvasComponent = (component: PageComponentMetadata, nested = false) => {
     if (!isAppComponentVisible(component)) return null;
     return <div key={component.id} className={nested ? 'free-canvas-runtime-component nested-page-runtime' : 'free-canvas-runtime-component'}
@@ -1574,6 +1576,10 @@ function LightningAppRuntime({
               width: component.position?.width ?? 320,
               height: component.position?.height ?? 180
             }),
+        // Grow large left-hand surfaces and anchor right-side panels on wider
+        // monitors; do not enlarge text, icons, buttons or saved component sizes.
+        ...(!nested && !isStandaloneRuntime
+          ? runtimeResponsiveComponentStyle(page, component, runtimeRightColumn) : {}),
         ...(isLayoutType(component.type) ? {} : resolvePageComponentStyle(component.properties, component.type, layoutDevice)),
         ...behaviorAppearance(component.properties,appVisibilityContext),
         ...(isStandaloneRuntime && component.properties?.standalonePresentation === true && !nested

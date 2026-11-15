@@ -38,6 +38,20 @@ const asCompilerObjects=(objects:unknown)=>objects as CompilerObject[];
 
 /** Registered BEFORE the /api bearer-token guard: the ticket is the login. */
 export function registerPageScriptPublicRoute(app:Express,deps:PageScriptDeps){
+ // A published page's code file by its build id. The id is a hash of tenant + app +
+ // the generated code, so the same code always has the same URL: the browser keeps it
+ // (immutable) and a page opened again needs no page-file request. The file holds the
+ // page design only (layout, formulas, actions), never records; data still needs a login.
+ app.get('/api/page-builds/:appId/:buildId',wrap(async(req,res)=>{
+  const appId=String(req.params.appId??''),buildId=String(req.params.buildId??'').replace(/\.js$/,'');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  const build=api.test(appId)&&/^[A-Za-z0-9_-]{32}$/.test(buildId)?deps.scripts.publishedBuild(appId,buildId):null;
+  if(!build){res.setHeader('Cache-Control','no-store');res.status(404).type('text/plain').send('Not found');return;}
+  res.setHeader('Content-Type','text/javascript; charset=utf-8');
+  res.setHeader('Cache-Control','private, max-age=31536000, immutable');
+  res.setHeader('ETag',build.etag);
+  res.send(build.code);
+ }));
  app.get('/api/page-scripts/:ticket',wrap(async(req,res)=>{
   res.setHeader('Cache-Control','private, no-store');
   res.setHeader('X-Content-Type-Options','nosniff');

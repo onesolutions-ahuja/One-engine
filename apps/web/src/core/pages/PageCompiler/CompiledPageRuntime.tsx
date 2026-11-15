@@ -639,12 +639,18 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      show:update=>{
       const stateChanges=Object.entries(update.state).map(([key,value])=>({key,value}));
       if(stateChanges.length)applyState(stateChanges);
-      const objectApiNames=[...new Set(update.changes.map(change=>change.objectApiName))];
       // Failed: every list reads SQL again, so the predicted change disappears.
       if(update.failed){saved({});return;}
-      if(update.optimistic)saved({objectApiNames,recordChanges:update.changes,optimistic:update.optimistic});
-      else if(update.changes.length||update.replaces)saved({objectApiNames:objectApiNames.length?objectApiNames:undefined,
-       recordChanges:update.changes,replacesOptimistic:update.replaces});
+      // Lists are told about their own Object only. Totals and lookups over other
+      // Objects (SUMIFS over the cart) come from the page code's held rows.
+      const listObjects=new Set(runtime.compiled.dataSources.map(item=>item.objectApiName));
+      for(const object of new Set(update.changes.map(change=>change.objectApiName))){
+       const own=update.changes.filter(change=>change.objectApiName===object);
+       if(!listObjects.has(object))continue;
+       if(update.optimistic)void runtime.data.saved({objectApiNames:[object],recordChanges:own,optimistic:update.optimistic});
+       else void runtime.data.saved({objectApiNames:[object],recordChanges:own,replacesOptimistic:update.replaces});
+      }
+      if(!update.optimistic)runtime.broadcastSaved({objectApiNames:[...new Set(update.changes.map(change=>change.objectApiName))]});
      },
      effects:runEffects
     });

@@ -228,13 +228,18 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   /** A save (or a prediction of one): patch rows in place when exact, else reload only readers. */
   saved(detail:PageMutationDetail):Promise<void>{
    // Roll-up and cross-object formula parents change on the server too: their readers reload.
-   const written=withDependentObjects(detail.objectApiNames,objects);
-   if(written!==detail.objectApiNames)detail={...detail,objectApiNames:written};
+   const own=detail.objectApiNames;
+   const written=withDependentObjects(own,objects);
    const work:Promise<void>[]=[];
    // A new or deleted parent (a cart) is rediscovered on the next read.
    if(!detail.optimistic)load.invalidate?.(written);
    for(const source of compiled.dataSources){
     if(written&&!readsObject(source,written))continue;
+    // Reads only a roll-up parent of what was saved: re-read it after the real save.
+    if(own&&written&&!readsObject(source,own)){
+     if(!detail.optimistic)work.push(reload(source.id));
+     continue;
+    }
     const current=snapshots.get(source.id);
     const reads=source.components.map(id=>componentReads.get(id));
     const fullyLoaded=Boolean(current&&!current.hasMore&&current.records.length===current.total);

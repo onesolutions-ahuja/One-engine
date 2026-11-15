@@ -29,3 +29,23 @@ generates real code for that page revision.
    tenant_id and real columns + indexes for standard fields, plus one JSONB column for
    tenant-added fields (expression/trigram indexes for searched ones). Migrate from
    `md_records`/`md_record_values` object by object behind the record service API.
+
+## Status (15 Nov 2026, evening)
+Done (PRs #102, #103, this PR):
+- `apps/server/src/page-compiler/code/formulaDictionary.ts`: every formula defined once with the
+  code it becomes. Adding a formula = one entry there (+ its plain function in `formulaLibrary.ts`).
+- On save/publish each page revision is converted (`pageCode.ts`): display formulas -> plain
+  functions; each action -> ONE async function that the browser runs first on held rows (instant
+  tap) and the server runs on SQL in ONE transaction (all or nothing; the clicked row is re-read
+  from SQL). The server returns the saved rows and fresh "record sets" (open cart + its lines).
+- Totals over rows on screen (SUMIFS over the open cart) run in the browser: no evaluate-many.
+- Popup pages load only when first opened; Smart library + index load with page open.
+- Page file served by build id with immutable caching (repeat opens need no page-file request).
+
+Not done yet:
+- Old run-time formula engine (FieldExpression interpreter, evaluate-many, compiled-actions
+  interpreter path) is still present for formulas/actions the converter does not cover yet
+  (EMAIL/SMS/WHATSAPP/WAIT/LOCATION/RECORDPAYMENT/CREATEPDF steps, COLLECTION/TABLE criteria
+  forms, Flow/Navigate bindings). Remove once every page converts (see `codeIssues` in each page file).
+- Published apps still load the Setup shell and landing-bootstrap (358 KB).
+- Storage: real per-object tables (tenant_id, typed columns, JSONB extras, pg_trgm) not started.

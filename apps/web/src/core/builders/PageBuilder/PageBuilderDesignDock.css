@@ -1021,11 +1021,10 @@
   flex:0 1 auto!important;min-width:0!important;
   white-space:nowrap!important;font-size:10px!important;
 }
-/* Spacing: Padding / Key gap / Card Gap share a single full-width row.
- * Equal tracks use all available width, including spinner buttons. */
+/* Padding and the shared Gap are the only spacing controls. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  .smart-design2-others-section [data-others-group="Spacing"] .smart-design2-supplemental{
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
 }
 /* Calendar: existing two-up controls, paired in the requested order. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content

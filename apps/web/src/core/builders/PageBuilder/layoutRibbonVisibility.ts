@@ -1,7 +1,7 @@
 import type {Design2Slot,Design2SlotRule} from './builderPropertyInventory';
 
 // These are retired from the ribbon presentation, not from metadata or saved pages.
-export const HIDDEN_RIBBON_PROPERTY_KEYS=new Set(['imageBorderColor','iconFillColor','defaultCheck','columnVisibility','badgeVisible','tabIndex']);
+export const HIDDEN_RIBBON_PROPERTY_KEYS=new Set(['imageBorderColor','iconFillColor','defaultCheck','columnVisibility','badgeVisible','tabIndex','numpadGap']);
 
 /** A Layout control may disappear only if every selected component can edit that
  * exact property through an enabled Design 2 control. Different keys (for example,

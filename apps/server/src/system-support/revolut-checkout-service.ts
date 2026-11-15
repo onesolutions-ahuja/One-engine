@@ -121,7 +121,7 @@ export function registerRevolutCheckoutRoutes(
  };
  const settings=(c:Credential)=>parseSettings(c.configuration_ciphertext
   ?JSON.parse(vault.decryptOpaque(c.configuration_ciphertext,c.encryption_key_id)) as unknown:{});
- const merchant=async(tenant:string,c:Credential,method:'GET'|'POST',path:string,body?:Record<string,unknown>,attempt?:string)=>{
+ const merchant=async(tenant:string,c:Credential,method:'GET'|'POST'|'PATCH',path:string,body?:Record<string,unknown>,attempt?:string)=>{
   if(!c.secret_ciphertext)throw Error('Revolut Secret Merchant API key is not configured');
   const key=vault.decryptOpaque(c.secret_ciphertext,c.encryption_key_id);
   const data=body?JSON.stringify(body):undefined;
@@ -191,9 +191,14 @@ export function registerRevolutCheckoutRoutes(
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
    ON CONFLICT(tenant_id,created_by,attempt_key) DO UPDATE
     SET updated_at=md_revolut_checkout_orders.updated_at
+    WHERE md_revolut_checkout_orders.source_record_id=EXCLUDED.source_record_id
+     AND md_revolut_checkout_orders.source_object=EXCLUDED.source_object
+     AND md_revolut_checkout_orders.amount_minor=EXCLUDED.amount_minor
+     AND md_revolut_checkout_orders.currency=EXCLUDED.currency
    RETURNING id,public_token`,
    [who.tenant_id,c.id,who.user_id,s.recordObject,recordId,attemptKey,
     order.id,order.token,amount,s.currency]);
+  if(!rows[0]){res.status(409).json({error:'Payment attempt does not match the record'});return;}
   res.status(201).json({id:rows[0].id,token:rows[0].public_token});
  }));
  app.get('/api/revolut/checkout/orders/:id',route(async(req,res)=>{
@@ -216,23 +221,44 @@ export function registerRevolutCheckoutRoutes(
   if(!/^[A-Za-z0-9.-]+(?::443)?$/.test(host)||host.includes('..')
     ||host.startsWith('localhost')||host.startsWith('127.'))
    {res.status(400).json({error:'A public HTTPS hostname is required for Revolut webhooks'});return;}
-  const placeholder=randomBytes(32).toString('hex');
-  const local=await vault.configureWebhook(who.tenant_id,who.user_id,c.id,true,placeholder);
+  // Existing registrations keep their signing secret active until the remote
+  // registration and replacement secret have been successfully retrieved.
+  const {rows:localRows}=await db.query<{id:string}>(`
+   SELECT id FROM md_inbound_webhook_endpoints
+   WHERE tenant_id=$1 AND credential_id=$2 LIMIT 1`,[who.tenant_id,c.id]);
+  const existingId=localRows[0]?.id;
+  const local=existingId?{webhookId:existingId}:
+   await vault.configureWebhook(who.tenant_id,who.user_id,c.id,true,
+    randomBytes(32).toString('hex'));
   const callbackUrl='https://'+host+'/api/inbound-webhooks/'+local.webhookId;
   try{
-   const registered=await merchant(who.tenant_id,c,'POST','api/webhooks',
-    {url:callbackUrl,events:EVENTS});
+   // Revolut limits webhook registrations. Reuse the existing remote endpoint
+   // rather than creating a duplicate every time an admin clicks reconnect.
+   const list=await merchant(who.tenant_id,c,'GET','api/webhooks');
+   const existing=Array.isArray(list.webhooks)
+    ?list.webhooks.find((item:unknown)=>{
+      const row=item&&typeof item==='object'?item as Record<string,unknown>:{};
+      return row.url===callbackUrl&&typeof row.id==='string'&&UUID.test(row.id);
+     }) as Record<string,unknown>|undefined:undefined;
+   let registered:Record<string,unknown>;
+   if(existing){
+    const missing=EVENTS.some(event=>!Array.isArray(existing.events)||!existing.events.includes(event));
+    registered=missing
+     ?await merchant(who.tenant_id,c,'PATCH','api/webhooks/'+existing.id,{events:EVENTS})
+     :await merchant(who.tenant_id,c,'GET','api/webhooks/'+existing.id);
+   }else{
+    registered=await merchant(who.tenant_id,c,'POST','api/webhooks',
+     {url:callbackUrl,events:EVENTS});
+   }
    if(typeof registered.signing_secret!=='string'||registered.signing_secret.length<16
      ||registered.signing_secret.length>512)throw Error('Revolut webhook signing secret missing');
    await vault.configureWebhook(who.tenant_id,who.user_id,c.id,true,registered.signing_secret);
-   // The generic endpoint was created as HmacSha256; its Revolut signature
-   // policy is activated only after the remote signing secret was installed.
    await db.query(`UPDATE md_inbound_webhook_endpoints SET provider='Revolut',
        updated_at=now() WHERE tenant_id=$1 AND id=$2 AND credential_id=$3`,
     [who.tenant_id,local.webhookId,c.id]);
    res.json({connected:true,callbackUrl});
   }catch(error){
-   await vault.configureWebhook(who.tenant_id,who.user_id,c.id,false);
+   if(!existingId)await vault.configureWebhook(who.tenant_id,who.user_id,c.id,false);
    throw error;
   }
  }));

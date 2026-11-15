@@ -180,7 +180,7 @@ export function registerRevolutCheckoutRoutes(
    [who.tenant_id,s.recordObject,recordId]);
   if(existing.rows.length){res.status(409).json({error:'This record is already paid'});return;}
   const order=await merchant(who.tenant_id,c,'POST','api/orders',
-   {amount,currency:s.currency,merchant_order_ext_ref:attemptKey},attemptKey);
+   {amount,currency:s.currency,merchant_order_data:{reference:attemptKey}},attemptKey);
   if(typeof order.id!=='string'||!UUID.test(order.id)
     ||typeof order.token!=='string'||order.token.length<8||order.token.length>500)
    throw Error('Revolut order returned no usable checkout token');

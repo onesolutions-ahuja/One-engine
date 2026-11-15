@@ -186,6 +186,31 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     VALUES('smart_cart','Table','extra_tableSidePadding','tableSidePadding')
     ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
   `);
+  // Keep the repeated card fill and the background visible between cards as
+  // separate Smart Card Grid surfaces.
+  await client.query(`
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,
+      choices,scope,min_value,max_value,field_select,design_row,design_order,
+      design_width,design_height,design_caption_width,design_display)
+    SELECT 'gridBackgroundColor','Grid background','Design2','Grid','color',
+      COALESCE(MAX(sort_order),0)+1,NULL::jsonb,'[]'::jsonb,'component',NULL,NULL,false,2,1,40,26,0,'buttons'
+    FROM md_builder_shared_properties
+    ON CONFLICT(property_key) DO NOTHING;
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    VALUES('smart_card_grid','gridBackgroundColor',true)
+    ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true;
+    INSERT INTO md_builder_design2_slots
+     (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+    VALUES('Grid',9,'fill',2,1,40,26,'gridBackgroundColor','backgroundColor')
+    ON CONFLICT(area,slot_key) DO UPDATE SET
+      area_order=EXCLUDED.area_order,row_no=EXCLUDED.row_no,order_no=EXCLUDED.order_no,
+      width_px=EXCLUDED.width_px,height_px=EXCLUDED.height_px,
+      property_key=EXCLUDED.property_key,fallback_key=EXCLUDED.fallback_key;
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    VALUES('smart_card_grid','Grid','fill','gridBackgroundColor')
+    ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+  `);
   await client.query(`
     WITH styles(suffix,label,control_kind,min_value,max_value,choices,display_order) AS (
       VALUES

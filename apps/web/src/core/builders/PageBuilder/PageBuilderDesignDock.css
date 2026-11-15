@@ -1533,3 +1533,36 @@
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
  [data-others-property="chartColor6"]{order:13!important;}
+
+/* Values with at most three digits should not occupy a half-width box. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]>.smart-design2-supplemental{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadPlaceholder"]{
+  grid-column:1/-1!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadInputMode"]{order:1!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadDecimalPlaces"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadMaxDigits"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="inputRows"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadMask"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadPlaceholder"]{order:6!important;}
+/* Text editors need a full-width field, without extra expression captions. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-property="calendarTimeZone"]
+ .smart-simple-text-input{width:100%!important;}

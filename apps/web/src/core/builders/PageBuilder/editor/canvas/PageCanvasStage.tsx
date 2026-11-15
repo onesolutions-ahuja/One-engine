@@ -136,7 +136,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
               {/* Phone/Tablet Preview runs inside a device-sized screen that scrolls
                   on its own, like Chrome's device mode. SCREEN(...,popup) pages
                   open inside this screen (data-formula-screen-host). */}
-              <PreviewDeviceFrame device={device} width={page.canvasWidth}>
+              <PreviewDeviceFrame device={device} width={page.canvasWidth} height={page.canvasHeight} layoutVariant={page.layoutVariant}>
               {scriptPending ? <div className="records-message" role="status">Loading the server-built page…</div> :
               <LightningAppRuntime compiledPage={script?.plan ?? compiledPreview ?? undefined} compiledScript={script}
                 appId={builderAppApiName || apps[0]?.apiName || 'Records'}

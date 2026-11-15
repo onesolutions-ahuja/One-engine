@@ -85,8 +85,12 @@ export async function loadAppPageScript(request:Request,appId:string,page:{apiNa
  if(!fresh)throw Error('The server did not convert this page');
  return importAppPageScript(appId,page,variant,fresh);
 }
+/** The page file by build id: the browser keeps it, so opening the page again costs no request. */
+const buildUrl=(appId:string,buildId:string)=>apiBase+'/page-builds/'+encodeURIComponent(appId)+'/'+encodeURIComponent(buildId)+'.js';
 async function importAppPageScript(appId:string,page:{apiName:string},variant:string,answer:IssuedAppPageScript):Promise<LoadedPageScript>{
- const module=await import(/* @vite-ignore */ apiBase+'/page-scripts/'+answer.ticket+'.js') as Partial<PageScriptModule>;
+ let module:Partial<PageScriptModule>;
+ try{module=await import(/* @vite-ignore */ buildUrl(appId,answer.buildId)) as Partial<PageScriptModule>;}
+ catch{module=await import(/* @vite-ignore */ apiBase+'/page-scripts/'+answer.ticket+'.js') as Partial<PageScriptModule>;}
  const plan=module.plan;
  if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')
   throw Error('The server page script is not valid for this page');

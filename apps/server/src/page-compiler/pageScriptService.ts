@@ -154,6 +154,11 @@ export class PageScriptService{
   this.appBuilds.set(buildId,built);
   return {buildId,built};
  }
+ /** A published build by id alone (the id already binds tenant + app + code). */
+ publishedBuild(appId:string,buildId:string):(Built&{apiName:string})|null{
+  const entry=this.appBuilds.get(buildId);
+  return entry&&entry.appId===appId?entry:null;
+ }
  appBuild(tenantId:string,appId:string,buildId:string):(Built&{apiName:string})|null{
   const entry=this.appBuilds.get(buildId);
   return entry&&entry.tenantId===tenantId&&entry.appId===appId?entry:null;

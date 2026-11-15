@@ -11,7 +11,7 @@ import type {IntegrationActivityWriter} from './integration-api-log.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Authenticated=Request & {actor?:Actor;rawWebhookBody?:Buffer};
-type Endpoint={tenant_id:string;id:string;api_name:string;flow_api:string|null;
+type Endpoint={tenant_id:string;id:string;api_name:string;credential_id:string|null;flow_api:string|null;
  execution_user_id:string|null;created_by:string;credential_name:string|null;
  channel_id:string|null;channel_name:string|null;
  verify_token_digest:Buffer;signature_secret_ciphertext:Buffer;

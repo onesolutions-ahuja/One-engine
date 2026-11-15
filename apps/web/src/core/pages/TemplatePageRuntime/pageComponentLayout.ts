@@ -163,7 +163,15 @@ export function resolvePageComponentStyle(
   // Do not turn those defaults into newly visible decorative component shells.
   const oldSnapshot = Object.keys(visualDefaults).every(key => authored[key] !== undefined);
   const visual: CSSProperties = {};
-  if (isLayoutType(type)) Object.assign(visual, componentVisualStyle(properties.visualStyle, type, device));
+  if (isLayoutType(type)) {
+    Object.assign(visual, componentVisualStyle(properties.visualStyle, type, device));
+    // Standard Container/Row/Column/Card/Grid metadata can also store a direct
+    // fill property. The live runtime honors it, so the design canvas must use
+    // it when no visualStyle fill was authored.
+    const directFill=properties.backgroundColor;
+    if(visual.backgroundColor===undefined&&typeof directFill==='string'&&colorPattern.test(directFill))
+      visual.backgroundColor=directFill;
+  }
   else {
     const keys = ['padding','margin','borderWidth','borderRadius','backgroundColor','borderColor','color'] as const;
     for (const key of keys) {

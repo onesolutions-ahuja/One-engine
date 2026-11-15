@@ -201,6 +201,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const cardBorder=single?"none":strokeWidth===0?"none":
   (strokeWidth+"px solid "+(p.borderColor||"#e2e8f0"));
  return <article className="smart-card"
+  data-design-area={p.builderPreview&&grid?"Body":undefined}
   onClick={onSelect?event=>{if(event.target.closest("button"))return;onSelect();}:undefined}
   onKeyDown={onSelect?event=>{
    if(event.target!==event.currentTarget)return;
@@ -912,7 +913,7 @@ export default function SmartRuntime(p){
   const previewRows=(p.previewOnly===true||p.builderPreview===true||p.preview===true)&&boundRows.length===0
     ?Array.from({length:columns*rows},(_,i)=>({Id:"card-preview-"+i,Name:"Sample item "+(i+1)}))
     :boundRows;
-  content=<div ref={gridViewportRef} data-md-bind={p.builderPreview&&p.collectionFormula?"collectionFormula":undefined} className="smart-grid" role="region" aria-label="Product cards" tabIndex={0}
+  content=<div ref={gridViewportRef} data-design-area={p.builderPreview?"Grid":undefined} data-md-bind={p.builderPreview&&p.collectionFormula?"collectionFormula":undefined} className="smart-grid" role="region" aria-label="Product cards" tabIndex={0}
    onKeyDown={event=>{
      // The inner grid is an independent keyboard scroller. Never steal
      // arrow/action keys from a focused card or from the Page Builder.
@@ -941,7 +942,7 @@ export default function SmartRuntime(p){
    ...(gridViewportHeight>0?{
     gridAutoRows:Math.max(minimumCardHeight,(gridViewportHeight-(rows-1)*gap)/rows)+"px"
    }:{}),
-   alignContent:"start"
+   alignContent:"start",backgroundColor:p.gridBackgroundColor||undefined
   }}>
    {previewRows.map((r,i)=>{
     // One shared click event handles either the authored card button or the

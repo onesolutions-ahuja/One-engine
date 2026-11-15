@@ -5,6 +5,7 @@ import {
   runtimeCanvasWidthScale,runtimeCanvasExtraWidth,
   runtimeRightColumnStart,runtimeResponsiveComponentStyle
 } from '../src/core/pages/PageRuntime/runtimeCanvasSizing';
+import {resolvePageComponentStyle} from '../src/core/pages/TemplatePageRuntime/pageComponentLayout';
 
 const component=(id:string,x:number,y:number,width:number,height:number):PageComponentMetadata=>({
   id,type:'Custom:smart_card_grid',label:id,visible:true,properties:{},
@@ -58,4 +59,9 @@ test('non-column pages preserve normal sized controls and nested layouts',()=>{
   const lonely=component('button',200,100,180,60);
   assert.deepEqual(runtimeResponsiveComponentStyle(page,lonely,null),{});
   assert.deepEqual(runtimeResponsiveComponentStyle(page,{...cart,parentId:'inside'},810),{});
+});
+
+test('standard layout component direct fill is visible in the design renderer',()=>{
+  assert.equal(resolvePageComponentStyle({backgroundColor:'#ffdf70'},'Container').backgroundColor,'#ffdf70');
+  assert.equal(resolvePageComponentStyle({visualStyle:{backgroundColor:'#e5e7eb'},backgroundColor:'#ffdf70'},'Container').backgroundColor,'#e5e7eb');
 });

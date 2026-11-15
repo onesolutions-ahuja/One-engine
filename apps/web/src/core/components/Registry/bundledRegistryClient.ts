@@ -5,6 +5,21 @@ export type SqlRegisteredComponent = {
   rendererKey:string;
 };
 
+let indexRequest:{baseUrl:string;promise:Promise<unknown>}|null=null;
+function loadIndex(baseUrl:string):Promise<unknown>{
+  if(indexRequest?.baseUrl===baseUrl)return indexRequest.promise;
+  const promise=fetch(`${baseUrl}component-library/catalog-index.json`,{cache:'no-cache'}).then(response=>{
+    if (!response.ok) throw Error('Bundled component index unavailable');
+    return response.json() as Promise<unknown>;
+  });
+  promise.catch(()=>{if(indexRequest?.promise===promise)indexRequest=null;});
+  indexRequest={baseUrl,promise};
+  return promise;
+}
+/** Start loading the bundled component index now (page open needs it); later calls reuse it. */
+export function prefetchSqlComponentIndex(baseUrl: string = import.meta.env.BASE_URL):void{
+  loadIndex(baseUrl).catch(()=>undefined);
+}
 /** Only SQL-enabled, explicitly bundled definitions acquire trusted runtime assets.
  * The lightweight index is loaded after authentication, not during public startup. */
 export async function resolveSqlComponentLibrary(
@@ -13,9 +28,7 @@ export async function resolveSqlComponentLibrary(
 ): Promise<LibraryComponentMetadata[]> {
   const authorised = registered.filter(item => item.apiName.startsWith('smart_') && item.rendererKey === 'smart-bundled:' + item.apiName);
   if (!authorised.length) return [];
-  const response = await fetch(`${baseUrl}component-library/catalog-index.json`,{cache:'no-cache'});
-  if (!response.ok) throw Error('Bundled component index unavailable');
-  const payload:unknown = await response.json();
+  const payload:unknown = await loadIndex(baseUrl);
   if (!payload || typeof payload !== 'object' || !('components' in payload) ||
     !Array.isArray(payload.components)) throw Error('Invalid bundled component index');
   const indexed = new Map<string, LibraryComponentMetadata>();

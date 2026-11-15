@@ -1,7 +1,7 @@
 // @ts-nocheck
 // Tenant-scoped bootstrap: core metadata first, optional admin metadata afterwards.
 import { useEffect, useRef } from 'react';
-import { resolveSqlComponentLibrary } from '../../components/Registry/bundledRegistryClient';
+import { resolveSqlComponentLibrary, prefetchSqlComponentIndex } from '../../components/Registry/bundledRegistryClient';
 import { setAuthenticatedFormulaBindingContext } from '../../components/RegisteredComponent/fieldExpressionRuntime';
 import { saveVerifiedMetadata, type MetadataPublicationResponse } from '../../metadata/Cache/verifiedMetadataCache';
 import { reconcileCurrentAppId, reconcileSelectedObject, reconcileSelectedPage } from './metadataSelection';
@@ -171,8 +171,11 @@ export function useSetupMetadata(ctx: any) {
       };
       // Start the component library at the same time as the bootstrap. It does not depend on
       // it, and it used to wait for it (an extra 0.6 s). recover() reuses this same request later.
-      if (route.kind === 'setup' && route.workspace !== 'home')
-        recover<{ components: LibraryComponentMetadata[]; registered: {apiName:string;rendererKey:string}[]; canManage: boolean }>('/component-library', { components: [], registered: [], canManage: false }).catch(() => undefined);
+      // App pages need it too (their Smart components): start it now, not after the 0.7 s pause.
+      const libraryRequest = recover<{ components: LibraryComponentMetadata[]; registered: {apiName:string;rendererKey:string}[]; canManage: boolean }>('/component-library', { components: [], registered: [], canManage: false });
+      libraryRequest.catch(() => undefined);
+      // The bundled component index is a static file: fetch it in parallel, not after the library.
+      prefetchSqlComponentIndex();
       // Login can carry the bootstrap directly. Session restoration deliberately
       // returns its token promptly, then obtains the same RBAC-checked snapshot
       // through one authenticated request instead of four independent reads.
@@ -234,6 +237,13 @@ export function useSetupMetadata(ctx: any) {
           setCanManageApps(firstSession.user.permissions.includes('metadata:write')); setCanReadMetadata(firstSession.user.permissions.includes('metadata:read')||firstSession.user.permissions.includes('metadata:write')); setCanReadSecurity(firstSession.user.permissions.includes('security:read')||firstSession.user.permissions.includes('security:manage'));
           setSessionPermissionsLoaded(true);
           setMetadataLoaded(true);
+          // App pages draw Smart components: hand them the library as soon as it arrives.
+          if (route.kind !== 'setup') {
+            try {
+              const library = await libraryRequest;
+              setLibraryComponents([...library.components, ...await resolveSqlComponentLibrary(library.registered ?? [])]);
+            } catch { /* the full load below reports it */ }
+          }
           // Give the landing screen a chance to paint before loading editor-only
           // data in the background. On direct builder URLs the full load begins
           // immediately, preserving the previous deep-link behaviour.

@@ -69,8 +69,11 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   return {records,total:paged?page.total:records.length,
    serverFilters:query.filters,relatedFilter:related.filter,paged,
    // The parent filter is checked separately (relatedFilter), so it never makes rows unpredictable.
-   predictable:Boolean(query.serverFilterable&&!source.filterFormula
-    &&(!query.filterLogic||/^\(?1\)?$/.test(query.filterLogic)))};
+   // Exact when every filter must hold (AND only) and each is equal/blank: a saved
+   // or predicted row can then be placed in (or taken out of) the list without a re-read.
+   predictable:Boolean(query.serverFilterable
+    &&(!query.filterLogic||!/\b(?:OR|NOT)\b/i.test(query.filterLogic))
+    &&(query.filters??[]).every(filter=>filter.operator==='eq'||filter.operator==='isBlank'))};
  };
  // Search follows the exact same metadata filter and parent-scope rules as the
  // list loader. Never show broader results when a filter cannot run on the server.

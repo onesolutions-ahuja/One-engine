@@ -33,7 +33,9 @@ function validate(value:Definition,apiName:string):Definition{
   if(!id.test(operation)||!['GET','POST','PUT','PATCH','DELETE'].includes(definition.method)
    ||!definition.path||definition.path.startsWith('/')||definition.path.includes('\\')
    ||(definition.headers!==undefined&&(typeof definition.headers!=='string'
-     ||definition.headers.length>512||!/^Revolut-Api-Version: \\d{4}-\\d{2}-\\d{2}$/.test(definition.headers))))
+     ||definition.headers.length>512
+     ||definition.headers.split(/\r?\n/).some(line=>
+       !/^(?:X-[A-Za-z0-9-]+|Revolut-Api-Version): [A-Za-z0-9._:-]{1,128}$/i.test(line)))))
     throw Error('Invalid connector operation: '+apiName);
  }
  return value;

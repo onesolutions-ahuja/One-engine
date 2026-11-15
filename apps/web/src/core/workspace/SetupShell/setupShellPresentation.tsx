@@ -533,6 +533,7 @@ export function renderSetupShell(ctx: any) {
             encryptionReady={namedCredentialsEncryptionReady}
             onSave={saveNamedCredential}
             onDelete={deleteNamedCredential}
+            onTest={testNamedCredential}
             onRotate={rotateNamedCredential}
             onTest={testNamedCredential}
             canTest={canManageNamedCredentials}

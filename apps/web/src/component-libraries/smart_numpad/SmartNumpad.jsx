@@ -83,7 +83,7 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
  const bodyStyle={
   background:p.backgroundColor||"transparent",border:p.borderColor?"1px solid "+p.borderColor:"none",
   borderRadius:size(p.radius,12,0,128),boxShadow:shadow(p.shadow),
-  gap:size(p.numpadGap,8,0,48),padding:size(p.numpadPadding,10,0,80)
+  gap:gap,padding:size(p.numpadPadding,10,0,80)
  };
  const customStyle=index=>{
   const prefix="customButton"+index;
@@ -119,10 +119,10 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
      if(p.actionFlows?.click)fire("click",valueRef.current);}}}/>
    {p.numpadSuffix&&!isPin&&<span className="smart-numpad-suffix" aria-hidden="true">{p.numpadSuffix}</span>}
   </div>
-  <div className="smart-numpad-grid" style={{gap:size(p.numpadGap,8,0,48)}}>
+  <div className="smart-numpad-grid" style={{gap:gap}}>
    {labels.map(key=>sharedButton(key,key==="backspace"?"⌫":key,baseKey,()=>press(key)))}
   </div>
-  <div className="smart-numpad-custom-row" style={{gap:size(p.numpadGap,8,0,48)}}>
+  <div className="smart-numpad-custom-row" style={{gap:gap}}>
    {[1,2,3].filter(index=>p["customButton"+index+"Visible"]!==false).map(index=>sharedButton("customButton"+index,
     String(buttonLabels[index-1]||"Custom "+index),customStyle(index),
     ()=>{const event="customButton"+index;

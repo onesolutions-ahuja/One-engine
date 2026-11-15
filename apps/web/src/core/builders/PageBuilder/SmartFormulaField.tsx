@@ -239,7 +239,8 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   setValidationError(error);
   // An edit that fails validation is not saved: always say so instead of
   // silently showing the old value next time (e.g. a Record filter left blank).
-  if(error&&(isFormulaDraft(draft.trim())||draft!==value))setConfirmIncomplete(true);
+  if(error&&isFormulaDraft(draft.trim()))setConfirmIncomplete(true);
+  else if(error&&draft!==value)setConfirmIncomplete(true);
  };
  const keyDown=(event:KeyboardEvent<HTMLInputElement>)=>{
   const options=functionMatch?functionSuggestions:matches?filtered:[];

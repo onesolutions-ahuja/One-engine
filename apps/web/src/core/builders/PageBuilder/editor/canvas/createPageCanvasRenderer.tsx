@@ -152,7 +152,7 @@ export function createPageCanvasRenderer(
           :undefined;
         const cartColumn=Number(cartColumnNode?.dataset.mdCartColumn);
         if(cartColumnNode&&Number.isInteger(cartColumn)&&cartColumn>=1&&cartColumn<=5){
-          setSelectedCartColumn(cartColumn);
+          setSelectedCartColumn(cartColumn,component.id);
           chooseCanvasDesignArea('Cart columns');
           if(openDesignSection!=='Properties')toggleDesignSection('Properties');
         }else{

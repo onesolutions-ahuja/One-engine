@@ -506,10 +506,6 @@ export function createPageRibbon(
             </button>
             {openDesignSection==='Conditional Visibility'&&<div className="page-builder-dock-section-body">
               <div className="page-builder-visibility-controls">
-                <label className="ribbon-small-checkbox"><input type="checkbox"
-                  checked={selected?.visible??false} disabled={!selected}
-                  onChange={event=>{if(selected)updateComponent(selected.id,{visible:event.target.checked});}}/>
-                  Visible on this page</label>
                 <button type="button" className="office-ribbon-icon-button" aria-label="Edit conditional visibility"
                   title="Edit conditional visibility" disabled={!selected} onClick={openVisibilityEditor}>
                   <Filter size={17} aria-hidden="true"/></button>

@@ -68,6 +68,18 @@ const scalarState=(state:unknown):Record<string,unknown>=>{
 };
 
 class ServerScope{
+ /** Same read between two writes of that Object = one SQL read (SUMIFS asked 3 times costs 1). */
+ private readonly reads=new Map<string,Promise<unknown>>();
+ private cached<T>(object:string,key:string,read:()=>Promise<T>):Promise<T>{
+  const id=object+'\u0000'+key;
+  const hit=this.reads.get(id) as Promise<T>|undefined;
+  if(hit)return hit;
+  const promise=read();
+  promise.catch(()=>{if(this.reads.get(id)===promise)this.reads.delete(id);});
+  this.reads.set(id,promise);
+  return promise;
+ }
+ private forget(object:string){for(const id of [...this.reads.keys()])if(id.startsWith(object+'\u0000'))this.reads.delete(id);}
  readonly changes:RecordChange[]=[];
  readonly effects:Array<{name:string;args:unknown[]}>=[];
  readonly stateChanges:Record<string,unknown>=Object.create(null);
@@ -122,9 +134,10 @@ class ServerScope{
   return second===undefined?this.verify(first):this.verify(second,first);
  }
  private async rows(object:string,criteria:ReadonlyArray<readonly [string,unknown]>,max:number):Promise<{rows:Row[];complete:boolean}>{
+  const filters=criteriaFilters(criteria);
+  return this.cached(object,'rows:'+max+':'+JSON.stringify(filters),async()=>{
   const rows:Row[]=[];
   let cursor:unknown;
-  const filters=criteriaFilters(criteria);
   for(;;){
    const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,100,0,
     {filters,...(cursor?{cursor:cursor as never}:{})}) as {records:Row[];total:number;nextCursor?:unknown};
@@ -133,11 +146,23 @@ class ServerScope{
    if(page.records.length<100||!page.nextCursor||rows.length>=page.total)return {rows,complete:true};
    cursor=page.nextCursor;
   }
+  });
  }
  async getRecord(object:string,criteria:Array<[string,unknown]>){
-  const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,1,0,
-   {filters:criteriaFilters(criteria)}) as {records:Row[]};
-  return page.records[0]??{};
+  // GETRECORD(Object, Id, x): one row by Id.
+  if(criteria.length===1&&criteria[0][0]==='Id'){
+   const id=criteria[0][1];
+   if(typeof id!=='string'||!uuid.test(id))return {};
+   return this.cached(object,'id:'+id,async()=>{
+    try{return await this.records.get(this.actor.tenant_id,this.actor.user_id,object,id) as Row;}
+    catch(error){if(error instanceof Error&&/not found/i.test(error.message))return {};throw error;}
+   });
+  }
+  const filters=criteriaFilters(criteria);
+  return this.cached(object,'first:'+JSON.stringify(filters),async()=>{
+   const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,1,0,{filters}) as {records:Row[]};
+   return page.records[0]??{};
+  });
  }
  async list(object:string,criteria:Array<[string,unknown]>){
   const result=await this.rows(object,criteria,RECORD_SET_LIMIT);
@@ -146,9 +171,11 @@ class ServerScope{
  }
  async agg(kind:string,object:string,field:string,criteria:Array<[string,unknown]>){
   if(kind==='COUNTIFS'){
-   const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,1,0,
-    {filters:criteriaFilters(criteria)}) as {total:number};
-   return page.total;
+   const filters=criteriaFilters(criteria);
+   return this.cached(object,'count:'+JSON.stringify(filters),async()=>{
+    const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,1,0,{filters}) as {total:number};
+    return page.total;
+   });
   }
   const result=await this.rows(object,criteria,5000);
   if(!result.complete)throw Error(kind+' matches more than 5000 records; narrow the criteria');
@@ -168,22 +195,27 @@ class ServerScope{
   catch{/* write-only users keep the Id */}
   this.changes.push({objectApiName:object,operation,record:row});
   this.written.add(object);
+  this.forget(object);
   return row;
  }
  async create(object:string,pairs:Array<[string,unknown]>){
+  this.forget(object);
   const id=await this.records.create(this.actor.tenant_id,this.actor.user_id,object,this.values(pairs)) as unknown as string;
   return this.saved(object,String(id),'create');
  }
  async update(object:string,id:unknown,pairs:Array<[string,unknown]>){
   if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
+  this.forget(object);
   await this.records.update(this.actor.tenant_id,this.actor.user_id,object,id,this.values(pairs));
   return this.saved(object,id,'update');
  }
  async remove(object:string,id:unknown){
   if(typeof id!=='string'||!uuid.test(id))throw Error('DELETERECORD needs a record Id');
+  this.forget(object);
   await this.records.remove(this.actor.tenant_id,this.actor.user_id,object,id);
   this.changes.push({objectApiName:object,operation:'delete',record:{Id:id}});
   this.written.add(object);
+  this.forget(object);
  }
  setState(name:string,value:unknown){
   if(!key.test(name))throw Error('Invalid Page State key');

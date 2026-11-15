@@ -318,7 +318,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
    backgroundColor:p.summaryBackgroundColor||"#f7f9fc",
    border:border(p.summaryBorderColor),borderRadius:n(p.summaryRadius,8),
    boxShadow:shadow(p.summaryShadow),minHeight:n(p.summaryHeight,148,40),
-   width:p.summaryWidth?n(p.summaryWidth,600,1,10000):"100%",maxWidth:"100%"}}>
+   width:p.summaryWidth?n(p.summaryWidth,600,1,10000):"100%",maxWidth:"100%",
+   // The cart's Padding is also the totals box's left/right inset, so labels
+   // and amounts line up with the item columns above.
+   paddingLeft:n(p.tableSidePadding,6,0,80),paddingRight:n(p.tableSidePadding,6,0,80)}}>
    {["Subtotal","Discount","Tax"].map(label=><div key={label} className="smart-cart-summary-line"
     style={{fontSize:n(p.summaryTextSize,14,8,96),
      textAlign:p.summaryAlignment?align(p.summaryAlignment):undefined,

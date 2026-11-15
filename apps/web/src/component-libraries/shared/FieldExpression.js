@@ -280,6 +280,11 @@ export function evaluateParsedExpression(expression,record,formulaContext){
    const selected=parseComponentStateReference(reference);
    if(selected)return readComponentState(formulaContext.namedCollectionSelections
      ??formulaContext.pageState?.collectionSelections,selected.name,selected.field);
+   // Event values of the action being run: @recordId (the clicked row/card),
+   // @value (tab Id, typed or scanned text), @index, @label.
+   if(['recordId','value','index','label'].includes(reference)&&currentRecord&&typeof currentRecord==='object'
+     &&!Array.isArray(currentRecord)&&Object.prototype.hasOwnProperty.call(currentRecord,reference))
+    return currentRecord[reference]??'';
    if(/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(reference)){
     if(Object.prototype.hasOwnProperty.call(formulaContext.collectionSources??{},reference))
      throw Error('Use @'+reference+' as a component Data Source, not a scalar field');

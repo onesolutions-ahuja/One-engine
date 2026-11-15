@@ -494,7 +494,10 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      return openFormulaScreen(formula,navigationContext,onNavigate as never,runtime.pageSessionKey,session,
       String(event.recordId??pageState.recordId??record?.Id??''),
       source=>{
-       const result=evaluateFieldExpressionDetailed('='+source,event,{sessionId:session,pageState});
+       // The clicked row (cart line, card) is the record: @CartLine.Id works too.
+       const row=event.record&&typeof event.record==='object'&&!Array.isArray(event.record)
+        ?{...event.record as Record<string,unknown>,recordId:event.recordId??(event.record as Record<string,unknown>).Id}:event;
+       const result=evaluateFieldExpressionDetailed('='+source,row,{sessionId:session,pageState,rootObjectApiName:objectApiName});
        if(result.error)throw Error('SCREEN record Id: '+result.error);
        return result.value;
       });

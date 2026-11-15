@@ -50,3 +50,13 @@ test('Tabs keep their configured background; segmented look only without one',()
 test('A component mostly inside the right column moves with it on wide screens',()=>{
  assert.match(read('../src/core/pages/PageRuntime/runtimeCanvasSizing.ts'),/p\.x \+ p\.width \/ 2 >= rightColumnStart/);
 });
+
+test('Cart Padding also insets the totals box left and right',()=>{
+ assert.match(read('../src/component-libraries/smart_cart/SmartCart.jsx'),/paddingLeft:n\(p\.tableSidePadding,6,0,80\),paddingRight:n\(p\.tableSidePadding,6,0,80\)/);
+});
+
+test('Action event values @recordId and @value resolve (SCREEN(page, popup, @recordId) from a cart row)',()=>{
+ const expression=read('../src/component-libraries/shared/FieldExpression.js');
+ assert.match(expression,/\['recordId','value','index','label'\]\.includes\(reference\)/);
+ assert.match(read('../src/core/pages/PageCompiler/CompiledPageRuntime.tsx'),/rootObjectApiName:objectApiName\}\);\s*if\(result\.error\)throw Error\('SCREEN record Id: '/);
+});

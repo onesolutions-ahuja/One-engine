@@ -19,6 +19,14 @@
 .builder-editor-mode .reference-builder-layout.page-builder-layout .record-preview.free-canvas-preview{
   margin:0!important;max-width:none!important;
 }
+/* Design mode shows the same slim screen boundary as Preview. An outline
+ * deliberately does not change authored canvas dimensions or drag geometry.
+ * The existing canvas viewport keeps its normal horizontal/vertical scrolling. */
+.builder-editor-mode:not(.builder-interactive-preview)
+ .reference-builder-layout.page-builder-layout .record-preview.free-canvas-preview{
+  outline:2px solid #64748b!important;
+  outline-offset:-1px;
+}
 /* The canvas frame is geometry-only. Authored borders belong to the component's native surface. */
 .builder-editor-mode .modern-canvas-builder .free-canvas-component.canvas-hidden-selection{
   outline:2px dashed #ca6b0d!important;outline-offset:-2px;

@@ -200,7 +200,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     ), columns AS (SELECT generate_series(1,5) AS n), properties AS (
       SELECT 'cartColumn'||columns.n||styles.suffix AS property_key,
        'Column '||columns.n||' '||styles.label AS label,styles.control_kind,
-       styles.min_value,styles.max_value,styles.choices,columns.n,styles.display_order
+       styles.min_value,styles.max_value,styles.choices,
+       columns.n AS column_number,styles.display_order
       FROM columns CROSS JOIN styles
     ), existing AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
     INSERT INTO md_builder_shared_properties

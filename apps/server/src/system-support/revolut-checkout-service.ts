@@ -1,4 +1,4 @@
-import {createHmac,timingSafeEqual,randomUUID,randomBytes} from 'node:crypto';
+import {createHmac,timingSafeEqual,randomBytes} from 'node:crypto';
 import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
@@ -121,7 +121,7 @@ export function registerRevolutCheckoutRoutes(
  };
  const settings=(c:Credential)=>parseSettings(c.configuration_ciphertext
   ?JSON.parse(vault.decryptOpaque(c.configuration_ciphertext,c.encryption_key_id)) as unknown:{});
- const merchant=async(c:Credential,method:'GET'|'POST',path:string,body?:Record<string,unknown>,attempt?:string)=>{
+ const merchant=async(tenant:string,c:Credential,method:'GET'|'POST',path:string,body?:Record<string,unknown>,attempt?:string)=>{
   if(!c.secret_ciphertext)throw Error('Revolut Secret Merchant API key is not configured');
   const key=vault.decryptOpaque(c.secret_ciphertext,c.encryption_key_id);
   const data=body?JSON.stringify(body):undefined;
@@ -136,7 +136,7 @@ export function registerRevolutCheckoutRoutes(
      Authorization:'Bearer '+key,...(data?{'Content-Type':'application/json'}:{}),
      ...(attempt?{'Idempotency-Key':attempt}:{})}});
    status=result.status;
-   await activity({tenantId:'',direction:'Outbound',transport:'HTTP',provider:'Revolut',credentialId:c.id,
+   await activity({tenantId:tenant,direction:'Outbound',transport:'HTTP',provider:'Revolut',credentialId:c.id,
     endpoint:url.origin+url.pathname,method,statusCode:status,
     outcome:status>=200&&status<300?'success':'http_error',durationMs:Date.now()-started,
     requestBytes:Buffer.byteLength(data??''),responseBytes:result.responseBytes});
@@ -148,13 +148,6 @@ export function registerRevolutCheckoutRoutes(
    if(status===0)throw Error('Revolut Merchant API unavailable');
    throw error;
   }
- };
- // Merchant calls are explicitly scoped to the tenant; every audit record must be too.
- const call=async(tenant:string,c:Credential,method:'GET'|'POST',path:string,body?:Record<string,unknown>,attempt?:string)=>{
-  // Implementation uses the same fixed public HTTPS transport as Named Credentials.
-  // See merchant() for request validation; the tenant context is used for audit.
-  void tenant;
-  return merchant(c,method,path,body,attempt);
  };
  app.get('/api/revolut/checkout/config',route(async(req,res)=>{
   const who=actor(req);if(!who)throw Error('Authentication required');
@@ -186,7 +179,7 @@ export function registerRevolutCheckoutRoutes(
     AND source_record_id=$3 AND status='completed' LIMIT 1`,
    [who.tenant_id,s.recordObject,recordId]);
   if(existing.rows.length){res.status(409).json({error:'This record is already paid'});return;}
-  const order=await call(who.tenant_id,c,'POST','api/orders',
+  const order=await merchant(who.tenant_id,c,'POST','api/orders',
    {amount,currency:s.currency,merchant_order_ext_ref:attemptKey},attemptKey);
   if(typeof order.id!=='string'||!UUID.test(order.id)
     ||typeof order.token!=='string'||order.token.length<8||order.token.length>500)
@@ -227,7 +220,7 @@ export function registerRevolutCheckoutRoutes(
   const local=await vault.configureWebhook(who.tenant_id,who.user_id,c.id,true,placeholder);
   const callbackUrl='https://'+host+'/api/inbound-webhooks/'+local.webhookId;
   try{
-   const registered=await call(who.tenant_id,c,'POST','api/webhooks',
+   const registered=await merchant(who.tenant_id,c,'POST','api/webhooks',
     {url:callbackUrl,events:EVENTS});
    if(typeof registered.signing_secret!=='string'||registered.signing_secret.length<16
      ||registered.signing_secret.length>512)throw Error('Revolut webhook signing secret missing');

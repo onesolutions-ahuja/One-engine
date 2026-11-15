@@ -186,6 +186,10 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     VALUES('smart_cart','Table','extra_tableSidePadding','tableSidePadding')
     ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
   `);
+  // Smart Tabs: Tab Index -1 means no tab is selected when the page opens
+  // (e.g. a product grid shows every category until a tab is picked).
+  await client.query(`UPDATE md_builder_shared_properties SET min_value=-1
+    WHERE property_key='tabIndex' AND COALESCE(min_value,0)<>-1`);
   // Keep the repeated card fill and the background visible between cards as
   // separate Smart Card Grid surfaces.
   await client.query(`

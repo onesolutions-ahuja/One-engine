@@ -51,6 +51,11 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  }
  if(node.kind==='call'&&node.name==='ISBLANK'&&node.args.length===1)
   return blank(asState(node.args[0],state,sessionId));
+ // Value-side IF, e.g. @Product.Category = IF(ISBLANK($state.category),"*",$state.category).
+ if(node.kind==='call'&&node.name==='IF'&&node.args.length===3){
+  const condition=asState(node.args[0],state,sessionId);
+  return asState(Boolean(condition)?node.args[1]:node.args[2],state,sessionId);
+ }
  if(node.kind==='call'&&node.name==='NOT'&&node.args.length===1)
   return !Boolean(asState(node.args[0],state,sessionId));
  if(node.kind==='unary'&&node.operator==='NOT')return !Boolean(asState(node.value,state,sessionId));
@@ -208,7 +213,9 @@ export function validateRecordFilterFormula(formula:string,fields:ReadonlyArray<
   const picked=Object.fromEntries(published.map(name=>[name,{Id:'test-id',Name:'test',Value:'test-id',Text:'test',Field:'',Criteria:''}]));
   const state:Record<string,unknown>=selected?{...Object.fromEntries(keys.map(key=>[key,'test-id'])),collectionSelections:picked}:{};
   const result=compileRecordFilterFormula(formula,fields,{...state,[componentReaderKey]:()=>selected?'test-id':''});
-  if(result.error)return result.error;
+  // Nothing picked yet is a runtime state, not a formula error: the formula
+  // must still save (the page shows no rows until a value is picked).
+  if(result.error&&!(!selected&&result.error==='Selected formula state value is empty'))return result.error;
  }
  return null;
 }

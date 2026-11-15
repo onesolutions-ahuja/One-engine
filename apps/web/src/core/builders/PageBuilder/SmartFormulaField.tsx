@@ -237,7 +237,9 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const finishEdit=()=>{
   const error=errorFor(draft);
   setValidationError(error);
-  if(error&&isFormulaDraft(draft.trim()))setConfirmIncomplete(true);
+  // An edit that fails validation is not saved: always say so instead of
+  // silently showing the old value next time (e.g. a Record filter left blank).
+  if(error&&(isFormulaDraft(draft.trim())||draft!==value))setConfirmIncomplete(true);
  };
  const keyDown=(event:KeyboardEvent<HTMLInputElement>)=>{
   const options=functionMatch?functionSuggestions:matches?filtered:[];
@@ -282,7 +284,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   {confirmIncomplete&&createPortal(<div className="smart-formula-confirm-backdrop">
     <section role="dialog" aria-modal="true" aria-label="Incomplete formula"
       className="smart-formula-confirm">
-      <strong>Incomplete formula</strong><p>{validationError}</p>
+      <strong>Formula not saved</strong><p>{validationError}</p>
       <button type="button" autoFocus onClick={()=>{
         setConfirmIncomplete(false);requestAnimationFrame(()=>input.current?.focus());
       }}>Complete Formula</button>

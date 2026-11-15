@@ -32,6 +32,27 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  // Select the most recently appended item by default. Preserve a manually
  // selected row until it is removed, and automatically follow newly added rows.
  const rowKeys=rows.map((row,i)=>String(row?.Id??row?.id??i));
+ const rowsRef=React.useRef(null);
+
+React.useEffect(()=>{
+  if(p.builderPreview)return;
+  const container=rowsRef.current;
+  if(!container||!selectedKey)return;
+
+  const selected=[...container.children].find(
+    row=>row.dataset.rowKey===selectedKey
+  );
+  if(!selected)return;
+
+  const rowTop=selected.offsetTop-container.offsetTop;
+  const rowBottom=rowTop+selected.offsetHeight;
+
+  if(rowBottom>container.scrollTop+container.clientHeight){
+    container.scrollTop=rowBottom-container.clientHeight;
+  }else if(rowTop<container.scrollTop){
+    container.scrollTop=rowTop;
+  }
+},[selectedKey,rowSignature,p.builderPreview]);
  const rowSignature=rowKeys.join("\\u001f");
  const [selectedKey,setSelectedKey]=React.useState(()=>rowKeys.at(-1)??null);
  const previousKeys=React.useRef(rowKeys);
@@ -212,7 +233,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
        key={index} style={columnStyle(index,true)}>{columnHeadings[index]}</span>;
      })}
     </div>
-    <div className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows">
+    <div ref={rowsRef} className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows">
          {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
       const src=p.imageSource?fieldExpression('imageSource',p.imageSource,record):"";
@@ -226,7 +247,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
       const rowKey=rowKeys[i];
       const selected=selectedKey===rowKey;
       const selectRow=()=>setSelectedKey(rowKey);
-      return <div key={rowKey} className={"smart-cart-row-wrap"+(selected?" is-selected":"")}
+      return <div key={rowKey} data-row-key={rowKey} className={"smart-cart-row-wrap"+(selected?" is-selected":"")}
        style={{
         ...(p.rowWidth!==undefined&&p.rowWidth!==null&&p.rowWidth!==""
          ?{width:n(p.rowWidth,0,0,10000)+"px",maxWidth:"100%"}:{}),

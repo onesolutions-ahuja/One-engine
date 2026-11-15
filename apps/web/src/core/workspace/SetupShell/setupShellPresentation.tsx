@@ -1,7 +1,6 @@
 // @ts-nocheck
 import WorkspaceFormulaScreen from '../../pages/PageRuntime/WorkspaceFormulaScreen';
 import SetupLoadingState from './SetupLoadingState';
-import AppPageIcon from '../Navigation/AppPageIcon';
 import { UneBrandLogo } from '../../branding/UneBrandLogo';
 import CompanySettingsWorkspace from '../../settings/CompanySettingsWorkspace/CompanySettingsWorkspace';
 import SettingsNavigationIcon from '../../settings/SettingsNavigationIcon';
@@ -11,7 +10,7 @@ import * as React from 'react';
 import './InstalledAppMenu.css';
 const WorkspaceShortcutHelp = React.lazy(() => import('../Navigation/WorkspaceShortcutHelp'));
 const GlobalQuickActionLauncher=React.lazy(()=>import('./GlobalQuickActionLauncher'));
-import { MobileAppNavigation, MobileAppLauncher } from './MobileAppNavigation';
+import { MobileAppLauncher, MobilePageActions } from './MobileAppLauncher';
 import { resolvePageToolbarActions } from '../../pages/PageRuntime/pageToolbarActions';
 import { appPageOpensOn } from './appPageDevices';
 import { type ObjectMetadata, type LightningPageMetadata, type LightningAppMetadata } from '../../metadata/Definitions/metadata';
@@ -70,9 +69,9 @@ export function renderSetupShell(ctx: any) {
       // whatever the device's dark-mode setting is.
       + ((route.kind === 'app-page' || route.kind === 'app-home') && !standalonePageMode && !isStandaloneMetadataPage ? ' md-app-runtime md-setup-light' : '')}>
       <header className="salesforce-header">
-        {(route.kind === 'setup' || (isRecordsRoute && readableRecordObjects.length > 1) || ((route.kind === 'app-page' || route.kind === 'app-home') && activeAppPages.length > 1)) && <button type="button" className="md-sidebar-trigger"
+        {(route.kind === 'setup' || (isRecordsRoute && readableRecordObjects.length > 1)) && <button type="button" className="md-sidebar-trigger"
           aria-label={setupSidebarCollapsed ? 'Open navigation' : 'Close navigation'}
-          aria-expanded={!setupSidebarCollapsed} aria-controls={route.kind === 'setup' ? 'md-setup-sidebar' : isRecordsRoute ? 'md-records-sidebar' : 'md-app-sidebar'}
+          aria-expanded={!setupSidebarCollapsed} aria-controls={route.kind === 'setup' ? 'md-setup-sidebar' : 'md-records-sidebar'}
           onClick={() => setSetupSidebarCollapsed((collapsed: boolean) => !collapsed)}>
           {setupSidebarCollapsed ? <ChevronRight size={20} aria-hidden="true" /> : <ChevronLeft size={20} aria-hidden="true" />}
         </button>}
@@ -93,6 +92,7 @@ export function renderSetupShell(ctx: any) {
         <span className="header-mobile-app-name" aria-label="Current application">{installedAppLabel}</span>
         <MobileAppLauncher apps={[...apps, {apiName:'__mail__',label:'Mail'}, {apiName:'__mail_admin__',label:'Mail Administration'}]}
           showRecords={readableRecordObjects.length > 0} onOpenApp={openInstalledApp} />
+        <MobilePageActions actions={pageToolbarActions} onAction={invokePageAction} />
         <div className="header-searches">
           <GlobalRecordSearch objects={readableRecordObjects}
             searchObject={(apiName, term) => apiRequest<{ records: RecordData[] }>(
@@ -116,16 +116,8 @@ export function renderSetupShell(ctx: any) {
             onOpenObject={(objectApiName:string)=>navigateRoute({kind:'record-list',objectApiName,appId:'Records'})} />
 
         </div>
-        {(activeAppPages.length > 0 || activeAppPage) && <div className="header-page-context" aria-label="Current app pages"
+        {pageToolbarActions.length > 0 && <div className="header-page-context" aria-label="Current app pages"
           data-page-session-key={activeAppPage ? route.appId + ':' + route.pageApiName : undefined}>
-          <nav className="header-page-tabs" aria-label="Workspace navigation">
-            {activeAppPages.map((appPage: LightningPageMetadata) =>
-              <button type="button" key={appPage.apiName}
-                className={route.kind === 'app-page' && route.pageApiName === appPage.apiName ? 'header-page-tab active' : 'header-page-tab'}
-                aria-current={route.kind === 'app-page' && route.pageApiName === appPage.apiName ? 'page' : undefined}
-                onClick={() => navigateRoute({kind:'app-page',appId:currentApp?.apiName ?? '',pageApiName:appPage.apiName})}>{appPage.label}</button>)}
-            {!activeAppPages.length && activeAppPage && <span className="header-page-title">{activeAppPage.label}</span>}
-          </nav>
           {pageToolbarActions.map(action =>
             <button key={action.componentId} type="button" className="btn header-page-action"
               onClick={() => invokePageAction(action)}>{action.label}</button>)}
@@ -156,25 +148,15 @@ export function renderSetupShell(ctx: any) {
         </div>
       </header>
       {shortcutHelpOpen && <React.Suspense fallback={null}><WorkspaceShortcutHelp onClose={()=>setShortcutHelpOpen(false)}/></React.Suspense>}
-      {(route.kind === 'app-page' || route.kind === 'app-home') && (
-        <MobileAppNavigation
-          pages={activeAppPages} appId={currentApp?.label ?? route.appId}
-          activePageApiName={route.kind === 'app-page' ? route.pageApiName : undefined}
-          actions={pageToolbarActions}
-          onNavigate={(pageApiName) => navigateRoute({ kind: 'app-page', appId: route.appId, pageApiName })}
-          onAction={invokePageAction}
-        />
-      )}
-
-      {(route.kind === 'setup' || (isRecordsRoute && readableRecordObjects.length > 1) || ((route.kind === 'app-page' || route.kind === 'app-home') && activeAppPages.length > 1))
+      {(route.kind === 'setup' || (isRecordsRoute && readableRecordObjects.length > 1))
         && !setupSidebarCollapsed && <button type="button"
         className="md-sidebar-scrim" aria-label="Close navigation"
         onClick={() => setSetupSidebarCollapsed(true)} />}
       <div className={route.kind === 'setup' ? 'setup-layout setup-no-tabs' : 'setup-layout'}>
         {isRecordsRoute && readableRecordObjects.length > 1 && runtimeFormFactor !== 'Phone' && (
-          <aside id="md-records-sidebar" className={setupSidebarCollapsed ? 'md-app-sidebar md-app-sidebar-collapsed' : 'md-app-sidebar'}
+          <aside id="md-records-sidebar" className={setupSidebarCollapsed ? 'md-records-sidebar md-records-sidebar-collapsed' : 'md-records-sidebar'}
             aria-label="Records navigation">
-            <div className="md-app-sidebar-heading">
+            <div className="md-records-sidebar-heading">
               <strong>Records</strong>
               <button type="button" aria-label={setupSidebarCollapsed ? 'Expand records navigation' : 'Collapse records navigation'}
                 aria-expanded={!setupSidebarCollapsed} onClick={() => setSetupSidebarCollapsed((collapsed: boolean) => !collapsed)}>
@@ -194,30 +176,6 @@ export function renderSetupShell(ctx: any) {
                     customTabStyles.find((style: any) => style.name === recordObject.customTab.style)?.icon ?? Database,
                     {size:16,'aria-hidden':true,style:{color:customTabStyles.find((style: any) => style.name === recordObject.customTab.style)?.color}}
                   )}<span>{recordObject.pluralLabel}</span></button>
-              ))}
-            </nav>
-          </aside>
-        )}
-        {(route.kind === 'app-page' || route.kind === 'app-home') && activeAppPages.length > 1 && runtimeFormFactor !== 'Phone' && (
-          <aside id="md-app-sidebar" className={setupSidebarCollapsed ? 'md-app-sidebar md-app-sidebar-collapsed' : 'md-app-sidebar'}
-            aria-label="App navigation">
-            <div className="md-app-sidebar-heading">
-              <strong title={currentApp?.label ?? route.appId}>{currentApp?.label ?? route.appId}</strong>
-              <button type="button" aria-label={setupSidebarCollapsed ? 'Expand app navigation' : 'Collapse app navigation'}
-                aria-expanded={!setupSidebarCollapsed} onClick={() => setSetupSidebarCollapsed((collapsed: boolean) => !collapsed)}>
-                {setupSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-              </button>
-            </div>
-            <nav aria-label="App pages">
-              {activeAppPages.map((appPage: LightningPageMetadata) => (
-                <button type="button" key={appPage.apiName}
-                  data-short-label={appPage.label.trim().slice(0, 2).toUpperCase()}
-                  aria-current={route.kind === 'app-page' && route.pageApiName === appPage.apiName ? 'page' : undefined}
-                  title={appPage.label}
-                  onClick={() => {
-                    navigateRoute({kind:'app-page',appId:route.appId,pageApiName:appPage.apiName});
-                    if (window.matchMedia('(min-width: 600px) and (max-width: 1023px)').matches) setSetupSidebarCollapsed(true);
-                  }}><AppPageIcon label={appPage.label} /><span>{appPage.label}</span></button>
               ))}
             </nav>
           </aside>

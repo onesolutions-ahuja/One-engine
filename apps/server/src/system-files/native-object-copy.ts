@@ -117,6 +117,9 @@ export async function copyNativeObject(db:SqlPersistence,tenantId:string,objectA
     await client.query("SET LOCAL lock_timeout='3s'");
     await client.query("SET LOCAL statement_timeout='120s'");
     await client.query("SET LOCAL standard_conforming_strings=on");
+    // Serialize initial extension/receipt/table DDL too, including first copies
+    // of different objects. CREATE IF NOT EXISTS alone is not concurrency safe.
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['native-object-copy']);
     // Include direct SQL consumers, field changes and package installs, not just
     // RecordEngine's advisory lock. Never upgrade a row lock into this table lock.
     await client.query(`LOCK TABLE md_tenants,md_object_definitions,md_field_definitions,
@@ -146,8 +149,6 @@ export async function copyNativeObject(db:SqlPersistence,tenantId:string,objectA
       table_name text NOT NULL,source_count bigint NOT NULL,copied_at timestamptz NOT NULL,
       schema_hash text NOT NULL,status text NOT NULL CHECK(status='snapshot-only'),
       PRIMARY KEY(tenant_id,object_api))`);
-    // Serialize DDL across tenants sharing an object's physical table.
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['native-copy:'+objectApi]);
     for(const sql of plan.ddl)await client.query(sql);
     await client.query(`DELETE FROM ${ident(plan.table)} WHERE tenant_id=$1`,[tenantId]);
     await client.query(plan.copy,[tenantId,objectApi]);

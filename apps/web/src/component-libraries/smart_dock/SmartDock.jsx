@@ -37,7 +37,7 @@ export default function SmartDock({p,fire,resolve}){
   border:p.borderColor?"1px solid "+p.borderColor:undefined,
   borderRadius:size(p.radius,22,0,64),boxShadow:shadow(p.shadow),
   flexDirection:vertical?"column":"row",
-  gap:size(p.numpadGap,6,0,48),padding:size(p.numpadPadding,8,0,48)
+  gap:size(p.gap??p.numpadGap,6,0,48),padding:size(p.numpadPadding,8,0,48)
  };
  return <nav className={"smart-dock"+(vertical?" is-vertical":"")+(settings.magnify?" is-magnify":"")
    +(p.backgroundColor?"":" is-glass")} aria-label={settings.label||"Dock"} style={body}>

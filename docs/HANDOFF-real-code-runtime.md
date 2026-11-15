@@ -30,6 +30,22 @@ Then check kiosk (`smartkiosk`) and ServiceFlow pages.
 - Debug in browser console: `window.__unePageCode` (`.misses` = taps that could not be predicted).
 
 ## Remaining work, in order
+Copy-stage tooling is now available in `apps/server/src/system-files/native-object-copy.ts`
+and `system-support/native-object-copy-cli.ts`. **Step 1 is still unfinished.** This is an
+explicit offline copy/verification command, not a runtime storage switch or live mirror.
+No copy is run on deployment. It leaves EAV and its permissions/relationships authoritative.
+Run only in a maintenance window (it takes SHARE locks on source tables, with a 3 s lock
+timeout and 120 s statement timeout):
+`node apps/server/dist-system/system-support/native-object-copy-cli.js --copy-snapshot TENANT_UUID Product MenuCategory Cart CartLine Customer`.
+It copies deleted records too, compares counts AND typed field/system values, and rolls back
+on mismatch. Receipts are labelled `snapshot-only`; later writes make the copy stale.
+Installed app-package fields and Name receive typed columns; other fields use one extras
+JSONB column. Unsupported stored types or persisted formula values abort without cutover.
+Before activation: implement write routing/compatibility for ALL EAV consumers, metadata
+lifecycle integration, filtered custom-field expression indexes, central RBAC/field/sharing
+tests against the new backend, and a final locked copy/verification/switch. Never route
+reads to these snapshots while writes still target EAV.
+
 1. **Storage (biggest for save < 400 ms + search):** replace EAV `md_records`/`md_record_values` with one real
    table per object shared by tenants (`tenant_id`), typed columns + indexes for standard/app fields, one JSONB
    column for tenant-added fields (auto expression indexes for filtered ones), `pg_trgm` index on Name/Barcode.

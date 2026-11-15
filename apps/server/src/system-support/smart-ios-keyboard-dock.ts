@@ -49,7 +49,7 @@ export const SMART_IOS_PROPERTY_SPECS:Spec[]=[
 const KEYBOARD_RULES:Array<[string,string|null]>=[
  ['backgroundColor',json('#d1d4d9')],['borderColor',null],['radius','12'],['shadow',json('none')],
  ['width',null],['height',null],['x',null],['y',null],
- ['numpadPadding','6'],['numpadGap','6'],
+ ['numpadPadding','6'],['gap','6'],
  ['numpadKeyFill',json('#ffffff')],['numpadKeyBorderColor',null],['numpadKeyRadius','6'],
  ['numpadKeyShadow',null],['numpadKeyHeight','42'],['numpadKeyTextColor',json('#000000')],
  ['numpadKeyTextSize','22'],['numpadKeyBold',null],
@@ -64,7 +64,7 @@ const KEYBOARD_RULES:Array<[string,string|null]>=[
 const DOCK_RULES:Array<[string,string|null]>=[
  ['backgroundColor',json('')],['borderColor',null],['radius','22'],['shadow',json('none')],
  ['width',null],['height',null],['x',null],['y',null],['label',null],
- ['numpadPadding','8'],['numpadGap','6'],
+ ['numpadPadding','8'],['gap','6'],
  ['numpadKeyFill',json('')],['numpadKeyBorderColor',null],['numpadKeyRadius','14'],
  ['numpadKeyHeight','52'],['numpadKeyTextColor',json('#3c3c43')],['numpadKeyTextSize','11'],
  ['numpadKeyBold',null],['numpadFocusedFill',json('')],['numpadFocusedTextColor',json('#007aff')],
@@ -192,6 +192,6 @@ export async function applySmartIosKeyboardDock(client:Query){
     OR (r.component_api='smart_keyboard' AND d.slot_key LIKE 'extra_keyboard%')
     OR (r.component_api='smart_dock' AND d.slot_key LIKE 'extra_dock%')
     OR (r.component_api IN ('smart_keyboard','smart_dock')
-        AND d.slot_key IN ('extra_numpadPadding','extra_numpadGap')))
+        AND d.slot_key IN ('extra_numpadPadding')))
   ON CONFLICT(component_api,area,slot_key) DO NOTHING`);
 }

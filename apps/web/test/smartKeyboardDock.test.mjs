@@ -121,3 +121,62 @@ test('iOS Style is opt-in per saved component and never overrides configured val
  const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
  assert.match(ribbon,/property\.id==='visualStyle'\?'Classic'/);
 });
+
+
+test('Key Gap uses the shared Card Gap setting for every key-based component',()=>{
+ const numpad=read('../src/component-libraries/smart_numpad/SmartNumpad.jsx');
+ const keyboard=read('../src/component-libraries/smart_keyboard/SmartKeyboard.jsx');
+ const dock=read('../src/component-libraries/smart_dock/SmartDock.jsx');
+ for(const component of [numpad,keyboard,dock]){
+  assert.match(component,/p\.gap\?\?p\.numpadGap/,
+   'shared gap wins; legacy page values remain readable');
+  assert.doesNotMatch(component,/size\(p\.numpadGap,/);
+ }
+ const sql=read('../../server/src/system-support/system-migrations.ts');
+ for(const api of ['smart_numpad','smart_keyboard','smart_dock'])
+  assert.match(sql,new RegExp("\\('"+api+"'"));
+ assert.match(sql,/property_key='gap'/);
+ assert.match(sql,/slot_key='extra_cardGap'/);
+ assert.match(sql,/SET enabled=false\s+WHERE property_key='numpadGap'/);
+ const seeder=read('../../server/src/system-support/smart-ios-keyboard-dock.ts');
+ assert.doesNotMatch(seeder,/\['numpadGap'/);
+ const hidden=read('../src/core/builders/PageBuilder/layoutRibbonVisibility.ts');
+ assert.match(hidden,/'numpadGap'/);
+ const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
+ assert.match(ribbon,/properties\.numpadGap:undefined/);
+ const style=read('../src/core/builders/PageBuilder/PageBuilderDesignDock.css');
+ assert.match(style,/\[data-others-group="Spacing"\][\s\S]*?repeat\(2,minmax\(0,1fr\)\)/);
+});
+
+test('Design properties keep their place for every selection and feature groups follow visibility',()=>{
+ const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
+ const pageRibbon=read('../src/core/builders/PageBuilder/editor/ribbon/createPageRibbon.tsx');
+ const layoutVisibility=read('../src/core/builders/PageBuilder/layoutRibbonVisibility.ts');
+ const css=read('../src/core/builders/PageBuilder/PageBuilderDesignDock.css');
+
+ // The Design area list cannot be filtered by the selected component.
+ assert.doesNotMatch(ribbon,/fixedAreaComponents/);
+ assert.match(ribbon,/const design2Areas=\[\.\.\.new Map\(design2Slots/);
+ assert.match(ribbon,/aria-label=\{group\} data-others-group=\{group\}/);
+ assert.match(ribbon,/\['Calendar','Keyboard','Dock','Chart'\]\.map\(group=>/);
+ assert.match(pageRibbon,/renderSmartRibbon\('designTail'\)/);
+ assert.match(ribbon,/property\.components\.includes\(api\)/);
+
+ // Only the former UI duplicates disappear; saved values still use original keys.
+ assert.match(ribbon,/const paddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
+ assert.match(ribbon,/api==='smart_dock'\?\[\{key:'dockItemCount',label:'Count'\}\]/);
+ assert.match(ribbon,/\['numpadGap','numpadPadding','dockItemCount',\s*'numpadPrefix','numpadSuffix'\]/);
+ assert.match(ribbon,/\[paddingKey\]:next\},\[paddingKey\]/);
+ assert.match(ribbon,/\?properties\.numpadGap:undefined/);
+
+ // All 12 Dock items use the same real icon picker.
+ assert.match(ribbon,/\^dockItem\(\?:\[1-9\]\|1\[0-2\]\)Icon\$/);
+ assert.match(ribbon,/allowIcons onChange=\{write\}/);
+
+ // A single visibility toggle remains, with conditional rules still editable.
+ assert.doesNotMatch(pageRibbon,/Visible on this page/);
+ assert.match(ribbon,/aria-label="Component visibility"/);
+ assert.match(pageRibbon,/Edit conditional visibility/);
+ assert.match(layoutVisibility,/propertyKey==='tabWidth'\|\|propertyKey==='tabHeight'/);
+ assert.match(css,/smart-design2-tail/);
+});

@@ -1021,11 +1021,10 @@
   flex:0 1 auto!important;min-width:0!important;
   white-space:nowrap!important;font-size:10px!important;
 }
-/* Spacing: Padding / Key gap / Card Gap share a single full-width row.
- * Equal tracks use all available width, including spinner buttons. */
+/* Padding and the shared Gap are the only spacing controls. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  .smart-design2-others-section [data-others-group="Spacing"] .smart-design2-supplemental{
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
 }
 /* Calendar: existing two-up controls, paired in the requested order. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
@@ -1228,3 +1227,342 @@
  .smart-design2-supplemental-setting:has(>.smart-property .smart-formula-filter){
   grid-column:1/-1!important;
 }
+
+/* Consolidated PageBuilder Design 2: independent, always-mounted feature
+ * accordions after Conditional Visibility. Width stays at 284px. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail{
+  box-sizing:border-box!important;display:block!important;
+  width:284px!important;min-width:0!important;max-width:100%!important;
+  flex:none!important;padding:0!important;margin:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail>.smart-design2-feature-section{
+  box-sizing:border-box!important;display:block!important;
+  width:100%!important;max-width:100%!important;
+  margin:0!important;padding:0!important;border:0!important;
+  border-bottom:1px solid #ccd2dd!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail>.smart-design2-feature-section>.smart-inspector-section-toggle{
+  box-sizing:border-box!important;display:flex!important;
+  align-items:center!important;gap:7px!important;width:100%!important;
+  min-height:32px!important;padding:5px 6px!important;margin:0!important;
+  border:0!important;background:transparent!important;color:#183b68!important;
+  text-align:left!important;font:600 12px/18px "Segoe UI",Arial,sans-serif!important;
+  cursor:pointer!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail>.smart-design2-feature-section>.smart-inspector-section-toggle[aria-expanded="false"] svg{
+  transform:rotate(-90deg)!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail>.smart-design2-feature-section>.smart-inspector-section-content{
+  box-sizing:border-box!important;width:100%!important;padding:4px 0 8px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-others-property-group{
+  box-sizing:border-box!important;width:100%!important;margin:0!important;padding:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:7px 8px!important;width:100%!important;
+  padding:5px 6px!important;align-items:start!important;
+}
+/* Use compact three-across rows only where labels/editors really fit. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail :is([data-others-group="Calendar"],
+  [data-others-group="Dock"],[data-others-group="Chart"])>.smart-design2-supplemental{
+  grid-template-columns:repeat(6,minmax(0,1fr))!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail :is([data-others-group="Calendar"],
+  [data-others-group="Dock"],[data-others-group="Chart"])
+ .smart-design2-supplemental-setting{
+  grid-column:span 3!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail :is([data-others-group="Calendar"],
+  [data-others-group="Dock"],[data-others-group="Chart"])
+ :is([data-others-property="showDays"],[data-others-property="firstDay"],
+  [data-others-property="calendarView"],[data-others-property="calendarShowEvents"],
+  [data-others-property="calendarShowHeader"],[data-others-property="calendarShowDateStrip"],
+  [data-others-property="calendarStartHour"],[data-others-property="calendarEndHour"],
+  [data-others-property="calendarSlotMinutes"],
+  [data-others-property^="dockItem"],[data-others-property^="chartColor"],
+  [data-others-property="chartShowGrid"],[data-others-property="chartShowLegend"],
+  [data-others-property="chartShowValues"]){
+  grid-column:span 2!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-property="calendarTimeZone"]{
+  grid-column:1/-1!important;
+}
+/* Match the existing compact two-row editor shape, without truncation or
+ * inserting duplicated labels inside expression and text controls. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental-setting{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:minmax(15px,auto) 26px!important;
+  align-items:center!important;gap:3px!important;
+  min-width:0!important;width:100%!important;height:auto!important;
+  margin:0!important;padding:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental-label{
+  display:block!important;box-sizing:border-box!important;
+  white-space:normal!important;overflow:visible!important;
+  font:10px/13px "Segoe UI",Arial,sans-serif!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental-setting>.smart-property{
+  display:flex!important;width:100%!important;min-width:0!important;
+  max-width:100%!important;margin:0!important;padding:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental-setting>.smart-property>.smart-label{
+  display:none!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental-setting :is(.smart-select,.smart-numeric,.smart-simple-text-input){
+  box-sizing:border-box!important;min-width:0!important;
+  max-width:100%!important;width:100%!important;height:26px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail .smart-design2-supplemental-setting .smart-numeric .smart-office-number{
+  box-sizing:border-box!important;max-width:58px!important;width:58px!important;
+  min-width:0!important;flex:0 1 58px!important;height:26px!important;
+}
+/* All twelve icon pickers use the identical 26px Shapes trigger. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-group="Dock"] .smart-icon-gallery{
+  display:flex!important;align-items:center!important;
+  width:100%!important;min-width:0!important;height:26px!important;
+  min-height:26px!important;max-height:26px!important;
+  padding:0!important;border:0!important;overflow:visible!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-group="Dock"] .smart-shapes-trigger{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  width:100%!important;min-width:0!important;height:26px!important;
+  gap:2px!important;padding:0 3px!important;white-space:nowrap!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-group="Dock"] .smart-shapes-trigger svg{
+  width:13px!important;max-width:13px!important;flex:0 0 13px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-group="Chart"] [data-others-property^="chartColor"]
+ .office-ribbon-colour-property{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;width:100%!important;
+  height:26px!important;min-height:26px!important;
+  padding:0 3px!important;border:1px solid #c4d2e4!important;
+  border-radius:4px!important;
+}
+/* Compact, still keyboard-editable number fields with native spinner arrows. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section .smart-others-property-group
+ .smart-design2-supplemental-setting .smart-numeric .smart-office-number{
+  box-sizing:border-box!important;width:58px!important;min-width:0!important;
+  max-width:58px!important;flex:0 1 58px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-others-section,.smart-design2-tail)
+ .smart-simple-text-input{
+  display:block!important;box-sizing:border-box!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  height:26px!important;padding:2px 5px!important;
+  border:1px solid #b7c9df!important;border-radius:4px!important;
+  background:#fff!important;color:#1d4266!important;
+  font:11px "Segoe UI",Arial,sans-serif!important;
+}
+/* Fixed Count/Padding editors now live inside their related group rows. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section .smart-design2-extras-cell{
+  box-sizing:border-box!important;grid-column:span 1!important;
+  display:flex!important;align-items:end!important;justify-content:flex-start!important;
+  width:auto!important;min-width:0!important;max-width:100%!important;
+  padding:0!important;margin:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section .smart-design2-extras-cell
+ :is(.smart-design2-count,.smart-design2-padding){
+  position:static!important;grid-area:auto!important;
+  margin:0!important;max-width:100%!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadPlaceholder"]{grid-column:1/-1!important;}
+/* 3-column calendar/colour/icon rows are order-stable across selections. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarView"]{order:1!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="showDays"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="firstDay"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarShowEvents"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarShowHeader"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarShowDateStrip"]{order:6!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarStartHour"]{order:7!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarEndHour"]{order:8!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarSlotMinutes"]{order:9!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Calendar"]
+ [data-others-property="calendarTimeZone"]{order:10!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Input & Text"]
+ [data-others-property="numpadInputMode"]{order:1!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Input & Text"]
+ [data-others-property="numpadDecimalPlaces"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Input & Text"]
+ [data-others-property="numpadMaxDigits"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Input & Text"]
+ [data-others-property="numpadMask"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Input & Text"]
+ [data-others-property="inputRows"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Input & Text"]
+ [data-others-property="numpadPlaceholder"]{order:6!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockIconSize"]{order:1!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockMagnify"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockShowLabels"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockShowIndicator"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem1Icon"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem2Icon"]{order:6!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem3Icon"]{order:7!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem4Icon"]{order:8!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem5Icon"]{order:9!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem6Icon"]{order:10!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem7Icon"]{order:11!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem8Icon"]{order:12!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem9Icon"]{order:13!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem10Icon"]{order:14!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem11Icon"]{order:15!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Dock"]
+ [data-others-property="dockItem12Icon"]{order:16!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartType"]{order:1!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartSort"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartMaxItems"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartDecimals"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartShowGrid"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartShowLegend"]{order:6!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartShowValues"]{order:7!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartColor1"]{order:8!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartColor2"]{order:9!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartColor3"]{order:10!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartColor4"]{order:11!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartColor5"]{order:12!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ :is(.smart-design2-tail,.smart-design2-others-section) [data-others-group="Chart"]
+ [data-others-property="chartColor6"]{order:13!important;}
+
+/* Values with at most three digits should not occupy a half-width box. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]>.smart-design2-supplemental{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadPlaceholder"]{
+  grid-column:1/-1!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadInputMode"]{order:1!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadDecimalPlaces"]{order:2!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadMaxDigits"]{order:3!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="inputRows"]{order:4!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadMask"]{order:5!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-others-section [data-others-group="Input & Text"]
+ [data-others-property="numpadPlaceholder"]{order:6!important;}
+/* Text editors need a full-width field, without extra expression captions. */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
+ .smart-design2-tail [data-others-property="calendarTimeZone"]
+ .smart-simple-text-input{width:100%!important;}

@@ -844,7 +844,7 @@ export type ConnectorProviderMetadata = {
   authHeader?: string;
   authCredential?: string;
   credentialsSchema: Array<{ name: string; label: string; secret: boolean; required: boolean }>;
-  operations: Record<string, { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; headers?: string }>;
+  operations: Record<string, { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string }>;
   test?: {
     method: 'GET' | 'HEAD';
     path: string;

@@ -290,7 +290,8 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
   return await deps.db.transaction(async()=>{
    await scope.loadEventRecord();
    await action.run(scope);
-   const sets=scope.written.size?await loadSets(scope,code,scope.written):{};
+   // All held sets: roll-ups and triggers can change Objects the action did not write.
+   const sets=scope.written.size?await loadSets(scope,code):{};
    return {ok:true,changes:scope.changes,state:{...scope.stateChanges},effects:scope.effects,sets};
   });
  }catch(error){

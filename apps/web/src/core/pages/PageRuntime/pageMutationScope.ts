@@ -112,7 +112,7 @@ export function applySavedRecordMutations(
  if(scope.readObjectApiNames.some(name=>name!==objectApiName&&written.includes(name)))return null;
  if(!written.includes(objectApiName))return null;
  const own=changes.filter(change=>change.objectApiName===objectApiName);
- if((scope.filters?.length??0)>1)return null;
+ // Several filters are exact too: a list with OR/NOT logic is marked unpredictable above.
  // Remove the provisional rows of the prediction this real save replaces.
  const provisional=detail?.replacesOptimistic?'ffffffff-ffff-4fff-8fff-'+detail.replacesOptimistic:null;
  const kept=provisional?rows.filter(row=>!(typeof row.Id==='string'&&row.Id.startsWith(provisional))):rows;

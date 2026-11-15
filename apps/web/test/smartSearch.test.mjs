@@ -24,7 +24,7 @@ test('Smart Search fires from the 3rd letter, debounced, and Enter fires at once
  assert.match(source,/const DEBOUNCE_MS=250;/);
  assert.match(source,/if\(term===lastFired\.current\)return;/,'no repeated query for the same text');
  assert.match(source,/fire\("enter",value\)/);
- assert.match(source,/\^\\d\{4,\}\$/,'scanned codes are cleared for the next scan');
+ assert.match(source,/\(\?=\\S\*\\d\)\\S\{4,\}/,'scanned codes are cleared for the next scan');
  assert.doesNotMatch(source,/role="listbox"/,'no dropdown list');
 });
 

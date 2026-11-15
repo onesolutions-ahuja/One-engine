@@ -39,13 +39,13 @@ export default function ResponsivePageCanvas({
   const standalone=isStandalonePagePresentation(page);
   const scale=standalone?1:runtimeCanvasWidthScale(page.canvasWidth,availableWidth);
   const extra=standalone?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
-  const canvasStyle={
+  const canvasStyle: CSSProperties & { '--md-runtime-canvas-extra': string }={
     ...pageCanvasPresentationStyle(page),
     ...(!standalone && extra > 0 ? {width:'100%'} : {}),
     '--md-runtime-canvas-extra':extra+'px',
     transform:scale<1?`scale(${scale})`:undefined,
     transformOrigin:'top left'
-  } as CSSProperties;
+  };
 
   return <div ref={frame} className="page-responsive-canvas-frame" style={{
     position:'relative',width:'100%',minWidth:0,

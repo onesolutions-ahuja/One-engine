@@ -30,6 +30,7 @@ export function createCompiledPageStore(compiled:CompiledPage,initial:State={},
  let state:State={...initial};
  const byComponent=new Map<string,Set<Listener>>();
  const anyListeners=new Set<Listener>();
+ const keyListeners=new Set<{keys:ReadonlySet<string>;listener:Listener}>();
  // Keys only known at run time (STATE() results, Flow outputs, collection
  // names): resolve their readers once, then cache.
  const readers=new Map<string,string[]>(Object.entries(compiled.stateReaders));
@@ -44,6 +45,8 @@ export function createCompiledPageStore(compiled:CompiledPage,initial:State={},
   const ids=new Set(keys.flatMap(readersOf));
   for(const id of ids)byComponent.get(id)?.forEach(listener=>listener());
   if(keys.length)anyListeners.forEach(listener=>listener());
+  if(keys.length)for(const entry of keyListeners)
+   if(keys.some(key=>entry.keys.has(key.toLowerCase())))entry.listener();
  };
  const commit=(next:State):string[]=>{
   if(next===state)return [];
@@ -77,6 +80,12 @@ export function createCompiledPageStore(compiled:CompiledPage,initial:State={},
    return ()=>{set.delete(listener);};
   },
   subscribeAll(listener:Listener):()=>void{anyListeners.add(listener);return ()=>{anyListeners.delete(listener);};},
+  /** Called when one of these state keys (lower-case) changes. */
+  subscribeKeys(keys:readonly string[],listener:Listener):()=>void{
+   const entry={keys:new Set(keys.map(key=>key.toLowerCase())),listener};
+   keyListeners.add(entry);
+   return ()=>{keyListeners.delete(entry);};
+  },
   readersOf
  };
 }

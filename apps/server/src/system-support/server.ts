@@ -629,7 +629,9 @@ export function createSystemServer(db:SqlPersistence) {
   registerConnectedPublicRoutes(app,connected);
   registerInboundWebhookPublicRoutes(app,db,namedCredentials,flows,rbac,records,integrationActivityWriter);
   // Compiled page scripts: the script fetch carries a one-time ticket instead of a bearer token.
-  const pageScriptDeps={db,rbac,records,pages,definitions,scripts:new PageScriptService()};
+  const pageScriptDeps={db,rbac,records,pages,definitions,scripts:new PageScriptService(),
+    verifyPin:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>tillPins.verify(actor.tenant_id,
+      typeof userId==='string'&&/^[0-9a-f-]{36}$/i.test(userId)?userId:actor.user_id,pin,actor.user_id)};
   registerPageScriptPublicRoute(app,pageScriptDeps);
   app.use('/api',authorize);
   registerPageScriptRoutes(app,pageScriptDeps);

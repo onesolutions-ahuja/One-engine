@@ -1,6 +1,8 @@
 import {apiBase} from '../../authentication/Client/authClient';
 import type {CompiledPage} from './compilePage';
 import {scriptFormulaLibrary,scriptFormulaOperators} from './pageScriptHost';
+import {F,O} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
+import type {PageCode,PageCodeModule} from './pageCodeRuntime';
 
 /**
  * Loads the page's server-built compiled.js (fix 4). The server builds it from
@@ -15,13 +17,18 @@ export type PageScriptModule={
  PLANS:Record<string,{formula:string;serverDataSteps:number;totalSteps:number;writes:string[]}>;
  createActions(host:unknown):Record<string,CompiledActionFn>;
  createFormulas(host:unknown):Record<string,(ctx:unknown)=>unknown>;
-};
+}&PageCodeModule;
 export type LoadedPageScript={apiName:string;variant:string;revision:number;plan:CompiledPage;
  /** Set when the file was converted from the Builder's current (unsaved) page. */
  previewId?:string;
  /** Published app page: the tenant-shared build and its app. */
  app?:{appId:string;buildId:string};
- actions:Record<string,CompiledActionFn>;formulas:Record<string,(ctx:unknown)=>unknown>};
+ actions:Record<string,CompiledActionFn>;formulas:Record<string,(ctx:unknown)=>unknown>;
+ /** The page as real code (v2): formula functions, action functions, record sets. */
+ code?:PageCode};
+/** The page code part of a loaded page file (older files have none). */
+const pageCodeOf=(module:Partial<PageScriptModule>):PageCode|undefined=>
+ typeof module.createCode==='function'&&module.codeVersion===2?module.createCode(F,O):undefined;
 
 const ticketPattern=/^[A-Za-z0-9_-]{43}$/;
 async function scriptUrl(request:Request,apiName:string,variant:string):Promise<string>{
@@ -55,7 +62,7 @@ export async function loadPreviewPageScript(request:Request,page:{apiName:string
  const plan=module.plan;
  if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')
   throw Error('The server page script is not valid for this page');
- return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,previewId,
+ return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,previewId,code:pageCodeOf(module),
   actions:module.createActions(host),formulas:module.createFormulas(host)};
 }
 /** Ticket the server already issued with the page itself (?script=1): no extra round trip. */
@@ -84,7 +91,7 @@ async function importAppPageScript(appId:string,page:{apiName:string},variant:st
  if(!plan||plan.apiName!==page.apiName||typeof module.createActions!=='function'||typeof module.createFormulas!=='function')
   throw Error('The server page script is not valid for this page');
  return {apiName:page.apiName,variant,revision:typeof plan.revision==='number'?plan.revision:0,plan,
-  app:{appId,buildId:answer.buildId},actions:module.createActions(host),formulas:module.createFormulas(host)};
+  app:{appId,buildId:answer.buildId},code:pageCodeOf(module),actions:module.createActions(host),formulas:module.createFormulas(host)};
 }
 /** The exact bytes of the Preview file (same draft → same file). */
 export async function fetchPreviewPageScriptSource(request:Request,page:{apiName:string},variant:string):Promise<string>{

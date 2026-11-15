@@ -129,9 +129,12 @@ export function useSqlFormulaDisplay(properties,hooks){
   const names=Array.isArray(properties.objects)?properties.objects
     .find(object=>object.apiName===properties.objectApiName)?.fields.map(field=>field.apiName)??[]:[];
   const allowedFields=[...new Set(names.filter(name=>/^[A-Za-z][A-Za-z0-9_]*$/.test(name)))];
+  // Formulas the page converter turned into code are worked out in the browser.
+  const compiled=properties.__formulaCode&&properties.__formulaCode.functions instanceof Map
+   ?properties.__formulaCode.functions:null;
   const sources=Object.entries(properties).filter(([key,value])=>
-    !['html','properties','record','records','items','pageState','sessionId'].includes(key)
-    &&isSelectedSqlFormula(value));
+    !['html','properties','record','records','items','pageState','sessionId','__formulaCode'].includes(key)
+    &&isSelectedSqlFormula(value)&&!(compiled&&typeof value==='string'&&compiled.has(value.trim())));
   const rows=Array.isArray(properties.records)&&properties.records.length
     ?properties.records:Array.isArray(properties.items)&&properties.items.length
       ?properties.items:[properties.record&&typeof properties.record==='object'

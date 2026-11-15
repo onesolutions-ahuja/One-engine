@@ -212,7 +212,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
        key={index} style={columnStyle(index,true)}>{columnHeadings[index]}</span>;
      })}
     </div>
-    <div className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows"
+    <div className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows">
          {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
       const src=p.imageSource?fieldExpression('imageSource',p.imageSource,record):"";

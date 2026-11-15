@@ -2113,6 +2113,10 @@ export function createSystemServer(db:SqlPersistence) {
     const saved=(await namedCredentials.list(actor.tenant_id,actor.user_id))
       .find(item=>item.id===req.params.id);
     const headers=saved?.configuration?.public_testHeaders??'';
+    // Read-only diagnostics accept only version selectors, never method
+    // override or other custom X-headers that could alter GET semantics.
+    if(headers&&!/^(?:Revolut-Api-Version: \d{4}-\d{2}-\d{2}|X-Api-Version: [A-Za-z0-9._-]{1,48})$/.test(headers))
+      throw new Error('Invalid connection test version header');
     const result=await namedCredentials.callout(
       actor.tenant_id,actor.user_id,
       {namedCredentialId:req.params.id,method:'GET',path,headers},{},'credential-connectivity-test');

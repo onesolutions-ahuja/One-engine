@@ -1,4 +1,5 @@
 import {recordInvoicePayment} from './record-payment-service.js';
+import {registerRevolutCheckoutRoutes} from './revolut-checkout-service.js';
 import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
@@ -632,6 +633,7 @@ export function createSystemServer(db:SqlPersistence) {
   registerPageScriptPublicRoute(app,pageScriptDeps);
   app.use('/api',authorize);
   registerPageScriptRoutes(app,pageScriptDeps);
+  registerRevolutCheckoutRoutes(app,db,records,namedCredentials,rbac,integrationActivityWriter);
   registerGovernanceRoutes(app,db,rbac,auth,connected,securityMonitor);
   registerIdentityAdminRoutes(app,{sessions:sessionPolicies,federation,passkeys,backups});
   app.use('/api',countTenantApiRequests(db));

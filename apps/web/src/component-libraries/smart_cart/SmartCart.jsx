@@ -1,61 +1,50 @@
+
 /** Cart is presentation-only; expressions and actions use the existing shared runtimes. */
 import {groupCartRows} from './cartGrouping.js';
 import {smartCustomButtonAppearance} from '../smart/shared/SmartCustomButtonAppearance.js';
 import {smartPartOffsetStyle,smartPartOrderStyle,smartPartSide} from '../smart/shared/SmartPartPlacement.js';
+
 const n=(v,f,min=0,max=2000)=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
 const shadow=v=>v==="large"?"0 8px 20px #0003":v==="medium"?"0 3px 9px #0003":"none";
 const border=v=>v?"1px solid "+v:"1px solid transparent";
 const align=v=>["left","center","right"].includes(v)?v:"left";
 const summaryJustify=v=>v==="left"?"flex-start":v==="center"?"center":v==="right"?"flex-end":undefined;
+
 const names=['Column 1','Column 2','Column 3','Column 4','Column 5'];
 const headings=['Product','Unit price','Quantity','Total','Discount'];
 const tracks=['minmax(0,2.2fr)','minmax(0,1fr)','minmax(78px,1.35fr)','minmax(0,1fr)','minmax(0,1fr)'];
 const numericType=/^(Number|Currency|Percent|Integer|Decimal|Double|Float|Long|Short|Int)$/i;
+
 // A direct field is @Field or @Object.Field (not a relationship path or formula).
 const directField=source=>/^=?\s*@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(typeof source==="string"?source.trim():"")?.[1]??null;
 const display=value=>value===null||value===undefined||value===""?"—":String(value);
+
 export default function SmartCart({p,records,Picture,expression,fieldAllowed,fire}){
  const allows=(key,row)=>typeof fieldAllowed!=='function'||fieldAllowed(key,row);
  const fieldExpression=(key,source,row)=>allows(key,row)?expression(source,row):'';
  const demo=p.builderPreview===true&&!records.length;
  const actions=p.actionFlows&&typeof p.actionFlows==="object"&&!Array.isArray(p.actionFlows)?p.actionFlows:{};
  const canClick=Boolean(actions.click)&&!p.previewOnly&&!p.builderPreview;
+
  // Per-button metadata actions; legacy qtyIcon is a compatibility fallback.
  const showIncrease=p.qtyIncreaseVisible!==false;
  const showDecrease=p.qtyDecreaseVisible!==false;
  const canIncrease=showIncrease&&Boolean(actions.qtyIncrease||actions.qtyIcon)&&!p.previewOnly&&!p.builderPreview;
  const canDecrease=showDecrease&&Boolean(actions.qtyDecrease||actions.qtyIcon)&&!p.previewOnly&&!p.builderPreview;
+
  // Group the full authorised collection before limiting the visible rows.
  // Preserve the source records: row actions still use their real record IDs.
  const rows=demo?Array.from({length:3},(_,i)=>({id:"preview-"+i,Quantity:1,__preview:true}))
    :groupCartRows(records,{quantityField:directField(p.column3Source)||'Quantity'}).slice(0,200);
+
  // Select the most recently appended item by default. Preserve a manually
  // selected row until it is removed, and automatically follow newly added rows.
  const rowKeys=rows.map((row,i)=>String(row?.Id??row?.id??i));
- const rowsRef=React.useRef(null);
-
-React.useEffect(()=>{
-  if(p.builderPreview)return;
-  const container=rowsRef.current;
-  if(!container||!selectedKey)return;
-
-  const selected=[...container.children].find(
-    row=>row.dataset.rowKey===selectedKey
-  );
-  if(!selected)return;
-
-  const rowTop=selected.offsetTop-container.offsetTop;
-  const rowBottom=rowTop+selected.offsetHeight;
-
-  if(rowBottom>container.scrollTop+container.clientHeight){
-    container.scrollTop=rowBottom-container.clientHeight;
-  }else if(rowTop<container.scrollTop){
-    container.scrollTop=rowTop;
-  }
-},[selectedKey,rowSignature,p.builderPreview]);
  const rowSignature=rowKeys.join("\\u001f");
  const [selectedKey,setSelectedKey]=React.useState(()=>rowKeys.at(-1)??null);
  const previousKeys=React.useRef(rowKeys);
+ const rowsRef=React.useRef(null);
+
  React.useEffect(()=>{
    const before=previousKeys.current;
    const added=rowKeys.filter(key=>!before.includes(key));
@@ -63,14 +52,39 @@ React.useEffect(()=>{
      current&&rowKeys.includes(current)?current:rowKeys.at(-1)??null);
    previousKeys.current=rowKeys;
  },[rowSignature]);
+
+ // Keep the selected cart row visible as new products are added.
+ // Only scroll the cart rows, not the entire page or summary.
+ React.useEffect(()=>{
+   if(p.builderPreview)return;
+   const container=rowsRef.current;
+   if(!container||!selectedKey)return;
+
+   const selected=[...container.children].find(
+     row=>row.dataset.rowKey===selectedKey
+   );
+   if(!selected)return;
+
+   const rowTop=selected.offsetTop-container.offsetTop;
+   const rowBottom=rowTop+selected.offsetHeight;
+
+   if(rowBottom>container.scrollTop+container.clientHeight){
+     container.scrollTop=rowBottom-container.clientHeight;
+   }else if(rowTop<container.scrollTop){
+     container.scrollTop=rowTop;
+   }
+ },[selectedKey,rowSignature,p.builderPreview]);
+
  const expandedActions=[
   {key:"customButton1",label:String(p.customButton1Label||"Custom Button 1"),visible:p.customButton1Visible!==false},
   {key:"customButton2",label:String(p.customButton2Label||"Custom Button 2"),visible:p.customButton2Visible!==false}
  ].filter(action=>action.visible);
+
  // Row buttons set to the right side move to the far end of the row;
  // the first of them takes the free space. Blank keeps them on the left.
  const firstRightAction=expandedActions.find(action=>
   smartPartSide(p[action.key+"Placement"],"left")==="right")?.key;
+
  // Financial amounts come from explicit permission-checked Page State/Flow
  // bindings. Do not infer VAT, discounts or a payable total from line prices.
  const money=value=>{
@@ -81,6 +95,7 @@ React.useEffect(()=>{
    /^[A-Z]{3}$/.test(p.currencyCode||"")?p.currencyCode:"GBP"}).format(amount);}
   catch{return new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP"}).format(amount);}
  };
+
  // The same existing ribbon expression evaluator resolves @Field, formulas,
  // literals and Flow-bound Page State values; all fields come from authorised rows.
  const summaryRecord=records[0]??{};
@@ -93,6 +108,7 @@ React.useEffect(()=>{
   }
   return expression(source,summaryRecord);
  };
+
  // Summary slots accept free-form text as well as numeric bindings. Only
  // numeric results (and explicitly numeric Object fields) receive the default
  // currency formatter; user-authored text must never be coerced to a number.
@@ -125,6 +141,7 @@ React.useEffect(()=>{
   Discount:summaryValue(p.discountValue,'discountValue'),
   Tax:summaryValue(p.taxValue,'taxValue'),
   Total:summaryValue(p.totalValue,'totalValue')};
+
  const rowHeight=n(p.rowHeight,64,24);
  // Table side padding is the whole left/right inset of the item table: from the
  // table edge to the first and last column (header and every row), e.g. 5px.
@@ -154,11 +171,12 @@ React.useEffect(()=>{
  const supportingDefault=demo?'Preview items (3)':
   rows.reduce((sum,row)=>sum+Number(row.Quantity||0),0)+' items';
  const supportingText=displayFormula('cartSupportingSource',p.cartSupportingSource,supportingDefault);
- // The visible row count measures actual cell content, not just the configured min-height.
+
  const sources=[null,p.column2Source,p.column3Source,p.column4Source,p.column5Source];
  const object=Array.isArray(p.objects)?p.objects.find(item=>item.apiName===p.objectApiName):null;
  const quantityField=directField(p.column3Source);
  const field=quantityField?object?.fields?.find(item=>item.apiName===quantityField):null;
+
  const renderQuantity=(record,name,payload)=>{
   const legacy=!p.column3Source;
   const legacyKey=['Quantity','quantity','Qty','qty'].find(key=>record?.[key]!==undefined);
@@ -185,6 +203,7 @@ React.useEffect(()=>{
     onClick={()=>fire?.(actions.qtyIncrease?'qtyIncrease':'qtyIcon',{...payload,delta:1,operation:"increment",fieldApiName:fieldName,quantity:Number(payload.record?.[fieldName]??quantity)})}>+</button>}
   </div>;
  };
+
  return <section className="smart-cart-root" aria-label="Smart Cart" style={{
   backgroundColor:p.backgroundColor||"#fff",border:border(p.borderColor),
   borderRadius:n(p.radius,12),boxShadow:shadow(p.shadow)}}>
@@ -234,7 +253,7 @@ React.useEffect(()=>{
      })}
     </div>
     <div ref={rowsRef} className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows">
-         {rows.map((record,i)=>{
+     {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
       const src=p.imageSource?fieldExpression('imageSource',p.imageSource,record):"";
       const rowSupporting=!demo&&p.rowSupportingSource

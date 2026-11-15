@@ -1,60 +1,82 @@
-# Revolut Connector
+# Revolut Merchant Connector
 
-Revolut **Merchant API** payments through UNE Engine's existing AppExchange, tenant-scoped
-Named Credentials, Integration Connections and HTTP Callout Flow nodes. This package
-contains no API keys and is Sandbox-first.
+UNE Engine's Revolut Connector is installed from **Setup → AppExchange**. It
+supports **on-screen embedded checkout with Revolut**, reliable signed webhook
+payment status, and (separately) the generic HTTPS HTTP Callout operations.
+**No application Flow definition is created or required for checkout.**
 
-## Install and configure
+## 1. Configure credentials
 
-1. Open **Setup → AppExchange → Revolut Connector** and install/activate it.
-2. In **Settings**, edit the provisioned Revolut credential. The default Base URL is
-   `https://sandbox-merchant.revolut.com/`; Authentication is **Bearer**.
-3. Paste the **Secret Merchant API key** from Revolut's API Console into **Secret**
-   (never the SDK/Public key) and save. It remains encrypted by Named Credentials.
-4. Choose **Test Connection**. This is a read-only `GET api/orders`, with the
-   `Revolut-Api-Version: 2026-08-17` header supplied from the public connector
-   configuration. It does not create or charge an order.
-5. If the test returns 401/403, check the key's environment and Merchant Orders
-   permissions in the Revolut API Console before changing the connector.
+1. Install/activate **Revolut Connector** in AppExchange.
+2. In Settings, edit the provisioned HTTPS Named Credential.
+3. Paste the matching environment's **Secret Merchant API key** in the encrypted
+   Secret field (never add it to a Page, a public variable or Git).
+4. Set the required public Configuration variables:
 
-## Flow Builder
+| Field | Purpose | Example |
+| --- | --- | --- |
+| Merchant public key | Revolut Web SDK public key | `pk_...` |
+| Payment source Object API name | Tenant Object containing amount | `Invoice` |
+| Amount field API name in major units | Must be an accessible numeric/currency field | `Total` |
+| Currency ISO code | Currency for server-created orders | `GBP` |
 
-Add **HTTP Callout**, choose the installed **Provider / Integration Connection**,
-then one of the following operations. The editor and server supply the required
-version header; no Flow stores the API key.
+These variables are stored as `public_checkoutPublishable`,
+`public_checkoutRecordObject`, `public_checkoutAmountField`,
+`public_checkoutCurrency` in the existing Named Credential configuration.
+**The browser does not choose a price or a currency.** Instead, the server reads
+the field of the authenticated user's authorised Record and converts it to the
+provider's minor units. GBP 5.00 becomes 500 pence.
 
-| Operation | Method | Relative path | Body |
-| --- | --- | --- | --- |
-| ListOrders | GET | `api/orders` | none |
-| CreateOrder | POST | `api/orders` | JSON, e.g. `{"amount":500,"currency":"GBP"}` |
-| GetOrder | GET | `api/orders/{!OrderId}` | none |
-| CaptureOrder | POST | `api/orders/{!OrderId}/capture` | JSON, e.g. `{"amount":500}` |
-| CancelOrder | POST | `api/orders/{!OrderId}/cancel` | none |
+5. **Test Connection** performs a read-only Merchant GET; it never creates payment.
+6. Choose **Register / reconnect webhook** under Signed Payment Webhook. The
+   connector registers a public HTTPS callback with Revolut (reusing an existing
+   registration for the same URL), securely saves Revolut's returned signing
+   secret, and activates the verified callback.
+7. For Production, update both Base URL to
+   `https://merchant.revolut.com/` and both keys to their matching Production
+   values. Never mix Sandbox keys with Production endpoints.
 
-Amounts are in the currency's *minor units* (GBP 500 = £5). For operations using
-`{!OrderId}`, create/populate an `OrderId` Flow variable or use an existing Flow
-resource reference for the order ID. For capture, the order must have been
-created with `capture_mode:"manual"` and be authorised.
+## 2. On-screen checkout, no Flow
 
-Use synchronous HTTP Callouts and **Outputs for next steps** to pick `id`,
-`state`, `checkout_url` and other fields from a sample order response.
-Return the `checkout_url` to your application's checkout view; verify the
-order on the server with GetOrder before fulfilling anything. Use a stable,
-unique **Idempotency Key** for a payment attempt, especially if retrying.
-Never interpret the checkout redirect alone as proof of payment.
+In Page Builder add the standard **Revolut Checkout** component to a Page that
+has a current record ID (`recordId` Page state). Publish the Page. A signed-in,
+authorised tenant user will see Revolut's embedded checkout card/wallet widget
+for the configured source Record. The server creates a Merchant order only
+when the widget requests one, using an idempotent, unique attempt ID.
 
-## Go live
+The widget does not declare success when the browser fires `onSuccess`.
+It waits until its tenant-scoped receipt has status `completed`, which is set
+by a verified `ORDER_COMPLETED` webhook. A browser closure does not erase the
+backend receipt. The request and HTTP response never expose the encrypted
+Secret Merchant key or webhook signing secret.
 
-After the Revolut Merchant account is approved, replace the credential's **Base URL**
-with `https://merchant.revolut.com/` and replace the Sandbox key with the
-corresponding **Production Merchant Secret API key**. Both origins are explicitly
-approved by the connector. Verify production access with a read-only test before
-enabling live payment Flows.
+The component is currently for **authenticated UNE Engine Pages** with a
+current Record. It is not a public guest storefront checkout or an automatic
+Invoice/Cash Ledger posting integration. That needs separate, explicit
+authorization and accounting requirements.
 
-Webhooks and provider-specific signature verification are **not** provisioned by
-this package. It does not automatically register subscriptions or change order
-records when webhooks arrive; use GetOrder server-side for state confirmation.
-Live payments require appropriate permissions, fraud handling and operational controls.
+## 3. Webhook security and troubleshooting
 
-Official API: https://developer.revolut.com/docs/api/merchant
-Sandbox testing: https://developer.revolut.com/docs/guides/merchant/test-and-go-live/testing/sandbox-test-scenarios
+The inbound webhook route reuses UNE Engine's central tenant-bound webhook event
+archive, raw-body capture, one-time deduplication and Communication audit record.
+For Revolut, it verifies HMAC-SHA256 over `v1.{timestamp}.{rawBody}` against
+`Revolut-Signature`, and rejects stale timestamps more than five minutes away.
+Only the installed, enabled credential and its approved callback can change
+saved Revolut payment receipts. Other providers' webhook handling is unchanged.
+
+Use a public HTTPS domain, an enabled connector and a Merchant key with
+Orders and Webhooks API permissions. If connection testing succeeds but checkout
+fails, verify the public key matches the same environment and the configured
+Object/amount field is readable for the signed-in user.
+
+## 4. Optional generic HTTP Callout operations
+
+The connector still exposes ListOrders, CreateOrder, GetOrder, CaptureOrder and
+CancelOrder through existing Named Credentials and Integration Connections. These
+do **not** create any Flow definitions and are independent of the embedded
+checkout widget.
+
+Official:
+- [Merchant Web SDK embeddedCheckout](https://developer.revolut.com/docs/sdks/merchant-web-sdk/payment-methods/embedded-checkout)
+- [Merchant API](https://developer.revolut.com/docs/api/merchant)
+- [Verify the payload signature](https://developer.revolut.com/docs/guides/merchant/monitor-and-observe/webhooks/verify-the-payload-signature)

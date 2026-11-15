@@ -35,3 +35,18 @@ test('Preview lists each formula issue in red with the component name',()=>{
  assert.match(read('../src/core/pages/PageCompiler/CompiledPreviewBar.css'),/\.compiled-preview-issues\{[^}]*color:#b91c1c/);
  assert.match(read('../../server/src/page-compiler/compilePage.ts'),/if\(!formula\|\|formula==='='\)return null;/);
 });
+
+test('STATE(key, …) without quotes registers the Page State write, so readers refresh',()=>{
+ const compiler=read('../../server/src/page-compiler/compilePage.ts');
+ assert.match(compiler,/steps\.filter\(step=>step\.name==='STATE'&&identifier\.test\(step\.object\)\)/);
+ assert.match(compiler,/\['smart_tabs','smart_navigation','smart_selector'\]\.includes\(libraryApiName\)/);
+});
+
+test('Tabs keep their configured background; segmented look only without one',()=>{
+ assert.match(read('../src/component-libraries/smart/shared/SmartRuntime.jsx'),/"smart-tabs"\+\(p\.backgroundColor\?"":" is-segmented"\)/);
+ assert.match(read('../src/component-libraries/smart/shared/smart-ios.css'),/\.smart-tabs\.is-segmented\{/);
+});
+
+test('A component mostly inside the right column moves with it on wide screens',()=>{
+ assert.match(read('../src/core/pages/PageRuntime/runtimeCanvasSizing.ts'),/p\.x \+ p\.width \/ 2 >= rightColumnStart/);
+});

@@ -51,8 +51,11 @@ export function runtimeResponsiveComponentStyle(
   if (!p || component.parentId || !Number.isFinite(w) || w <= 0) return {};
   const rightGap = w - (p.x + p.width);
   const coversPage = p.x <= w * .08 && p.width >= w * .8 && rightGap <= w * .12;
+  // A component that starts a little left of the right column but mostly lies in
+  // it (e.g. a cart overlapping the panel edge) moves with the column: left
+  // behind, it ended up over the product grid on wider screens.
   const rightSide = rightColumnStart !== null
-    ? p.x >= rightColumnStart - 12 && !coversPage
+    ? (p.x >= rightColumnStart - 12 || p.x + p.width / 2 >= rightColumnStart) && !coversPage
     : p.x >= w * .55 && p.width <= w * .45
       && rightGap >= -w * .03 && rightGap <= w * .09;
   const fillsLeft = rightColumnStart !== null

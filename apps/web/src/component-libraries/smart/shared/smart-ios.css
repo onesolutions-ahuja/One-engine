@@ -85,11 +85,14 @@
 .smart-runtime.smart-ios .smart-lookup-menu button{border-radius:8px;padding:9px 12px}
 .smart-runtime.smart-ios .smart-lookup-menu button:hover{background:var(--smart-ios-field)}
 
-/* Tabs: segmented control. */
-.smart-runtime.smart-ios .smart-tabs{
+/* Tabs: segmented control only while no background is set; a configured
+   background (even transparent) keeps the tabs exactly as designed, the same
+   in the Page Builder and on the live page. */
+.smart-runtime.smart-ios .smart-tabs.is-segmented{
  background:var(--smart-ios-fill);border-radius:10px;padding:2px;gap:2px;
 }
-.smart-runtime.smart-ios .smart-tabs button{border-color:transparent;border-radius:8px;font-weight:500}
+.smart-runtime.smart-ios .smart-tabs.is-segmented button{border-color:transparent;border-radius:8px}
+.smart-runtime.smart-ios .smart-tabs button{font-weight:500}
 
 /* Navigation bar items: rounded, hairline border. */
 .smart-runtime.smart-ios .smart-navigation{gap:6px}

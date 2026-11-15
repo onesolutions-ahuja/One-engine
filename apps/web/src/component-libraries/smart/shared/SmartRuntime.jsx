@@ -616,7 +616,7 @@ function SmartTabs({p,record,fire}){
  },[active,tabs.length,defaultTabIndex]);
  return <div data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,
    display:"flex",flexDirection:"column",height:"100%",minHeight:0,width:"100%"}}>
-  <nav className="smart-tabs" role="tablist" aria-label="Tabs"
+  <nav className={"smart-tabs"+(p.backgroundColor?"":" is-segmented")} role="tablist" aria-label="Tabs"
    aria-orientation={vertical?"vertical":"horizontal"} style={{
     width:"100%",height:"100%",flex:"1 1 auto",minHeight:0,
     flexDirection:vertical?"column":"row",flexWrap:vertical?"nowrap":"wrap",

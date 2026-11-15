@@ -121,3 +121,29 @@ test('iOS Style is opt-in per saved component and never overrides configured val
  const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
  assert.match(ribbon,/property\.id==='visualStyle'\?'Classic'/);
 });
+
+
+test('Key Gap uses the shared Card Gap setting for every key-based component',()=>{
+ const numpad=read('../src/component-libraries/smart_numpad/SmartNumpad.jsx');
+ const keyboard=read('../src/component-libraries/smart_keyboard/SmartKeyboard.jsx');
+ const dock=read('../src/component-libraries/smart_dock/SmartDock.jsx');
+ for(const component of [numpad,keyboard,dock]){
+  assert.match(component,/p\.gap\?\?p\.numpadGap/,
+   'shared gap wins; legacy page values remain readable');
+  assert.doesNotMatch(component,/size\(p\.numpadGap,/);
+ }
+ const sql=read('../../server/src/system-support/system-migrations.ts');
+ for(const api of ['smart_numpad','smart_keyboard','smart_dock'])
+  assert.match(sql,new RegExp("\\('"+api+"'"));
+ assert.match(sql,/property_key='gap'/);
+ assert.match(sql,/slot_key='extra_cardGap'/);
+ assert.match(sql,/SET enabled=false\s+WHERE property_key='numpadGap'/);
+ const seeder=read('../../server/src/system-support/smart-ios-keyboard-dock.ts');
+ assert.doesNotMatch(seeder,/\['numpadGap'/);
+ const hidden=read('../src/core/builders/PageBuilder/layoutRibbonVisibility.ts');
+ assert.match(hidden,/'numpadGap'/);
+ const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
+ assert.match(ribbon,/properties\.numpadGap:undefined/);
+ const style=read('../src/core/builders/PageBuilder/PageBuilderDesignDock.css');
+ assert.match(style,/\[data-others-group="Spacing"\][\s\S]*?repeat\(2,minmax\(0,1fr\)\)/);
+});

@@ -246,10 +246,8 @@
 }
 
 
-/* Reuse the authorised app-page navigation metadata in a vertical sidebar.
- * The existing header actions remain available; only duplicate tabs are hidden.
- */
-.lightning .md-app-sidebar {
+/* Records navigation remains in the workspace; editable app pages never receive a shell sidebar. */
+.lightning .md-records-sidebar {
   flex: 0 0 240px;
   width: 240px;
   min-width: 0;
@@ -260,14 +258,14 @@
   padding: 12px 8px;
   gap: 12px;
 }
-.lightning .md-app-sidebar-heading {
+.lightning .md-records-sidebar-heading {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
   padding: 4px 6px;
 }
-.lightning .md-app-sidebar-heading strong {
+.lightning .md-records-sidebar-heading strong {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -276,7 +274,7 @@
   font-size: 13px;
   font-weight: 600;
 }
-.lightning .md-app-sidebar-heading button {
+.lightning .md-records-sidebar-heading button {
   width: 32px;
   height: 32px;
   border: 0;
@@ -286,11 +284,11 @@
   display: grid;
   place-items: center;
 }
-.lightning .md-app-sidebar nav {
+.lightning .md-records-sidebar nav {
   display: grid;
   gap: 3px;
 }
-.lightning .md-app-sidebar nav button {
+.lightning .md-records-sidebar nav button {
   min-height: 36px;
   padding: 8px 12px;
   border: 0;
@@ -304,28 +302,24 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.lightning .md-app-sidebar nav button { display: flex; align-items: center; gap: 10px; }
-.lightning .md-app-sidebar nav button .md-app-nav-icon { flex: none; }
-.lightning .md-app-sidebar nav button[aria-current="page"] {
+.lightning .md-records-sidebar nav button { display: flex; align-items: center; gap: 10px; }
+.lightning .md-records-sidebar nav button[aria-current="page"] {
   background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface));
   color: var(--md-primary);
   font-weight: 600;
 }
 @media (hover: hover) {
-  .lightning .md-app-sidebar nav button:hover { background: var(--md-fill); }
+  .lightning .md-records-sidebar nav button:hover { background: var(--md-fill); }
 }
 @media (pointer: coarse) {
-  .lightning .md-app-sidebar nav button { min-height: 44px; }
-}
-@media (min-width: 600px) {
-  .lightning:has(.md-app-sidebar) .header-page-tabs { display: none; }
+  .lightning .md-records-sidebar nav button { min-height: 44px; }
 }
 @media (min-width: 1024px) {
   /* Collapsed app menu = slim icon rail: icon with a short caption, most space left for the page. */
-  .lightning .md-app-sidebar-collapsed { flex-basis: 72px; width: 72px; padding-inline: 6px; }
-  .lightning .md-app-sidebar-collapsed .md-app-sidebar-heading { justify-content: center; padding-inline: 0; }
-  .lightning .md-app-sidebar-collapsed .md-app-sidebar-heading strong { display: none; }
-  .lightning .md-app-sidebar-collapsed nav button {
+  .lightning .md-records-sidebar-collapsed { flex-basis: 72px; width: 72px; padding-inline: 6px; }
+  .lightning .md-records-sidebar-collapsed .md-records-sidebar-heading { justify-content: center; padding-inline: 0; }
+  .lightning .md-records-sidebar-collapsed .md-records-sidebar-heading strong { display: none; }
+  .lightning .md-records-sidebar-collapsed nav button {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -333,7 +327,7 @@
     padding: 8px 2px;
     text-align: center;
   }
-  .lightning .md-app-sidebar-collapsed nav button span {
+  .lightning .md-records-sidebar-collapsed nav button span {
     max-width: 100%;
     font-size: 10px;
     line-height: 1.15;
@@ -342,7 +336,7 @@
   }
 }
 @media (min-width: 600px) and (max-width: 1023px) {
-  .lightning .md-app-sidebar {
+  .lightning .md-records-sidebar {
     position: fixed;
     z-index: 100;
     inset-block-start: calc(60px + env(safe-area-inset-top, 0px));
@@ -354,7 +348,7 @@
     border-radius: var(--md-radius-xl);
     box-shadow: var(--md-shadow-sheet);
   }
-  .lightning .md-app-sidebar-collapsed { display: none; }
+  .lightning .md-records-sidebar-collapsed { display: none; }
 }
 
 /* Back and Forward belong to the single top toolbar; keep the title and

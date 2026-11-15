@@ -87,7 +87,11 @@ export async function resolveFlowIntegrationCallout(db:SqlExecutor,rbac:RbacEngi
  // A provider may not redirect a connection's credentials to a different service.
  if(typeof provider.baseUrl==='string'&&provider.baseUrl){
   const configured=new URL(credentials[0].base_url),approved=new URL(provider.baseUrl);
-  if(configured.origin!==approved.origin)
+  const allowed=Array.isArray(provider.approvedOrigins)
+   ?provider.approvedOrigins.filter((item):item is string=>
+     typeof item==='string'&&/^https:\/\/[a-z0-9.-]+$/i.test(item))
+   :[approved.origin];
+  if(!allowed.includes(approved.origin)||!allowed.includes(configured.origin))
    throw new Error('Integration credential origin differs from provider');
  }
  if(config.path&&config.path!==operation.path||config.method&&config.method!==operation.method)

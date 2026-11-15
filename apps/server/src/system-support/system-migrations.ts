@@ -631,6 +631,52 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   // Smart iOS Style, Smart Keyboard and Smart Dock (additive, idempotent).
   await applySmartIosKeyboardDock(client);
   await applySmartChart(client);
+  // Retire the duplicate Key Gap control. Existing page JSON keeps numpadGap
+  // until authored again; all three renderers and the ribbon read that legacy
+  // value only when the new shared gap property has not been set.
+  // Reuse the existing Card Gap (gap) slot rather than making another editor.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules
+      (component_api,property_key,enabled,default_value_override)
+    SELECT spec.api,'gap',true,spec.default_gap::jsonb
+    FROM (VALUES
+      ('smart_numpad','8'),
+      ('smart_keyboard','6'),
+      ('smart_dock','6')
+    ) AS spec(api,default_gap)
+    JOIN md_builder_ribbon_components c ON c.component_api=spec.api
+    JOIN md_builder_shared_properties p ON p.property_key='gap'
+    ON CONFLICT(component_api,property_key) DO UPDATE SET
+      enabled=true,
+      default_value_override=COALESCE(
+        md_builder_ribbon_component_rules.default_value_override,
+        EXCLUDED.default_value_override)
+  `);
+  await client.query(`
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT spec.api,s.area,s.slot_key,'gap'
+    FROM (VALUES ('smart_numpad'),('smart_keyboard'),('smart_dock')) AS spec(api)
+    JOIN md_builder_design2_slots s ON s.area='Extras'
+      AND s.slot_key='extra_cardGap' AND s.property_key='gap'
+    ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key='gap'
+  `);
+  await client.query(`
+    DELETE FROM md_builder_design2_slot_rules
+    WHERE property_key='numpadGap'
+       OR (area,slot_key) IN (
+         SELECT area,slot_key FROM md_builder_design2_slots
+         WHERE slot_key='extra_numpadGap'
+            OR property_key='numpadGap' OR fallback_key='numpadGap')
+  `);
+  await client.query(`
+    DELETE FROM md_builder_design2_slots
+    WHERE slot_key='extra_numpadGap'
+       OR property_key='numpadGap' OR fallback_key='numpadGap'
+  `);
+  await client.query(`
+    UPDATE md_builder_ribbon_component_rules SET enabled=false
+    WHERE property_key='numpadGap'
+  `);
   // Tenant developer mailboxes live on the platform-owned mail domain but
   // belong to the new tenant. The baseline's (tenant_id,domain) foreign key
   // made every such insert fail, leaving new tenants suspended without a

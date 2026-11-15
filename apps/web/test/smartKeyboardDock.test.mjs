@@ -166,7 +166,7 @@ test('Design properties keep their place for every selection and feature groups 
  assert.match(ribbon,/const basePaddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
  assert.match(ribbon,/const paddingKey=api==='smart_cart'\?'tableSidePadding':basePaddingKey/);
  assert.match(ribbon,/api==='smart_dock'\?\[\{key:'dockItemCount',label:'Count'\}\]/);
- assert.match(ribbon,/\['numpadGap','numpadPadding','dockItemCount',\s*'numpadPrefix','numpadSuffix'\]/);
+ assert.match(ribbon,/\['numpadGap','numpadPadding','dockItemCount',\s*'numpadPrefix','numpadSuffix','tableSidePadding','visualStyle'\]/);
  assert.match(ribbon,/\[paddingKey\]:next\},\[paddingKey\]/);
  assert.match(ribbon,/\?properties\.numpadGap:undefined/);
 

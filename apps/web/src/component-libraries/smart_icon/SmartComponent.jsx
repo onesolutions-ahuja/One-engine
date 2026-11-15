@@ -5,7 +5,8 @@ export default function SmartComponent(p){
  const selected=icons.find(icon=>icon.id===p.iconId)??smartShapes.find(shape=>shape.id===p.iconId)??fallbackIcon;
  const url="/smart-icons/"+selected.id+".svg";
  // Style = iOS (new inserts): soft blue glyph and press effect. Older icons stay Classic.
- const ios=p.visualStyle==="iOS";
+ // iOS is the only Smart style (the Classic/iOS switch was removed).
+ const ios=true;
  const radius=Number.isFinite(Number(p.radius))?Math.max(0,Math.min(1000,Number(p.radius))):12;
  const shadow=p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none";
  const style={width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",

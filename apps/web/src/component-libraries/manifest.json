@@ -5,6 +5,7 @@
     "smart_button/component.json",
     "smart_toggle/component.json",
     "smart_lookup/component.json",
+    "smart_search/component.json",
     "smart_selector/component.json",
     "smart_tabs/component.json",
     "smart_text/component.json",

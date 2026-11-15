@@ -107,8 +107,8 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  const rowHeight=n(p.rowHeight,64,24);
  // Table side padding is the whole left/right inset of the item table: from the
  // table edge to the first and last column (header and every row), e.g. 5px.
- const sidePaddingSet=p.tableSidePadding!==undefined&&p.tableSidePadding!==null&&p.tableSidePadding!==""
-  &&Number.isFinite(Number(p.tableSidePadding));
+ // Default 6px, the value the Padding control shows when nothing is set.
+ const sidePaddingSet=true;
  const rowLimit=Math.floor(n(p.cardsPerRow,5,1,50));
  const visible=Array.isArray(p.columnVisibility)
    ?names.flatMap((name,index)=>p.columnVisibility.includes(name)?[index]:[])

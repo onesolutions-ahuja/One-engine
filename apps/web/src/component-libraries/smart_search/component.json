@@ -1,0 +1,26 @@
+{
+  "apiName": "smart_search",
+  "label": "Smart Search",
+  "category": "Inputs",
+  "description": "Search box with no dropdown. On Change gives the typed text (from the 3rd letter) to an action, e.g. to filter a Card Grid; On Enter handles a scanned barcode.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_search/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_search/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 320,
+    "defaultHeight": 44,
+    "minWidth": 96,
+    "minHeight": 32
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {"apiName": "change", "label": "Text changed (from 3rd letter)"},
+    {"apiName": "enter", "label": "Enter pressed / barcode scanned"}
+  ]
+}

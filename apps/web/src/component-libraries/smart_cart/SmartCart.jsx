@@ -117,10 +117,13 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  const columnStyle=(index,header)=>{
   const prefix='cartColumn'+(index+1)+(header?'Header':'Cell');
   const bold=p['cartColumn'+(index+1)+'Bold'];
+  const alignment=p['cartColumn'+(index+1)+'Alignment'];
   return {backgroundColor:p[prefix+'Fill']||undefined,color:p[prefix+'TextColor']||undefined,
    fontSize:n(p['cartColumn'+(index+1)+'TextSize'],header?11:n(p.rowTextSize,13,8,96),8,96),
    fontWeight:bold===true?700:bold===false?400:header?undefined:p.rowBold===true?700:undefined,
-   textAlign:p['cartColumn'+(index+1)+'Alignment']?align(p['cartColumn'+(index+1)+'Alignment']):undefined};
+   textAlign:alignment?align(alignment):undefined,
+   ...(header?{}:{width:'100%',justifySelf:'stretch'}),
+   ...(index===0&&alignment?{justifyContent:alignment==='left'?'flex-start':alignment==='right'?'flex-end':'center'}:{})};
  };
  const columnHeadings=headings.map((heading,index)=>
   displayFormula('cartColumn'+(index+1)+'Header',p['cartColumn'+(index+1)+'Header'],heading));

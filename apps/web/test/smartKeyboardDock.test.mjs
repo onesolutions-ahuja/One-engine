@@ -121,3 +121,27 @@ test('iOS Style is opt-in per saved component and never overrides configured val
  const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
  assert.match(ribbon,/property\.id==='visualStyle'\?'Classic'/);
 });
+
+test('Design ribbon has one Gap, Padding, Count and visibility editor without changing saved keys',()=>{
+ const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
+ const pageRibbon=read('../src/core/builders/PageBuilder/editor/ribbon/createPageRibbon.tsx');
+ const layoutVisibility=read('../src/core/builders/PageBuilder/layoutRibbonVisibility.ts');
+
+ // Only the presentation is merged; historic saved properties keep working.
+ assert.match(ribbon,/const gapCandidates=api==='smart_card_grid'\?\['gap','numpadGap'\]:\['numpadGap','gap'\]/);
+ assert.match(ribbon,/label:'Gap',designCaption:'Gap'/);
+ assert.match(ribbon,/\['numpadPadding','numpadGap','gap','dockItemCount'\]\.includes\(property\.id\)/);
+ assert.match(ribbon,/const paddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
+ assert.match(ribbon,/\[paddingKey\]:next\},\[paddingKey\]/);
+ assert.match(ribbon,/api==='smart_dock'\?\[\{key:'dockItemCount',label:'Count'\}\]/);
+ assert.match(ribbon,/\[\{key:'tabCount',label:'Count'\},\{key:'tabIndex',label:'Default tab'\}\]/);
+ assert.doesNotMatch(pageRibbon,/Visible on this page/);
+ assert.match(pageRibbon,/onVisibleChange=\{visible=>/);
+ assert.match(pageRibbon,/Edit conditional visibility/);
+
+ // Per-tab width is not the canvas-frame width: only its duplicate Layout
+ // editor disappears; both underlying dimensions remain available.
+ assert.match(layoutVisibility,/propertyKey==='tabWidth'\|\|propertyKey==='tabHeight'/);
+ assert.match(layoutVisibility,/selectedApis\.every\(api=>api==='smart_tabs'\)/);
+ assert.match(ribbon,/slot\.slotKey==='width'\?'tabWidth':'tabHeight'/);
+});

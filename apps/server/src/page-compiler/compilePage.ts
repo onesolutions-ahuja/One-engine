@@ -219,7 +219,9 @@ export function compileComponentAction(event:string,raw:unknown):CompiledAction|
   let split:ReturnType<typeof splitServerDataActionPlan>=null;
   try{split=/\bFOREACH\s*\(/i.test(formula)?null:splitServerDataActionPlan(formula);}catch{split=null;}
   const writes=steps.filter(step=>['CREATERECORD','UPDATERECORD','DELETERECORD'].includes(step.name)).map(step=>step.object);
-  const stateWrites=[...formula.matchAll(/\bSTATE\s*\(\s*["']([A-Za-z][A-Za-z0-9_]{0,63})["']/gi)].map(match=>match[1]);
+  // STATE(key, …) and STATE("key", …) both write Page State key: take it from the
+  // compiled steps (the unquoted form was missed, so readers never refreshed).
+  const stateWrites=steps.filter(step=>step.name==='STATE'&&identifier.test(step.object)).map(step=>step.object);
   return {...base,kind:'ActionPlan',formula,steps,serverDataSteps:split?.dataSteps??0,totalSteps:steps.length,
    writesObjects:unique(writes),writesState:unique(stateWrites)};
  }catch(error){
@@ -348,7 +350,10 @@ export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],
    ...(dataSourceId?{dataSourceId}:{}),
    // Actions read the latest state when they run, so a key used only inside an
    // action never redraws the component (a product grid must not redraw on cart change).
-   searchText:JSON.stringify({...properties,actionFlows:undefined}).toLowerCase()});
+   searchText:(JSON.stringify({...properties,actionFlows:undefined})
+    // Tabs / Navigation / Selector show the selection their own change action
+    // stores (=STATE(category, @value)), so another control can change it.
+    +(['smart_tabs','smart_navigation','smart_selector'].includes(libraryApiName)?' '+stateWrites.join(' '):'')).toLowerCase()});
  }
  // State reads are resolved once the page's full set of state keys is known.
  const stateKeys=unique(allStateWrites);

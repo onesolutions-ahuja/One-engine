@@ -6,6 +6,7 @@ export default Object.freeze({
   "description": "Revolut Merchant API payments, orders and checkout (Sandbox by default)",
   "credential": "Revolut_API",
   "url": "https://sandbox-merchant.revolut.com/",
+  "allowedUrls": ["https://merchant.revolut.com/"],
   "auth": "Bearer",
   "header": "",
   "fields": [

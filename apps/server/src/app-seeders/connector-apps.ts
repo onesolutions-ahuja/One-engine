@@ -6,22 +6,27 @@ import type {SqlPersistence} from '../system-files/sql-persistence.js';
 
 export const connectorApps=Object.freeze({
  WhatsAppConnector:'whatsapp',SmsGateConnector:'sms-gate',BrevoConnector:'brevo',
- UberEatsConnector:'uber-eats',DeliverooConnector:'deliveroo',JustEatConnector:'just-eat'
+ UberEatsConnector:'uber-eats',DeliverooConnector:'deliveroo',JustEatConnector:'just-eat',
+ RevolutConnector:'revolut'
 } as const);
 export type ConnectorAppName=keyof typeof connectorApps;
 export const isConnectorApp=(name:string):name is ConnectorAppName=>
  Object.prototype.hasOwnProperty.call(connectorApps,name);
 type Field={apiName:string;label:string;required:boolean;defaultValue:string};
-type Operation={method:'GET'|'POST'|'PUT'|'PATCH'|'DELETE';path:string;
+type Operation={method:'GET'|'POST'|'PUT'|'PATCH'|'DELETE';path:string;headers?:string;
  communicationFields?:{recipient?:string;sender?:string;body?:string;responseId?:string}};
 type Definition={folder:string;appApi:string;label:string;description:string;credential:string;url:string;
- auth:string;header:string;fields:Field[];operations:Record<string,Operation>;docs:string;notes:string;
+ auth:string;header:string;allowedUrls?:string[];fields:Field[];operations:Record<string,Operation>;docs:string;notes:string;
  communicationChannel?:string;defaultCommunicationFields?:Record<string,string>};
 const id=/^[A-Za-z][A-Za-z0-9_]*$/;
 function validate(value:Definition,apiName:string):Definition{
  if(value.appApi!==apiName||!id.test(value.credential)||!value.label||!value.description
   ||!['Bearer','Basic','API Key','OAuth Client Credentials','OAuth Authorization Code','Authorization Scheme'].includes(value.auth)
-  ||new URL(value.url).protocol!=='https:')throw Error('Invalid connector manifest: '+apiName);
+  ||new URL(value.url).protocol!=='https:'
+  ||(value.allowedUrls!==undefined&&(!Array.isArray(value.allowedUrls)
+    ||value.allowedUrls.length>3||value.allowedUrls.some(url=>
+      typeof url!=='string'||!/^https:\/\/[a-z0-9.-]+\/$/i.test(url)))))
+  throw Error('Invalid connector manifest: '+apiName);
  const names=new Set<string>();
  for(const field of value.fields){
   if(!/^public_[A-Za-z][A-Za-z0-9_]*$/.test(field.apiName)||names.has(field.apiName)
@@ -30,7 +35,11 @@ function validate(value:Definition,apiName:string):Definition{
  }
  for(const [operation,definition] of Object.entries(value.operations)){
   if(!id.test(operation)||!['GET','POST','PUT','PATCH','DELETE'].includes(definition.method)
-   ||!definition.path||definition.path.startsWith('/')||definition.path.includes('\\'))
+   ||!definition.path||definition.path.startsWith('/')||definition.path.includes('\\')
+   ||(definition.headers!==undefined&&(typeof definition.headers!=='string'
+     ||definition.headers.length>512
+     ||definition.headers.split(/\r?\n/).some(line=>
+       !/^(?:X-[A-Za-z0-9-]+|Revolut-Api-Version): [A-Za-z0-9._:-]{1,128}$/i.test(line)))))
     throw Error('Invalid connector operation: '+apiName);
  }
  return value;
@@ -142,7 +151,9 @@ export async function installConnectorApp(client:PoolClient,tenantId:string,name
   WHERE tenant_id=$1 AND app_id=$2 AND credential_name=$3
     AND NOT (field_api=ANY($4::text[]))`,
   [tenantId,appId,credentialName,d.fields.map(field=>field.apiName)]);
- const properties={status:'ACTIVE',baseUrl:d.url,operations:d.operations,documentation:d.docs,
+ const properties={status:'ACTIVE',baseUrl:d.url,
+  approvedOrigins:[d.url,...(d.allowedUrls??[])].map(url=>new URL(url).origin),
+  operations:d.operations,documentation:d.docs,
   channelId:systemChannelId,credentialName,
   ...(d.communicationChannel?{communicationChannel:d.communicationChannel}:{}),
   ...(d.defaultCommunicationFields?{defaultCommunicationFields:d.defaultCommunicationFields}:{})};

@@ -1092,7 +1092,9 @@ export class NamedCredentialService {
     const colon=line.indexOf(':');
     if(colon<1)throw new Error('Invalid HTTP header');
     const name=line.slice(0,colon).trim(),value=substitute(line.slice(colon+1).trim());
-    if(!/^X-[a-z0-9-]+$/i.test(name)||/[\r\n]/.test(value))throw new Error('Restricted HTTP header');
+    if(!/^X-[a-z0-9-]+$/i.test(name)
+      &&!(name.toLowerCase()==='revolut-api-version'&&/^\d{4}-\d{2}-\d{2}$/.test(value))
+      ||/[\r\n]/.test(value))throw new Error('Restricted HTTP header');
     header[name]=value;
    }
   }

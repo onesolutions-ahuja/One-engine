@@ -53,7 +53,7 @@ function configFields(metadata?: string): { values: Record<string, string>; labe
     const rows = parsed.filter((entry) => entry && entry.required === true
       && typeof entry.apiName === 'string'
       && /^[A-Za-z][A-Za-z0-9_]*$/.test(entry.apiName));
-    return { values: Object.fromEntries(rows.map((entry) => [entry.apiName, ''])),
+    return { values: Object.fromEntries(rows.map((entry) => [entry.apiName, typeof entry.defaultValue === 'string' ? entry.defaultValue : ''])), 
       labels: Object.fromEntries(rows.map((entry) => [entry.apiName, typeof entry.label === 'string' ? entry.label : entry.apiName])) };
   } catch { return { values: {}, labels: {} }; }
 }
@@ -61,7 +61,7 @@ function configFields(metadata?: string): { values: Record<string, string>; labe
 export default function ConnectorAppWorkspace({
   app, credentials, flows, canManageCredentials, canView, canManageSecrets,
   canInstall, canManageFlows, encryptionReady, onBack,
-  onSave, onDelete, loadHistory, onOpenRecord, onOpenFlow, onLifecycle
+  onSave, onDelete, onTest, loadHistory, onOpenRecord, onOpenFlow, onLifecycle
 }: {
   app: ConnectorApp;
   credentials: NamedCredentialMetadata[];
@@ -75,6 +75,7 @@ export default function ConnectorAppWorkspace({
   onBack: () => void;
   onSave: (value: CredentialInput) => Promise<{credential: NamedCredentialMetadata; webhookVerifyToken?: string}>;
   onDelete: (id: string) => Promise<void>;
+  onTest?: (id: string, path?: string) => Promise<{connected:boolean;status?:number;message:string}>;
   loadHistory: (objectName: string, field: string, source: string, offset: number, search: string) => Promise<CommunicationPage>;
   onOpenRecord: (objectName: string, id: string) => void;
   onOpenFlow: (apiName: string) => void;
@@ -150,7 +151,7 @@ export default function ConnectorAppWorkspace({
         fieldLabels={configFields(app.ConfigFields__c).labels}
         credentials={matched} canManage={canManageCredentials && licensed}
         canManageSecrets={canManageSecrets}
-        encryptionReady={encryptionReady} onSave={onSave} onDelete={onDelete}/>
+        encryptionReady={encryptionReady} onSave={onSave} onDelete={onDelete} onTest={onTest}/>
     </>}
     {section === 'licence' && <section className="surface" style={{padding:18}}>
       <h2>App Licence</h2>

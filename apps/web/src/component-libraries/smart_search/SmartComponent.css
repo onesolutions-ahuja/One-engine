@@ -4,7 +4,8 @@
  border:1px solid #d1d5db;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif}
 .smart-search-box:focus-within{outline:3px solid rgb(0 122 255 / .3);outline-offset:0}
 .smart-search-icon{flex:none;width:1em;height:1em;margin-left:.75em;background:currentColor;opacity:.55;pointer-events:none;
- -webkit-mask:url(/smart-icons/search.svg) center/contain no-repeat;mask:url(/smart-icons/search.svg) center/contain no-repeat}
+ -webkit-mask-size:contain;mask-size:contain;-webkit-mask-position:center;mask-position:center;
+ -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
 .smart-search-input{flex:1 1 auto;min-width:0;height:100%;border:0;outline:0;background:transparent;color:inherit;
  font:inherit;padding:0 .6em;-webkit-appearance:none;appearance:none}
 .smart-search-input::placeholder{color:var(--smart-placeholder-color,#8e8e93);opacity:1}

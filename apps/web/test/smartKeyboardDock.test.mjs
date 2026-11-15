@@ -163,7 +163,8 @@ test('Design properties keep their place for every selection and feature groups 
  assert.match(ribbon,/property\.components\.includes\(api\)/);
 
  // Only the former UI duplicates disappear; saved values still use original keys.
- assert.match(ribbon,/const paddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
+ assert.match(ribbon,/const basePaddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
+ assert.match(ribbon,/const paddingKey=api==='smart_cart'\?'tableSidePadding':basePaddingKey/);
  assert.match(ribbon,/api==='smart_dock'\?\[\{key:'dockItemCount',label:'Count'\}\]/);
  assert.match(ribbon,/\['numpadGap','numpadPadding','dockItemCount',\s*'numpadPrefix','numpadSuffix'\]/);
  assert.match(ribbon,/\[paddingKey\]:next\},\[paddingKey\]/);

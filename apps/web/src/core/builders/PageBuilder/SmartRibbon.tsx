@@ -766,8 +766,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           <div className="smart-design2-extras-cell">
             {(()=>{
             // Same Padding editor, choosing the original component-specific saved key.
+            const basePaddingKey=api==='smart_card_grid'?'cardPadding':'numpadPadding';
             // Cart: Padding is the item table's left/right inset (header and rows).
-            const paddingKey=api==='smart_card_grid'?'cardPadding':api==='smart_cart'?'tableSidePadding':'numpadPadding';
+            const paddingKey=api==='smart_cart'?'tableSidePadding':basePaddingKey;
             const property=definitions.find(p=>p.id===paddingKey);
             const enabled=Boolean(property?.components.includes(api))&&
             (!sharedPropertyIds||sharedPropertyIds.includes(paddingKey));

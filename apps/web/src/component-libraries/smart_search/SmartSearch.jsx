@@ -32,7 +32,8 @@ export default function SmartSearch({p,fire,placeholder,style}){
  };
  return <div className="smart-search-box" data-design-area={p.builderPreview?"Body":undefined}
   style={{...style,"--smart-placeholder-color":p.labelColor||undefined}}>
-  <span className="smart-search-icon" aria-hidden="true"/>
+  <span className="smart-search-icon" aria-hidden="true"
+   style={{WebkitMaskImage:"url(/smart-icons/search.svg)",maskImage:"url(/smart-icons/search.svg)"}}/>
   <input data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Search placeholder":undefined}
    className="smart-search-input" type="search" inputMode="search" enterKeyHint="search" autoComplete="off" spellCheck={false}
    aria-label={placeholder||"Search"} placeholder={placeholder||"Search"} value={query}

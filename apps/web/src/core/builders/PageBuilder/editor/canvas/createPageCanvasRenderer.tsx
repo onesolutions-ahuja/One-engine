@@ -324,6 +324,11 @@ export function createPageCanvasRenderer(
           {directChildren(page.components, component.id).map((child) => renderPageComponent(child, page.components.indexOf(child), libraryPreview, interactivePreview))}
           {!libraryPreview && !previewMode && <div className="canvas-drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.stopPropagation(); const draggedId = event.dataTransfer.getData('application/x-metadrive-component-id'); if (draggedId && canNestComponent(page.components, draggedId, component.id)) { applyPage({ ...page, components: page.components.map((item) => item.id === draggedId ? { ...item, parentId: component.id } : item) }); } else if (!draggedId) { const type = event.dataTransfer.getData('text/plain').replace(/^component:/, ''); if (type) addComponent(type, page.components.length, component.region ?? 'main', undefined, component.id); } }}>Drop components inside {component.label}</div>}
         </div>
+        : component.type === 'Revolut Checkout'
+        ? <div className="record-fields-card surface" style={{minHeight:170,padding:18}}>
+            <strong>Revolut Checkout</strong><p>Secure embedded payment widget</p>
+            <small>Payment amount is read from the configured record field. Live payment is available only on the published page.</small>
+          </div>
         : component.type === 'Record Detail'
         ? <div className="record-detail-grid">{(Array.isArray(component.properties.fields) ? component.properties.fields : fields.slice(0, 6).map((field) => field.apiName)).map((apiName) => { const field = fields.find((item) => item.apiName === apiName); return field ? <div className="record-detail-field" key={apiName}><small>{field.label}</small><span>{previewFieldValue(field.apiName)}</span></div> : null; })}
           {!previewMode&&!(Array.isArray(component.properties.fields)?component.properties.fields:fields.slice(0,6)).length&&<div className="record-detail-field"><small>Field Name</small><span>Field value</span></div>}</div>

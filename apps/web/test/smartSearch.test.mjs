@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+
+const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
+
+test('Smart Search is registered like the other Smart components',()=>{
+ const manifest=JSON.parse(read('../src/component-libraries/manifest.json'));
+ assert.ok(manifest.components.includes('smart_search/component.json'));
+ const descriptor=JSON.parse(read('../src/component-libraries/smart_search/component.json'));
+ assert.equal(descriptor.apiName,'smart_search');
+ assert.deepEqual(descriptor.eventDefinitions.map(item=>item.apiName),['change','enter']);
+ assert.match(read('../../server/src/app-seeders/smart-components.ts'),/"smart_search"/);
+ assert.match(read('../../server/src/system-support/system-migrations.ts'),/await applySmartSearch\(client\)/);
+ assert.match(read('../src/component-libraries/smart/shared/SmartRuntime.jsx'),/name==="smart_search"\)content=<SmartSearch/);
+ const events=read('../src/core/builders/PageBuilder/SmartEventActionsRibbon.tsx');
+ assert.match(events,/'smart_lookup','smart_search'/);
+ assert.match(events,/event==='enter'\?api==='smart_search'/);
+});
+
+test('Smart Search fires from the 3rd letter, debounced, and Enter fires at once',()=>{
+ const source=read('../src/component-libraries/smart_search/SmartSearch.jsx');
+ assert.match(source,/const MIN_LETTERS=3;/);
+ assert.match(source,/const DEBOUNCE_MS=250;/);
+ assert.match(source,/if\(term===lastFired\.current\)return;/,'no repeated query for the same text');
+ assert.match(source,/fire\("enter",value\)/);
+ assert.match(source,/\^\\d\{4,\}\$/,'scanned codes are cleared for the next scan');
+ assert.doesNotMatch(source,/role="listbox"/,'no dropdown list');
+});
+
+test('Preview lists each formula issue in red with the component name',()=>{
+ const bar=read('../src/core/pages/PageCompiler/CompiledPreviewBar.tsx');
+ assert.match(bar,/className="compiled-preview-issues"/);
+ assert.match(bar,/navigatorName/);
+ assert.match(read('../src/core/pages/PageCompiler/CompiledPreviewBar.css'),/\.compiled-preview-issues\{[^}]*color:#b91c1c/);
+ assert.match(read('../../server/src/page-compiler/compilePage.ts'),/if\(!formula\|\|formula==='='\)return null;/);
+});

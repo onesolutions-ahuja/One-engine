@@ -11,13 +11,21 @@ type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 export default function CompiledPreviewBar({compiled,request,variant,script,note,page}:{
  compiled:CompiledPage;request?:Request;variant?:string;script?:LoadedPageScript|null;note?:string;
  /** The page as shown in the Builder: View code / Download give its converted file. */
- page?:{apiName:string};
+ page?:{apiName:string;components?:ReadonlyArray<{id:string;label?:string;properties?:Record<string,unknown>}>};
 }){
  const [open,setOpen]=useState(false);
  const [code,setCode]=useState('');
  const [error,setError]=useState('');
  const s=compiled.stats;
  const errors=compiled.diagnostics.filter(item=>item.level==='error');
+ // Name each issue by the component's Navigator name, so it can be found and fixed.
+ const nameOf=(id:string)=>{
+  const component=page?.components?.find(item=>item.id===id);
+  const name=component?.properties?.navigatorName;
+  return typeof name==='string'&&name?name:component?.label||id;
+ };
+ const describe=(message:string)=>message.replace(/^Action ([A-Za-z0-9_]+):/,(_,event:string)=>
+  'On '+event.charAt(0).toUpperCase()+event.slice(1)+' action:');
  const fileName=compiled.apiName+'.page.js';
  // The exact file Preview runs, byte for byte.
  const source=async():Promise<string>=>script&&request
@@ -42,6 +50,9 @@ export default function CompiledPreviewBar({compiled,request,variant,script,note
    {note?<span className="compiled-preview-errors"> · {note}</span>:null}
    {error&&!open?<span className="compiled-preview-errors"> · {error}</span>:null}
   </span>
+  {errors.length>0&&<ul className="compiled-preview-issues" aria-label="Formula issues to fix">
+   {errors.map((item,index)=><li key={index}><strong>{nameOf(item.componentId)}</strong> — {describe(item.message)}</li>)}
+  </ul>}
   <span className="compiled-preview-actions">
    <button type="button" className="btn btn-small" onClick={()=>setOpen(true)}>View code</button>
    <button type="button" className="btn btn-small" onClick={download}>Download .js</button>
@@ -55,7 +66,7 @@ export default function CompiledPreviewBar({compiled,request,variant,script,note
      <button type="button" className="btn btn-small" onClick={()=>setOpen(false)}>Close</button>
     </header>
     {errors.length>0&&<ul className="compiled-preview-notes">
-     {errors.map((item,index)=><li key={'e'+index} className="is-error">{item.componentId}: {item.message}</li>)}
+     {errors.map((item,index)=><li key={'e'+index} className="is-error">{nameOf(item.componentId)}: {describe(item.message)}</li>)}
     </ul>}
     <pre className="compiled-preview-code"><code>{error||code||'Loading…'}</code></pre>
    </div>

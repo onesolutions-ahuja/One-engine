@@ -3,6 +3,7 @@ import SmartNumpad from "../../smart_numpad/SmartNumpad.jsx";
 import SmartScheduleCalendar from "../../smart_calendar/SmartScheduleCalendar.jsx";
 import SmartKeyboard from "../../smart_keyboard/SmartKeyboard.jsx";
 import SmartDock from "../../smart_dock/SmartDock.jsx";
+import SmartSearch from "../../smart_search/SmartSearch.jsx";
 import icons from "../../smart_icon/iconCatalog.json";
 import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
@@ -713,7 +714,8 @@ export default function SmartRuntime(p){
  const name=p.kind||"smart_text",record=recordOf(p),label=scopedExpression(p,"label",p.label||"",record);
  // Style = iOS is saved on newly inserted components. Older saved components have
  // no Style value and stay Classic. Configured properties always win over either.
- const ios=p.visualStyle==="iOS";
+ // iOS is the only Smart style (the Classic/iOS switch was removed).
+ const ios=true;
  const style={fontSize:number(p.textSize,16),color:p.labelColor||undefined,textAlign:p.labelAlignment||"left",borderRadius:number(p.radius,12)};
  const buttonIcon=name==="smart_button"?icons.find(icon=>icon.id===p.shapeId):null;
  // Preserve selections when a data-driven category filter temporarily hides records.
@@ -896,6 +898,12 @@ export default function SmartRuntime(p){
   rows={inputRows} uploadImage={p.allowImageUpload===true&&!p.builderPreview?p.uploadImage:null} onValueChange={value=>fire("change",value)}/>;
  }
  else if(name==="smart_selector")content=<SmartSelector p={p} fire={fire}/>;
+ else if(name==="smart_search")content=<SmartSearch p={p} fire={fire}
+   placeholder={text(scopedExpression(p,"label",p.placeholder??p.label??"Search",recordOf(p)))}
+   style={{background:p.backgroundColor||(ios?"#e9e9ee":"#fff"),borderColor:p.borderColor||"transparent",
+    color:p.labelColor||undefined,fontSize:number(p.textSize,16),
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}/>;
  else if(name==="smart_lookup")content=<SmartLookup p={p} fire={fire}
    style={{...style,backgroundColor:p.backgroundColor||undefined,borderColor:p.borderColor||undefined,
     width:"100%",height:"100%",minHeight:0,color:p.labelColor||undefined,fontSize:number(p.textSize,16)}}/>;

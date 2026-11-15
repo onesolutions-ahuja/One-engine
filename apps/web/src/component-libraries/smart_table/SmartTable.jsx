@@ -35,7 +35,8 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
  const [selected,setSelected]=React.useState(null);
  // Style = iOS (saved on new inserts). Configured colours still win; this only
  // changes the defaults used when nothing was set. Older tables stay Classic.
- const ios=p.visualStyle==="iOS";
+ // iOS is the only Smart style (the Classic/iOS switch was removed).
+ const ios=true;
  const border=value=>value?"1px solid "+value:"1px solid transparent";
  const headingStyle={
   backgroundColor:colour(p.headerBodyColor,ios?"#f9f9fb":"#f3f6fb"),

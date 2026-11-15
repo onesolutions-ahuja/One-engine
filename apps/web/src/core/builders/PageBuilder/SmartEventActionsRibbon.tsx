@@ -5,7 +5,7 @@ type Actions=Record<string,unknown>;
 const clickComponents=new Set(['smart_button','smart_toggle','smart_calendar','smart_cart','smart_card_grid','smart_numpad',
  'smart_keyboard','smart_dock']);
 const selectComponents=new Set(['smart_lookup']);
-const changeComponents=new Set(['smart_calendar','smart_lookup','smart_selector','smart_tabs','smart_toggle','smart_text','smart_card_grid','smart_numpad',
+const changeComponents=new Set(['smart_calendar','smart_lookup','smart_search','smart_selector','smart_tabs','smart_toggle','smart_text','smart_card_grid','smart_numpad',
  'smart_keyboard']);
 /** Smart Dock: one independent event per item, shown under Other events. */
 export const dockItemEvents=['dockItem1','dockItem2','dockItem3','dockItem4','dockItem5','dockItem6',
@@ -20,6 +20,7 @@ export const supportsSmartActionEvent=(api:string,event:string):boolean=>
  ['customButton1','customButton2'].includes(event)?['smart_cart','smart_card_grid','smart_numpad'].includes(api):
  event==='customButton3'||event==='clear'||event==='backspace'?api==='smart_numpad':
  event==='dismiss'?api==='smart_keyboard':
+ event==='enter'?api==='smart_search':
  (dockItemEvents as readonly string[]).includes(event)?api==='smart_dock':false;
 
 const asObject=(value:unknown):Binding=>

@@ -1566,3 +1566,33 @@
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content
  .smart-design2-tail [data-others-property="calendarTimeZone"]
  .smart-simple-text-input{width:100%!important;}
+/* Cart column properties: one compact block per column, two rows
+   (Header / Cell colours; Bold, text size + alignment, width). */
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-groups{
+  display:grid!important;gap:6px!important;padding:2px 6px 6px!important;box-sizing:border-box!important;width:100%!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-group{
+  display:grid!important;gap:3px!important;padding:4px 0!important;border-top:1px solid #e4e9f0!important;min-width:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-group-heading{
+  font:600 11px/15px "Segoe UI",Arial,sans-serif!important;color:#344d6c!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-row{
+  display:flex!important;flex-wrap:wrap!important;align-items:flex-end!important;gap:4px 10px!important;min-width:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-cell{
+  display:grid!important;grid-template-rows:14px auto!important;gap:1px!important;min-width:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-cell-label{
+  font:11px/14px "Segoe UI",Arial,sans-serif!important;color:#5b6b80!important;white-space:nowrap!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-cell-controls{
+  display:flex!important;align-items:center!important;gap:3px!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-control>.smart-property{
+  display:flex!important;align-items:center!important;margin:0!important;width:auto!important;min-width:0!important;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-control>.smart-property>.smart-label{display:none!important;}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-control :is(input[type="number"],.smart-office-number){
+  width:52px!important;max-width:52px!important;
+}

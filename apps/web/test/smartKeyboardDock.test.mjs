@@ -93,9 +93,9 @@ test('Smart Keyboard and Dock are registered like every Smart component',()=>{
  assert.match(events,/event==='dismiss'\?api==='smart_keyboard'/);
 });
 
-test('Smart Table and Smart Icon also support iOS Style',()=>{
+test('Smart Table and Smart Icon also use the iOS Style',()=>{
  const table=read('../src/component-libraries/smart_table/SmartTable.jsx');
- assert.match(table,/const ios=p\.visualStyle==="iOS"/);
+ assert.match(table,/const ios=true;/);
  assert.match(table,/colour\(p\.headerBodyColor,ios\?"#f9f9fb":"#f3f6fb"\)/,'configured colour still first');
  assert.match(read('../src/component-libraries/smart_table/SmartComponent.css'),/^@import "\.\.\/smart\/shared\/smart-ios\.css";/);
  const icon=read('../src/component-libraries/smart_icon/SmartComponent.jsx');
@@ -103,9 +103,9 @@ test('Smart Table and Smart Icon also support iOS Style',()=>{
  assert.match(read('../../server/src/system-support/smart-ios-keyboard-dock.ts'),/const STYLED=\['smart_table','smart_icon'/);
 });
 
-test('iOS Style is opt-in per saved component and never overrides configured values',()=>{
+test('iOS Style is the only Smart style and never overrides configured values',()=>{
  const runtime=read('../src/component-libraries/smart/shared/SmartRuntime.jsx');
- assert.match(runtime,/const ios=p\.visualStyle==="iOS"/);
+ assert.match(runtime,/const ios=true;/);
  assert.match(runtime,/\(ios\?" smart-ios":""\)/);
  // Configured colours stay first in every fallback.
  assert.match(runtime,/p\.backgroundColor\|\|\(ios\?"#007aff":"#2267bc"\)/);
@@ -119,7 +119,7 @@ test('iOS Style is opt-in per saved component and never overrides configured val
  assert.match(sql,/\['visualStyle','Style','Design2','Others','choice',json\('iOS'\)/);
  assert.doesNotMatch(sql,/UPDATE\s+md_page|DELETE\s+FROM/i,'no saved page or component is rewritten');
  const ribbon=read('../src/core/builders/PageBuilder/SmartRibbon.tsx');
- assert.match(ribbon,/property\.id==='visualStyle'\?'Classic'/);
+ assert.match(ribbon,/'tableSidePadding','visualStyle'\]\.includes\(property\.id\)/,'no Classic\/iOS switch in Others');
 });
 
 
@@ -163,9 +163,10 @@ test('Design properties keep their place for every selection and feature groups 
  assert.match(ribbon,/property\.components\.includes\(api\)/);
 
  // Only the former UI duplicates disappear; saved values still use original keys.
- assert.match(ribbon,/const paddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
+ assert.match(ribbon,/const basePaddingKey=api==='smart_card_grid'\?'cardPadding':'numpadPadding'/);
+ assert.match(ribbon,/const paddingKey=api==='smart_cart'\?'tableSidePadding':basePaddingKey/);
  assert.match(ribbon,/api==='smart_dock'\?\[\{key:'dockItemCount',label:'Count'\}\]/);
- assert.match(ribbon,/\['numpadGap','numpadPadding','dockItemCount',\s*'numpadPrefix','numpadSuffix'\]/);
+ assert.match(ribbon,/\['numpadGap','numpadPadding','dockItemCount',\s*'numpadPrefix','numpadSuffix','tableSidePadding','visualStyle'\]/);
  assert.match(ribbon,/\[paddingKey\]:next\},\[paddingKey\]/);
  assert.match(ribbon,/\?properties\.numpadGap:undefined/);
 

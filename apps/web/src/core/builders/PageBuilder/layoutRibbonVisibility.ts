@@ -1,7 +1,7 @@
 import type {Design2Slot,Design2SlotRule} from './builderPropertyInventory';
 
 // These are retired from the ribbon presentation, not from metadata or saved pages.
-export const HIDDEN_RIBBON_PROPERTY_KEYS=new Set(['imageBorderColor','iconFillColor','defaultCheck','columnVisibility','badgeVisible','tabIndex','numpadGap']);
+export const HIDDEN_RIBBON_PROPERTY_KEYS=new Set(['imageBorderColor','iconFillColor','defaultCheck','columnVisibility','badgeVisible','tabIndex','numpadGap','visualStyle']);
 
 /** A Layout control may disappear only if every selected component can edit that
  * same value through an enabled Design 2 control. Smart Tabs Body Width and

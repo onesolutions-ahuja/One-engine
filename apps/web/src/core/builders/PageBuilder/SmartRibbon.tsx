@@ -766,7 +766,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           <div className="smart-design2-extras-cell">
             {(()=>{
             // Same Padding editor, choosing the original component-specific saved key.
-            const paddingKey=api==='smart_card_grid'?'cardPadding':'numpadPadding';
+            const basePaddingKey=api==='smart_card_grid'?'cardPadding':'numpadPadding';
+            // Cart: Padding is the item table's left/right inset (header and rows).
+            const paddingKey=api==='smart_cart'?'tableSidePadding':basePaddingKey;
             const property=definitions.find(p=>p.id===paddingKey);
             const enabled=Boolean(property?.components.includes(api))&&
             (!sharedPropertyIds||sharedPropertyIds.includes(paddingKey));
@@ -796,7 +798,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    return [...design2AreaExtraProperties,...design2SupplementalProperties]
      .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
      .filter(property=>!['numpadGap','numpadPadding','dockItemCount',
-       'numpadPrefix','numpadSuffix'].includes(property.id))
+       'numpadPrefix','numpadSuffix','tableSidePadding','visualStyle'].includes(property.id))
      .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)))
      .map(property=>property.id==='gap'?{...property,label:'Gap'}:property);
  })();
@@ -809,22 +811,54 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    if(id.startsWith('numpad')||id==='inputRows')return 'Input & Text';
    return 'General';
  };
- const renderDesignGroup=(group:string,showHeading:boolean)=>(
-   <div className="smart-others-property-group" key={group} role="group"
+ // Cart column N: all eight properties in two compact rows (Header and Cell
+ // colours, then Bold, text size, alignment and width) instead of eight
+ // labelled rows. Each icon keeps its own tooltip, key and enabled state.
+ const cartColumnNumber=(id:string)=>Number(/^cartColumn(\d+)(?:Width|HeaderFill|HeaderTextColor|CellFill|CellTextColor|TextSize|Bold|Alignment)$/.exec(id)?.[1]??0);
+ const renderCartColumnGroups=(properties:BuilderRibbonProperty[])=>{
+   const columns=[...new Set(properties.map(property=>cartColumnNumber(property.id)).filter(Boolean))].sort((a,b)=>a-b);
+   const pick=(column:number,suffix:string)=>properties.find(property=>property.id==='cartColumn'+column+suffix);
+   const cell=(label:string,column:number,suffixes:string[])=>{
+     const items=suffixes.map(suffix=>pick(column,suffix)).filter((item):item is BuilderRibbonProperty=>Boolean(item));
+     return items.length?<div className="smart-column-cell" data-column-cell={label}>
+       {label&&<span className="smart-column-cell-label">{label}</span>}
+       <div className="smart-column-cell-controls">{items.map(item=>
+         <div className="smart-column-control" key={item.id} data-others-property={item.id}>{controls(item)}</div>)}</div>
+     </div>:null;
+   };
+   return columns.map(column=><div className="smart-column-group" key={column} role="group"
+     aria-label={'Column '+column} data-cart-column={column}>
+     <div className="smart-column-group-heading">Column {column}</div>
+     <div className="smart-column-row">
+       {cell('Header',column,['HeaderFill','HeaderTextColor'])}
+       {cell('Cell',column,['CellFill','CellTextColor'])}
+     </div>
+     <div className="smart-column-row">
+       {cell('Bold',column,['Bold'])}
+       {cell('Text',column,['TextSize','Alignment'])}
+       {cell('Width',column,['Width'])}
+     </div>
+   </div>);
+ };
+ const renderDesignGroup=(group:string,showHeading:boolean)=>{
+   const groupProperties=design2OtherProperties.filter(property=>designOtherCategory(property.id)===group);
+   const columnProperties=groupProperties.filter(property=>cartColumnNumber(property.id)>0);
+   return <div className="smart-others-property-group" key={group} role="group"
      aria-label={group} data-others-group={group}>
      {showHeading&&<div className="smart-others-property-heading">{group}</div>}
      <div className="smart-design2-supplemental">
        {group==='General'&&design2CountEditor}
        {group==='Spacing'&&design2PaddingEditor}
-       {design2OtherProperties.filter(property=>designOtherCategory(property.id)===group)
+       {groupProperties.filter(property=>cartColumnNumber(property.id)===0)
          .map(property=><div className="smart-design2-supplemental-setting"
            key={property.id} data-others-property={property.id}>
            <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
            {controls(property)}
          </div>)}
      </div>
-   </div>
- );
+     {columnProperties.length>0&&<div className="smart-column-groups">{renderCartColumnGroups(columnProperties)}</div>}
+   </div>;
+ };
  // These sections follow Conditional Visibility in the parent editor, not Others.
  if(tab==='Design2'&&part==='designTail')return <div
      className="smart-ribbon smart-design2-ribbon smart-design2-tail"
@@ -913,16 +947,12 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           {activeDesign2Area==='Cart columns'&&selectedCartColumn&&
             <div className="smart-design2-supplemental" role="group"
               aria-label={`Column ${selectedCartColumn} properties`}>
-              {design2AreaExtraProperties.filter(property=>
-                property.group==='Cart columns'&&property.id.startsWith('cartColumn'+selectedCartColumn))
-                .map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
-                  <span className="smart-design2-supplemental-label" title={property.label}>{property.label.replace(/^Column \d+\s*/, '')}</span>
-                  {controls(property)}
-                </div>)}
+              {renderCartColumnGroups(design2AreaExtraProperties.filter(property=>
+                property.group==='Cart columns'&&cartColumnNumber(property.id)===selectedCartColumn))}
             </div>}
-          {activeDesign2Area==='Table'&&design2AreaExtraProperties.some(property=>property.group==='Table')&&
+          {activeDesign2Area==='Table'&&design2AreaExtraProperties.some(property=>property.group==='Table'&&property.id!=='tableSidePadding')&&
             <div className="smart-design2-supplemental" role="group" aria-label="Table properties">
-              {design2AreaExtraProperties.filter(property=>property.group==='Table').map(property=>
+              {design2AreaExtraProperties.filter(property=>property.group==='Table'&&property.id!=='tableSidePadding').map(property=>
                 <div className="smart-design2-supplemental-setting" key={property.id}>
                   <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
                   {controls(property)}

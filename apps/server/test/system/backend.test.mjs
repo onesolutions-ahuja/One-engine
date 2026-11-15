@@ -242,3 +242,37 @@ test('Revolut Flow operation enforces version header and only approved Merchant 
  await assert.rejects(resolveFlowIntegrationCallout(db,rbac,'tenant','user',input),
   /origin differs from provider/);
 });
+
+
+test('Revolut signed webhook accepts raw payload, timestamp and rotated signatures only',async()=>{
+ const {verifyRevolutWebhook,revolutEventState,revolutMinorAmount}=await import(
+  '../../src/system-support/revolut-checkout-service.ts');
+ const {createHmac}=await import('node:crypto');
+ const timestamp=String(Date.now());
+ const secret='wsk_test_secret_very_long';
+ const body=Buffer.from('{"event":"ORDER_COMPLETED","order_id":"6634c172-3398-ac93-aee9-50de0282e3ac"}');
+ const sign=raw=>'v1='+createHmac('sha256',secret).update('v1.'+timestamp+'.').update(raw).digest('hex');
+ assert.equal(verifyRevolutWebhook(body,timestamp,sign(body),secret),true);
+ assert.equal(verifyRevolutWebhook(body,timestamp,'v1='+('0'.repeat(64))+','+sign(body),secret),true);
+ assert.equal(verifyRevolutWebhook(Buffer.from(body.toString().replace('ORDER_COMPLETED','ORDER_FAILED')),
+  timestamp,sign(body),secret),false);
+ assert.equal(verifyRevolutWebhook(body,String(Date.now()-300001),sign(body),secret),false);
+ assert.equal(verifyRevolutWebhook(body,timestamp,'sha256='+('a'.repeat(64)),secret),false);
+ assert.equal(verifyRevolutWebhook(body,timestamp,sign(body),'different-secret'),false);
+ assert.equal(revolutEventState('ORDER_COMPLETED'),'completed');
+ assert.equal(revolutEventState('ORDER_AUTHORISED'),'authorised');
+ assert.equal(revolutEventState('ORDER_PAYMENT_FAILED'),'failed');
+ assert.equal(revolutEventState('INVALID'),null);
+ assert.equal(revolutMinorAmount(5,'GBP'),500);
+ assert.throws(()=>revolutMinorAmount(-1,'GBP'),/Invalid payment/);
+ assert.throws(()=>revolutMinorAmount(0.001,'GBP'),/precision/);
+});
+
+test('Revolut checkout is a Page Builder block without an installed application Flow',async()=>{
+ const {standardPageComponents}=await import('../../../web/src/core/components/Catalog/catalog.ts');
+ assert.ok(standardPageComponents.some(block=>block.apiName==='Revolut Checkout'));
+ const {default:manifest}=await import('../../../connectors/revolut/scripts/install.mjs');
+ assert.ok(manifest.fields.some(field=>field.apiName==='public_checkoutPublishable'));
+ assert.ok(manifest.fields.some(field=>field.apiName==='public_checkoutAmountField'));
+ assert.equal(manifest.operations.CreateOrder.method,'POST');
+});

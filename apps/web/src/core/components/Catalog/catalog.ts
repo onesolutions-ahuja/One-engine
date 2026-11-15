@@ -11,6 +11,7 @@ export const standardPageComponents: StandardPageComponent[] = [
   { apiName: 'Rich Text', label: 'Rich Text', description: 'Display configurable notes and readable text on a page.' },
   { apiName: 'List View', label: 'List View', description: 'Search, sort and page through authorised Object records.' },
   { apiName: 'Screen Flow', label: 'Screen Flow', description: 'Start an active Screen Flow through the shared Flow interview runtime.' },
+  { apiName: 'Revolut Checkout', label: 'Revolut Checkout', description: 'Accept on-screen Revolut card and wallet payments for the selected tenant record.' },
   { apiName: 'Path', label: 'Path', description: 'Display and update the permitted current record Picklist stage.' },
   { apiName: 'Items to Approve', label: 'Items to Approve', description: 'Review and decide approvals assigned to the current user.' },
   { apiName: 'Related List Quick Links', label: 'Related List Quick Links', description: 'Jump to configured related record sections.' },

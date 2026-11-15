@@ -276,12 +276,19 @@ export function usePageEditorState(
   const [canvasBinding,setCanvasBinding]=useState<CanvasBindingTarget|null>(null);
   const [ribbonTab, setRibbonTab] = useState<'Add Block' | 'Component Content' | 'Component Design 2' | 'Component Style' | 'Component Data' | 'Component Action' | 'Component Layout' | 'Component Responsive' | 'Preview' | 'Filters' | 'Source' | 'Arrange' | 'Advanced'>('Add Block');
   const [inspectorSection,setInspectorSection]=useState<string|null>('Body');
-  const [selectedCartColumn,setSelectedCartColumn]=useState<number|null>(null);
+  const [cartColumnSelection,setCartColumnSelection]=useState<{componentId:string;column:number}|null>(null);
+  const selectedCartColumn=cartColumnSelection?.componentId===selectedId?cartColumnSelection.column:null;
+  const setSelectedCartColumn=useCallback((column:number|null,componentId=selectedId)=>{
+    setCartColumnSelection(column?{componentId,column}:null);
+  },[selectedId]);
+  useEffect(()=>{
+    if(cartColumnSelection&&cartColumnSelection.componentId!==selectedId)setCartColumnSelection(null);
+  },[selectedId,cartColumnSelection]);
   // One open section at a time, independently from the canvas-selected design area.
   const [openDesignSection,setOpenDesignSection]=useState<string|null>(null);
   const toggleDesignSection=useCallback((section:string)=>
     setOpenDesignSection(current=>current===section?null:section),[]);
-  useEffect(()=>setOpenDesignSection(null),[selectedId,ribbonTab]);
+  useEffect(()=>setOpenDesignSection(selectedCartColumn?'Properties':null),[selectedId,ribbonTab]);
   // A canvas click may choose a Design area (Header, Row...) in the same click
   // that selects the component; that area survives the selection reset.
   const nextDesignAreaRef=useRef<string|null>(null);

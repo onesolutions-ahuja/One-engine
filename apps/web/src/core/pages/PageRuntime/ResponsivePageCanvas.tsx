@@ -1,9 +1,17 @@
-import {useLayoutEffect,useRef,useState,type ReactNode} from 'react';
+import {useLayoutEffect,useRef,useState,type CSSProperties,type ReactNode} from 'react';
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import {isStandalonePagePresentation,pageCanvasPresentationStyle} from './pageRuntimePresentation';
+import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth} from './runtimeCanvasSizing';
 
-/** Maintain authored pixel positions while scaling the *whole* canvas to the
- * runtime container. ResizeObserver avoids fixed viewport guesses or clipping. */
+/**
+ * Published pages and compiled Builder Preview use the same width-first layout.
+ * A screen narrower than the authored canvas scales the whole page uniformly;
+ * height never forces an extra shrink. Taller pages scroll naturally.
+ *
+ * When the viewport is wider than the authored canvas, the background fills
+ * the available width while authored controls keep their native size. Large
+ * surfaces/right-hand panels adapt via the shared canvas-extra CSS variable.
+ */
 export default function ResponsivePageCanvas({
   page,children
 }:{
@@ -11,52 +19,40 @@ export default function ResponsivePageCanvas({
   children:ReactNode;
 }) {
   const frame=useRef<HTMLDivElement>(null);
-  const [size,setSize]=useState({width:page.canvasWidth,height:Number.POSITIVE_INFINITY});
-  // A landscape (screen-shaped) canvas is a fixed screen such as a till: fit
-  // both width and height so nothing drops below the window. Taller canvases
-  // are scrolling pages and keep fitting width only.
-  const screenShaped=page.canvasHeight<=page.canvasWidth;
-  // Measured before the first paint: the page appears at its final size instead
-  // of showing full size for a moment and then jumping to fit the screen.
+  const [availableWidth,setAvailableWidth]=useState(page.canvasWidth);
+
   useLayoutEffect(()=>{
     const target=frame.current;
     if(!target)return;
-    // A popup is already sized to the canvas shape inside the window
-    // (formulaScreenWidth): fitting its width zooms the whole page in or out, with
-    // no scrollbar. Its top edge says nothing about the room left below it.
-    const inPopup=Boolean(target.closest('.formula-screen-card,dialog.formula-screen-modal:not(.formula-screen-page)'));
     const update=()=>{
-      const box=target.getBoundingClientRect();
-      // Preview frames can be visually scaled. Read layout dimensions, not the
-      // transformed bounding box, or a wide Custom preview scales twice.
-      const previewScreen=target.closest<HTMLElement>('.preview-device-scroll');
-      setSize({width:target.clientWidth||box.width||page.canvasWidth,
-        height:screenShaped&&!inPopup&&typeof window!=='undefined'
-          ?previewScreen
-            ?Math.max(200,previewScreen.clientHeight)
-            :Math.max(200,window.innerHeight-Math.max(0,box.top))
-          :Number.POSITIVE_INFINITY});
+      // Layout width, not getBoundingClientRect(): the parent preview device
+      // frame can be transformed to fit the editor without changing CSS pixels.
+      const next=Math.max(1,target.clientWidth||page.canvasWidth);
+      setAvailableWidth(previous=>Math.abs(previous-next)<.5?previous:next);
     };
     update();
     const observer=new ResizeObserver(update);
     observer.observe(target);
-    if(typeof window!=='undefined')window.addEventListener('resize',update);
-    return()=>{observer.disconnect();if(typeof window!=='undefined')window.removeEventListener('resize',update);};
-  },[page.canvasWidth,page.canvasHeight,screenShaped]);
+    return()=>observer.disconnect();
+  },[page.canvasWidth]);
+
   const standalone=isStandalonePagePresentation(page);
-  const scale=standalone?1:Math.min(1,Math.max(.1,size.width/page.canvasWidth,0),
-    Math.max(.1,size.height/page.canvasHeight));
+  const scale=standalone?1:runtimeCanvasWidthScale(page.canvasWidth,availableWidth);
+  const extra=standalone?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
+  const canvasStyle={
+    ...pageCanvasPresentationStyle(page),
+    ...(!standalone && extra > 0 ? {width:'100%'} : {}),
+    '--md-runtime-canvas-extra':extra+'px',
+    transform:scale<1?`scale(${scale})`:undefined,
+    transformOrigin:'top left'
+  } as CSSProperties;
+
   return <div ref={frame} className="page-responsive-canvas-frame" style={{
-    position:'relative',width:'100%',
+    position:'relative',width:'100%',minWidth:0,
     height:standalone?'100dvh':Math.ceil(page.canvasHeight*scale),
     overflow:'hidden'
   }}>
-    <div className="free-canvas-runtime" data-layout-mode="free-canvas" style={{
-      ...pageCanvasPresentationStyle(page),
-      transform:scale<1?`scale(${scale})`:undefined,transformOrigin:'top left',
-      // Centre a height-fitted screen horizontally instead of leaving a gap on the right.
-      marginLeft:scale<1&&size.width>page.canvasWidth*scale+1?Math.floor((size.width-page.canvasWidth*scale)/2):undefined
-    }}>
+    <div className="free-canvas-runtime" data-layout-mode="free-canvas" style={canvasStyle}>
       {children}
     </div>
   </div>;

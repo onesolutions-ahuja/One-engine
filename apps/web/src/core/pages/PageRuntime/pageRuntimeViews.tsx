@@ -1139,7 +1139,7 @@ function appPageEndpoint(appId:string,pageApiName:string|undefined,inScreen:bool
       ? `/apps/${app}/pages/${encodeURIComponent(pageApiName)}?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`
       : `/apps/${app}/home-page?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`;
 }
-/** Pages this page can open (navigation targets, SCREEN popups), fetched and
+/** Pages this page can navigate to (not popups), fetched and
  * converted in the background once it has loaded, so moving to them shows the
  * next screen at once instead of a loading gap. */
 const prefetchedPages=new WeakMap<PageDefinitionCache,Set<string>>();
@@ -1151,7 +1151,8 @@ function prefetchLinkedPages(page:LightningPageMetadata,pages:readonly Lightning
   prefetchedPages.set(cache,done);
   const word=(name:string)=>new RegExp('(^|[^A-Za-z0-9_])'+name+'([^A-Za-z0-9_]|$)').test(text);
   const targets=pages.filter(item=>item.apiName!==page.apiName
-    &&(item.pageType==='App Page'||item.pageType==='Home Page'||item.pageType==='In-Screen Page')
+    // Popup (In-Screen) pages load only when first opened: they never compete with page open.
+    &&(item.pageType==='App Page'||item.pageType==='Home Page')
     &&(navigationPageApiNames.includes(item.apiName)||word(item.apiName))).slice(0,30);
   const queue=targets.map(item=>{
     const inScreen=item.pageType==='In-Screen Page';

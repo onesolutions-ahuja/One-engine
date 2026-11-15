@@ -9,7 +9,9 @@ const components = [];
 const index = [];
 await mkdir('dist/component-library/components', { recursive: true });
 // Off by default: existing renderer format remains available for rollback.
-const sharedSmartEnabled=process.env.METADRIVE_SHARED_SMART_RUNTIME==='1';
+// On by default: every Smart component used to carry its own ~345 KB copy of the
+// Smart runtime (9 copies on the till). Set METADRIVE_SHARED_SMART_RUNTIME=0 to turn off.
+const sharedSmartEnabled=process.env.METADRIVE_SHARED_SMART_RUNTIME!=='0';
 let sharedRuntimePath='';
 if(sharedSmartEnabled){
  const source=await buildBundledComponent({

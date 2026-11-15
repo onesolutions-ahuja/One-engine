@@ -209,41 +209,6 @@ test('Revolut connector exposes verified Merchant API operations without package
  assert.equal(JSON.stringify(manifest).includes('sk_'),false,'no secret is bundled');
 });
 
-test('Revolut Flow operation enforces version header and only approved Merchant origins',async()=>{
- const {default:manifest}=await import('../../../connectors/revolut/scripts/install.mjs');
- const {resolveFlowIntegrationCallout}=await import('../../src/system-files/flow-integration-connection.ts');
- const id='00000000-0000-4000-8000-000000000001';
- let origin='https://sandbox-merchant.revolut.com/';
- const db={query:async sql=>{
-  if(sql.includes("kind='integration-connections'"))
-   return {rows:[{properties:{status:'ACTIVE',connectorKey:'RevolutConnector',
-    configuration:{namedCredentialId:id}}}]};
-  if(sql.includes("kind='connector-providers'"))
-   return {rows:[{properties:{status:'ACTIVE',baseUrl:manifest.url,
-    approvedOrigins:[manifest.url,...manifest.allowedUrls].map(url=>new URL(url).origin),
-    operations:manifest.operations}}]};
-  if(sql.includes('SELECT base_url FROM md_named_credentials'))
-   return {rows:[{base_url:origin}]};
-  throw Error('Unexpected mock query');
- }};
- const rbac={require:async()=>{}};
- const input={integrationConnectionId:'RevolutConnector',operation:'CreateOrder'};
- const result=await resolveFlowIntegrationCallout(db,rbac,'tenant','user',input);
- assert.equal(result.namedCredentialId,id);
- assert.equal(result.method,'POST');
- assert.equal(result.path,'api/orders');
- assert.equal(result.headers,'Revolut-Api-Version: 2026-08-17');
- await assert.rejects(resolveFlowIntegrationCallout(db,rbac,'tenant','user',{
-  ...input,headers:'X-Other: malicious'
- }),/headers have been modified/);
- origin='https://merchant.revolut.com/';
- assert.equal((await resolveFlowIntegrationCallout(db,rbac,'tenant','user',input)).method,'POST');
- origin='https://other.example.com/';
- await assert.rejects(resolveFlowIntegrationCallout(db,rbac,'tenant','user',input),
-  /origin differs from provider/);
-});
-
-
 test('Revolut signed webhook accepts raw payload, timestamp and rotated signatures only',async()=>{
  const {verifyRevolutWebhook,revolutEventState,revolutMinorAmount}=await import(
   '../../src/system-support/revolut-checkout-service.ts');

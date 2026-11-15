@@ -61,7 +61,7 @@ function configFields(metadata?: string): { values: Record<string, string>; labe
 export default function ConnectorAppWorkspace({
   app, credentials, flows, canManageCredentials, canView, canManageSecrets,
   canInstall, canManageFlows, encryptionReady, onBack,
-  onSave, onDelete, onTest, loadHistory, onOpenRecord, onOpenFlow, onLifecycle
+  onSave, onDelete, onTest, registerRevolutWebhook, loadHistory, onOpenRecord, onOpenFlow, onLifecycle
 }: {
   app: ConnectorApp;
   credentials: NamedCredentialMetadata[];
@@ -76,6 +76,7 @@ export default function ConnectorAppWorkspace({
   onSave: (value: CredentialInput) => Promise<{credential: NamedCredentialMetadata; webhookVerifyToken?: string}>;
   onDelete: (id: string) => Promise<void>;
   onTest?: (id: string, path?: string) => Promise<{connected:boolean;status?:number;message:string}>;
+  registerRevolutWebhook?: (credentialId:string)=>Promise<{callbackUrl:string}>;
   loadHistory: (objectName: string, field: string, source: string, offset: number, search: string) => Promise<CommunicationPage>;
   onOpenRecord: (objectName: string, id: string) => void;
   onOpenFlow: (apiName: string) => void;
@@ -88,6 +89,8 @@ export default function ConnectorAppWorkspace({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
+  const [webhookBusy,setWebhookBusy]=useState(false);
+  const [webhookNotice,setWebhookNotice]=useState('');
   const licensed = appLicensed(app);
   const matched = credentials.filter((item) => item.name === app.CredentialName__c);
   const credential = matched[0];
@@ -152,6 +155,20 @@ export default function ConnectorAppWorkspace({
         credentials={matched} canManage={canManageCredentials && licensed}
         canManageSecrets={canManageSecrets}
         encryptionReady={encryptionReady} onSave={onSave} onDelete={onDelete} onTest={onTest}/>
+      {app.AppKey__c==='RevolutConnector'&&credential&&registerRevolutWebhook&&
+       <section className="surface" style={{padding:16,marginTop:12}}>
+        <h3>Signed payment webhook</h3>
+        <p>Register the Revolut payment webhook and save its signing secret securely. No Flow is required. Completed payments update the connector's payment receipts.</p>
+        <button className="btn btn-brand" disabled={webhookBusy||!canManageCredentials||!canManageSecrets||!licensed||!credential.hasSecret}
+         onClick={()=>{setWebhookBusy(true);setWebhookNotice('');setError('');
+          void registerRevolutWebhook(credential.id)
+           .then(result=>setWebhookNotice('Revolut webhook connected: '+result.callbackUrl))
+           .catch(reason=>setError(reason instanceof Error?reason.message:'Unable to register Revolut webhook'))
+           .finally(()=>setWebhookBusy(false));
+         }}>{webhookBusy?'Registering…':'Register / reconnect webhook'}</button>
+        {webhookNotice&&<p role="status">{webhookNotice}</p>}
+        {credential.webhookEnabled&&<p>Webhook endpoint is configured for this credential.</p>}
+       </section>}
     </>}
     {section === 'licence' && <section className="surface" style={{padding:18}}>
       <h2>App Licence</h2>

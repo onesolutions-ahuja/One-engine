@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {mkdirSync,readFileSync} from 'node:fs';
 import {chromium} from 'playwright';
 const assets=[
- '../apps/web/src/core/workspace/SetupShell/MobileAppNavigation.css',
+ '../apps/web/src/core/workspace/SetupShell/MobileAppLauncher.css',
  '../apps/web/src/core/workspace/SetupShell/MobileSheet.css',
  '../apps/web/src/core/records/RecordWorkspace/recordsListToolbar.css',
  '../apps/web/src/core/records/ResponsiveDataList/ResponsiveDataList.css',
@@ -16,7 +16,7 @@ mkdirSync('artifacts',{recursive:true});
 const template=`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head>
 <body style="margin:0"><div class="lightning" style="--md-ios-surface:#fff;--md-ios-bg:#f2f2f7;--md-ios-separator:#c6c6c8;--md-ios-accent:#007aff;min-height:100dvh">
 <header class="salesforce-header" style="display:flex;align-items:center;justify-content:space-between">
-  <strong>MetaDrive</strong><button type="button" class="md-mobile-launcher">Apps</button></header>
+  <strong>MetaDrive</strong><div class="md-mobile-launcher"><button type="button">Apps</button></div></header>
 <main class="setup-layout" style="display:block;background:#f2f2f7;min-height:100dvh">
  <section class="records-list-card" style="margin:0;padding:0 12px">
   <div class="records-list-toolbar records-main-toolbar"><div class="records-phone-title-line">
@@ -33,11 +33,6 @@ const template=`<!doctype html><html><head><meta name="viewport" content="width=
   <div class="records-phone-pagination"><span>50 of 5000 loaded</span><button>Load more</button></div>
  </section>
  </main>
- <nav class="md-mobile-app-tabs" aria-label="Application pages">
-  <button class="active"><span>⌂</span><span>Home</span></button>
-  <button><span>▦</span><span>Accounts</span></button>
-  <button><span>⚙</span><span>Settings</span></button>
- </nav>
  <div class="md-mobile-sheet-backdrop"><section class="md-mobile-sheet" role="dialog" aria-modal="true">
   <header><span class="md-mobile-sheet-grabber"></span><strong>Edit account</strong><button>Done</button></header>
   <div class="md-mobile-sheet-content"><label>Account Name <input value="Acme" /></label>
@@ -58,17 +53,17 @@ try{
   const result=await page.evaluate(()=>{
     const info=selector=>{const el=document.querySelector(selector),rect=el.getBoundingClientRect();
       return {display:getComputedStyle(el).display,height:rect.height,width:rect.width};};
-    return {width:document.documentElement.scrollWidth,tab:info('.md-mobile-app-tabs'),
+    return {width:document.documentElement.scrollWidth,launcher:info('.md-mobile-launcher'),
       rows:info('.records-phone-rows'),sheet:info('.md-mobile-sheet'),header:info('.salesforce-header')};
   });
   assert.ok(result.width<=width+2,'Unexpected horizontal overflow '+width+': '+JSON.stringify(result));
   if(phone) {
-   assert.notEqual(result.tab.display,'none','Bottom tabs missing '+width);
-   assert.ok(result.tab.height>=49,'Bottom tab touch target is too short');
+   assert.notEqual(result.launcher.display,'none','App launcher missing '+width);
+   assert.ok(result.launcher.width>=44,'App launcher touch target is too narrow');
    assert.notEqual(result.rows.display,'none','Phone record list missing');
    assert.ok(result.sheet.width<=width+1,'Sheet exceeds viewport');
   }else{
-   assert.equal(result.tab.display,'none','Desktop tab bar appeared at '+width);
+   assert.equal(result.launcher.display,'none','Desktop launcher appeared at '+width);
   }
   await page.screenshot({path:'artifacts/mobile-plan-'+width+'x'+height+'.png',fullPage:false});
   if(width===390){
@@ -84,4 +79,4 @@ try{
   await page.close();
  }
 }finally{await browser.close();}
-console.log('Mobile Records, tab and form-sheet viewport contracts passed');
+console.log('Mobile Records, app launcher and form-sheet viewport contracts passed');

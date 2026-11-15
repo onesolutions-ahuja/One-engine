@@ -1,33 +1,11 @@
-/* iOS-like application controls are isolated to the phone shell. */
-.md-mobile-app-tabs, .md-mobile-launcher { display: none; }
+/* App launcher, authored page actions and shared mobile sheets. No automatic page tabs. */
+.md-mobile-launcher, .md-mobile-page-actions { display: none; }
 @media (max-width: 599px), (max-height: 500px) and (pointer: coarse) {
-  /* The existing app launcher remains available in Setup, Records and app pages.
-     Do not make availability depend on page-runtime presentation flags. */
-  .lightning .salesforce-header .md-mobile-launcher { display: flex; }
+  .lightning .salesforce-header .md-mobile-launcher,
+  .lightning .salesforce-header .md-mobile-page-actions { display: flex; }
   .lightning .header-installed-apps { display: none !important; }
   .lightning .header-page-context { display: none !important; }
-  .lightning:not(.standalone-page-mode):not(.page-builder-editing) .md-mobile-app-tabs {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
-    display: flex; align-items: flex-start; justify-content: space-around;
-    min-height: calc(49px + env(safe-area-inset-bottom, 0px));
-    padding: 3px 4px env(safe-area-inset-bottom, 0px);
-    background: var(--md-ios-surface, #fff);
-    border-top: 0.5px solid var(--md-ios-separator, #c6c6c8);
-    box-sizing: border-box;
-  }
-  .md-mobile-app-tabs button {
-    flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent;
-    color: var(--md-ios-secondary, #73737a); display: flex; flex-direction: column;
-    justify-content: center; align-items: center; gap: 2px; padding: 2px 4px;
-    font: inherit; cursor: pointer; touch-action: manipulation;
-  }
-  .md-mobile-app-tabs button span { max-width: 100%; overflow-wrap: anywhere; white-space: normal; text-align: center; font-size: 11px; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-  .md-mobile-app-tabs button.active { color: var(--md-ios-accent, #007aff); }
-  .md-mobile-app-tabs button:active { background: var(--md-ios-pressed, #e5e5ea); border-radius: 10px; }
-  .lightning .setup-layout:has(~ .md-mobile-app-tabs), .lightning:has(.md-mobile-app-tabs) .setup-layout {
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-  }
-  .md-mobile-launcher > button {
+  .md-mobile-launcher > button, .md-mobile-page-actions > button {
     display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px;
     background: transparent; border: 0; color: var(--md-ios-accent, #007aff);
   }
@@ -50,8 +28,7 @@
 .md-mobile-app-grid > button { border: 0; background: transparent; color: inherit; display: grid; justify-items: center; gap: 8px; font-size: 13px; min-height: 84px; overflow-wrap: anywhere; }
 .md-mobile-app-symbol { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 13px; color: #fff; background: var(--md-ios-accent, #007aff); }
 @media (prefers-reduced-motion: no-preference) { .md-mobile-sheet { animation: md-mobile-rise .24s ease-out; } @keyframes md-mobile-rise { from { transform: translateY(24px); opacity: .8; } to { transform: translateY(0); opacity: 1; } } }
-:root.md-keyboard-open .lightning .md-mobile-app-tabs { display: none; }
-@media print { .md-mobile-app-tabs, .md-mobile-launcher, .md-mobile-sheet-backdrop { display: none !important; } }
+@media print { .md-mobile-launcher, .md-mobile-page-actions, .md-mobile-sheet-backdrop { display: none !important; } }
 
 /* Some published runtimes hide workspace chrome. Keep the ORIGINAL launcher
    reachable without exposing the rest of the hidden header or a second menu. */

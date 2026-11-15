@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {createPortal} from 'react-dom';
 import {X} from 'lucide-react';
-import './MobileAppNavigation.css';
+import './MobileAppLauncher.css';
 import './MobileSheet.css';
 
 /** Shared accessible phone sheet. Focus is restored after dismissal; body scroll

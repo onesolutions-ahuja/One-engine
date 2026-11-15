@@ -1,5 +1,6 @@
 import {requireAvailableMetadataName} from './metadata-name-guard.js';
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
+import {verifyRevolutWebhook,revolutEventState} from './revolut-checkout-service.js';
 import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
@@ -299,7 +300,7 @@ export function registerInboundWebhookPublicRoutes(app:Express,db:SqlPersistence
    res.status(503).json({error:'Webhook communication logger unavailable'});
    return;
   }
-  const signature=req.get('x-hub-signature-256');
+  const signature=req.get(endpoint?.provider==='Revolut'?'revolut-signature':'x-hub-signature-256');
   const raw=req.rawWebhookBody;
   const logInbound=async(statusCode:number,outcome:'success'|'http_error'|'network_error'|'rejected',
    errorCode?:string)=>{
@@ -327,14 +328,20 @@ export function registerInboundWebhookPublicRoutes(app:Express,db:SqlPersistence
   if(!raw){await reject('raw_body_unavailable');return;}
   if(raw.length>262144){await reject('body_too_large',raw.length);return;}
   if(!signature){await reject('signature_missing',raw.length);return;}
-  if(!/^sha256=[a-f0-9]{64}$/i.test(signature)){
-   await reject('signature_format_invalid',raw.length);return;
-  }
   const secret=vault.decryptOpaque(endpoint.signature_secret_ciphertext,endpoint.encryption_key_id);
-  const signatureDigest=createHmac('sha256',secret).update(raw).digest();
-  const supplied=Buffer.from(signature.slice(7),'hex');
-  if(!matches(signatureDigest,supplied)){
-   await reject('signature_mismatch',raw.length);return;
+  if(endpoint.provider==='Revolut'){
+   if(!verifyRevolutWebhook(raw,req.get('revolut-request-timestamp'),signature,secret)){
+    await reject('revolut_signature_invalid_or_stale',raw.length);return;
+   }
+  }else{
+   if(!/^sha256=[a-f0-9]{64}$/i.test(signature)){
+    await reject('signature_format_invalid',raw.length);return;
+   }
+   const signatureDigest=createHmac('sha256',secret).update(raw).digest();
+   const supplied=Buffer.from(signature.slice(7),'hex');
+   if(!matches(signatureDigest,supplied)){
+    await reject('signature_mismatch',raw.length);return;
+   }
   }
   // Credential-linked webhooks are ingestion endpoints: persist Communication directly.
   // AceChatter reads Communication through its authorised Flows; it is not a webhook consumer.
@@ -374,7 +381,23 @@ export function registerInboundWebhookPublicRoutes(app:Express,db:SqlPersistence
   try{
    // Save the provider message before any optional legacy Flow work. A credential
    // webhook never executes AceChatterReceiveWebhook or any other app Flow.
-   if(endpoint.credential_name){
+   if(endpoint.provider==='Revolut'){
+    const data=req.body as Record<string,unknown>;
+    const state=typeof data.event==='string'?revolutEventState(data.event):null;
+    if(state&&typeof data.order_id==='string'&&uuid.test(data.order_id)){
+     await db.query(`UPDATE md_revolut_checkout_orders
+       SET status=CASE WHEN status='completed' THEN 'completed'
+          WHEN $3='completed' THEN 'completed'
+          WHEN status='authorised' AND $3='pending' THEN 'authorised'
+          ELSE $3 END,
+       last_event=$4,updated_at=now()
+       WHERE tenant_id=$1 AND revolut_order_id=$2 AND credential_id=$5`,
+      [endpoint.tenant_id,data.order_id,state,data.event,endpoint.credential_id]);
+    }else{
+     throw Error('Unsupported Revolut webhook event payload');
+    }
+    requestCommunicationRecorded=false;
+   }else if(endpoint.credential_name){
     if(!activityWriter)throw new Error('Central Communication writer unavailable');
     const messages=whatsappMessages(req.body,endpoint.id);
     let writtenMessages=0;

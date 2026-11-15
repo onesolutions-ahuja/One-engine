@@ -44,7 +44,7 @@ type Props={tab:BuilderTab;api:string;definitions:readonly BuilderRibbonProperty
  openDesignSection?:string|null;onToggleDesignSection?:(section:string)=>void;
  /** Data only: 'formulaBar' renders just the Formula Bar (topbar); 'source' just the
   * Source object selectors (end of Design). Both reuse this single Data engine. */
- part?:'formulaBar'|'source';};
+ part?:'formulaBar'|'source'|'designTail';};
 const weekdays=[['sun','Sun'],['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat']] as const;
 const fallback=(value:unknown)=>typeof value==='string'?value:'';
 const cartSummaryLabels:Record<string,{key:string;slot:string}>={
@@ -206,7 +206,6 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
  // Unsupported controls are disabled by the per-property `supported` check below.
  const compactDesign=true;
  // These components declare exactly their editable areas through SQL mapping rows.
- const fixedAreaComponents=new Set(['smart_numpad','smart_keyboard','smart_dock']);
  // Independent SQL-planned view over shared controls and persisted property keys.
  // A null property key displays the fallback glyph, always disabled.
  // SQL supplies the shared area order. Retired aliases cannot return from
@@ -218,9 +217,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
  const design2Areas=[...new Map(design2Slots
    .filter(slot=>!retiredDesign2Areas.has(slot.area))
    .map(slot=>[slot.area,slot.areaOrder] as const)).entries()]
-   .sort((a,b)=>a[1]-b[1]).map(([area])=>area)
-   .filter(area=>area==='Others'||!fixedAreaComponents.has(api)||design2SlotRules.some(rule=>
-     rule.componentApi===api&&rule.area===area));
+   .sort((a,b)=>a[1]-b[1]).map(([area])=>area);
  // Focused/Others/Extras are not places on the canvas; they live in Others.
  const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
  const canvasDesign2Areas=design2Areas.filter(area=>!nonCanvasDesign2Areas.has(area));
@@ -526,7 +523,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      (isTextSize||isCorner||isWidth||isHeight||isCanvasAxis);
    const isTabIndex=property.id==='tabIndex';
    let editor;
-   if(/^dockItem[1-6]Icon$/.test(property.id))editor=<SmartIconGallery value={String(value||'house')}
+   if(/^dockItem(?:[1-9]|1[0-2])Icon$/.test(property.id))editor=<SmartIconGallery value={String(value||'house')}
      disabled={!enabled} allowIcons onChange={write}/>;
    else if(property.id==='shapeId'||property.id==='numpadKeyShape'||(tab==='Design2'&&property.id==='footerShape'))editor=<SmartIconGallery value={String(value||'shape:rectangle')}
      disabled={!enabled} allowIcons={property.id==='footerShape'?false:(selectedApis?.length?selectedApis:[api]).every(member=>
@@ -548,7 +545,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
          title="Upload image from this computer" aria-label="Upload image" disabled={uploadBusy||!enabled}
          onClick={()=>uploadInput.current?.click()}><ImagePlus size={16}/></button>}
      </div>;
-   }else if(kind==='expression')editor=<div className="smart-formula-filter">
+   }else if(tab==='Design2'&&property.id==='numpadPlaceholder')editor=
+     <input type="text" className="smart-simple-text-input" aria-label={title}
+       disabled={!enabled} value={String(value??'')} placeholder="Enter placeholder"
+       onChange={event=>write(event.target.value)}/>;
+   else if(kind==='expression')editor=<div className="smart-formula-filter">
      {summaryLabel?<input type="text" className="smart-summary-label"
        aria-label={summaryLabel.slot+' cart label'} title={summaryLabel.slot+' displayed cart label'}
        placeholder={summaryLabel.slot} maxLength={64} spellCheck={false}
@@ -687,6 +688,154 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        title={!enabled?'Applies to: '+property.components.map(api=>api.replace(/^smart_/,'' )).join(', '):title}>
        <span className="smart-label">{shortLabel}</span>{editor}</div>;
  };
+ const design2CountEditor=(
+          <div className="smart-design2-extras-cell">
+            {(()=>{
+            // Select existing persisted property keys; no duplicate count state.
+            const options=api==='smart_card_grid'
+            ?[{key:'cardsPerRow',label:'Columns'},{key:'cardsPerColumn',label:'Rows'}]:
+            api==='smart_tabs'
+            ?[{key:'tabCount',label:'Count'},{key:'tabIndex',label:'Default tab'}]:
+            api==='smart_cart'?[{key:'cardsPerRow',label:'Count'}]:
+            api==='smart_dock'?[{key:'dockItemCount',label:'Count'}]:[];
+            const key=options.some(option=>option.key===countKey)?countKey:(options[0]?.key??'');
+            const property=definitions.find(p=>p.id===key);
+            const supported=Boolean(property?.components.includes(api)&&
+            (!sharedPropertyIds||sharedPropertyIds.includes(key)));
+            const sourceBound=api==='smart_tabs'&&key==='tabCount'&&smartTabsHaveDataSource(properties);
+            const enabled=supported&&!sourceBound;
+            const raw=properties[property?.valueKeys?.[api]??key]??
+            property?.defaultsOverrides?.[api]??property?.default;
+            const numeric=Number(raw);
+            const value=Number.isFinite(numeric)?Math.trunc(numeric):key==='tabIndex'?0:1;
+            const title=sourceBound?'Number of tabs is determined by its data source':
+            options.find(option=>option.key===key)?.label??property?.label??'Count';
+            const minimum=property?.min??(key==='tabIndex'?0:1);
+            const maximum=property?.max??(key==='tabIndex'?99:api==='smart_tabs'?20:99);
+            const selectedDays=Array.isArray(raw)?raw.filter((day):day is string=>typeof day==='string'):[];
+            return <div className="smart-design2-count" role="group"
+            aria-label="Appearance value controls" data-supported={enabled?'true':'false'}
+            data-source-bound={sourceBound?'true':'false'}>
+            <span className="smart-design2-count-field" title={title}>
+            <select className="smart-design2-count-choice" aria-label="Appearance property"
+            title="Choose appearance property" disabled={options.length<2}
+            value={key} onChange={event=>{setCountKey(event.target.value);setDaysOpen(false);}}>
+            {options.length?options.map(option=>
+            <option key={option.key} value={option.key}>{option.label}</option>):
+            <option value="">Count</option>}
+            </select>
+            {key==='showDays'?<>
+            <button ref={daysButton} type="button" className="smart-design2-days-trigger"
+            aria-label="Show Days" aria-expanded={daysOpen} disabled={!enabled}
+            onClick={()=>setDaysOpen(open=>!open)}>{selectedDays.length}/7</button>
+            {daysOpen&&createPortal(<div ref={daysMenu} className="smart-weekday-popup"
+            role="dialog" aria-label="Choose calendar days"
+            style={{top:daysPosition.top,left:daysPosition.left}}>
+            {weekdays.map(([day,label])=><label key={day}>
+            <input type="checkbox" checked={selectedDays.includes(day)}
+            onChange={event=>{if(!enabled)return;
+            onChange({...properties,showDays:event.target.checked
+            ?[...selectedDays,day]:selectedDays.filter(item=>item!==day)},['showDays']);
+            }}/>{label}</label>)}
+            </div>,document.body)}
+            </>:
+            key==='firstDay'?<select className="smart-design2-day-choice"
+            aria-label="First Day" title="First Day" disabled={!enabled}
+            value={String(raw??'mon')} onChange={event=>{
+            if(enabled)onChange({...properties,[property!.valueKeys?.[api]??key]:event.target.value},[property!.valueKeys?.[api]??key]);
+            }}>{(property?.choices??['sun','mon','tue','wed','thu','fri','sat']).map(day=>
+            <option key={day} value={day}>{day.slice(0,3)}</option>)}</select>:
+            <BuilderNumberInput key={componentId+':'+key}
+            className="smart-office-number" step={1} integer
+            aria-label={api==='smart_tabs'&&key==='tabCount'?'Number of tabs':title}
+            title={title} min={minimum} max={maximum}
+            disabled={!enabled} value={supported?value:''}
+            onValueChange={next=>{
+            if(enabled)onChange({...properties,[property!.valueKeys?.[api]??key]:next},[property!.valueKeys?.[api]??key]);
+            }}/>}
+            </span>
+            </div>;
+            })()}
+          </div>
+ );
+ const design2PaddingEditor=(
+          <div className="smart-design2-extras-cell">
+            {(()=>{
+            // Same Padding editor, choosing the original component-specific saved key.
+            const paddingKey=api==='smart_card_grid'?'cardPadding':'numpadPadding';
+            const property=definitions.find(p=>p.id===paddingKey);
+            const enabled=Boolean(property?.components.includes(api))&&
+            (!sharedPropertyIds||sharedPropertyIds.includes(paddingKey));
+            const raw=properties[paddingKey]??property?.defaultsOverrides?.[api]??property?.default;
+            const value=raw===undefined||raw===null||raw===''?'':Number(raw);
+            return <div className="smart-design2-padding" role="group"
+            aria-label="Padding controls" data-supported={enabled?'true':'false'}>
+            <select aria-label="Position spacing property" title="Padding"
+            disabled={!enabled} value={paddingKey} onChange={()=>{}}>
+            <option value={paddingKey}>Padding</option>
+            </select>
+            <BuilderNumberInput key={componentId+':'+paddingKey}
+            className="smart-office-number" aria-label="Padding"
+            title="Padding" min={property?.min??0} max={property?.max??160}
+            disabled={!enabled} value={enabled?value:''}
+            onValueChange={next=>{
+            if(enabled)onChange({...properties,[paddingKey]:next},[paddingKey]);
+            }}/>
+            </div>;
+            })()}
+          </div>
+ );
+
+ // A fixed inventory for every component. Only enabled state varies by component.
+ const design2OtherProperties=(()=>{
+   const seen=new Set<string>();
+   return [...design2AreaExtraProperties,...design2SupplementalProperties]
+     .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
+     .filter(property=>!['numpadGap','numpadPadding','dockItemCount',
+       'numpadPrefix','numpadSuffix'].includes(property.id))
+     .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
+ })();
+ const designOtherCategory=(id:string)=>{
+   if(id.startsWith('calendar')||id==='showDays'||id==='firstDay')return 'Calendar';
+   if(id.startsWith('keyboard'))return 'Keyboard';
+   if(id.startsWith('dock'))return 'Dock';
+   if(id.startsWith('chart'))return 'Chart';
+   if(id==='gap')return 'Spacing';
+   if(id.startsWith('numpad')||id==='inputRows')return 'Input & Text';
+   return 'General';
+ };
+ const renderDesignGroup=(group:string,showHeading:boolean)=>(
+   <div className="smart-others-property-group" key={group} role="group"
+     aria-label={group} data-others-group={group}>
+     {showHeading&&<div className="smart-others-property-heading">{group}</div>}
+     <div className="smart-design2-supplemental">
+       {group==='General'&&design2CountEditor}
+       {group==='Spacing'&&design2PaddingEditor}
+       {design2OtherProperties.filter(property=>designOtherCategory(property.id)===group)
+         .map(property=><div className="smart-design2-supplemental-setting"
+           key={property.id} data-others-property={property.id}>
+           <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
+           {controls(property)}
+         </div>)}
+     </div>
+   </div>
+ );
+ // These sections follow Conditional Visibility in the parent editor, not Others.
+ if(tab==='Design2'&&part==='designTail')return <div
+     className="smart-ribbon smart-design2-ribbon smart-design2-tail"
+     data-smart-tab={tab} data-smart-api={api} data-smart-part={part}>
+   {['Calendar','Keyboard','Dock','Chart'].map(group=>
+     <section className="smart-inspector-section page-builder-dock-section smart-design2-feature-section"
+       key={group} data-design-area={group} aria-label={group}>
+       <button type="button" className="smart-inspector-section-toggle"
+         aria-expanded={designSectionOpen(group)} onClick={()=>toggleDesignSection(group)}>
+         <ChevronDown size={15} aria-hidden="true"/>{group}
+       </button>
+       {designSectionOpen(group)&&<div className="smart-inspector-section-content">
+         {renderDesignGroup(group,false)}
+       </div>}
+     </section>)}
+ </div>;
  return <div className={'smart-ribbon'+(tab==='Design2'?' smart-design2-ribbon':'')+
    (part==='formulaBar'?' smart-topbar-formula':part==='source'?' smart-design-source':'')}
   data-smart-tab={tab} data-smart-api={api} data-smart-part={part}
@@ -782,133 +931,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           <ChevronDown size={15} aria-hidden="true"/>Others
         </button>
         {designSectionOpen('Others')&&<div className="smart-inspector-section-content">
-          {(()=>{
-            // One fixed list for every selection: same properties, same order.
-            const seen=new Set<string>();
-            const list=[...design2AreaExtraProperties,...design2SupplementalProperties]
-              .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
-              .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
-            // Every existing property stays within Others, grouped for readability.
-            // Each retains its SQL binding and existing control/disabled behaviour.
-            const category=(id:string)=>{
-              if(['numpadPadding','gap'].includes(id))return 'Spacing';
-              if(id.startsWith('calendar')||id==='showDays'||id==='firstDay')return 'Calendar';
-              if(id==='inputRows')return 'Text';
-              if(id==='selectionMode')return 'Selection';
-              if(id.startsWith('numpad'))return 'Input Settings';
-              return 'Additional';
-            };
-            return <div className="smart-others-groups">
-              {['Spacing','Calendar','Input Settings','Text','Selection','Additional'].map(group=>{
-                const members=list.filter(property=>category(property.id)===group);
-                return members.length>0&&<div className="smart-others-property-group" key={group} role="group" aria-label={group} data-others-group={group}>
-                  <div className="smart-others-property-heading">{group}</div>
-                  <div className="smart-design2-supplemental">
-                    {members.map(property=><div className="smart-design2-supplemental-setting" key={property.id} data-others-property={property.id}>
-                      <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
-                      {controls(property)}
-                    </div>)}
-                  </div>
-                </div>;
-              })}
-            </div>;
-          })()}
-        <div className="smart-others-property-heading smart-others-extra-heading">Additional controls</div>
-        <div className="smart-design2-extras-fixed" role="group" aria-label="Additional appearance and spacing controls">
-          {/* Both editors occupy fixed positions, preserving component-aware availability. */}
-          <div className="smart-design2-extras-cell">
-            {(()=>{
-            // Select existing persisted property keys; no duplicate count state.
-            const options=api==='smart_card_grid'
-            ?[{key:'cardsPerRow',label:'Columns'},{key:'cardsPerColumn',label:'Rows'}]:
-            api==='smart_tabs'
-            ?[{key:'tabCount',label:'No. of tabs'},{key:'tabIndex',label:'Default tab'}]:
-            api==='smart_cart'?[{key:'cardsPerRow',label:'Count'}]:[];
-            const key=options.some(option=>option.key===countKey)?countKey:(options[0]?.key??'');
-            const property=definitions.find(p=>p.id===key);
-            const supported=Boolean(property?.components.includes(api)&&
-            (!sharedPropertyIds||sharedPropertyIds.includes(key)));
-            const sourceBound=api==='smart_tabs'&&key==='tabCount'&&smartTabsHaveDataSource(properties);
-            const enabled=supported&&!sourceBound;
-            const raw=properties[property?.valueKeys?.[api]??key]??
-            property?.defaultsOverrides?.[api]??property?.default;
-            const numeric=Number(raw);
-            const value=Number.isFinite(numeric)?Math.trunc(numeric):key==='tabIndex'?0:1;
-            const title=sourceBound?'Number of tabs is determined by its data source':
-            property?.label??'Count';
-            const minimum=property?.min??(key==='tabIndex'?0:1);
-            const maximum=property?.max??(key==='tabIndex'?99:api==='smart_tabs'?20:99);
-            const selectedDays=Array.isArray(raw)?raw.filter((day):day is string=>typeof day==='string'):[];
-            return <div className="smart-design2-count" role="group"
-            aria-label="Appearance value controls" data-supported={enabled?'true':'false'}
-            data-source-bound={sourceBound?'true':'false'}>
-            <span className="smart-design2-count-field" title={title}>
-            <select className="smart-design2-count-choice" aria-label="Appearance property"
-            title="Choose appearance property" disabled={options.length<2}
-            value={key} onChange={event=>{setCountKey(event.target.value);setDaysOpen(false);}}>
-            {options.length?options.map(option=>
-            <option key={option.key} value={option.key}>{option.label}</option>):
-            <option value="">Count</option>}
-            </select>
-            {key==='showDays'?<>
-            <button ref={daysButton} type="button" className="smart-design2-days-trigger"
-            aria-label="Show Days" aria-expanded={daysOpen} disabled={!enabled}
-            onClick={()=>setDaysOpen(open=>!open)}>{selectedDays.length}/7</button>
-            {daysOpen&&createPortal(<div ref={daysMenu} className="smart-weekday-popup"
-            role="dialog" aria-label="Choose calendar days"
-            style={{top:daysPosition.top,left:daysPosition.left}}>
-            {weekdays.map(([day,label])=><label key={day}>
-            <input type="checkbox" checked={selectedDays.includes(day)}
-            onChange={event=>{if(!enabled)return;
-            onChange({...properties,showDays:event.target.checked
-            ?[...selectedDays,day]:selectedDays.filter(item=>item!==day)},['showDays']);
-            }}/>{label}</label>)}
-            </div>,document.body)}
-            </>:
-            key==='firstDay'?<select className="smart-design2-day-choice"
-            aria-label="First Day" title="First Day" disabled={!enabled}
-            value={String(raw??'mon')} onChange={event=>{
-            if(enabled)onChange({...properties,[property!.valueKeys?.[api]??key]:event.target.value},[property!.valueKeys?.[api]??key]);
-            }}>{(property?.choices??['sun','mon','tue','wed','thu','fri','sat']).map(day=>
-            <option key={day} value={day}>{day.slice(0,3)}</option>)}</select>:
-            <BuilderNumberInput key={componentId+':'+key}
-            className="smart-office-number" step={1} integer
-            aria-label={api==='smart_tabs'&&key==='tabCount'?'Number of tabs':title}
-            title={title} min={minimum} max={maximum}
-            disabled={!enabled} value={supported?value:''}
-            onValueChange={next=>{
-            if(enabled)onChange({...properties,[property!.valueKeys?.[api]??key]:next},[property!.valueKeys?.[api]??key]);
-            }}/>}
-            </span>
-            </div>;
-            })()}
+          <div className="smart-others-groups">
+            {['General','Spacing','Input & Text'].map(group=>renderDesignGroup(group,true))}
           </div>
-          <div className="smart-design2-extras-cell">
-            {(()=>{
-            // Position retains the existing Card Grid padding key, not a new focused override.
-            const property=definitions.find(p=>p.id==='cardPadding');
-            const enabled=api==='smart_card_grid'&&
-            Boolean(property?.components.includes(api))&&
-            (!sharedPropertyIds||sharedPropertyIds.includes('cardPadding'));
-            const raw=properties.cardPadding??property?.defaultsOverrides?.[api]??property?.default;
-            const value=raw===undefined||raw===null||raw===''?'':Number(raw);
-            return <div className="smart-design2-padding" role="group"
-            aria-label="Padding controls" data-supported={enabled?'true':'false'}>
-            <select aria-label="Position spacing property" title="Padding"
-            disabled={!enabled} value="cardPadding" onChange={()=>{}}>
-            <option value="cardPadding">Padding</option>
-            </select>
-            <BuilderNumberInput key={componentId+':cardPadding'}
-            className="smart-office-number" aria-label="Card Padding"
-            title="Card Padding" min={property?.min??0} max={property?.max??160}
-            disabled={!enabled} value={enabled?value:''}
-            onValueChange={next=>{
-            if(enabled)onChange({...properties,cardPadding:next},['cardPadding']);
-            }}/>
-            </div>;
-            })()}
-          </div>
-        </div>
         </div>}
       </section>
       </div>

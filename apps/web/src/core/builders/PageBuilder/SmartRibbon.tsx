@@ -781,13 +781,22 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           {(()=>{
             // One fixed list for every selection: same properties, same order.
             const seen=new Set<string>();
-            const list=[...design2AreaExtraProperties,...design2SupplementalProperties]
+            const all=[...design2AreaExtraProperties,...design2SupplementalProperties]
               .filter(property=>property.group!=='Focused'&&!/^focused/i.test(property.id))
               .filter(property=>!seen.has(property.id)&&Boolean(seen.add(property.id)));
-            // Every existing property stays within Others, grouped for readability.
-            // Each retains its SQL binding and existing control/disabled behaviour.
+            // One Gap editor for cards, numpads, keyboards and docks, using each
+            // renderer's existing saved property key. No page-data migration.
+            const gapCandidates=api==='smart_card_grid'?['gap','numpadGap']:['numpadGap','gap'];
+            const availableGap=gapCandidates.map(id=>all.find(p=>p.id===id))
+              .filter((property):property is BuilderRibbonProperty=>Boolean(property));
+            const gapProperty=availableGap.find(property=>property.components.includes(api))??availableGap[0];
+            const list=[
+              ...all.filter(property=>!['numpadPadding','numpadGap','gap','dockItemCount'].includes(property.id)),
+              ...(gapProperty?[{...gapProperty,label:'Gap',designCaption:'Gap'}]:[])
+            ];
+            // Padding is the one fixed editor below; Dock Items uses Count.
             const category=(id:string)=>{
-              if(['numpadPadding','numpadGap','gap'].includes(id))return 'Spacing';
+              if(id==='numpadGap'||id==='gap')return 'Spacing';
               if(id.startsWith('calendar')||id==='showDays'||id==='firstDay')return 'Calendar';
               if(id==='inputRows')return 'Text';
               if(id==='selectionMode')return 'Selection';
@@ -800,7 +809,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
                 return members.length>0&&<div className="smart-others-property-group" key={group} role="group" aria-label={group} data-others-group={group}>
                   <div className="smart-others-property-heading">{group}</div>
                   <div className="smart-design2-supplemental">
-                    {members.map(property=><div className="smart-design2-supplemental-setting" key={property.id} data-others-property={property.id}>
+                    {members.map(property=><div className="smart-design2-supplemental-setting" key={property.id} data-others-property={property.id==='numpadGap'?'gap':property.id}>
                       <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
                       {controls(property)}
                     </div>)}
@@ -818,8 +827,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             const options=api==='smart_card_grid'
             ?[{key:'cardsPerRow',label:'Columns'},{key:'cardsPerColumn',label:'Rows'}]:
             api==='smart_tabs'
-            ?[{key:'tabCount',label:'No. of tabs'},{key:'tabIndex',label:'Default tab'}]:
-            api==='smart_cart'?[{key:'cardsPerRow',label:'Count'}]:[];
+            ?[{key:'tabCount',label:'Count'},{key:'tabIndex',label:'Default tab'}]:
+            api==='smart_cart'?[{key:'cardsPerRow',label:'Count'}]:
+            api==='smart_dock'?[{key:'dockItemCount',label:'Count'}]:[];
             const key=options.some(option=>option.key===countKey)?countKey:(options[0]?.key??'');
             const property=definitions.find(p=>p.id===key);
             const supported=Boolean(property?.components.includes(api)&&
@@ -831,7 +841,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             const numeric=Number(raw);
             const value=Number.isFinite(numeric)?Math.trunc(numeric):key==='tabIndex'?0:1;
             const title=sourceBound?'Number of tabs is determined by its data source':
-            property?.label??'Count';
+            options.find(option=>option.key===key)?.label??property?.label??'Count';
             const minimum=property?.min??(key==='tabIndex'?0:1);
             const maximum=property?.max??(key==='tabIndex'?99:api==='smart_tabs'?20:99);
             const selectedDays=Array.isArray(raw)?raw.filter((day):day is string=>typeof day==='string'):[];
@@ -881,25 +891,25 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           </div>
           <div className="smart-design2-extras-cell">
             {(()=>{
-            // Position retains the existing Card Grid padding key, not a new focused override.
-            const property=definitions.find(p=>p.id==='cardPadding');
-            const enabled=api==='smart_card_grid'&&
-            Boolean(property?.components.includes(api))&&
-            (!sharedPropertyIds||sharedPropertyIds.includes('cardPadding'));
-            const raw=properties.cardPadding??property?.defaultsOverrides?.[api]??property?.default;
+            // Single Padding editor, mapped to the renderer's existing saved key.
+            const paddingKey=api==='smart_card_grid'?'cardPadding':'numpadPadding';
+            const property=definitions.find(p=>p.id===paddingKey);
+            const enabled=Boolean(property?.components.includes(api))&&
+            (!sharedPropertyIds||sharedPropertyIds.includes(paddingKey));
+            const raw=properties[paddingKey]??property?.defaultsOverrides?.[api]??property?.default;
             const value=raw===undefined||raw===null||raw===''?'':Number(raw);
             return <div className="smart-design2-padding" role="group"
             aria-label="Padding controls" data-supported={enabled?'true':'false'}>
             <select aria-label="Position spacing property" title="Padding"
-            disabled={!enabled} value="cardPadding" onChange={()=>{}}>
-            <option value="cardPadding">Padding</option>
+            disabled={!enabled} value={paddingKey} onChange={()=>{}}>
+            <option value={paddingKey}>Padding</option>
             </select>
-            <BuilderNumberInput key={componentId+':cardPadding'}
-            className="smart-office-number" aria-label="Card Padding"
-            title="Card Padding" min={property?.min??0} max={property?.max??160}
+            <BuilderNumberInput key={componentId+':'+paddingKey}
+            className="smart-office-number" aria-label="Padding"
+            title="Padding" min={property?.min??0} max={property?.max??160}
             disabled={!enabled} value={enabled?value:''}
             onValueChange={next=>{
-            if(enabled)onChange({...properties,cardPadding:next},['cardPadding']);
+            if(enabled)onChange({...properties,[paddingKey]:next},[paddingKey]);
             }}/>
             </div>;
             })()}

@@ -1298,6 +1298,15 @@ function LightningAppRuntime({
   const compiledPage=compiledPageProp??(appScript.status==='ready'?appScript.script.plan:undefined);
   const compiledById=useMemo(()=>new Map((compiledPage?.components??[]).map(item=>[item.id,item])),[compiledPage]);
   const error=previewPage?'':routePending?'':pageLoad.error;
+  const libraryPending=!libraryComponents.length&&Boolean(page?.components.some(item=>item.type.startsWith('Custom:')));
+  const [libraryWaitExpired,setLibraryWaitExpired]=useState(false);
+  useEffect(()=>{
+    if(!libraryPending)return;
+    // A tenant whose library request failed still sees its page (with the
+    // missing-component notice) instead of waiting forever.
+    const timer=window.setTimeout(()=>setLibraryWaitExpired(true),10000);
+    return()=>window.clearTimeout(timer);
+  },[libraryPending]);
   const loading=previewPage?false:routePending?!cached:pageLoad.loading;
   const [activeTabs, setActiveTabs] = useState<Record<string,string>>({});
   const [layoutState,setLayoutState]=useState<Record<string,unknown>>(inScreenPage?inScreenContext?.values??{}:{});
@@ -1399,6 +1408,10 @@ function LightningAppRuntime({
   if(error&&!page)return <div className="records-page"><div className="records-message" role="alert">{error}</div></div>;
   if(loading&&!page)return <DelayedPageLoading/>;
   if(page&&appScript.status==='loading')return <DelayedPageLoading/>;
+  // The component library loads with the workspace metadata. Until it has
+  // arrived, a page with library components waits instead of flashing
+  // "Component is no longer registered" for every component.
+  if(page&&libraryPending&&!libraryWaitExpired)return <DelayedPageLoading/>;
   if (!page) return <main className="records-page"><section className="records-empty records-home-unassigned" aria-labelledby="records-home-empty-heading"><h1 id="records-home-empty-heading">Home page is not configured</h1><p>This app has no active Home Page assigned for your current profile and device.</p><p>Ask an administrator to activate and assign a Home Page in the Lightning App Builder. Existing app pages and records remain available from navigation.</p></section></main>;
   const isStandaloneRuntime = isStandalonePagePresentation(page);
   const regions: Array<'header' | 'main' | 'sidebar'> = ['header', 'main', 'sidebar'];
@@ -1565,6 +1578,7 @@ function LightningAppRuntime({
     if (!isAppComponentVisible(component)) return null;
     return <div key={component.id} className={nested ? 'free-canvas-runtime-component nested-page-runtime' : 'free-canvas-runtime-component'}
       data-layout-component-id={component.id}
+      data-smart-frame={component.type.startsWith('Custom:smart_') ? 'true' : undefined}
       data-page-appearance={isLayoutType(component.type) ? 'layout' : pageAppearanceTarget(component.type)}
       data-page-style={pageAppearanceStyleKeys(resolvePageComponentStyle(component.properties, component.type, layoutDevice))}
       style={{

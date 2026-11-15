@@ -495,7 +495,9 @@ function SmartLookup({p,style,fire}){
 function SmartTabs({p,record,fire}){
  // Zero-based default; invalid/fractional values revert to the legacy first tab.
  const configuredTabIndex=Number.isInteger(Number(p.tabIndex))&&Number(p.tabIndex)>=0
-  ?Number(p.tabIndex):0;
+  &&p.tabIndex!==""&&p.tabIndex!==null?Number(p.tabIndex)
+  // Default tab -1: no tab is selected when the page opens.
+  :Number(p.tabIndex)===-1&&p.tabIndex!==""&&p.tabIndex!==null?-1:0;
  const [active,setActive]=React.useState(configuredTabIndex);
  React.useEffect(()=>setActive(configuredTabIndex),[configuredTabIndex]);
  const vertical=p.tabOrientation==="vertical";
@@ -528,7 +530,10 @@ function SmartTabs({p,record,fire}){
  // parent selection must not leave a dependent child visibly selected.
  const changeAction=p.actionFlows?.change;
  const formulaStateKey=changeAction?.actionType==="Formula"&&typeof changeAction.formula==="string"
-  ?/^@state\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/.exec(changeAction.formula.trim())?.[1]:null;
+  ?(/^@state\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/.exec(changeAction.formula.trim())
+   // =STATE(category, @record.Id): the tab shows the selection held in that Page State,
+   // so another control (e.g. an "All" button doing =STATE(category, "*")) can change it.
+   ??/^=?\s*STATE\s*\(\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*,/i.exec(changeAction.formula.trim()))?.[1]:null;
  const stateKey=dynamic?(changeAction?.actionType==="PageState"?changeAction.stateKey:formulaStateKey):null;
  const selectedCollection=hasCollection&&p.pageState?.collectionSelections
   ?Object.entries(p.pageState.collectionSelections).find(([name])=>
@@ -542,9 +547,12 @@ function SmartTabs({p,record,fire}){
   });
  // Default index is bounded by the filtered, permission-checked tab list.
  // An existing explicit PageState/Collection selection always has priority.
- const defaultTabIndex=tabs.length?Math.min(configuredTabIndex,tabs.length-1):-1;
+ const defaultTabIndex=tabs.length&&configuredTabIndex>=0?Math.min(configuredTabIndex,tabs.length-1):-1;
+ // A held value that is no tab (e.g. "*" for All) means no tab is selected.
+ const heldOtherValue=!hasCollection&&Boolean(stateKey)&&selectedId!==null&&selectedId!==undefined
+  &&selectedId!==""&&indexForSelection<0;
  const selectedTabIndex=(hasCollection||stateKey)
-  ?indexForSelection>=0?indexForSelection:defaultTabIndex
+  ?indexForSelection>=0?indexForSelection:heldOtherValue?-1:defaultTabIndex
   :tabs.length?Math.max(0,Math.min(active,tabs.length-1)):-1;
  const autoSelected=React.useRef(null);
  const selectedTabRef=React.useRef(null);
@@ -587,13 +595,14 @@ function SmartTabs({p,record,fire}){
   if(changeAction&&changeAction.actionType!=="PageState"&&
     !(changeAction.actionType==="Formula"&&formulaStateKey))return;
   if(indexForSelection>=0){autoSelected.current=null;return;}
+  if(heldOtherValue||defaultTabIndex<0)return;
   const key=String(p.pageSessionKey??"")+"|"+String(p.componentId??"")+"|"+
    String(hasCollection?p.dataCollection.name:stateKey)+"|"+String(defaultTabIndex)+"|"+String(defaultItemId??"");
   if(autoSelected.current===key)return;
   autoSelected.current=key;
   selectTab(defaultTabIndex,true);
  },[indexForSelection,defaultItemId,defaultTabIndex,tabs.length,p.loading,p.previewOnly,p.builderPreview,
-   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name]);
+   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue]);
  // Focus the actual selected initial tab only if no other control owns focus.
  React.useEffect(()=>{
   if(selectedTabIndex<0||!tabs.length||p.loading||
@@ -624,7 +633,7 @@ function SmartTabs({p,record,fire}){
      borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:p.labelColor||undefined,
      background:selectedTabIndex===index?p.selectedTabColor||"#eaf2ff":p.tabColor||"#fff",
     borderColor:p.borderColor||undefined}}
-    tabIndex={selectedTabIndex===index?0:-1}
+    tabIndex={selectedTabIndex===index||selectedTabIndex<0&&index===0?0:-1}
     onClick={()=>selectTab(index)}>{text(tab?.label??tab)}</button>)}
    {(dynamic||hasCollection)&&tabs.length===0&&<span className="smart-tabs-empty">No matching records</span>}
   </nav>

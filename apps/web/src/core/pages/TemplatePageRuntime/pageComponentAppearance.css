@@ -18,6 +18,10 @@
   outline-offset:0;
   box-shadow:none!important;
 }
+/* Smart components fill their frame and scroll inside themselves. The frame must
+ * not clip their shadow: a clipped shadow showed as grey square corners around
+ * rounded components (e.g. Smart Dock with a radius and a shadow). */
+.free-canvas-runtime-component[data-smart-frame] { overflow: visible; }
 .free-canvas-runtime-component[data-page-appearance] {
   background:transparent!important;
   border:0!important;

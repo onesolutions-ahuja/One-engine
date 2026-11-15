@@ -280,6 +280,9 @@ export function useSetupMetadata(ctx: any) {
           Promise.resolve({ reports: [] as ReportMetadata[] }),
           sessionRequest
         ]);
+        // Resolve the component library before pages land, so a page never
+        // renders against an empty library ("Component is no longer registered").
+        const resolvedLibrary=[...libraryPayload.components, ...await resolveSqlComponentLibrary(libraryPayload.registered ?? [])];
         setObjects(objectPayload.objects);
         if(objectPayload.objects.length)setObject(current=>reconcileSelectedObject(current,objectPayload.objects));
         setPlatformEvents(platformEventPayload.platformEvents);
@@ -298,7 +301,7 @@ export function useSetupMetadata(ctx: any) {
         setApprovalProcesses(approvalProcessPayload.approvalProcesses);
         setConnectorProviders(providerPayload.providers);
         setIntegrationConnections(integrationPayload.connections);
-        setLibraryComponents([...libraryPayload.components, ...await resolveSqlComponentLibrary(libraryPayload.registered ?? [])]);
+        setLibraryComponents(resolvedLibrary);
         setCanManageLibrary(libraryPayload.canManage);
         setDashboards(dashboardPayload.dashboards);
         setDashboardFolders(folderPayload.folders);

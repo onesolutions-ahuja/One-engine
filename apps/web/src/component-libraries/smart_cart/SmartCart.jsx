@@ -105,6 +105,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
   Tax:summaryValue(p.taxValue,'taxValue'),
   Total:summaryValue(p.totalValue,'totalValue')};
  const rowHeight=n(p.rowHeight,64,24);
+ // Table side padding is the whole left/right inset of the item table: from the
+ // table edge to the first and last column (header and every row), e.g. 5px.
+ const sidePaddingSet=p.tableSidePadding!==undefined&&p.tableSidePadding!==null&&p.tableSidePadding!==""
+  &&Number.isFinite(Number(p.tableSidePadding));
  const rowLimit=Math.floor(n(p.cardsPerRow,5,1,50));
  const visible=Array.isArray(p.columnVisibility)
    ?names.flatMap((name,index)=>p.columnVisibility.includes(name)?[index]:[])
@@ -182,10 +186,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
    fontWeight:p.supportingBold===true?700:400,color:p.supportingTextColor||"#586a81"}}>
    {supportingText}
   </div>
-  <div data-design-area={p.builderPreview?"Table":undefined} className="smart-cart-table" style={{
+  <div data-design-area={p.builderPreview?"Table":undefined} className={"smart-cart-table"+(sidePaddingSet?" has-side-padding":"")} style={{
    backgroundColor:p.tableBackgroundColor||"#fff",border:border(p.tableBorderColor),
    borderRadius:n(p.tableRadius,8),boxShadow:shadow(p.tableShadow),'--smart-cart-columns':columns,
-   '--smart-cart-side-padding':n(p.tableSidePadding,6,0,80)+'px',
+   ...(sidePaddingSet?{'--smart-cart-side-padding':n(p.tableSidePadding,6,0,80)+'px'}:{}),
    ...(p.tableWidth!==undefined&&p.tableWidth!==null&&p.tableWidth!==""
      ?{width:n(p.tableWidth,0,0,10000)+"px",maxWidth:"100%",alignSelf:"flex-start"}:{}),
    ...(p.tableHeight!==undefined&&p.tableHeight!==null&&p.tableHeight!==""

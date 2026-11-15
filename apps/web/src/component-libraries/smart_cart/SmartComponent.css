@@ -76,3 +76,13 @@
 /* Per-record supporting text lives below the name, never in the cart header. */
 .smart-cart-product-text{display:flex;flex:1 1 auto;min-width:0;flex-direction:column;align-items:stretch;gap:2px}
 .smart-cart-row-supporting{display:block;min-width:0;max-width:100%;font-size:11px;line-height:1.25;overflow:hidden;text-overflow:ellipsis}
+
+/* Table side padding set: it is the only left/right inset of the table, so the
+   first and last columns sit exactly that far from the table edge (the old
+   table + row insets added up to a much wider gap than the value set). */
+.smart-cart-table.has-side-padding{padding-left:0;padding-right:0}
+.smart-cart-table.has-side-padding .smart-cart-columns,
+.smart-cart-table.has-side-padding .smart-cart-row{padding-left:var(--smart-cart-side-padding);padding-right:var(--smart-cart-side-padding)}
+/* No always-reserved scrollbar strip: it added an empty band right of the last
+   column that the header did not have. */
+.smart-cart-table.has-side-padding .smart-cart-rows{scrollbar-gutter:auto;scrollbar-width:thin}

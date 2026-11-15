@@ -106,7 +106,11 @@ export function usePageManagement(
         const compiled=compilePage(nextPage,objects);
         const errors=compiled.diagnostics.filter(entry=>entry.level==='error');
         if(errors.length){
-          const label=(id:string)=>nextPage.components.find(item=>item.id===id)?.label||id;
+          const label=(id:string)=>{
+            const item=nextPage.components.find(entry=>entry.id===id);
+            const name=item?.properties?.navigatorName;
+            return typeof name==='string'&&name?name:item?.label||id;
+          };
           onNotify('Saved. '+errors.length+' formula error'+(errors.length===1?'':'s')+' to fix: '
             +errors.slice(0,3).map(entry=>label(entry.componentId)+' → '+entry.message).join('; ')+(errors.length>3?' …':''));
         }

@@ -197,6 +197,8 @@ export function compileComponentAction(event:string,raw:unknown):CompiledAction|
     ?Object.values(binding.outputs as Record<string,unknown>).filter((k):k is string=>typeof k==='string'&&identifier.test(k)):[]};
  if(type!=='Formula')return {...base,kind:'Other'};
  const formula=String(binding.formula??'').trim();
+ // An event whose formula was left empty does nothing; it is not a formula error.
+ if(!formula||formula==='=')return null;
  try{
   const assignment=parseActionFormulaAssignment(formula);
   if(assignment){

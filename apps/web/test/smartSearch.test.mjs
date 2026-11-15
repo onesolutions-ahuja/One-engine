@@ -27,3 +27,11 @@ test('Smart Search fires from the 3rd letter, debounced, and Enter fires at once
  assert.match(source,/\^\\d\{4,\}\$/,'scanned codes are cleared for the next scan');
  assert.doesNotMatch(source,/role="listbox"/,'no dropdown list');
 });
+
+test('Preview lists each formula issue in red with the component name',()=>{
+ const bar=read('../src/core/pages/PageCompiler/CompiledPreviewBar.tsx');
+ assert.match(bar,/className="compiled-preview-issues"/);
+ assert.match(bar,/navigatorName/);
+ assert.match(read('../src/core/pages/PageCompiler/CompiledPreviewBar.css'),/\.compiled-preview-issues\{[^}]*color:#b91c1c/);
+ assert.match(read('../../server/src/page-compiler/compilePage.ts'),/if\(!formula\|\|formula==='='\)return null;/);
+});

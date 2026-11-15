@@ -90,6 +90,7 @@ import {
   PanelRight
 } from 'lucide-react';
 import RegisteredComponent from '../../components/RegisteredComponent/RegisteredComponent';
+const RevolutEmbeddedCheckout=React.lazy(()=>import('./RevolutEmbeddedCheckout'));
 import { findRegisteredComponent } from '../../components/Registry/componentRegistryLookup';
 import PageRouteDirectory from '../PageRouteDirectory/PageRouteDirectory';
 import { isComponentVisible } from '../../components/Properties/componentVisibility';
@@ -1489,6 +1490,10 @@ function LightningAppRuntime({
           ...behaviorAppearance(component.properties,appVisibilityContext),
           ...(component.properties?.fillRegion===true ? {height:'100%',minHeight:0}: {})}}>{rendered}</div>;
     }
+    if(component.type==='Revolut Checkout')return <React.Suspense key={component.id}
+      fallback={<p role="status">Loading Revolut Checkout…</p>}>
+      <RevolutEmbeddedCheckout recordId={typeof layoutState.recordId==='string'?layoutState.recordId:''}/>
+    </React.Suspense>;
     if(component.type==='Items to Approve')
       return <React.Suspense key={component.id} fallback={<p role="status">Loading approvals…</p>}>
         <StandardApprovals request={apiRequest} appId={appId} onNavigate={onNavigate}/>

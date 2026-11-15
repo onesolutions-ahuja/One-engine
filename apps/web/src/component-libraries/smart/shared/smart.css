@@ -129,6 +129,11 @@
  flex:0 0 auto!important;
  white-space:nowrap;
 }
+/* The first/last tab can sit against the scrollport edge. Keep the focus ring
+   inside its pill so it stays visible in both runtime and builder preview. */
+.smart-runtime.smart_tabs .smart-tabs>button:focus-visible{
+ position:relative;z-index:1;outline-offset:-2px;
+}
 /* Configured cardsPerColumn determines visible rows. Overflow scrolls inside. */
 .smart-runtime.smart_card_grid>.smart-grid{
  align-content:start!important;

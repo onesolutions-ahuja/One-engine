@@ -42,6 +42,7 @@ type Props={tab:BuilderTab;api:string;definitions:readonly BuilderRibbonProperty
  inspectorSection?:string|null;
  onInspectorSectionChange?:(section:string|null)=>void;
  openDesignSection?:string|null;onToggleDesignSection?:(section:string)=>void;
+ selectedCartColumn?:number|null;
  /** Data only: 'formulaBar' renders just the Formula Bar (topbar); 'source' just the
   * Source object selectors (end of Design). Both reuse this single Data engine. */
  part?:'formulaBar'|'source'|'designTail';};
@@ -56,7 +57,7 @@ const cartSummaryLabels:Record<string,{key:string;slot:string}>={
 // Left/right side of buttons inside a row; also set by dragging the button on the canvas.
 const partSidePropertyIds=['cardButtonPlacement','customButton1Placement','customButton2Placement',
  'qtyIncreasePlacement','qtyDecreasePlacement'];
-export default function SmartRibbon({tab,api,definitions,properties,onChange,objects,pageObjectApiName='',position,onPositionChange,layoutMode,sharedPropertyIds,mixedPropertyIds,selectedApis,pageComponents=[],componentId='',canvasBinding=null,design2Slots=[],design2SlotRules=[],componentVisible=true,onVisibleChange,design2Arrange,inspectorSection,onInspectorSectionChange,openDesignSection,onToggleDesignSection,part}:Props){
+export default function SmartRibbon({tab,api,definitions,properties,onChange,objects,pageObjectApiName='',position,onPositionChange,layoutMode,sharedPropertyIds,mixedPropertyIds,selectedApis,pageComponents=[],componentId='',canvasBinding=null,design2Slots=[],design2SlotRules=[],componentVisible=true,onVisibleChange,design2Arrange,inspectorSection,onInspectorSectionChange,openDesignSection,onToggleDesignSection,selectedCartColumn=null,part}:Props){
  const uploadInput=useRef<HTMLInputElement>(null);
  const [uploadBusy,setUploadBusy]=useState(false);
  const [uploadError,setUploadError]=useState('');
@@ -455,6 +456,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
     ?'objectApiName2':property.id;
    const supported=property.components.includes(api)&&(!sharedPropertyIds||
      sharedPropertyIds.includes(property.id)||sharedPropertyIds.includes(sharedKey));
+   const cartColumnNumber=/^cartColumn([1-5])(?:Width|HeaderFill|HeaderTextColor|CellFill|CellTextColor|TextSize|Bold|Alignment)$/.exec(property.id);
    const kind=api==='smart_calendar'&&property.id==='shadow'
      ? 'shadow' : property.kindOverrides?.[api]??property.kind;
    const key=api==='smart_calendar'&&property.id==='shadow'?'shadow':property.valueKeys?.[api]??property.id;
@@ -471,7 +473,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        const choices=property.choicesOverrides?.[member]??property.choices??[];
        return choices.length===0||choices.includes(option);
      })):primaryOptions;
-   const enabled=supported&&(kind!=='position'||isSize||useCanvasPosition)&&
+   const enabled=supported&&(!cartColumnNumber||Number(cartColumnNumber[1])===selectedCartColumn)&&
+     (kind!=='position'||isSize||useCanvasPosition)&&
      (!condition||condition.in.includes(String(conditionValue??'')))&&
      (kind!=='choice'||!sharedPropertyIds||options.length>0);
    // Components saved before Style existed render Classic; show that, not the new-insert default.
@@ -894,7 +897,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
         <button type="button" className="smart-inspector-section-toggle"
           aria-expanded={designSectionOpen('Properties')} onClick={()=>toggleDesignSection('Properties')}>
           <ChevronDown size={15} aria-hidden="true"/>Properties
-          <span className="smart-design2-active-area" title="Click a part of the component on the canvas to edit it">{activeDesign2Area}</span>
+          <span className="smart-design2-active-area" title="Click a part of the component on the canvas to edit it">
+            {api==='smart_cart'&&selectedCartColumn
+              ?`Column ${selectedCartColumn} — ${['Product','Unit price','Quantity','Total','Discount'][selectedCartColumn-1]}`
+              :activeDesign2Area}
+          </span>
         </button>
         {designSectionOpen('Properties')&&<div className="smart-inspector-section-content">
           <div className="smart-ribbon-items">
@@ -903,6 +910,24 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
               {sectionRow(activeDesign2Area,row).map(controls)}
             </div>)}
           </div>
+          {activeDesign2Area==='Cart columns'&&selectedCartColumn&&
+            <div className="smart-design2-supplemental" role="group"
+              aria-label={`Column ${selectedCartColumn} properties`}>
+              {design2AreaExtraProperties.filter(property=>
+                property.group==='Cart columns'&&property.id.startsWith('cartColumn'+selectedCartColumn))
+                .map(property=><div className="smart-design2-supplemental-setting" key={property.id}>
+                  <span className="smart-design2-supplemental-label" title={property.label}>{property.label.replace(/^Column \d+\s*/, '')}</span>
+                  {controls(property)}
+                </div>)}
+            </div>}
+          {activeDesign2Area==='Table'&&design2AreaExtraProperties.some(property=>property.group==='Table')&&
+            <div className="smart-design2-supplemental" role="group" aria-label="Table properties">
+              {design2AreaExtraProperties.filter(property=>property.group==='Table').map(property=>
+                <div className="smart-design2-supplemental-setting" key={property.id}>
+                  <span className="smart-design2-supplemental-label" title={property.label}>{property.label}</span>
+                  {controls(property)}
+                </div>)}
+            </div>}
         </div>}
       </section>
       {design2Areas.includes('Focused')&&<section className="smart-inspector-section smart-design2-area-section smart-design2-focused-section" data-design-area="Focused">

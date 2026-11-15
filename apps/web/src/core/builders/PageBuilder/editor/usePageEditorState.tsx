@@ -276,6 +276,7 @@ export function usePageEditorState(
   const [canvasBinding,setCanvasBinding]=useState<CanvasBindingTarget|null>(null);
   const [ribbonTab, setRibbonTab] = useState<'Add Block' | 'Component Content' | 'Component Design 2' | 'Component Style' | 'Component Data' | 'Component Action' | 'Component Layout' | 'Component Responsive' | 'Preview' | 'Filters' | 'Source' | 'Arrange' | 'Advanced'>('Add Block');
   const [inspectorSection,setInspectorSection]=useState<string|null>('Body');
+  const [selectedCartColumn,setSelectedCartColumn]=useState<number|null>(null);
   // One open section at a time, independently from the canvas-selected design area.
   const [openDesignSection,setOpenDesignSection]=useState<string|null>(null);
   const toggleDesignSection=useCallback((section:string)=>
@@ -314,7 +315,12 @@ export function usePageEditorState(
       if(inspectorSection&&inspectorSection!=='Body'&&node.dataset.designArea===inspectorSection)
         node.setAttribute('data-design-area-active','true');
     });
-  },[selectedId,inspectorSection,page]);
+    host?.querySelectorAll<HTMLElement>('[data-md-cart-column]').forEach(node=>{
+      if(Number(node.dataset.mdCartColumn)===selectedCartColumn)
+        node.setAttribute('data-md-cart-column-active','true');
+      else node.removeAttribute('data-md-cart-column-active');
+    });
+  },[selectedId,inspectorSection,selectedCartColumn,page]);
   const componentNeedsData = (type: string) => {
     const metadata = type.startsWith('Custom:') ? findRegisteredComponent(libraryComponents,type.slice('Custom:'.length),'page') : undefined;
     return Boolean(type.startsWith('Custom:')&&isBuilderApi(type.slice(7),ribbonCatalog?.components??[])
@@ -458,7 +464,7 @@ export function usePageEditorState(
     setInspectorTab, ribbonPropertyHost, setRibbonPropertyHost, ribbonCatalog, setRibbonFilterDraft,
     pageSettingsDialogOpen, setPageSettingsDialogOpen, advancedEditor, setAdvancedEditor,
     inlineActionEvent, setInlineActionEvent, setFocusedCardMapping, ribbonStripRef,
-    canvasBinding, ribbonTab, setRibbonTab, inspectorSection,
+    canvasBinding, ribbonTab, setRibbonTab, inspectorSection, selectedCartColumn, setSelectedCartColumn,
     setInspectorSection, openDesignSection, toggleDesignSection, chooseCanvasDesignArea, componentNeedsData, selectCanvasDataBinding, selectRibbonTab,
     componentClipboard, setComponentClipboard, recordScope, setRecordScope, recordAppId, setRecordAppId,
     recordProfileId, setRecordProfileId, recordTypeId, setRecordTypeId, recordFormFactors,

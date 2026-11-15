@@ -49,6 +49,7 @@ export function createPageRibbon(
     componentClipboard, undoStack, redoStack, switchingLayout, setInspectorTab, setActivePanel,
     selectionIds, ribbonTab, selectedId, paletteInsertRegion, setPaletteInsertRegion,
     inspectorSection, setInspectorSection, openDesignSection, toggleDesignSection,
+    selectedCartColumn,
     canvasBinding, selectRibbonTab, ribbonStripRef,
     setGroupEditId, setSelectionIds, setSelectedId, setSelectedRegion, setPageSettingsOpen,
     pagePreviewAreaRef, setFitCanvas, setFitFullPage, fitCanvas, fitFullPage, setCanvasZoom,
@@ -264,6 +265,7 @@ export function createPageRibbon(
                 design2Arrange={canvasArrangeProps}
                 inspectorSection={inspectorSection} onInspectorSectionChange={setInspectorSection}
                 openDesignSection={openDesignSection} onToggleDesignSection={toggleDesignSection}
+                selectedCartColumn={selectedCartColumn}
                 properties={selected.properties} objects={objects} pageObjectApiName={page.targetObject}
                 componentId={selected.id} pageComponents={page.components}
                 canvasBinding={canvasBinding}

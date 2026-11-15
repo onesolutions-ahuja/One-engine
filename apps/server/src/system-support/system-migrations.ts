@@ -160,6 +160,88 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   END $$`);
   // Upgrade-safe global ribbon metadata. Reapplying these idempotent inserts
   // works with the immutable single SQL baseline and already-created tenants.
+  // Smart Cart gets an independent left/right table inset, plus column-specific
+  // design controls. Definitions stay in the shared property inventory so the
+  // ribbon can keep unsupported controls visible but disabled for other parts.
+  await client.query(`
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,
+      choices,scope,min_value,max_value,field_select,design_row,design_order,
+      design_width,design_height,design_caption_width,design_display)
+    SELECT 'tableSidePadding','Table side padding','Design2','Table','number',
+      COALESCE(MAX(sort_order),0)+1,'6'::jsonb,'[]'::jsonb,'component',0,80,false,2,4,58,26,0,'buttons'
+    FROM md_builder_shared_properties
+    ON CONFLICT(property_key) DO NOTHING;
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    VALUES('smart_cart','tableSidePadding',true)
+    ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true;
+    INSERT INTO md_builder_design2_slots
+     (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+    VALUES('Table',8,'extra_tableSidePadding',3,1,58,26,'tableSidePadding','radius')
+    ON CONFLICT(area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    VALUES('smart_cart','Table','extra_tableSidePadding','tableSidePadding')
+    ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+  `);
+  await client.query(`
+    WITH styles(suffix,label,control_kind,min_value,max_value,choices,display_order) AS (
+      VALUES
+       ('Width','Width','number',24,1200,'[]'::jsonb,1),
+       ('HeaderFill','Header fill','color',NULL::integer,NULL::integer,'[]'::jsonb,2),
+       ('HeaderTextColor','Header text','color',NULL::integer,NULL::integer,'[]'::jsonb,3),
+       ('CellFill','Cell fill','color',NULL::integer,NULL::integer,'[]'::jsonb,4),
+       ('CellTextColor','Cell text','color',NULL::integer,NULL::integer,'[]'::jsonb,5),
+       ('TextSize','Text size','number',8,96,'[]'::jsonb,6),
+       ('Bold','Bold','boolean',NULL::integer,NULL::integer,'[]'::jsonb,7),
+       ('Alignment','Alignment','align',NULL::integer,NULL::integer,'["left","center","right"]'::jsonb,8)
+    ), columns AS (SELECT generate_series(1,5) AS n), properties AS (
+      SELECT 'cartColumn'||columns.n||styles.suffix AS property_key,
+       'Column '||columns.n||' '||styles.label AS label,styles.control_kind,
+       styles.min_value,styles.max_value,styles.choices,columns.n,styles.display_order
+      FROM columns CROSS JOIN styles
+    ), existing AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
+    INSERT INTO md_builder_shared_properties
+     (property_key,label,tab,section_group,control_kind,sort_order,default_value,
+      choices,scope,min_value,max_value,field_select,design_row,design_order,
+      design_width,design_height,design_caption_width,design_display)
+    SELECT p.property_key,p.label,'Design2','Cart columns',p.control_kind,
+     e.n+ROW_NUMBER() OVER(ORDER BY p.column_number,p.display_order),NULL::jsonb,
+     p.choices,'component',p.min_value,p.max_value,false,2,p.display_order,
+     CASE WHEN p.control_kind='number' THEN 58 ELSE 40 END,26,0,
+     CASE WHEN p.control_kind='align' THEN 'dropdown' ELSE 'buttons' END
+    FROM properties p CROSS JOIN existing e
+    ON CONFLICT(property_key) DO NOTHING;
+    WITH keys AS (
+      SELECT 'cartColumn'||column_number||suffix AS property_key,
+       'extra_cartColumn'||column_number||suffix AS slot_key,column_number,display_order
+      FROM generate_series(1,5) AS c(column_number)
+      CROSS JOIN (VALUES ('Width',1),('HeaderFill',2),('HeaderTextColor',3),
+       ('CellFill',4),('CellTextColor',5),('TextSize',6),('Bold',7),('Alignment',8)) v(suffix,display_order)
+    )
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    SELECT 'smart_cart',keys.property_key,true FROM keys
+    JOIN md_builder_shared_properties p ON p.property_key=keys.property_key
+    ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true;
+    WITH keys AS (
+      SELECT 'cartColumn'||column_number||suffix AS property_key,
+       'extra_cartColumn'||column_number||suffix AS slot_key,column_number,display_order
+      FROM generate_series(1,5) AS c(column_number)
+      CROSS JOIN (VALUES ('Width',1),('HeaderFill',2),('HeaderTextColor',3),
+       ('CellFill',4),('CellTextColor',5),('TextSize',6),('Bold',7),('Alignment',8)) v(suffix,display_order)
+    )
+    INSERT INTO md_builder_design2_slots
+     (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+    SELECT 'Cart columns',COALESCE((SELECT MAX(area_order) FROM md_builder_design2_slots),0)+1,
+     keys.slot_key,2,keys.display_order,
+     CASE WHEN keys.property_key LIKE '%Width' OR keys.property_key LIKE '%TextSize' THEN 58 ELSE 40 END,
+     26,keys.property_key,'radius'
+    FROM keys
+    ON CONFLICT(area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+    INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+    SELECT 'smart_cart','Cart columns',slot_key,property_key
+    FROM md_builder_design2_slots WHERE area='Cart columns'
+    ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+  `);
   await client.query(`
     INSERT INTO md_builder_shared_properties
      (property_key,label,tab,section_group,control_kind,sort_order,

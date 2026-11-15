@@ -109,7 +109,19 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  const visible=Array.isArray(p.columnVisibility)
    ?names.flatMap((name,index)=>p.columnVisibility.includes(name)?[index]:[])
    :[0,1,2,3,4];
- const columns=visible.length?visible.map(index=>tracks[index]).join(' '):'1fr';
+ const columnWidth=index=>{
+  const width=n(p['cartColumn'+(index+1)+'Width'],0,0,10000);
+  return width>0?'minmax(0,'+width+'px)':tracks[index];
+ };
+ const columns=visible.length?visible.map(columnWidth).join(' '):'1fr';
+ const columnStyle=(index,header)=>{
+  const prefix='cartColumn'+(index+1)+(header?'Header':'Cell');
+  const bold=p['cartColumn'+(index+1)+'Bold'];
+  return {backgroundColor:p[prefix+'Fill']||undefined,color:p[prefix+'TextColor']||undefined,
+   fontSize:n(p['cartColumn'+(index+1)+'TextSize'],header?11:n(p.rowTextSize,13,8,96),8,96),
+   fontWeight:bold===true?700:bold===false?400:header?undefined:p.rowBold===true?700:undefined,
+   textAlign:p['cartColumn'+(index+1)+'Alignment']?align(p['cartColumn'+(index+1)+'Alignment']):undefined};
+ };
  const columnHeadings=headings.map((heading,index)=>
   displayFormula('cartColumn'+(index+1)+'Header',p['cartColumn'+(index+1)+'Header'],heading));
  const supportingDefault=demo?'Preview items (3)':
@@ -170,6 +182,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
   <div data-design-area={p.builderPreview?"Table":undefined} className="smart-cart-table" style={{
    backgroundColor:p.tableBackgroundColor||"#fff",border:border(p.tableBorderColor),
    borderRadius:n(p.tableRadius,8),boxShadow:shadow(p.tableShadow),'--smart-cart-columns':columns,
+   '--smart-cart-side-padding':n(p.tableSidePadding,6,0,80)+'px',
    ...(p.tableWidth!==undefined&&p.tableWidth!==null&&p.tableWidth!==""
      ?{width:n(p.tableWidth,0,0,10000)+"px",maxWidth:"100%",alignSelf:"flex-start"}:{}),
    ...(p.tableHeight!==undefined&&p.tableHeight!==null&&p.tableHeight!==""
@@ -189,9 +202,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
        'Unit price heading|Unit price value','Quantity heading|Quantity value',
        'Total column heading|Row total value','Discount column heading|Discount value'
       ];
-      return <span data-md-bind={p.builderPreview?heading+pending:undefined}
+      return <span data-md-cart-column={p.builderPreview?index+1:undefined}
+       data-md-bind={p.builderPreview?heading+pending:undefined}
        data-md-bind-titles={p.builderPreview?titles[index]:undefined}
-       key={index}>{columnHeadings[index]}</span>;
+       key={index} style={columnStyle(index,true)}>{columnHeadings[index]}</span>;
      })}
     </div>
     <div className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows"
@@ -232,7 +246,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
          whiteSpace:p.rowWrapText===false?"nowrap":undefined,
          textAlign:p.rowAlignment?align(p.rowAlignment):undefined}}>
        {visible.map(index=>{
-        if(index===0)return <div key={index} className={"smart-cart-product "+(p.imagePlacement==="right"?"image-right":"image-left")}>
+        if(index===0)return <div key={index} className={"smart-cart-product "+(p.imagePlacement==="right"?"image-right":"image-left")} style={columnStyle(index,false)}>
          <span data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Product image":undefined} className="smart-cart-image-binding" data-design-area={p.builderPreview?"Image":undefined} style={smartPartOffsetStyle(p,"image")}><Picture src={src} alt={String(name||"Product")} loadAsset={p.loadAsset}
           style={{width:n(p.imageHeight,44,16),height:n(p.imageHeight,44,16),
            border:border(p.imageBorderColor),borderRadius:4,
@@ -260,10 +274,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
            }}>{rowSupporting}</span>}
          </div>
         </div>;
-        if(index===2)return <div data-md-bind={p.builderPreview?"column3Source":undefined} data-md-bind-titles={p.builderPreview?"Quantity value":undefined} key={index} className="smart-cart-cell-qty">
+        if(index===2)return <div data-md-bind={p.builderPreview?"column3Source":undefined} data-md-bind-titles={p.builderPreview?"Quantity value":undefined} key={index} className="smart-cart-cell-qty" style={{...columnStyle(index,false),justifyContent:p.cartColumn3Alignment?({left:'flex-start',center:'center',right:'flex-end'}[p.cartColumn3Alignment]):undefined}}>
          {renderQuantity(record,name,payload)}</div>;
         const value=demo||!sources[index]?"—":fieldExpression('column'+(index+1)+'Source',sources[index],record);
-        return <span data-md-bind={p.builderPreview?("column"+(index+1)+"Source"):undefined} key={index} className="smart-cart-cell" aria-label={value==="—"?headings[index]+" not bound":undefined}>
+        return <span data-md-bind={p.builderPreview?("column"+(index+1)+"Source"):undefined} key={index} className="smart-cart-cell" style={columnStyle(index,false)} aria-label={value==="—"?headings[index]+" not bound":undefined}>
          {display(value)}</span>;
        })}
        </div>

@@ -80,10 +80,12 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
   onPointerDown={()=>setFocusedKey(key)} onPointerLeave={()=>setFocusedKey(previous=>previous===key?"":previous)}
   onClick={onClick}
   style={{...style,...(focusedKey===key?focusStyle:{})}}>{label}</button>;
+ // Prefer the shared Gap setting; keep old saved Numpad Gap values readable.
+ const gap=size(p.gap??p.numpadGap,8,0,48);
  const bodyStyle={
   background:p.backgroundColor||"transparent",border:p.borderColor?"1px solid "+p.borderColor:"none",
   borderRadius:size(p.radius,12,0,128),boxShadow:shadow(p.shadow),
-  gap:gap,padding:size(p.numpadPadding,10,0,80)
+  gap,padding:size(p.numpadPadding,10,0,80)
  };
  const customStyle=index=>{
   const prefix="customButton"+index;

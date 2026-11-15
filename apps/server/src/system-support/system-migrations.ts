@@ -177,8 +177,11 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true;
     INSERT INTO md_builder_design2_slots
      (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
-    VALUES('Table',8,'extra_tableSidePadding',3,1,58,26,'tableSidePadding','radius')
-    ON CONFLICT(area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;
+    VALUES('Table',8,'extra_tableSidePadding',3,6,58,26,'tableSidePadding','radius')
+    ON CONFLICT(area,slot_key) DO UPDATE SET
+      area_order=EXCLUDED.area_order,row_no=EXCLUDED.row_no,order_no=EXCLUDED.order_no,
+      width_px=EXCLUDED.width_px,height_px=EXCLUDED.height_px,
+      property_key=EXCLUDED.property_key,fallback_key=EXCLUDED.fallback_key;
     INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
     VALUES('smart_cart','Table','extra_tableSidePadding','tableSidePadding')
     ON CONFLICT(component_api,area,slot_key) DO UPDATE SET property_key=EXCLUDED.property_key;

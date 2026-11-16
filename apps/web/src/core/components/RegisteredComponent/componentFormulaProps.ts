@@ -27,6 +27,12 @@ const rowDisplayProperties:Readonly<Record<string,ReadonlySet<string>>>={
  smart_image:new Set(['textSource','imageSource','badgeText'])
 };
 
+/** Reads only page or tenant values (@ThisPage, @ThisTenant): the same for every row. */
+function readsNoRow(source:string):boolean{
+ const refs=source.match(/@[A-Za-z][A-Za-z0-9_]*/g);
+ return Boolean(refs?.length)&&refs!.every(ref=>/^@This(?:Page|Tenant)$/i.test(ref));
+}
+
 export function isRowDisplayProperty(apiName:string,key:string,props:Readonly<Record<string,unknown>>):boolean {
  return Boolean(rowDisplayProperties[apiName]?.has(key)
   &&(Array.isArray(props.records)||Array.isArray(props.items)||props.dataCollection));
@@ -44,7 +50,7 @@ export function resolveComponentFormulaProps(
    ?configuredProps.records[0] as Record<string,unknown>:undefined;
  for(const [key,source] of Object.entries(result)){
   if(typeof source!=='string'||nonDisplayProperties.has(key)
-    ||isRowDisplayProperty(apiName,key,configuredProps))continue;
+    ||isRowDisplayProperty(apiName,key,configuredProps)&&!readsNoRow(source))continue;
   const formulaLike=/^\s*=/.test(source)||/^\s*@[A-Za-z]/.test(source);
   const run=codeFunctions&&formulaLike
    ?codeFunctions.get(source.trim())??convertedFormula(codeFunctions,source)??undefined:undefined;

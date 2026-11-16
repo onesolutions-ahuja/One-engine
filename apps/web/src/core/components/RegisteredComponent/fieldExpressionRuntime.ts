@@ -52,6 +52,8 @@ export function getAuthenticatedFormulaBindingContext():FormulaBindingContext|nu
 
 function isFieldExpression(value:string):boolean{
   const input=value.trim().replace(/^=\s*/,'');
+  // A plain date or date-time ("2026-11-16") is a value, not a subtraction.
+  if(!value.trim().startsWith('=')&&/^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?$/.test(input))return false;
   return /^(?:TRUE|FALSE|NULL|PI)$/i.test(input)||input.startsWith('(')||/^[+-]\d/.test(input)
     ||input.startsWith('@')||input.startsWith('{!')||/^\$(?:component|state|session)(?:\.|$)/.test(input)||/^"(?:[^"]|"")*"\s*&/.test(input)
     ||/^(?:\d+(?:\.\d+)?\s*[+\-*/%^<>]|"(?:[^"]|"")*"\s*(?:&|=|<>|!=|<=|>=|<|>))/.test(input)

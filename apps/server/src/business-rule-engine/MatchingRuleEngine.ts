@@ -69,8 +69,9 @@ export class RecordMatching {
    // an inaccessible record by rejecting a save either.
    const recordAccess=' AND md_record_access($1,$'+String(params.length+1)+",r.id,'read')";
    params.push(userId);
-   const records=await client.query<{id:string}>(`SELECT r.id FROM md_records r WHERE
-     r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
+   const records=await client.query<{id:string}>(`SELECT r.id FROM md_records r
+     JOIN ${nativeTableSql(native)} nr ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+     WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false AND nr.is_deleted=false
      AND ($3::uuid IS NULL OR r.id<>$3::uuid)
      AND (${filter})${recordAccess} ORDER BY r.id LIMIT 20`,params);
    if(!records.rows.length)continue;

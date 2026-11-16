@@ -326,7 +326,8 @@ export function compileRecordFilters(
       const direct=condition.replace(/fv\.reference_record_id::text/g,nativeText)
         .replace(/fv\.value_text/g,nativeText)
         .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,nativeValue);
-      return negated?`NOT COALESCE((${direct}),FALSE)`:`(${direct})`;
+      return negated?`(${fieldParameter}::text IS NOT NULL AND NOT COALESCE((${direct}),FALSE))`
+        :`(${fieldParameter}::text IS NOT NULL AND (${direct}))`;
     };
     if(filter.operator==='isBlank'||filter.operator==='isNotBlank'){
       if(filter.value!=='')throw new Error('Blank filters require an empty value');

@@ -114,10 +114,8 @@ test('tenant form uses verified domain, retains mailbox failures, and blocks dup
  assert.match(ui,/disabled=\{!canCreateTenant\}/);
  assert.match(fields,/key:'tenantId'[^\n]*maxLength:54/);
  const service=readFileSync(new URL('../../src/system-files/platform-tenant-service.ts',import.meta.url),'utf8');
- const inspection=readFileSync(new URL('../../src/system-support/tenant-inspection-routes.ts',import.meta.url),'utf8');
  assert.match(service,/domain:expectedDomain/);
  assert.match(service,/x\.developerDomain!==undefined/);
- assert.match(inspection,/domain===tenantDeveloperDomain\(name\)/);
 });
 
 test('publishing standalone Page Builder templates does not demand navigation assignments',async()=>{

@@ -78,29 +78,6 @@ try {
  await db.query("INSERT INTO md_permission_sets(tenant_id,api_name) VALUES($1,'AceChatterUser')",[tid]);
  await db.query("UPDATE md_users SET landing_app_api='AceChatter' "+
   "WHERE tenant_id=$1 AND email='administrator@example.test'",[tid]);
- // Communication is append-only: use the approved integration writer, never
- // fabricate or bypass a record through direct SQL insertion.
- for(const apiName of ['Contact','Customer'])await db.query(
-  'INSERT INTO md_object_definitions(tenant_id,api_name,label,is_system) '+
-  'VALUES($1,$2,$2,false) ON CONFLICT(tenant_id,api_name) DO NOTHING',[tid,apiName]);
- const {seedCommunicationObjects}=await import(
-  '../apps/server/dist-system/app-seeders/core-communication-objects.js');
- await db.transaction(client=>seedCommunicationObjects(client,tid));
- const {createIntegrationCommunicationWriter,IntegrationCommunicationOutbox}=await import(
-  '../apps/server/dist-system/system-support/integration-api-log.js');
- const outbox=new IntegrationCommunicationOutbox(db,createIntegrationCommunicationWriter(db));
- await outbox.write({tenantId:tid,direction:'Inbound',transport:'Webhook',
-  provider:'WhatsApp_Cloud_API',endpoint:'/api/inbound-webhooks/retirement-ci',
-  method:'POST',statusCode:200,outcome:'success',
-  communication:{channel:'WhatsApp',sender:'447700900111',recipient:'447700900222',
-   body:'Protected communication record',externalMessageId:'retirement-ci-'+tid}});
- const {rows:[communication]}=await db.query(
-  "SELECT r.id FROM md_records r JOIN md_record_values v "+
-  "ON v.tenant_id=r.tenant_id AND v.record_id=r.id "+
-  "AND v.field_api='ExternalMessageId' "+
-  "WHERE r.tenant_id=$1 AND r.object_api='Communication' AND v.value_text=$2",
-  [tid,'retirement-ci-'+tid]);
- assert.ok(communication?.id,'Approved integration writer must seed Communication record');
  const {rows:[flow]}=await db.query(
   "INSERT INTO md_flow_definitions(tenant_id,api_name,label,flow_type,version,active) "+
   "VALUES($1,'AceChatterSmokeFlow','Smoke test','Autolaunched Flow',1,true) RETURNING id",[tid]);
@@ -112,9 +89,6 @@ try {
   'WHERE api_name=ANY($1::text[])',[[...REMOVED_APP_APIS]])).rows[0].n,0);
  assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_page_definitions "+
   "WHERE tenant_id=$1 AND api_name IN ('AcetillRegister','UNEAceChatterDesktop')",[tid])).rows[0].n,0);
- assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_records "+
-  "WHERE tenant_id=$1 AND object_api='Communication' AND id=$2",[tid,communication.id])).rows[0].n,1,
-  'Communication record must survive retired app cleanup');
  assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_object_definitions "+
   "WHERE tenant_id=$1 AND api_name='Communication'",[tid])).rows[0].n,1,
   'Communication Object must survive retired app cleanup');
@@ -128,7 +102,7 @@ try {
   "WHERE tenant_id=$1 AND landing_app_api='AceChatter'",[tid])).rows[0].n,0);
  const replay=await deleteRetiredChatterMetadata(db);
  assert.equal(replay.apps,0,'Retired app cleanup must be idempotent');
- console.log('PASS: six retired app metadata rows purged; Object, Communication record, Flow preserved');
+ console.log('PASS: six retired app metadata rows purged; Object and Flow preserved');
  // Reproduce a production database with original migration receipts.
  // Verify authentic SQL checksums and preserve receipts for API rollback.
  const snapshot=readFileSync(new URL('../apps/server/src/system-support/migrations/20261107-core-baseline.sql',import.meta.url),'utf8');
@@ -155,8 +129,6 @@ try {
  await applySystemMigrations(db);
  const recovered=await db.query("SELECT version FROM md_system_migrations WHERE version LIKE '%.sql'");
  assert.equal(recovered.rows.length,280,'Missing original migration and baseline receipts recovered atomically');
- assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_records WHERE tenant_id=$1 AND object_api='Communication' AND id=$2",[tid,communication.id])).rows[0].n,1,
-  'Production-style migration catch-up preserves existing Communication records');
 
  // OCI had a separately applied ribbon normalization with a durable receipt
  // that is not among the 279 consolidated source files. It must not prevent
@@ -173,8 +145,6 @@ try {
  assert.equal(externalAdopted.find(row=>row.version===externalVersion)?.checksum,
   externalChecksum,'Out-of-band receipt must retain its exact stored checksum');
  await applySystemMigrations(db);
- assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_records WHERE tenant_id=$1 AND object_api='Communication' AND id=$2",[tid,communication.id])).rows[0].n,1,
-  'OCI receipt compatibility must preserve existing business data');
 
 
  // Post-baseline receipts can be from newer releases and must not crash

@@ -15,7 +15,6 @@ import {OutboundWebhookDispatcher,registerOutboundWebhookJobHandler}
  from './outbound-webhook-worker.js';
 import {decodeMetadataValues,type MetadataValueRow} from '../system-files/component-runtime.js';
 import {applySystemMigrations} from './system-migrations.js';
-import {createIntegrationCommunicationWriter,IntegrationCommunicationOutbox} from './integration-api-log.js';
 
 export async function startDurableJobWorker(env:NodeJS.ProcessEnv=process.env) {
  const db=new SqlPersistence(env.DATABASE_URL??'');
@@ -24,18 +23,6 @@ export async function startDurableJobWorker(env:NodeJS.ProcessEnv=process.env) {
   const rbac=new RbacEngine(db);
   const records=new RecordEngine(db,rbac);
   const credentials=new NamedCredentialService(db,rbac);
-  // Durable Flow and webhook callouts run in this separate process. Wire the same
-  // central Communication writer here as in the API server so worker-originated
-  // HTTP attempts are not silently omitted from Communication.
-  const integrationLogRecords=new RecordEngine(db,rbac,credentials);
-  const integrationCommunicationOutbox=new IntegrationCommunicationOutbox(
-   db,createIntegrationCommunicationWriter(db,integrationLogRecords,
-    (client,tenant,user,record)=>flowTriggers.execute(client,tenant,user,'Communication','created',record,null,'after-save').then(()=>undefined)));
-  credentials.setIntegrationActivityWriter(integrationCommunicationOutbox.write);
-  // Do not load optional Mail synchronization modules for tenants without
-  // activated mailboxes. SQL is the installation/activation source of truth.
-  let incomingMail:{runOnce:()=>Promise<number>}|null=null;
-  let nextMailScanAt=0;
   const service=new DurableJobService(db);
   const flows=new FlowRuntime(db,rbac,records,
    (tenant,user,config,vars,key)=>credentials.callout(tenant,user,config,vars,key),
@@ -94,25 +81,6 @@ export async function startDurableJobWorker(env:NodeJS.ProcessEnv=process.env) {
     // Claims use tenant-scoped SQL row locks; uncertain outcomes stay quarantined.
     try { await credentials.dispatchOne(); }
     catch(error){console.error('Durable HTTP Callout poll failed',error);}
-    try { await integrationCommunicationOutbox.dispatchOne(); }
-    catch(error){console.error('Integration Communication outbox poll failed',error);}
-    // Optional mail transport is lazy: empty active-mailbox sets do no Docker work.
-    // Read the maildir via the restricted broker rather than persisting passwords.
-    if(Date.now()>=nextMailScanAt){
-     nextMailScanAt=Date.now()+20000;
-     try{
-      if(!incomingMail){
-       const {rows}=await db.query(
-        "SELECT 1 FROM md_mail_accounts WHERE status='active' LIMIT 1");
-       if(rows.length){
-        const {MailInboxCommunicationSync}=await import('./mail-inbox-communication-sync.js');
-        incomingMail=new MailInboxCommunicationSync(db,integrationCommunicationOutbox.write);
-       }
-      }
-      if(incomingMail)await incomingMail.runOnce();
-     }catch(error){console.error('Inbound Communication scan dispatch failed',
-      error instanceof Error?error.message:'unknown');}
-    }
     if(running)await new Promise<void>(resolve=>setTimeout(resolve,interval));
    }
   } finally {

@@ -18,31 +18,6 @@ const actor=(req:Request)=> (req as Request&{actor?:{tenant_id:string;user_id:st
 const route=(fn:(req:Request,res:Response)=>Promise<void>)=>
  (req:Request,res:Response,next:NextFunction)=>{void fn(req,res).catch(next);};
 
-export const REVOLUT_PAYMENT_DDL=`
-CREATE TABLE IF NOT EXISTS md_revolut_checkout_orders (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
- tenant_id uuid NOT NULL REFERENCES md_tenants(id),
- credential_id uuid NOT NULL REFERENCES md_named_credentials(id),
- created_by uuid NOT NULL REFERENCES md_users(id),
- source_object text NOT NULL,
- source_record_id uuid NOT NULL,
- attempt_key uuid NOT NULL,
- revolut_order_id uuid NOT NULL,
- public_token text NOT NULL,
- amount_minor bigint NOT NULL CHECK(amount_minor>0),
- currency varchar(3) NOT NULL,
- status text NOT NULL DEFAULT 'pending'
-   CHECK(status IN ('pending','authorised','completed','failed','cancelled')),
- last_event text,
- created_at timestamptz NOT NULL DEFAULT now(),
- updated_at timestamptz NOT NULL DEFAULT now(),
- UNIQUE(tenant_id,created_by,attempt_key),
- UNIQUE(tenant_id,revolut_order_id)
-);
-CREATE INDEX IF NOT EXISTS md_revolut_checkout_source
- ON md_revolut_checkout_orders(tenant_id,source_object,source_record_id);
-`;
-
 /** Revolut signs "v1.{timestamp}.{unmodified raw body}", not Meta's sha256=raw-body format. */
 export function verifyRevolutWebhook(
  raw:Buffer,timestamp:unknown,signatures:unknown,secret:string,now=Date.now()

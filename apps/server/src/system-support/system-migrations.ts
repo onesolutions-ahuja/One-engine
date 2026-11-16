@@ -1,8 +1,8 @@
 import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
 import {RECORD_ACCESS_FAST_DDL} from './record-access-fast.js';
 import {createHash} from 'node:crypto';
-import {REVOLUT_PAYMENT_DDL} from './revolut-checkout-service.js';
-import {PAYMENT_ORDER_DDL,LEGACY_REVOLUT_PAYMENT_COPY} from './payment-order-service.js';
+import {REVOLUT_PAYMENT_DDL,LEGACY_REVOLUT_PAYMENT_COPY} from './revolut-payment-legacy-migration.js';
+import {PAYMENT_ORDER_DDL} from './payment-order-service.js';
 import {readdirSync,readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';

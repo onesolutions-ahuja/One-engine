@@ -241,3 +241,90 @@ test('Revolut checkout is a Page Builder block without an installed application 
  assert.ok(manifest.fields.some(field=>field.apiName==='public_checkoutAmountField'));
  assert.equal(manifest.operations.CreateOrder.method,'POST');
 });
+
+
+test('shared payment orders support independent providers, retries, and verified completion',async()=>{
+ const {createPaymentOrder,paymentOrderStatus,recordVerifiedPaymentEvent,
+  nextPaymentStatus,paymentAmountMinor,PAYMENT_ORDER_DDL,LEGACY_REVOLUT_PAYMENT_COPY}
+  =await import('../../src/system-support/payment-order-service.ts');
+ const tenant='11111111-1111-4111-8111-111111111111';
+ const user='22222222-2222-4222-8222-222222222222';
+ const credential='33333333-3333-4333-8333-333333333333';
+ const attempt='44444444-4444-4444-8444-444444444444';
+ const cart='55555555-5555-4555-8555-555555555555';
+ const secondCart='66666666-6666-4666-8666-666666666666';
+ const rows=[];
+ const db={query:async(sql,params)=>{
+  if(sql.includes('SELECT id,checkout_token,checkout_url,credential_id')){
+   const [t,provider,u,key]=params;
+   return {rows:rows.filter(x=>x.tenant_id===t&&x.provider===provider
+     &&x.created_by===u&&x.attempt_key===key)};
+  }
+  if(sql.includes('SELECT 1 FROM md_payment_orders')){
+   const [t,object,id]=params;
+   return {rows:rows.filter(x=>x.tenant_id===t&&x.source_object===object
+     &&x.source_record_id===id&&x.status==='completed')};
+  }
+  if(sql.includes('INSERT INTO md_payment_orders')){
+   const [t,provider,cred,u,object,id,key,providerId,token,url,amount,currency]=params;
+   const row={id:'77777777-7777-4777-8777-'+String(rows.length+1).padStart(12,'0'),
+    tenant_id:t,provider,credential_id:cred,created_by:u,source_object:object,
+    source_record_id:id,attempt_key:key,provider_order_id:providerId,
+    checkout_token:token,checkout_url:url,amount_minor:amount,currency,status:'pending'};
+   rows.push(row);return {rows:[row]};
+  }
+  if(sql.includes('SELECT status FROM md_payment_orders')){
+   const [t,provider,id,u]=params;
+   return {rows:rows.filter(x=>x.tenant_id===t&&x.provider===provider
+      &&x.id===id&&x.created_by===u)};
+  }
+  if(sql.includes('UPDATE md_payment_orders')){
+   const [t,provider,cred,providerOrderId,status]=params;
+   const matching=rows.filter(x=>x.tenant_id===t&&x.provider===provider
+      &&x.credential_id===cred&&x.provider_order_id===providerOrderId);
+   for(const x of matching)x.status=nextPaymentStatus(x.status,status);
+   return {rows:matching.map(x=>({id:x.id}))};
+  }
+  throw Error('Unexpected payment SQL: '+sql);
+ }};
+ const records={get:async()=>({Total:4.25})};
+ const base={tenantId:tenant,userId:user,credentialId:credential,
+  sourceObject:'Cart',recordId:cart,amountField:'Total',currency:'GBP',attemptKey:attempt};
+ let calls=0;
+ const revolt=async({amountMinor,currency,attemptKey})=>{
+  calls++;assert.equal(amountMinor,425);assert.equal(currency,'GBP');assert.equal(attemptKey,attempt);
+  return {providerOrderId:'88888888-8888-4888-8888-888888888888',checkoutToken:'tok_1234567890'};
+ };
+ const first=await createPaymentOrder(db,records,{...base,provider:'Revolut'},revolt);
+ assert.equal(first.reused,false);
+ assert.equal(first.token,'tok_1234567890');
+ const repeated=await createPaymentOrder(db,records,{...base,provider:'Revolut'},revolt);
+ assert.equal(repeated.id,first.id);
+ assert.equal(repeated.reused,true);
+ assert.equal(calls,1,'retry must not create a second provider order');
+ assert.equal(await paymentOrderStatus(db,{tenantId:tenant,userId:user,provider:'Revolut'},first.id),'pending');
+ assert.equal(await recordVerifiedPaymentEvent(db,{tenantId:tenant,provider:'Revolut',
+  credentialId:credential,providerOrderId:'88888888-8888-4888-8888-888888888888',
+  eventName:'ORDER_COMPLETED',status:'completed'}),true);
+ assert.equal(await paymentOrderStatus(db,{tenantId:tenant,userId:user,provider:'Revolut'},first.id),'completed');
+ assert.equal(nextPaymentStatus('completed','authorised'),'completed');
+ assert.equal(nextPaymentStatus('completed','failed'),'completed');
+ assert.equal(nextPaymentStatus('pending','authorised'),'authorised');
+ assert.equal(await recordVerifiedPaymentEvent(db,{tenantId:tenant,provider:'AnotherGateway',
+  credentialId:credential,providerOrderId:'88888888-8888-4888-8888-888888888888',
+  eventName:'FAKE',status:'failed'}),false,'different provider must not mutate Revolut');
+ assert.equal(rows[0].status,'completed');
+ await assert.rejects(()=>createPaymentOrder(db,records,{...base,attemptKey:
+  '99999999-9999-4999-8999-999999999999',provider:'AnotherGateway'},
+  async()=>({providerOrderId:'new-order',checkoutUrl:'https://example.com/pay'})),/already paid/);
+ const other=await createPaymentOrder(db,records,{...base,recordId:secondCart,provider:'AnotherGateway'},
+  async()=>({providerOrderId:'different-order',checkoutUrl:'https://example.com/pay'}));
+ assert.equal(other.checkoutUrl,'https://example.com/pay');
+ assert.equal(other.token,undefined);
+ assert.equal(await paymentOrderStatus(db,{tenantId:tenant,userId:user,provider:'Revolut'},other.id)
+  .catch(e=>e.httpStatus),404,'provider scoped status lookup');
+ assert.equal(paymentAmountMinor(4.25,'GBP'),425);
+ assert.throws(()=>paymentAmountMinor(4.251,'GBP'),/precision/);
+ assert.match(PAYMENT_ORDER_DDL,/UNIQUE\(tenant_id,provider,created_by,attempt_key\)/);
+ assert.match(LEGACY_REVOLUT_PAYMENT_COPY,/FROM md_revolut_checkout_orders/);
+});

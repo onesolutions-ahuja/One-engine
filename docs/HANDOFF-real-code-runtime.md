@@ -29,37 +29,39 @@ Then check kiosk (`smartkiosk`) and ServiceFlow pages.
 - Tests: `apps/web/test/pageCode.test.ts` (run: `cd apps/web && tsx --test test/pageCode.test.ts`).
 - Debug in browser console: `window.__unePageCode` (`.misses` = taps that could not be predicted).
 
-## Remaining work, in order
-Copy-stage tooling is now available in `apps/server/src/system-files/native-object-copy.ts`
-and `system-support/native-object-copy-cli.ts`. **Step 1 is still unfinished.** This is an
-explicit offline copy/verification command, not a runtime storage switch or live mirror.
-No copy is run on deployment. It leaves EAV and its permissions/relationships authoritative.
-Run only in a maintenance window (it takes SHARE locks on source tables, with a 3 s lock
-timeout and 120 s statement timeout):
-`node apps/server/dist-system/system-support/native-object-copy-cli.js --copy-snapshot TENANT_UUID Product MenuCategory Cart CartLine Customer`.
-It copies deleted records too, compares counts AND typed field/system values, and rolls back
-on mismatch. Receipts are labelled `snapshot-only`; later writes make the copy stale.
-Installed app-package fields and Name receive typed columns; other fields use one extras
-JSONB column. Unsupported stored types or persisted formula values abort without cutover.
-Before activation: implement write routing/compatibility for ALL EAV consumers, metadata
-lifecycle integration, filtered custom-field expression indexes, central RBAC/field/sharing
-tests against the new backend, and a final locked copy/verification/switch. Never route
-reads to these snapshots while writes still target EAV.
+## Status 16 Nov 2026 (PRs #109-#118, all live)
+- Tap shows 67-96 ms; saved 220-270 ms (86 SQL trips; CI probe `apps/server/scripts/record-trips-probe.mjs`, budget 60).
+- Page open 1.2-1.7 s (repeat), ~2.7 s first open after a deploy. Landing bootstrap now requested with the session.
+- Lists: `md_object_access_fast()` decides record access once per query (`system-support/record-access-fast.ts`);
+  10k products 24 s -> 7-20 ms (CI probe `search-10k-probe.mjs`, budget 150 ms, equivalence checks).
+- Every Object of every tenant has a typed native table (reads/filters). Writes still go to EAV + sync triggers.
+- Page code converts EVERY action step on every page (checked by building all 151 pages):
+  EMAIL/SMS/WHATSAPP (sent after commit), RECORDPAYMENT (same transaction), WAIT (schedules the rest as a
+  scheduled action in the same transaction), LOCATION/CREATEPDF (server returns `needs`, browser answers, action re-runs),
+  `@state/@filter/@navigate :=`. Popups (SCREEN) open from the prediction (Cash popup 89 ms).
+- Only page issue: smart_till_customer_display column3Source `@Quantity` (owner fixes to `@CartLine.Quantity`).
+- Old engine still answers (measured live with `window.__uneOldEngine`, see `oldEngineMeter.js`):
+  1. sql-formula: SUMIFS/COUNTIFS over Objects not held as record sets (Invoice, Cart Held) on
+     smart_till_dashboard / smart_till_reports -> add a page-code server call that runs the same generated
+     display functions with the server `$` (one request for all), then delete /formulas/evaluate(-many).
+  2. field-expression: `=$tenant.name`, time/NOW labels, `BLANKVALUE($state...)` labels (cash count), row formulas
+     `@Invoice.Total` (tables/charts), filter value formulas `TODAY()`, `ADDDAYS(...)`, `BLANKVALUE("","*")`
+     -> route these call sites (SmartRuntime scopedExpression paths, smart_table/smart_chart, record filter
+     formulas) through page code functions.
+  3. collection: static `COLLECTION("Name","a","b")` option lists (tabs/filters) -> page code function.
+  Then delete FieldExpression interpreter use, /formulas/evaluate*, /action-formulas/execute-data,
+  compiled-actions routes, formulaAction.ts.
 
-1. **Storage (biggest for save < 400 ms + search):** replace EAV `md_records`/`md_record_values` with one real
-   table per object shared by tenants (`tenant_id`), typed columns + indexes for standard/app fields, one JSONB
-   column for tenant-added fields (auto expression indexes for filtered ones), `pg_trgm` index on Name/Barcode.
-   Start: Product, MenuCategory, Cart, CartLine, Customer. Object/Field builder must keep working (adding a field
-   updates table/JSONB). Migrate safely: copy, verify counts, switch, keep old tables. Keep RBAC (`md_record_access`),
-   field security, sharing. ~40 server files query EAV directly (grep `md_record_values`); `record-engine.ts` is the
-   hot path. Note: DEVELOPER_POLICY #8 forbids JSON columns - the owner explicitly asked for the JSONB column; update the policy text in the same PR.
-2. **Page open < 1.5 s:** published apps still load Setup shell + `/metadata/landing-bootstrap` (358 KB) -
-   make an app-scoped bootstrap; return first data + record sets in the page response (one request).
-3. **Search/category:** filter in memory when all rows are held; else server search with trigram index.
-4. **Remove old engine:** convert remaining action steps (EMAIL, SMS, WHATSAPP, WAIT, LOCATION, RECORDPAYMENT,
-   CREATEPDF), COLLECTION/TABLE criteria forms, Flow/Navigate bindings; then delete FieldExpression interpreter use,
-   `/formulas/evaluate-many`, `compiled-actions` interpreter path. No fallback engine.
-5. Cash/Card popups open ~2 s after tap (SCREEN runs after save) - consider opening from prediction safely.
+## Remaining work, in order
+1. Old engine removal (list above), small PRs, deploy each, re-run the meter on all app pages.
+2. Storage: native tables authoritative, drop EAV (owner OK: data is dummy). Suggested: rewrite the ~19
+   write statements to native tables; make `md_record_values` a read view over native tables for the ~29 readers
+   and SQL functions (md_record_field, policies, uniqueness), then convert readers and drop the view.
+   Native unique indexes for unique fields; FKs for lookup columns. Keep `md_records` (owner, sharing, deletion).
+3. (Skipped by owner) standalone app entry without Setup shell.
+
+## Merge rule
+Merge only when BOTH CI jobs succeed (use a script that checks every conclusion; #117 was merged red and fixed by #118).
 
 ## Known facts
 - Kiosk menu design is in the Custom layout only (Desktop empty); its formulas use bare `@Name` (owner fixes by hand).

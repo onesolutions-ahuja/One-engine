@@ -1,3 +1,4 @@
+import {scopedMetadata} from '../system-support/record-read-scope.js';
 import type {PoolClient} from 'pg';
 import {evaluateResolvedFormulaSql} from '../system-support/formula-sql-runtime.js';
 import {
@@ -13,11 +14,11 @@ type FormulaContext={
 export async function resolveDefaultValues(client:PoolClient,tenantId:string,userId:string,objectApi:string,values:Values,
     literals:Values,context:(expression:string,values:Values,now:Date|string)=>Promise<FormulaContext>,
     evaluationNow?:Date|string) {
-    const {rows}=await client.query<{field_api:string;expression:string}>(
+    const {rows}=await scopedMetadata('default-formulas\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{field_api:string;expression:string}>(
       `SELECT d.field_api,d.expression FROM md_field_default_formulas d
        JOIN md_field_definitions f ON f.tenant_id=d.tenant_id AND f.object_api=d.object_api
         AND f.api_name=d.field_api AND f.deleted_at IS NULL
-       WHERE d.tenant_id=$1 AND d.object_api=$2 ORDER BY d.field_api`,[tenantId,objectApi]);
+       WHERE d.tenant_id=$1 AND d.object_api=$2 ORDER BY d.field_api`,[tenantId,objectApi]));
     const pending=new Map(rows.filter(row=>values[row.field_api]===undefined)
       .map(row=>[row.field_api,row.expression]));
     const now=evaluationNow??new Date();

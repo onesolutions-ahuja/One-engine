@@ -1,3 +1,4 @@
+import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {saveDuplicateMatches} from './DuplicateDetectionEngine.js';
 import type {PoolClient} from 'pg';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
@@ -12,9 +13,9 @@ export class RecordMatching {
  constructor(private readonly rbac:RbacEngine){}
  async check(client:PoolClient,tenantId:string,userId:string,objectApi:string,values:Values|(()=>Promise<Values>),
     excludeId?:string):Promise<Array<{ruleApi:string;recordId:string;matchedObjectApi?:string}>|null>{
-  const result=await client.query<Rule>(
+  const result=await scopedMetadata('matching-rules\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<Rule>(
    'SELECT api_name,match_mode,action,target_object_api FROM md_matching_rules WHERE tenant_id=$1 AND object_api=$2 AND active=true ORDER BY api_name',
-   [tenantId,objectApi]);
+   [tenantId,objectApi]));
   if(!result.rows.length)return null;
   const current=typeof values==='function'?await values():values;
   const columns=await client.query<RuleField>(`SELECT rule_api,field_api,target_field_api,case_sensitive,match_type,max_distance

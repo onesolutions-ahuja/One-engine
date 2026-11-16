@@ -11,16 +11,18 @@ export type RecordReadScope={
  fields:Map<string,Promise<unknown>>;
  rbac:Map<string,boolean>;
  locked:Set<string>;
+ /** Records read since the last write (any write forgets them all). */
+ records:Map<string,Promise<unknown>>;
 };
 const storage=new AsyncLocalStorage<RecordReadScope>();
 export function withRecordReadScope<T>(run:()=>Promise<T>):Promise<T>{
- return storage.run({fields:new Map(),rbac:new Map(),locked:new Set()},run);
+ return storage.run({fields:new Map(),rbac:new Map(),locked:new Set(),records:new Map()},run);
 }
 export const recordReadScope=()=>storage.getStore();
 /** Forget remembered metadata and decisions (after a Flow/trigger ran). */
 export function resetRecordReadScope(){
  const scope=storage.getStore();
- if(scope){scope.fields.clear();scope.rbac.clear();}
+ if(scope){scope.fields.clear();scope.rbac.clear();scope.records.clear();}
 }
 /** Metadata read once per page action (inside the scope); read every time outside it. */
 export function scopedMetadata<T>(cacheKey:string,load:()=>Promise<T>):Promise<T>{
@@ -34,3 +36,5 @@ export function scopedMetadata<T>(cacheKey:string,load:()=>Promise<T>):Promise<T
  }
  return hit;
 }
+/** A record write is starting: records read before it may change. */
+export function forgetScopedRecords(){storage.getStore()?.records.clear();}

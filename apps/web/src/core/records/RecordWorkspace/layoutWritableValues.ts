@@ -3,18 +3,22 @@ import type {PageLayoutMetadata} from '../../metadata/Definitions/metadata';
 /** Layout constraints are not permissions. The Record API still enforces RBAC.
  * Keep schema-required fields present in payloads for legacy page compatibility;
  * avoid submitting a value for a field the authored page hid or made read-only.
+ * Extra controls rendered outside the layout can be passed explicitly; read-only
+ * fields remain protected and callers must still apply field-level permissions.
  */
 export function filterLayoutWritableValues(
   values:Readonly<Record<string,unknown>>,
   layout:PageLayoutMetadata|undefined,
   schemaRequired:ReadonlySet<string>,
-  authoredDynamicFields=false
+  authoredDynamicFields=false,
+  supplementalWritableFields:ReadonlySet<string>=new Set()
 ):Record<string,unknown>{
   if(!layout)return {...values};
   const visible=new Set(layout.sections.flatMap(section=>section.fieldApiNames));
   const readOnly=new Set(layout.sections.flatMap(section=>section.readOnlyFieldApiNames??[]));
   return Object.fromEntries(Object.entries(values).filter(([name])=>
-    name==='RecordTypeId'||(!readOnly.has(name)&&(visible.has(name)||(!authoredDynamicFields&&schemaRequired.has(name))))
+    name==='RecordTypeId'||(!readOnly.has(name)&&(supplementalWritableFields.has(name)
+      ||visible.has(name)||(!authoredDynamicFields&&schemaRequired.has(name))))
   ));
 }
 

@@ -640,7 +640,7 @@ export class RecordEngine {
     }
   }
 
-  private async prepare(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>,creating:boolean,client?:PoolClient,recordId?:string,deferRequired=false) {
+  private async prepare(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>,creating:boolean,client?:PoolClient,recordId?:string,deferRequired=false,prior?:Record<string,unknown>) {
     if(Object.getPrototypeOf(values)!==Object.prototype && Object.getPrototypeOf(values)!==null) throw new Error('Invalid record');
     const definitions=await this.fields(tenantId,objectApi,client);
     const fields=new Map(definitions.map(f=>[f.api_name,f]));
@@ -744,12 +744,20 @@ export class RecordEngine {
         case 'reference':
           validateLookupField(value,key,field.related_object);
           if(recordId&&field.relationship_type==='Master-Detail'&&!field.allow_reparenting){
-            const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
-            const previous=await (client??this.db).query<{reference_record_id:string|null}>(
-              `SELECT ${nativeValueSql(meta,key,'nr')} AS reference_record_id
-                FROM ${nativeTableSql(meta)} nr WHERE nr.tenant_id=$1 AND nr.id=$2`,
-              [tenantId,recordId]);
-            enforceMasterDetailReparenting(previous.rows[0]?.reference_record_id,value,key,field.allow_reparenting);
+            // The caller's access-checked record read already contains this lookup.
+            // Fall back to one native lookup only when field-level read permission
+            // omitted it from that record.
+            const loaded=prior&&Object.hasOwn(prior,key)?prior[key]:undefined;
+            let previousId=typeof loaded==='string'?loaded:loaded===null?null:undefined;
+            if(previousId===undefined){
+              const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
+              const previous=await (client??this.db).query<{reference_record_id:string|null}>(
+                `SELECT ${nativeValueSql(meta,key,'nr')} AS reference_record_id
+                  FROM ${nativeTableSql(meta)} nr WHERE nr.tenant_id=$1 AND nr.id=$2`,
+                [tenantId,recordId]);
+              previousId=previous.rows[0]?.reference_record_id??null;
+            }
+            enforceMasterDetailReparenting(previousId,value,key,field.allow_reparenting);
           }
           await assertLookupTargetExists(client??this.db,tenantId,field.related_object,value,key,userId);
           // md_record_values.reference_record_id has a foreign key to md_records; users live in
@@ -1551,8 +1559,10 @@ export class RecordEngine {
     if(client)await this.lockObjectForWrite(client,tenantId,objectApi);
     // Inside an outer transaction the values are prepared again under the record lock
     // below, so the early (lock-free) validation pass would only repeat the same reads.
-    const prepared=client||!this.db.inTransaction()
-      ?await this.prepare(tenantId,userId,objectApi,values,false,client,id):new Map<string,Storable>();
+    // For explicit transactional callers the prior record is loaded below;
+    // validate against it rather than independently reading each lookup first.
+    if(!client&&!this.db.inTransaction())
+      await this.prepare(tenantId,userId,objectApi,values,false,client,id);
     const write=async(transactionClient:PoolClient,writeValues:Map<string,Storable>)=>{
       // Existing records can also predate native activation. Copy before taking
       // the md_records row lock; the native writer remains the sole value writer.
@@ -1641,7 +1651,7 @@ export class RecordEngine {
       let previous:Record<string,unknown>|undefined;
       const loadPrior=async()=>previous??(previous=await this.get(tenantId,userId,objectApi,id,client));
       const prior=await loadPrior();
-      let writeValues=prepared;
+      let writeValues=await this.prepare(tenantId,userId,objectApi,values,false,client,id,false,prior);
       if(runTriggers&&this.recordTrigger){
         const proposed=await this.recordTrigger(client,tenantId,userId,objectApi,'updated',
           {...prior,...values},prior,'before-save');
@@ -1650,7 +1660,7 @@ export class RecordEngine {
           for(const [field,value] of Object.entries(proposed))
             if(!['Id','CreatedAt','LastModifiedDate','OwnerId','RecordTypeId'].includes(field)
                &&!Object.is(value,prior?.[field]))changed[field]=value;
-          writeValues=await this.prepare(tenantId,userId,objectApi,changed,false,client,id);
+          writeValues=await this.prepare(tenantId,userId,objectApi,changed,false,client,id,false,prior);
         }
       }
       const proposedValues={...(prior??{}),...values};
@@ -1690,7 +1700,7 @@ export class RecordEngine {
         [tenantId,objectApi,id,userId]);
       if(!locked.rowCount)throw new Error('Record not found');
       const prior=await this.get(tenantId,userId,objectApi,id,transactionClient);
-      let finalPrepared=await this.prepare(tenantId,userId,objectApi,values,false,transactionClient,id);
+      let finalPrepared=await this.prepare(tenantId,userId,objectApi,values,false,transactionClient,id,false,prior);
       if(this.recordTrigger){
         const proposed=await this.recordTrigger(transactionClient,tenantId,userId,objectApi,'updated',
           {...prior,...values},prior,'before-save');
@@ -1699,7 +1709,7 @@ export class RecordEngine {
           for(const [field,value] of Object.entries(proposed))
             if(!['Id','CreatedAt','LastModifiedDate','OwnerId','RecordTypeId'].includes(field)
               &&!Object.is(value,prior[field]))changed[field]=value;
-          finalPrepared=await this.prepare(tenantId,userId,objectApi,changed,false,transactionClient,id);
+          finalPrepared=await this.prepare(tenantId,userId,objectApi,changed,false,transactionClient,id,false,prior);
         }
       }
       const proposedValues={...prior,...values};

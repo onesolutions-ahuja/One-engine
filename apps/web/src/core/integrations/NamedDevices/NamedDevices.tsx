@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
-import {browserSupports,findLocalDevice} from './deviceAccess';
+import {browserSupports,findLocalDevice,newCloudPrntKey} from './deviceAccess';
 import './NamedDevices.css';
 
 /** Setup → Named Devices. One list for card readers reached through a connector (Cloud API)
@@ -88,6 +88,7 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
   if(!draft)return;
   if(!draft.Name.trim()){setError('Enter a name');return;}
   if(draft.Connection==='Cloud API'&&(!draft.Connector||!draft.DeviceId)){setError('Choose the connector and pair or type the Device ID');return;}
+  if(draft.Connection==='Network'&&!draft.DeviceId){setError('Press Create printer link first');return;}
   setBusy(true);setError('');
   try{
    const Id=draft.Id;
@@ -110,7 +111,7 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
  return <section className="setup-card md-named-devices" aria-label="Named Devices">
   <header className="md-named-devices-head">
    <div><h1>Named Devices</h1>
-    <p>Card readers, printers, cash drawers, scanners and customer screens. Card readers use an installed connector; other devices connect by USB, Bluetooth, serial or network.</p></div>
+    <p>Card readers, printers, cash drawers, scanners and customer screens. Card readers use an installed connector. USB, Bluetooth and serial devices: Find device once on each till (Chrome or Edge). Network printers: Star CloudPRNT link. Actions use DEVICE("Receipt Printer","Print",text) or DEVICE("Cash Drawer","Open").</p></div>
    {canManage&&<button type="button" className="btn btn-brand" onClick={()=>{setDraft({...blank});setPairing(null);setStatus('');setError('');}}>New device</button>}
   </header>
   {error&&<p role="alert" className="md-named-devices-error">{error}</p>}
@@ -122,10 +123,16 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
    {cloud&&<label>Connector<select value={draft.Connector} onChange={e=>edit({Connector:e.target.value})}>
     <option value="">Choose…</option>{connectors.map(item=><option key={item} value={item+'Connector'}>{item}</option>)}</select></label>}
    {cloud?<label>Device / Reader ID<input value={draft.DeviceId} onChange={e=>edit({DeviceId:e.target.value})}/></label>
-    :<label>Address<input value={draft.Address} onChange={e=>edit({Address:e.target.value})} placeholder={draft.Connection==='Network'?'192.168.1.50:9100':'Use Find device'}/></label>}
+    :draft.Connection==='Network'
+     ?<label>CloudPRNT server URL (paste into the printer's CloudPRNT settings)
+      <input readOnly value={draft.DeviceId?location.origin+'/api/cloudprnt/'+draft.DeviceId:''} placeholder="Press Create printer link"/></label>
+     :<label>Address<input value={draft.Address} onChange={e=>edit({Address:e.target.value})} placeholder="Use Find device"/></label>}
    <label className="md-named-devices-check"><input type="checkbox" checked={draft.IsDefault} onChange={e=>edit({IsDefault:e.target.checked})}/>Default {draft.DeviceType.toLowerCase()}</label>
    <label className="md-named-devices-check"><input type="checkbox" checked={draft.Active} onChange={e=>edit({Active:e.target.checked})}/>Active</label>
    <div className="md-named-devices-actions">
+    {draft.Connection==='Network'&&<button type="button" className="btn" onClick={()=>{edit({DeviceId:newCloudPrntKey()});
+     setStatus('Copy the URL into the printer (Star CloudPRNT, poll every 5 seconds), then Save.');}}>
+     {draft.DeviceId?'New printer link':'Create printer link'}</button>}
     {(cloud||browserSupports(draft.Connection))&&<button type="button" className="btn" disabled={busy} onClick={()=>void find()}>
      {cloud?(pairing?'Check pairing':'Find / pair'):'Find device'}</button>}
     <button type="button" className="btn btn-brand" disabled={busy} onClick={()=>void save()}>Save</button>
@@ -137,7 +144,7 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
    <tbody>{devices.length===0&&<tr><td colSpan={7}>No devices yet.</td></tr>}
     {devices.map(device=><tr key={device.Id}>
      <td>{device.Name}</td><td>{device.DeviceType}</td><td>{device.Connection}</td>
-     <td>{device.Connection==='Cloud API'?String(device.Connector??'').replace(/Connector$/,'')+' · '+(device.DeviceId??''):device.Address}</td>
+     <td>{device.Connection==='Cloud API'?String(device.Connector??'').replace(/Connector$/,'')+' · '+(device.DeviceId??''):device.Connection==='Network'?'CloudPRNT':device.Address}</td>
      <td>{device.IsDefault?'Yes':''}</td><td>{device.Active?'Yes':'No'}</td>
      <td className="md-named-devices-row-actions">{canManage&&<>
       <button type="button" className="btn btn-small" onClick={()=>{setDraft({...blank,...device});setPairing(null);}}>Edit</button>

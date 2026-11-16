@@ -414,3 +414,15 @@ test('Card.* runs the default reader connector, chains before-steps and normalis
  const check=await runActionCallout(deps,'t','u','Card.CheckStatus',{PaymentId:'ts_1',OrderId:''},'key-87654321');
  assert.equal(check.Result,'Paid');
 });
+
+test('DEVICE compiles and builds ESC/POS print, drawer and cut bytes',async()=>{
+ const {escPos}=await import('../../src/expression-engine/ActionDevices.ts');
+ const plan=compileActionPlan('ACTIONS(DEVICE("Receipt Printer","Print","Total £5"),DEVICE("Cash Drawer","Open"))');
+ assert.deepEqual(plan.map(step=>step.name),['DEVICE','DEVICE']);
+ const print=[...escPos('Print','£1')];
+ assert.deepEqual(print.slice(0,2),[0x1b,0x40]);
+ assert.ok(print.includes(0x9c));
+ assert.deepEqual(print.slice(-3),[0x1d,0x56,0x01]);
+ assert.deepEqual([...escPos('Open')],[0x1b,0x40,0x1b,0x70,0x00,0x19,0xfa]);
+ assert.throws(()=>compileActionPlan('DEVICE("Printer")'),/DEVICE requires/);
+});

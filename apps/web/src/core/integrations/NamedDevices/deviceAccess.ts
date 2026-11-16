@@ -5,7 +5,7 @@ type Found={name:string;address:string};
 type Nav=Navigator&{
  usb?:{requestDevice:(o:{filters:unknown[]})=>Promise<{productName?:string;vendorId:number;productId:number;serialNumber?:string}>};
  serial?:{requestPort:(o?:unknown)=>Promise<{getInfo:()=>{usbVendorId?:number;usbProductId?:number}}>};
- bluetooth?:{requestDevice:(o:{acceptAllDevices:boolean})=>Promise<{id:string;name?:string}>};
+ bluetooth?:{requestDevice:(o:{acceptAllDevices:boolean;optionalServices?:string[]})=>Promise<{id:string;name?:string}>};
 };
 const hex=(value:number|undefined)=>(value??0).toString(16).padStart(4,'0');
 export const browserSupports=(connection:string)=>{
@@ -28,8 +28,17 @@ export async function findLocalDevice(connection:string):Promise<Found>{
  }
  if(connection==='Bluetooth'){
   if(!nav.bluetooth)throw Error('This browser cannot reach Bluetooth devices. Use Chrome or Edge.');
-  const device=await nav.bluetooth.requestDevice({acceptAllDevices:true});
+  // Common Bluetooth receipt-printer services, so DEVICE(...) can write to them later.
+  const device=await nav.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[
+   '000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+   '49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ff00-0000-1000-8000-00805f9b34fb']});
   return {name:device.name||'Bluetooth device',address:'bluetooth:'+device.id};
  }
  throw Error('Type the network address (for example 192.168.1.50:9100)');
+}
+
+/** Random key for a Star CloudPRNT printer: its poll URL is /api/cloudprnt/<key>. */
+export function newCloudPrntKey():string{
+ const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);
+ return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 }

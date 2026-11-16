@@ -55,7 +55,7 @@ export type PaymentOrderRequest=PaymentOrderIdentity&{
 };
 export type ProviderCreateRequest={amountMinor:number;currency:string;attemptKey:string};
 export type ProviderCheckout={providerOrderId:string;checkoutToken?:string;checkoutUrl?:string};
-export type PaymentOrderResult={id:string;token?:string;checkoutUrl?:string};
+export type PaymentOrderResult={id:string;token?:string;checkoutUrl?:string;reused:boolean};
 export type VerifiedPaymentEvent={
  tenantId:string;provider:string;credentialId:string;
  providerOrderId:string;eventName:string;status:PaymentStatus;
@@ -136,7 +136,7 @@ export async function createPaymentOrder(
     ||prior.currency!==input.currency)
    throw new PaymentOrderError('Payment attempt does not match the record',409);
   return {id:prior.id,token:prior.checkout_token??undefined,
-   checkoutUrl:prior.checkout_url??undefined};
+   checkoutUrl:prior.checkout_url??undefined,reused:true};
  }
  // An already paid source record cannot be charged again by a different provider.
  const paid=await db.query(`SELECT 1 FROM md_payment_orders
@@ -164,7 +164,7 @@ export async function createPaymentOrder(
  ]);
  const row=result.rows[0];
  if(!row)throw new PaymentOrderError('Payment attempt does not match the record',409);
- return {id:row.id,token:row.checkout_token??undefined,checkoutUrl:row.checkout_url??undefined};
+ return {id:row.id,token:row.checkout_token??undefined,checkoutUrl:row.checkout_url??undefined,reused:false};
 }
 
 /** Only the originating authenticated user can poll their own payment. */

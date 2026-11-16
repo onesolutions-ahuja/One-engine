@@ -1,6 +1,7 @@
 import {requireAvailableMetadataName} from './metadata-name-guard.js';
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import {verifyRevolutWebhook,revolutEventState} from './revolut-checkout-service.js';
+import {recordVerifiedPaymentEvent} from './payment-order-service.js';
 import type {Express,Request,Response,NextFunction} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
@@ -384,18 +385,15 @@ export function registerInboundWebhookPublicRoutes(app:Express,db:SqlPersistence
    if(endpoint.provider==='Revolut'){
     const data=req.body as Record<string,unknown>;
     const state=typeof data.event==='string'?revolutEventState(data.event):null;
-    if(state&&typeof data.order_id==='string'&&uuid.test(data.order_id)){
-     await db.query(`UPDATE md_revolut_checkout_orders
-       SET status=CASE WHEN status='completed' THEN 'completed'
-          WHEN $3='completed' THEN 'completed'
-          WHEN status='authorised' AND $3='pending' THEN 'authorised'
-          ELSE $3 END,
-       last_event=$4,updated_at=now()
-       WHERE tenant_id=$1 AND revolut_order_id=$2 AND credential_id=$5`,
-      [endpoint.tenant_id,data.order_id,state,data.event,endpoint.credential_id]);
-    }else{
-     throw Error('Unsupported Revolut webhook event payload');
-    }
+    if(!state||typeof data.order_id!=='string'||!uuid.test(data.order_id)
+      ||!endpoint.credential_id)throw Error('Unsupported Revolut webhook event payload');
+    // Signature already verified above; the shared service owns status transitions
+    // and tenant/provider/credential-scoped receipt lookup.
+    const matched=await recordVerifiedPaymentEvent(db,{
+     tenantId:endpoint.tenant_id,provider:'Revolut',credentialId:endpoint.credential_id,
+     providerOrderId:data.order_id,eventName:String(data.event),status:state
+    });
+    if(!matched)throw Error('Revolut checkout order not yet recorded');
     requestCommunicationRecorded=false;
    }else if(endpoint.credential_name){
     if(!activityWriter)throw new Error('Central Communication writer unavailable');

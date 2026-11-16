@@ -1416,7 +1416,7 @@ export class RecordEngine {
       value_datetime:'timestamptz',value_boolean:'boolean'};
     if(column==='value_boolean' && operator!=='eq')throw new Error('Invalid boolean comparison');
     const ops={eq:'=',lt:'<',lte:'<=',gt:'>',gte:'>='} as const;
-    const meta=await loadNativeFields(this.db,tenantId,objectApi);
+    const meta=await this.nativeMeta(tenantId,objectApi);
     const expression=nativeValueSql(meta,fieldApi,'nr');
     const {rows}=await this.db.query<{id:string}>(`
       SELECT r.id FROM md_records r
@@ -1440,7 +1440,7 @@ export class RecordEngine {
       [tenantId,objectApi,fieldApi]);
     if(!['number','currency','percent'].includes(fields[0]?.data_type??''))
       throw new Error('Invalid numeric aggregate field');
-    const meta=await loadNativeFields(this.db,tenantId,objectApi);
+    const meta=await this.nativeMeta(tenantId,objectApi);
     const expression=nativeValueSql(meta,fieldApi,'nr');
     const {rows}=await this.db.query<{count:string;sum:string|null;min:string|null;max:string|null;avg:string|null}>(`
       SELECT count(${expression})::text AS count,sum(${expression})::text AS sum,
@@ -1836,7 +1836,7 @@ export class RecordEngine {
       entry.fields.add(reference.field_api);
     }
     for(const entry of lookupClears.values()){
-      const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+      const meta=await this.nativeMeta(tenantId,entry.objectApi,client);
       const {rows:current}=await client.query<{field_api:string;reference_record_id:string|null}>(`
         SELECT v.field_api,v.reference_record_id FROM md_records r
         ${readNativeValueRows(meta,'r')}
@@ -2006,7 +2006,7 @@ export class RecordEngine {
         if(!entry.targets.has(link.field_api))entry.targets.set(link.field_api,link.target_record_id);
       }
       for(const entry of restoreBySource.values()){
-        const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+        const meta=await this.nativeMeta(tenantId,entry.objectApi,client);
         const {rows:current}=await client.query<{
           field_api:string;value_text:string|null;reference_record_id:string|null
         }>(`SELECT v.field_api,v.value_text,v.reference_record_id FROM md_records r

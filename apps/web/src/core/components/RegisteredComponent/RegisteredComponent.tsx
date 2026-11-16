@@ -14,6 +14,9 @@ import {pagePropertyIssues} from '../Properties/pagePropertyContract';
 import {resolveRegisteredTextProperties} from './fieldExpressionRuntime';
 import {FieldExpressionEvaluationError} from '../../../component-libraries/shared/FieldExpression.js';
 import {useSqlFormulaDisplay,isSelectedSqlFormula} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
+import {convertedFormula} from '../../../component-libraries/shared/formulaCodeLookup.js';
+/** Not display text: never replaced by a formula result. */
+const codeSkip=new Set(['html','properties','record','records','items','pageState','sessionId','__formulaCode','actionFlows','componentId','pageSessionKey']);
 import {validatePrimitiveMetadata, primitiveAccessibilityProps} from './sharedPrimitiveMetadata';
 import {loadSharedSmartRenderer} from './sharedSmartRenderer';
 
@@ -252,10 +255,13 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const formulaCode=(props.__formulaCode as {functions?:unknown}|undefined)?.functions;
   const codeFunctions=formulaCode instanceof Map?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
   for(const [key,source] of Object.entries(sqlProps)){
-    if(!isSelectedSqlFormula(source))continue;
-    const run=codeFunctions&&typeof source==='string'?codeFunctions.get(source.trim()):undefined;
+    if(typeof source!=='string'||codeSkip.has(key))continue;
+    // Converted page code first, for @ references and formulas alike (exact text, then same parsed form).
+    const formulaLike=/^\s*=/.test(source)||/^\s*@[A-Za-z]/.test(source);
+    const run=codeFunctions&&formulaLike?codeFunctions.get(source.trim())??convertedFormula(codeFunctions,source)??undefined:undefined;
+    if(!run&&!isSelectedSqlFormula(source))continue;
     if(run){
-      try{sqlProps[key]=run(sqlRecord??{});}
+      try{sqlProps[key]=run(sqlRecord??{})??"";}
       catch(error){sqlProps[key]=(error as {notHeld?:boolean})?.notHeld?'':'FORMULAERROR';}
       continue;
     }

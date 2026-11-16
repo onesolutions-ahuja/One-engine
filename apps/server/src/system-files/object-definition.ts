@@ -2,6 +2,8 @@ import {requireAvailableMetadataName} from '../system-support/metadata-name-guar
 import {validateFieldDefinitionAttributes} from './field-definition-attributes.js';
 import type {PoolClient} from 'pg';
 import type {SqlPersistence} from './sql-persistence.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql,readNativeValueRows,
+  type NativeFieldsMetadata} from './native-object-query.js';
 import {
   flowFormulaReferences,inferFlowFormulaType,validateFlowFormula,
   type FormulaValueType
@@ -675,6 +677,7 @@ export class ObjectDefinitionService {
          field.rollup?.sourceField??null,field.rollup?.filterLogic??'All',
          field.relationshipName,field.childRelationshipName,field.deleteBehavior,field.allowReparenting]);
       if(!inserted.rowCount)throw new Error('Field already exists');
+      await client.query('SELECT md_native_configure_field($1,$2,$3)',[tenantId,objectApi,fieldApi]);
       if(field.trackHistory)await client.query(
         'UPDATE md_field_definitions SET track_history=true WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3',
         [tenantId,objectApi,field.apiName]);
@@ -843,6 +846,8 @@ export class ObjectDefinitionService {
     };
     let fieldTypeMigrationId:string|null=null;
     await this.db.transaction(async client=>{
+      let nativeMeta:NativeFieldsMetadata|undefined;
+      const native=async()=>nativeMeta??=await loadNativeFields(client,tenantId,objectApi);
       if(typeDefinitionChanged){
         if(oldType.dataType==='richtext'&&field.dataType!=='richtext'){
           const files=await client.query(`SELECT 1 FROM md_record_files
@@ -892,10 +897,12 @@ export class ObjectDefinitionService {
         field.picklistValues=values.rows.map(row=>row.value);
       }
       if(globalValueSetChanged&&field.globalValueSetApiName){
+        const meta=await native();
+        const value=nativeValueSql(meta,fieldApi,'nr',true);
         const existing=await client.query<{value_text:string|null}>(`
-          SELECT value_text FROM md_record_values WHERE tenant_id=$1 AND object_api=$2
-            AND field_api=$3 AND value_text IS NOT NULL`,
-        [tenantId,objectApi,fieldApi]);
+          SELECT ${value} AS value_text FROM ${nativeTableSql(meta)} nr
+          WHERE nr.tenant_id=$1 AND $2=ANY(nr.present_fields) AND ${value} IS NOT NULL`,
+        [tenantId,fieldApi]);
         const allowed=new Set(field.picklistValues);
         if(existing.rows.some(row=>{
           const values=current.dataType==='multipicklist'?(row.value_text??'').split(';'):[row.value_text??''];
@@ -903,15 +910,16 @@ export class ObjectDefinitionService {
         }))throw new Error('Global Value Set does not contain existing record values');
       }
       if(required&&!current.required){
-        const valueIsPresent=field.dataType==='reference'?'v.reference_record_id IS NOT NULL':
-          field.dataType==='geolocation'?'v.geo_latitude IS NOT NULL AND v.geo_longitude IS NOT NULL':
-          field.dataType==='address'?'COALESCE(v.address_street,v.address_city,v.address_state,v.address_postal_code,v.address_country) IS NOT NULL':
-          'v.value_text IS NOT NULL';
-        const missing=await client.query(`SELECT 1 FROM md_records r
-          WHERE r.tenant_id=$1 AND r.object_api=$2 AND NOT EXISTS(
-            SELECT 1 FROM md_record_values v WHERE v.tenant_id=r.tenant_id
-              AND v.record_id=r.id AND v.field_api=$3 AND (${valueIsPresent}))
-          LIMIT 1`,[tenantId,objectApi,fieldApi]);
+        const meta=await native();
+        const value=nativeValueSql(meta,fieldApi,'nr');
+        const valueIsPresent=field.dataType==='geolocation'
+          ?`(${value})[1] IS NOT NULL AND (${value})[2] IS NOT NULL`
+          :field.dataType==='address'
+            ?`EXISTS(SELECT 1 FROM unnest(${value}) AS part(x) WHERE part.x IS NOT NULL)`
+            :`${value} IS NOT NULL`;
+        const missing=await client.query(`SELECT 1 FROM ${nativeTableSql(meta)} nr
+          WHERE nr.tenant_id=$1 AND NOT($2=ANY(nr.present_fields) AND (${valueIsPresent}))
+          LIMIT 1`,[tenantId,fieldApi]);
         if(missing.rowCount)throw new Error('Required field cannot be enabled while records have no value');
       }
       if(field.controllerFieldApiName){
@@ -927,15 +935,14 @@ export class ObjectDefinitionService {
           ||Object.values(field.valueSettings).some(values=>values.some(value=>!field.picklistValues.includes(value))))
           throw new Error('Invalid dependent picklist values');
         if(dependencyChanged){
+          const meta=await native();
+          const controller=nativeValueSql(meta,field.controllerFieldApiName,'nr',true);
+          const dependent=nativeValueSql(meta,fieldApi,'nr',true);
           const existing=await client.query<{controller_value:string|null;dependent_value:string|null}>(`
-            SELECT controller.value_text AS controller_value,dependent.value_text AS dependent_value
-            FROM md_records r
-            JOIN md_record_values dependent ON dependent.tenant_id=r.tenant_id AND dependent.record_id=r.id
-              AND dependent.field_api=$3
-            LEFT JOIN md_record_values controller ON controller.tenant_id=r.tenant_id
-              AND controller.record_id=r.id AND controller.field_api=$4
-            WHERE r.tenant_id=$1 AND r.object_api=$2
-          `,[tenantId,objectApi,fieldApi,field.controllerFieldApiName]);
+            SELECT ${controller} AS controller_value,${dependent} AS dependent_value
+            FROM ${nativeTableSql(meta)} nr
+            WHERE nr.tenant_id=$1 AND $2=ANY(nr.present_fields)
+          `,[tenantId,fieldApi]);
           if(existing.rows.some(row=>row.dependent_value!==null
             &&!field.valueSettings[row.controller_value??'']?.includes(row.dependent_value)))
             throw new Error('Dependent picklist update conflicts with existing record values');
@@ -955,15 +962,14 @@ export class ObjectDefinitionService {
       if(picklistValuesChanged){
         const removed=(current.picklistValues??[]).filter(value=>!field.picklistValues.includes(value));
         if(removed.length){
-          const inUse=currentUsesPicklist&&current.dataType.toLowerCase().replace(/[\s-]/g,'')==='multipicklist'
-            ?await client.query(`SELECT 1 FROM md_record_values
-              WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3 AND EXISTS(
-                SELECT 1 FROM unnest(string_to_array(value_text,';')) selected(value)
-                WHERE selected.value=ANY($4::text[])) LIMIT 1`,
-            [tenantId,objectApi,fieldApi,removed])
-            :await client.query(`SELECT 1 FROM md_record_values
-              WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3
-                AND value_text=ANY($4::text[]) LIMIT 1`,[tenantId,objectApi,fieldApi,removed]);
+          const meta=await native();
+          const value=nativeValueSql(meta,fieldApi,'nr',true);
+          const multiple=currentUsesPicklist&&current.dataType.toLowerCase().replace(/[\s-]/g,'')==='multipicklist';
+          const inUse=await client.query(`SELECT 1 FROM ${nativeTableSql(meta)} nr
+            WHERE nr.tenant_id=$1 AND $2=ANY(nr.present_fields) AND
+              ${multiple?`EXISTS(SELECT 1 FROM unnest(string_to_array(${value},';')) selected(value)
+               WHERE selected.value=ANY($3::text[]))`:`${value}=ANY($3::text[])`}
+            LIMIT 1`,[tenantId,fieldApi,removed]);
           if(inUse.rowCount)throw new Error('Picklist values cannot be removed while records use them');
         }
       }
@@ -1029,13 +1035,11 @@ export class ObjectDefinitionService {
               VALUES($1,$2,$3,$4,$5)`,[tenantId,objectApi,fieldApi,controllerValue,value]);
         }
       }
-      await client.query(`UPDATE md_record_values SET is_unique=$4,case_sensitive=$5
-        WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
-      [tenantId,objectApi,fieldApi,unique,caseSensitive]);
       if(typeDefinitionChanged&&field.dataType==='rollup'){
         if(!this.migrationRuntime.recalculateRollup)
           throw new Error('Roll-Up Summary migration requires the shared record runtime');
         await this.migrationRuntime.recalculateRollup(client,tenantId,objectApi,fieldApi);
+        const meta=await native();
         await client.query(`UPDATE md_field_type_migration_values m SET
             after_value_text=v.value_text,after_value_number=v.value_number::text,
             after_value_boolean=v.value_boolean,after_value_date=v.value_date::text,
@@ -1044,9 +1048,10 @@ export class ObjectDefinitionService {
             after_address_street=v.address_street,after_address_city=v.address_city,
             after_address_state=v.address_state,after_address_postal_code=v.address_postal_code,
             after_address_country=v.address_country,after_value_exists=true
-          FROM md_record_values v WHERE m.tenant_id=$1 AND m.migration_id=$4
-            AND v.tenant_id=m.tenant_id AND v.record_id=m.record_id
-            AND v.object_api=m.object_api AND v.field_api=$3`,
+          FROM md_records r ${readNativeValueRows(meta,'r')}
+          WHERE m.tenant_id=$1 AND m.migration_id=$4
+            AND r.tenant_id=m.tenant_id AND r.id=m.record_id
+            AND r.object_api=m.object_api AND v.field_api=$3`,
         [tenantId,objectApi,fieldApi,fieldTypeMigrationId]);
       }
     });
@@ -1082,19 +1087,46 @@ export class ObjectDefinitionService {
     });
     return this.get(tenantId,objectApi);
   }
+  /** Remove one tenant's native values; shared typed columns remain for other tenants. */
+  private async clearNativeField(client:PoolClient,tenantId:string,objectApi:string,fieldApi:string){
+    const activated=await client.query('SELECT 1 FROM md_native_objects WHERE tenant_id=$1 AND object_api=$2',
+      [tenantId,objectApi]);
+    if(!activated.rowCount)return;
+    const meta=await loadNativeFields(client,tenantId,objectApi);
+    const field=meta.fields.get(fieldApi);
+    const table=nativeTableSql(meta);
+    // Typed columns are generated names validated by loadNativeFields.
+    const column=field?.column?'"'+field.column+'"':null;
+    await client.query(`UPDATE ${table} SET ${column?column+'=NULL, ':''}
+      extras=extras-$2,present_fields=array_remove(present_fields,$2)
+      WHERE tenant_id=$1 AND ($2=ANY(present_fields) OR extras ? $2
+        ${column?' OR '+column+' IS NOT NULL':''})`,[tenantId,fieldApi]);
+    await client.query('DELETE FROM md_native_fields WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
+      [tenantId,objectApi,fieldApi]);
+    await client.query('DELETE FROM md_record_search_values WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
+      [tenantId,objectApi,fieldApi]);
+    if(column){
+      const shared=await client.query(`SELECT 1 FROM md_native_fields f
+        JOIN md_native_objects o ON o.tenant_id=f.tenant_id AND o.object_api=f.object_api
+        WHERE o.table_name=$1 AND f.column_name=$2 LIMIT 1`,[meta.table,field!.column]);
+      if(!shared.rowCount)await client.query(`ALTER TABLE ${table} DROP COLUMN IF EXISTS ${column}`);
+    }
+  }
   private async purgeExpiredDeletedFields(client:PoolClient,tenantId:string){
     const expired=await client.query<{object_api:string;api_name:string;id:string}>(`
       SELECT object_api,api_name,id FROM md_field_definitions
       WHERE tenant_id=$1 AND deleted_at<=now()-interval '15 days'
+        -- Until Task H drops the legacy values FK, only empty Objects can safely
+        -- hard-delete field metadata without touching legacy record values.
+        AND NOT EXISTS(SELECT 1 FROM md_records r
+          WHERE r.tenant_id=md_field_definitions.tenant_id AND r.object_api=md_field_definitions.object_api)
       ORDER BY object_api,api_name FOR UPDATE
     `,[tenantId]);
     for(const field of expired.rows){
       await client.query(`DELETE FROM md_record_history
         WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
       [tenantId,field.object_api,field.api_name]);
-      await client.query(`DELETE FROM md_record_values
-        WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
-      [tenantId,field.object_api,field.api_name]);
+      await this.clearNativeField(client,tenantId,field.object_api,field.api_name);
       await client.query(`DELETE FROM md_object_page_layout_fields
         WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
       [tenantId,field.object_api,field.api_name]);
@@ -1145,6 +1177,7 @@ export class ObjectDefinitionService {
           AND deleted_at>now()-interval '15 days' RETURNING id,data_type`,
       [tenantId,objectApi,fieldApi]);
       if(!restored.rowCount)throw new Error('Field not found or recovery period expired');
+      await client.query('SELECT md_native_configure_field($1,$2,$3)',[tenantId,objectApi,fieldApi]);
       // Child rows changed while the Roll-Up Summary was deleted: bring its stored totals up to date.
       if(restored.rows[0]?.data_type==='rollup'&&this.migrationRuntime.recalculateRollup)
         await this.migrationRuntime.recalculateRollup(client,tenantId,objectApi,fieldApi);
@@ -1190,6 +1223,7 @@ export class ObjectDefinitionService {
       await client.query(`UPDATE md_field_definitions SET deleted_at=now()
         WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND deleted_at IS NULL`,
         [tenantId,objectApi,fieldApi]);
+      await this.clearNativeField(client,tenantId,objectApi,fieldApi);
     });
     return this.get(tenantId,objectApi);
   }

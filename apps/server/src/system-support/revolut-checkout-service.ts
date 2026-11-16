@@ -6,6 +6,8 @@ import type {NamedCredentialService} from './named-credential-service.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {IntegrationActivityWriter} from './integration-api-log.js';
 import {requestExternalHttps,publicHttpsUrl} from './external-http-transport.js';
+import {createPaymentOrder,paymentOrderStatus,PaymentOrderError} from './payment-order-service.js';
+export {paymentAmountMinor as revolutMinorAmount} from './payment-order-service.js';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const NAME=/^[A-Za-z][A-Za-z0-9_]{0,127}$/;
@@ -65,19 +67,6 @@ export function revolutEventState(event:string):'completed'|'authorised'|'failed
  if(event==='ORDER_CANCELLED')return 'cancelled';
  if(['ORDER_FAILED','ORDER_PAYMENT_DECLINED','ORDER_PAYMENT_FAILED'].includes(event))return 'failed';
  return null;
-}
-
-export function revolutMinorAmount(amount:unknown,currency:string):number{
- if(typeof amount!=='number'||!Number.isFinite(amount)||amount<=0||amount>1e8
-   ||!/^[A-Z]{3}$/.test(currency))throw Error('Invalid payment amount or currency');
- let places:number;
- try{places=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits??2;}
- catch{throw Error('Unsupported currency');}
- if(places<0||places>3)throw Error('Unsupported currency precision');
- const multiplier=10**places,minor=Math.round(amount*multiplier);
- if(!Number.isSafeInteger(minor)||minor<=0||Math.abs(amount*multiplier-minor)>0.000001)
-  throw Error('Payment amount has invalid precision');
- return minor;
 }
 
 type Credential={
@@ -158,59 +147,42 @@ export function registerRevolutCheckoutRoutes(
  }));
  app.post('/api/revolut/checkout/orders',route(async(req,res)=>{
   const who=actor(req);if(!who)throw Error('Authentication required');
-  const recordId=req.body?.recordId,attemptKey=req.body?.attemptKey;
-  if(typeof recordId!=='string'||!UUID.test(recordId)
-    ||typeof attemptKey!=='string'||!UUID.test(attemptKey))
-   {res.status(400).json({error:'Invalid payment record or attempt'});return;}
   const c=await connected(who.tenant_id),s=settings(c);
-  const record=await records.get(who.tenant_id,who.user_id,s.recordObject,recordId);
-  const amount=revolutMinorAmount(record[s.amountField],s.currency);
-  const previous=await db.query<{id:string;public_token:string;source_record_id:string;amount_minor:number}>(`
-   SELECT id,public_token,source_record_id,amount_minor FROM md_revolut_checkout_orders
-   WHERE tenant_id=$1 AND created_by=$2 AND attempt_key=$3`,
-   [who.tenant_id,who.user_id,attemptKey]);
-  if(previous.rows[0]){
-   if(previous.rows[0].source_record_id!==recordId||Number(previous.rows[0].amount_minor)!==amount)
-    {res.status(409).json({error:'Payment attempt does not match the record'});return;}
-   res.json({id:previous.rows[0].id,token:previous.rows[0].public_token});return;
+  try{
+   const payment=await createPaymentOrder(db,records,{
+    tenantId:who.tenant_id,userId:who.user_id,provider:'Revolut',
+    credentialId:c.id,sourceObject:s.recordObject,recordId:req.body?.recordId,
+    amountField:s.amountField,currency:s.currency,attemptKey:req.body?.attemptKey
+   },async({amountMinor,currency,attemptKey})=>{
+    const order=await merchant(who.tenant_id,c,'POST','api/orders',
+     {amount:amountMinor,currency,merchant_order_data:{reference:attemptKey}},attemptKey);
+    if(typeof order.id!=='string'||!UUID.test(order.id)
+      ||typeof order.token!=='string'||order.token.length<8||order.token.length>500)
+     throw Error('Revolut order returned no usable checkout token');
+    return {providerOrderId:order.id,checkoutToken:order.token};
+   });
+   res.status(payment.reused?200:201).json({id:payment.id,token:payment.token});
+  }catch(error){
+   if(error instanceof PaymentOrderError){
+    res.status(error.httpStatus).json({error:error.message});return;
+   }
+   throw error;
   }
-  const existing=await db.query(`
-   SELECT 1 FROM md_revolut_checkout_orders WHERE tenant_id=$1 AND source_object=$2
-    AND source_record_id=$3 AND status='completed' LIMIT 1`,
-   [who.tenant_id,s.recordObject,recordId]);
-  if(existing.rows.length){res.status(409).json({error:'This record is already paid'});return;}
-  const order=await merchant(who.tenant_id,c,'POST','api/orders',
-   {amount,currency:s.currency,merchant_order_data:{reference:attemptKey}},attemptKey);
-  if(typeof order.id!=='string'||!UUID.test(order.id)
-    ||typeof order.token!=='string'||order.token.length<8||order.token.length>500)
-   throw Error('Revolut order returned no usable checkout token');
-  const {rows}=await db.query<{id:string;public_token:string}>(`
-   INSERT INTO md_revolut_checkout_orders
-     (tenant_id,credential_id,created_by,source_object,source_record_id,attempt_key,
-      revolut_order_id,public_token,amount_minor,currency)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-   ON CONFLICT(tenant_id,created_by,attempt_key) DO UPDATE
-    SET updated_at=md_revolut_checkout_orders.updated_at
-    WHERE md_revolut_checkout_orders.source_record_id=EXCLUDED.source_record_id
-     AND md_revolut_checkout_orders.source_object=EXCLUDED.source_object
-     AND md_revolut_checkout_orders.amount_minor=EXCLUDED.amount_minor
-     AND md_revolut_checkout_orders.currency=EXCLUDED.currency
-   RETURNING id,public_token`,
-   [who.tenant_id,c.id,who.user_id,s.recordObject,recordId,attemptKey,
-    order.id,order.token,amount,s.currency]);
-  if(!rows[0]){res.status(409).json({error:'Payment attempt does not match the record'});return;}
-  res.status(201).json({id:rows[0].id,token:rows[0].public_token});
  }));
  app.get('/api/revolut/checkout/orders/:id',route(async(req,res)=>{
   const who=actor(req);if(!who)throw Error('Authentication required');
-  if(!UUID.test(req.params.id)){res.status(400).json({error:'Invalid order ID'});return;}
-  const {rows}=await db.query<{status:string;last_event:string|null}>(`
-   SELECT status,last_event FROM md_revolut_checkout_orders
-   WHERE tenant_id=$1 AND id=$2 AND created_by=$3`,
-   [who.tenant_id,req.params.id,who.user_id]);
-  if(!rows[0]){res.status(404).json({error:'Order not found'});return;}
-  res.setHeader('Cache-Control','private, no-store');
-  res.json({status:rows[0].status});
+  try{
+   const status=await paymentOrderStatus(db,{
+    tenantId:who.tenant_id,userId:who.user_id,provider:'Revolut'
+   },req.params.id);
+   res.setHeader('Cache-Control','private, no-store');
+   res.json({status});
+  }catch(error){
+   if(error instanceof PaymentOrderError){
+    res.status(error.httpStatus).json({error:error.message});return;
+   }
+   throw error;
+  }
  }));
  app.post('/api/revolut/checkout/webhook/register',route(async(req,res)=>{
   const who=actor(req);if(!who)throw Error('Authentication required');

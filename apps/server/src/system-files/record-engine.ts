@@ -1,8 +1,9 @@
 import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {recordReadScope,forgetScopedRecords} from '../system-support/record-read-scope.js';
 export {withRecordReadScope} from '../system-support/record-read-scope.js';
-import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
-import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
+import type {RecordStoredValue} from './record-value-write.js';
+import {writeNativeValues} from './native-values.js';
+import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -1006,7 +1007,7 @@ export class RecordEngine {
       prepared.set(field.api_name,{value_text:value,reference_record_id:null,
         is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive});
     }
-    await writeRecordValues(client,tenantId,objectApi,rows[0].id,prepared,false);
+    await writeNativeValues(client,tenantId,objectApi,rows[0].id,prepared);
     const parents=await rollupParents(client,tenantId,objectApi,rows[0].id);
     await refreshRollups(client,tenantId,objectApi,parents);
     return rows[0].id;
@@ -1561,9 +1562,15 @@ export class RecordEngine {
       // Field history: previous values of all written fields in ONE read, changed ones in ONE insert.
       type Previous={field_api:string;value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null};
       const historyFields=[...writeValues.keys()].filter(field=>!field.startsWith('__'));
-      const previousRows=historyFields.length?(await transactionClient.query<Previous>(
-        'SELECT field_api,value_text,reference_record_id,geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=ANY($3::text[])',
-        [tenantId,id,historyFields])).rows:[];
+      const historyMeta=historyFields.length?await loadNativeFields(transactionClient,tenantId,objectApi):null;
+      const previousRows=historyMeta?(await transactionClient.query<Previous>(
+        `SELECT v.field_api,v.value_text,v.reference_record_id,
+          v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,
+          v.address_state,v.address_postal_code,v.address_country
+          FROM md_records r ${readNativeValueRows(historyMeta,'r')}
+          WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+            AND v.field_api=ANY($4::text[])`,
+        [tenantId,objectApi,id,historyFields])).rows:[];
       const previousByField=new Map<string,Previous>();
       for(const row of previousRows)if(!previousByField.has(row.field_api))previousByField.set(row.field_api,row);
       const history:Array<[string,string|null,string|null]>=[];
@@ -1593,7 +1600,7 @@ export class RecordEngine {
         'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL) '+
         'ORDER BY h.ordinal',
         [tenantId,id,objectApi,userId,history.map(h=>h[0]),history.map(h=>h[1]),history.map(h=>h[2])]);
-      await writeRecordValues(transactionClient,tenantId,objectApi,id,writeValues,true);
+      await writeNativeValues(transactionClient,tenantId,objectApi,id,writeValues);
       if(this.richTextFilePruner){
         const richTextFields=(await this.fields(tenantId,objectApi,transactionClient))
           .filter(field=>field.data_type==='richtext'&&writeValues.has(field.api_name));

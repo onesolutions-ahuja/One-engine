@@ -1,7 +1,8 @@
 import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
 import {RECORD_ACCESS_FAST_DDL} from './record-access-fast.js';
 import {createHash} from 'node:crypto';
-import {REVOLUT_PAYMENT_DDL} from './revolut-checkout-service.js';
+import {REVOLUT_PAYMENT_DDL,LEGACY_REVOLUT_PAYMENT_COPY} from './revolut-payment-legacy-migration.js';
+import {PAYMENT_ORDER_DDL} from './payment-order-service.js';
 import {readdirSync,readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
@@ -118,8 +119,10 @@ export async function applySystemMigrations(db:SqlPersistence) {
   }
   // Upgrade-safe shared-till saved sign-ins (idempotent; the SQL baseline is immutable).
   await client.query(TILL_DEVICE_DDL);
-  // Idempotent, upgrade-safe tenant-bound checkout receipts. No application Flow required.
+  // Preserve old receipts for rollback while moving checkout onto a shared order store.
   await client.query(REVOLUT_PAYMENT_DDL);
+  await client.query(PAYMENT_ORDER_DDL);
+  await client.query(LEGACY_REVOLUT_PAYMENT_COPY);
   // Upgrade-safe AppExchange publishing tables (idempotent; the SQL baseline is immutable).
   await client.query(`-- AppExchange publishing: a catalogue app published from a tenant-authored app.
 CREATE TABLE IF NOT EXISTS md_app_publications (

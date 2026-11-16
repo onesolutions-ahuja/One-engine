@@ -1944,11 +1944,8 @@ export class RecordEngine {
           AND parent.is_deleted=true AND parent.deletion_group_id IS DISTINCT FROM $3::uuid
         LIMIT 1`,[tenantId,rows.map(row=>row.id),record.deletion_group_id]);
       if(external.rowCount)throw new Error('Restore the master record first');
-      await client.query(`UPDATE md_record_values v SET record_is_deleted=false
-        FROM md_records r
-        WHERE v.tenant_id=r.tenant_id AND v.record_id=r.id AND
-          r.tenant_id=$1 AND r.deletion_group_id=$2 AND r.is_deleted=true`,
-        [tenantId,record.deletion_group_id]);
+      // md_records is authoritative for deletion state; its native-row trigger
+      // restores is_deleted at the same time, without touching EAV flags.
       await client.query(`UPDATE md_records SET is_deleted=false,deleted_at=NULL,deleted_by=NULL,
         deletion_group_id=NULL,deletion_root_id=NULL,updated_at=now()
         WHERE tenant_id=$1 AND deletion_group_id=$2 AND is_deleted=true`,
@@ -1958,6 +1955,9 @@ export class RecordEngine {
       }>(`SELECT source_record_id,source_object_api,field_api,target_record_id
         FROM md_deleted_lookup_links WHERE tenant_id=$1 AND deletion_group_id=$2`,
         [tenantId,record.deletion_group_id]);
+      const restoreBySource=new Map<string,{
+        objectApi:string;recordId:string;targets:Map<string,string>
+      }>();
       for(const link of links){
         const resource=link.source_object_api+'.'+link.field_api;
         if(!await this.rbac.allowed(tenantId,userId,link.source_object_api,'edit')
@@ -1965,31 +1965,59 @@ export class RecordEngine {
         try {
           await this.rbac.requireRecord(tenantId,userId,link.source_object_api,link.source_record_id,'edit');
         } catch {continue;}
-        const restored=await client.query(`UPDATE md_record_values v
-          SET value_text='',reference_record_id=$5::uuid
-          FROM md_records source,md_records target,md_field_definitions field
-          WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.object_api=$3 AND v.field_api=$4
-            AND v.reference_record_id IS NULL AND v.value_text IS NULL
-            AND source.tenant_id=v.tenant_id AND source.id=v.record_id AND source.is_deleted=false
-            AND target.tenant_id=v.tenant_id AND target.id=$5::uuid AND target.is_deleted=false
-            AND field.tenant_id=v.tenant_id AND field.object_api=v.object_api
-            AND field.api_name=v.field_api AND field.related_object=target.object_api
-            AND field.deleted_at IS NULL RETURNING v.record_id`,
-          [tenantId,link.source_record_id,link.source_object_api,link.field_api,
-            link.target_record_id]);
-        if(restored.rowCount){
-          await client.query(`DELETE FROM md_deleted_lookup_links
-            WHERE tenant_id=$1 AND deletion_group_id=$2 AND source_record_id=$3 AND field_api=$4`,
-            [tenantId,record.deletion_group_id,link.source_record_id,link.field_api]);
-          await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
-            [tenantId,link.source_object_api,link.source_record_id]);
-          const sourceParents=await rollupParents(client,tenantId,link.source_object_api,link.source_record_id);
-          await refreshRollups(client,tenantId,link.source_object_api,sourceParents);
-          await client.query(`INSERT INTO md_record_history
-            (tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value)
-            VALUES($1,$2,$3,$4,$5,NULL,$6)`,
-            [tenantId,link.source_record_id,link.source_object_api,link.field_api,userId,link.target_record_id]);
+        // Only recover into a live source when the target and field still match.
+        const valid=await client.query(`SELECT 1 FROM md_records source
+          JOIN md_records target ON target.tenant_id=source.tenant_id
+            AND target.id=$5::uuid AND target.is_deleted=false
+          JOIN md_field_definitions field ON field.tenant_id=source.tenant_id
+            AND field.object_api=source.object_api AND field.api_name=$4
+            AND field.related_object=target.object_api AND field.deleted_at IS NULL
+          WHERE source.tenant_id=$1 AND source.id=$2 AND source.object_api=$3
+            AND source.is_deleted=false`,
+          [tenantId,link.source_record_id,link.source_object_api,link.field_api,link.target_record_id]);
+        if(!valid.rowCount)continue;
+        const key=JSON.stringify([link.source_object_api,link.source_record_id]);
+        let entry=restoreBySource.get(key);
+        if(!entry){
+          entry={objectApi:link.source_object_api,recordId:link.source_record_id,targets:new Map()};
+          restoreBySource.set(key,entry);
         }
+        if(!entry.targets.has(link.field_api))entry.targets.set(link.field_api,link.target_record_id);
+      }
+      for(const entry of restoreBySource.values()){
+        const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+        const {rows:current}=await client.query<{
+          field_api:string;value_text:string|null;reference_record_id:string|null
+        }>(`SELECT v.field_api,v.value_text,v.reference_record_id FROM md_records r
+          ${readNativeValueRows(meta,'r')}
+          WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+            AND v.field_api=ANY($4::text[])`,
+          [tenantId,entry.objectApi,entry.recordId,[...entry.targets.keys()]]);
+        const existing=new Map(current.map(row=>[row.field_api,row]));
+        const recovered=[...entry.targets].filter(([field])=>{
+          const value=existing.get(field);
+          return !value||(value.reference_record_id===null&&(value.value_text===null||value.value_text===''));
+        });
+        if(!recovered.length)continue;
+        // One UPDATE on the source's native row, even if multiple links recover.
+        const values=new Map<string,Storable>(recovered.map(([field,target])=>[field,{
+          value_text:'',reference_record_id:target,is_unique:false,case_sensitive:false
+        }]));
+        await writeNativeValues(client,tenantId,entry.objectApi,entry.recordId,values);
+        await client.query(`DELETE FROM md_deleted_lookup_links
+          WHERE tenant_id=$1 AND deletion_group_id=$2 AND source_record_id=$3
+            AND field_api=ANY($4::text[])`,
+          [tenantId,record.deletion_group_id,entry.recordId,recovered.map(([field])=>field)]);
+        await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
+          [tenantId,entry.objectApi,entry.recordId]);
+        const sourceParents=await rollupParents(client,tenantId,entry.objectApi,entry.recordId);
+        await refreshRollups(client,tenantId,entry.objectApi,sourceParents);
+        await client.query(`INSERT INTO md_record_history
+          (tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value)
+          SELECT $1,$2,$3,links.field_api,$4,NULL,links.target_id
+          FROM unnest($5::text[],$6::text[]) AS links(field_api,target_id)`,
+          [tenantId,entry.recordId,entry.objectApi,userId,
+            recovered.map(([field])=>field),recovered.map(([,target])=>target)]);
       }
       // Keep unresolved recovery links for privileged/manual reconciliation.
       // Never discard them when a source Field or the user's edit rights have changed.

@@ -4,7 +4,7 @@ export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
 import {activateNativeObject} from '../system-support/native-object-storage.js';
-import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
+import {nativeFieldExpression,nativeRecordJoin,nativeValueSql,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -323,6 +323,7 @@ export class RecordEngine {
         ||!await canRead(objectApi,relationship.api_name)||!await canRead(targetObject,fieldApi)){
         referenceCache.set(key,null);return;
       }
+      const meta=await loadNativeFields(client??this.db,tenantId,targetObject);
       const result=await (client??this.db).query<{
         value_text:string|null;reference_record_id:string|null;data_type:string|null;
         value_date:string|null;value_datetime:Date|string|null;rollup_source_data_type:string|null;
@@ -335,9 +336,8 @@ export class RecordEngine {
            WHERE summary.tenant_id=f.tenant_id AND summary.object_api=f.object_api
              AND summary.api_name=f.api_name AND summary.data_type='rollup') AS rollup_source_data_type
         FROM md_records r
-        LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id
-          AND v.object_api=r.object_api AND v.field_api=$4
-        LEFT JOIN md_field_definitions f ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api
+        ${readNativeValueRows(meta,'r')} AND v.field_api=$4
+        LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id AND f.object_api=r.object_api
           AND f.api_name=v.field_api AND f.deleted_at IS NULL
         WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false
           AND ${migrationMode?'true':"md_record_access($1,$5,r.id,'read')"}`,
@@ -600,11 +600,11 @@ export class RecordEngine {
       const matches:boolean[]=[];
       for(const filter of rows.filter(row=>row.field_api===fieldApi)){
         // Query values through the same tenant boundary without dynamic SQL.
+        const targetMeta=await loadNativeFields(executor,tenantId,filter.related_object);
         const target=await executor.query<{
           value_text:string|null;reference_record_id:string|null;id:string
         }>(`SELECT r.id,v.value_text,v.reference_record_id FROM md_records r
-          LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id
-            AND v.field_api=$4
+          ${readNativeValueRows(targetMeta,'r')} AND v.field_api=$4
           WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false`,
           [tenantId,filter.related_object,lookup,filter.related_field_api]);
         if(!target.rows[0])throw Error('Invalid required lookup filter: '+fieldApi);
@@ -1028,6 +1028,7 @@ export class RecordEngine {
     const [,definitions]=await Promise.all([
       this.rbac.require(tenantId,userId,objectApi,'read'),
       this.fields(tenantId,objectApi)]);
+    const nativeMeta=await loadNativeFields(this.db,tenantId,objectApi);
     const pageSize=Math.min(Math.max(limit,1),100),start=options.cursor?0:Math.max(offset,0);
     const byApi=new Map(definitions.map(field=>[field.api_name,field]));
     const fieldFor=(name:string|undefined)=>{
@@ -1315,10 +1316,7 @@ export class RecordEngine {
         v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,v.address_postal_code,
         v.address_country,f.data_type
       FROM totals LEFT JOIN selected r ON true
-      ${nativeValuesJoin(definitions)??`LEFT JOIN md_record_values v ON v.tenant_id=$1 AND v.record_id=r.id AND v.object_api=$2
-        AND EXISTS(SELECT 1 FROM md_field_definitions active_field
-          WHERE active_field.tenant_id=v.tenant_id AND active_field.object_api=v.object_api
-            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)`}
+      ${readNativeValueRows(nativeMeta,'r')}
       LEFT JOIN md_field_definitions f ON f.tenant_id=$1 AND f.object_api=$2 AND f.api_name=v.field_api
         AND f.deleted_at IS NULL
       ORDER BY ${resultOrder}
@@ -1471,6 +1469,7 @@ export class RecordEngine {
     if(!uuid.test(id))throw new Error('Invalid record ID');
     const [,definitions]=await Promise.all([this.rbac.require(tenantId,userId,objectApi,'read'),this.fields(tenantId,objectApi,client)]);
     const query=client??this.db;
+    const nativeMeta=await loadNativeFields(query,tenantId,objectApi);
     const {rows}=await query.query<{
       id:string;created_at:Date;updated_at:Date;owner_id:string|null;record_type_id:string|null;is_clone:boolean;
       field_api:string|null;value_text:string|null;reference_record_id:string|null;data_type:string|null;
@@ -1482,10 +1481,7 @@ export class RecordEngine {
       v.field_api,v.value_text,v.reference_record_id,f.data_type,v.value_number,v.value_date,v.value_datetime,v.value_boolean,
       v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,v.address_postal_code,v.address_country
       FROM md_records r ${nativeRecordJoin(definitions)}
-      ${nativeValuesJoin(definitions)??`LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
-        AND EXISTS(SELECT 1 FROM md_field_definitions active_field
-          WHERE active_field.tenant_id=v.tenant_id AND active_field.object_api=v.object_api
-            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)`}
+      ${readNativeValueRows(nativeMeta,'r')}
       LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id AND f.object_api=r.object_api
         AND f.api_name=v.field_api AND f.deleted_at IS NULL
       WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false AND md_record_access($1,$4,r.id,'read') ORDER BY v.field_api`,

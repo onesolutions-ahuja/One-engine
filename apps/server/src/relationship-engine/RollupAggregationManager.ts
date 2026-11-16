@@ -1,5 +1,7 @@
 import type {PoolClient} from 'pg';
 import {scopedMetadata} from '../system-support/record-read-scope.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
+import {writeNativeValues} from '../system-files/native-values.js';
 /** The existing SQL rollup implementation, extracted verbatim from RecordEngine. */
 export async function rollupParents(client:PoolClient,tenantId:string,childObject:string,recordId:string) {
     const {rows}=await scopedMetadata('rollup-parents\u0000'+tenantId+'\u0000'+childObject,()=>client.query<{
@@ -13,10 +15,14 @@ export async function rollupParents(client:PoolClient,tenantId:string,childObjec
       &&typeof config.relationship_field==='string');
     if(!configs.length)return parents;
     const fields=[...new Set(configs.map(config=>config.relationship_field))];
-    const values=await client.query<{field_api:string;reference_record_id:string|null}>(
-      `SELECT field_api,reference_record_id FROM md_record_values
-       WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=ANY($4::text[])`,
-      [tenantId,childObject,recordId,fields]);
+    const native=await loadNativeFields(client,tenantId,childObject);
+    const slots=fields.map((field,index)=>
+      `(${nativeValueSql(native,field,'nr')},$${index+3}::text)`).join(',');
+    const values=await client.query<{field_api:string;reference_record_id:string|null}>(`
+      SELECT found.field_api,found.reference_record_id
+      FROM ${nativeTableSql(native)} nr
+      JOIN LATERAL (VALUES ${slots}) AS found(reference_record_id,field_api) ON true
+      WHERE nr.tenant_id=$1 AND nr.id=$2`,[tenantId,recordId,...fields]);
     const parentForField=new Map(configs.map(config=>[config.relationship_field,config.parent_object]));
     for(const value of values.rows){
       const parentObject=parentForField.get(value.field_api);
@@ -44,6 +50,8 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
       FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
         AND rollup_child_object=$2 AND deleted_at IS NULL`,
     [tenantId,childObject]));
+    const native=await loadNativeFields(client,tenantId,childObject);
+    const table=nativeTableSql(native);
     const rollups=rows.filter(rollup=>typeof rollup.parent_object==='string'
       &&typeof rollup.field_api==='string'&&typeof rollup.relationship_field==='string'
       &&typeof rollup.operation==='string');

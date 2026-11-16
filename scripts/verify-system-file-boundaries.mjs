@@ -16,7 +16,7 @@ const expected=['sql-persistence.ts','object-definition.ts','authentication.ts',
  'auto-number-format.ts','platform-event-runtime.ts','record-file-service.ts','rich-text.ts',
  'record-query.ts','field-type-migration.ts','encrypted-field.ts','object-metadata-history.ts','object-schema-lifecycle.ts','field-definition-attributes.ts',
  'declarative-rules.ts','record-matching.ts','external-id-upsert.ts',
- 'native-object-copy.ts','native-object-query.ts','record-value-write.ts'];
+ 'native-object-copy.ts','native-object-query.ts','native-values.ts','record-value-write.ts'];
 const allowed=new Set(expected);
 const nodeModules=new Set(['AssignmentNode.ts','DecisionNode.ts','WaitPauseNode.ts','LoopNode.ts','DataActionNodes.ts','NodeContext.ts','RecordNodeValidation.ts','GetRecordsNode.ts','CreateRecordsNode.ts','RecordMutationTargets.ts','RecordOverlapGuard.ts','RecordAvailabilityGuard.ts','AvailableSlotsNode.ts','DocumentFinancialGuard.ts','RecordPaymentGuard.ts','UpdateRecordsNode.ts','DeleteRecordsNode.ts','FilterCollectionNode.ts','SortCollectionNode.ts','TransformNode.ts','RollbackRecordsNode.ts','CustomErrorNode.ts','SubflowNode.ts','ScreenElementNode.ts','ActionNodeShared.ts','QuickActionNode.ts','PlatformEventPublishNode.ts','ActionEmailNode.ts','HttpCalloutNode.ts','CountCollectionNode.ts','ParseJsonNode.ts','BusinessContextNode.ts','ResumeEventNode.ts','ActionButtonNode.ts','CustomActionBridgeNode.ts']);
 const nodesDir=path.join(root,'nodes');

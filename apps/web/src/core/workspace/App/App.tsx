@@ -1,4 +1,4 @@
-import { loadPageBuilderFactory, loadObjectManagerFactory, LazyReportBuilder } from '../../builders/Entries/optionalBuilderEntries';
+import { loadPageBuilderFactory, loadObjectManagerFactory } from '../../builders/Entries/optionalBuilderEntries';
 import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
@@ -361,7 +361,7 @@ const LazySetupWorkspace = React.lazy(async () => {
     ]);
     return { default: createPageBuilder(MetadataComponentProperties, runtime.MetadataBoundPageComponent, runtime.LightningAppRuntime) };
   });
-  return { default: createSetupApp({isAuthErrorMessage, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords, apiRequest, ApiRequestError, fetchFlowListPage, customTabStyles, uneSolutionsLogoUrl, ProfilePasswordMenu, ConnectionHealthIndicator, LightningAppRuntime, RecordWorkspace, ObjectManager, PageBuilder, ReportBuilder, Permissions, SetupHome, AutomationSettingsWorkspace, CompanySettings, TenantMfaSettings, TenantSecurityAudit, TenantUserLockSettings, AccountSessionSecurity, TenantEmailRecoverySettings}) };
+  return { default: createSetupApp({isAuthErrorMessage, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords, apiRequest, ApiRequestError, fetchFlowListPage, customTabStyles, uneSolutionsLogoUrl, ProfilePasswordMenu, ConnectionHealthIndicator, LightningAppRuntime, RecordWorkspace, ObjectManager, PageBuilder, Permissions, SetupHome, AutomationSettingsWorkspace, CompanySettings, TenantMfaSettings, TenantSecurityAudit, TenantUserLockSettings, AccountSessionSecurity, TenantEmailRecoverySettings}) };
 });
 function SetupApp(props: {onLogout: () => void; entryTiming: EntryTiming | null}) {
   return <React.Suspense fallback={<div className="auth-loading">Loading workspace…</div>}><LazySetupWorkspace {...props} /></React.Suspense>;
@@ -383,7 +383,6 @@ function PageHeading({ eyebrow, title, description, actions }: { eyebrow?: strin
 // Builders and advanced settings are separate on-demand chunks, not login dependencies.
 const SetupHome = React.lazy(async () => ({ default: (await import('../../settings/SetupHome/setupHomeView')).createSetupHome(PageHeading) }));
 const ObjectManager = React.lazy(async () => ({ default: (await loadObjectManagerFactory())(apiRequest) }));
-const ReportBuilder = LazyReportBuilder;
 const Permissions = React.lazy(async () => ({ default: (await import('../../security/Permissions/permissionsView')).createPermissions(apiRequest, PageHeading) }));
 const settingsViewModules = () => import('../../settings/SettingsWorkspace/settingsWorkspaceViews').then(module => module.createSettingsViews(apiRequest, PageHeading));
 const AutomationSettingsWorkspace = React.lazy(async () => ({ default: (await settingsViewModules()).AutomationSettingsWorkspace }));

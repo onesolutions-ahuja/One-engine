@@ -2,7 +2,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import TenantManagement from '../src/core/platform/TenantManagement/TenantManagement';
 import OfflineBriefcaseSettings from '../src/core/platform/OfflineBriefcaseSettings/OfflineBriefcaseSettings';
-import DashboardBuilder from '../src/core/builders/DashboardBuilder/DashboardBuilder';
 import SchemaBuilder from '../src/core/builders/SchemaBuilder/SchemaBuilder';
 import OneTenantImage from '../src/component-libraries/shared/TenantImage.jsx';
 import SmartRuntime from '../src/component-libraries/smart/shared/SmartRuntime.jsx';
@@ -209,7 +208,6 @@ function Fixture(){
  else if(view==='offline-load-error')content=<OfflineBriefcaseSettings request={failingBriefcaseRequest} permitted objects={[object]}/>;
  else if(view==='offline-save-error')content=<OfflineBriefcaseSettings request={failingBriefcaseSaveRequest} permitted objects={[object]}/>;
  else if(view==='offline')content=<OfflineBriefcaseSettings request={request} permitted objects={[object]}/>;
- else if(view==='dashboard')content=<DashboardBuilder {...arrays} {...callbacks} userId="test" canCreate={params.get('allowed')==='true'} canManageAll={false} />;
  else if(view==='credentials'||view==='credentials-view'||view==='credentials-edit')content=<NamedCredentials credentials={credentials} canManage encryptionReady onTest={async()=>({connected:true,message:'Test available'})} onSave={noop} onDelete={noop}/>;
  else if(view==='flows')content=<FlowBuilder landing flow={defaultFlow} flows={[{...defaultFlow,apiName:'Long_Test_Flow',label:'A long automation name to verify the existing list remains readable',status:'Active'}]} libraryComponents={[]} objects={[]} users={[]} platformEvents={[]} namedCredentials={[]} emailAlerts={[]} connectorProviders={[]} integrationConnections={[]} approvalProcesses={[]} validation={{errors:[],warnings:[]}} onLoadCapabilities={async()=>({registryVersion:1,elements:[],flowTypes:[{type:'Screen Flow',description:'Guide users through a process',createEnabled:true,validateEnabled:true}]})} onLoadExternalServices={async()=>({services:[]})} onCreateFlow={(label,type)=>{window.createdFlow={label,type};}} />;
  else content=<FlowLogs logs={[{id:'run-id-with-a-very-long-identifier',flowLabel:'A long running automation with diagnostic details',flowApiName:'Long_Flow',status:'completed',flowType:'Record-Triggered Flow',startedAt:'2026-10-28T10:00:00Z',finishedAt:'2026-10-28T10:01:00Z',userId:'test-user'}]} loading={false} onOpenFlow={noop}/>;

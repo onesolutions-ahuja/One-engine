@@ -11,8 +11,6 @@ import {normalizedLoginIp} from './session-policy-service.js';
 import {registerConnectedPublicRoutes,registerGovernanceRoutes} from './security-governance-routes.js';
 import {createHash,randomUUID} from 'node:crypto';
 import {ComponentLibraryService} from './component-library-service.js';
-import {DashboardSnapshotService} from './dashboard-snapshot-service.js';
-import {DashboardSubscriptionService} from './dashboard-subscription-service.js';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import compression from 'compression';
 import { SqlPersistence } from '../system-files/sql-persistence.js';
@@ -69,11 +67,9 @@ import {registerDataLoaderRibbonRoutes} from './data-loader-ribbon.js';
 import {registerBusinessProcessRoutes} from './business-process-routes.js';
 import {registerObjectLabelTranslationRoutes,applyObjectLabelTranslations,requestedLabelLanguage} from './object-label-translation-routes.js';
 import {parseRecordCursor,parseRecordFilters} from '../system-files/record-query.js';
-import {SqlReportRuntime} from './sql-report-runtime.js';
 import {RecordCollaborationService} from './record-collaboration-service.js';
 import {ObjectQuickActionRuntime} from './object-quick-action-runtime.js';
 import {GlobalQuickActionMetadataService} from './global-quick-action-metadata.js';
-import {RecordRetentionService} from './record-retention-service.js';
 import {RecordListViewService,type ViewInput} from './record-list-view-service.js';
 import {RecordFileService} from '../system-files/record-file-service.js';
 import {TenantMediaService} from '../system-files/tenant-media-service.js';
@@ -88,9 +84,7 @@ import {registerOutboundWebhookRoutes} from './outbound-webhook-service.js';
 import {registerDockerMailAdminRoutes} from './docker-mail-admin-routes.js';
 import {registerDockerMailWebRoutes} from './docker-mail-web-routes.js';
 import {MailAdminAccess} from './mail-admin-access.js';
-import {registerInboundWebhookPublicRoutes,registerInboundWebhookAdminRoutes} from './inbound-webhook-service.js';
-import {createIntegrationCommunicationWriter,IntegrationCommunicationOutbox} from './integration-api-log.js';
-import {countTenantApiRequests,registerTenantInspectionRoutes} from './tenant-inspection-routes.js';
+import type {IntegrationActivityWriter} from './integration-api-log.js';
 import {registerDurableJobAdminRoutes} from './durable-job-admin-routes.js';
 import {registerScheduledActionRoutes} from './scheduled-action-routes.js';
 import {sendActionCommunication} from './action-formula-communication-service.js';
@@ -265,27 +259,13 @@ export function createSystemServer(db:SqlPersistence) {
     } as typeof res.writeHead;
     next();
   }));
-  // Log webhook ingress and response status without logging query tokens, signatures,
-  // request bodies, or credential material. This distinguishes delivery from processing failures.
-  app.use((req,res,next)=>{
-    if(/^\/api\/inbound-webhooks\/[^/]+\/?$/.test(req.path)){
-      const started=Date.now();
-      res.on('finish',()=>console.info('Inbound webhook request',JSON.stringify({
-        method:req.method,path:req.path,status:res.statusCode,durationMs:Date.now()-started
-      })));
-    }
-    next();
-  });
   let adminMailAccess:MailAdminAccess|undefined;
   registerDockerMailWebRoutes(app,undefined,undefined,undefined,()=>adminMailAccess);
   app.use('/api/media-assets',express.json({limit:'8mb'}));
   // XLSX is carried as base64 JSON; bound this route separately from ordinary API payloads.
   app.use('/api/metadata/loader',express.json({limit:'15mb'}));
   app.use('/api/data-loader',express.json({limit:'15mb'}));
-  app.use(express.json({limit:'2mb',verify:(req,_res,bytes)=>{
-    if((req.url??'').startsWith('/api/inbound-webhooks/') && bytes.length<=262144)
-      (req as Request & {rawWebhookBody?:Buffer}).rawWebhookBody=Buffer.from(bytes);
-  }}));
+  app.use(express.json({limit:'2mb'}));
   app.use(express.urlencoded({extended:false,limit:'1mb'}));
   app.use((_req,res,next)=>{res.set(browserSecurityHeaders({frame_policy:'DENY',csp_enabled:true}));next();});
   const auth=new AuthenticationService(db);
@@ -301,26 +281,18 @@ export function createSystemServer(db:SqlPersistence) {
   const rbacAdministration=new RbacAdministration(db,rbac);
   const namedCredentials=new NamedCredentialService(db,rbac);
   const flowJobs=new DurableJobService(db);
-  const recordRetention=new RecordRetentionService(db,rbac);
   const recoverySettings=new PasswordRecoverySettingsService(db,rbac);
   const records=new RecordEngine(db,rbac,namedCredentials);
-  // Use a dedicated RecordEngine without record-trigger callbacks for system-generated API logs.
-  const integrationCommunicationOutbox=new IntegrationCommunicationOutbox(
-    db,createIntegrationCommunicationWriter(db,undefined,
-      (client,tenant,user,record)=>flowRecordTriggers.execute(client,tenant,user,'Communication','created',record,null,'after-save').then(()=>undefined)));
-  const integrationActivityWriter=integrationCommunicationOutbox.write;
-  namedCredentials.setIntegrationActivityWriter(integrationActivityWriter);
+  // TODO(native): integration API logging is switched off until native storage is ready.
+  const integrationActivityWriter:IntegrationActivityWriter=async()=>{};
   const externalIdUpsert=new ExternalIdUpsert(db,rbac,records);
   const recordListViews=new RecordListViewService(db,rbac);
-  const reportRuntime=new SqlReportRuntime(db,rbac,records);
   const collaboration=new RecordCollaborationService(db,rbac);
   const recordFiles=new RecordFileService(db,rbac);
   const tenantMedia=new TenantMediaService(db,rbac);
   records.setRichTextFilePruner((client,tenantId,objectApi,recordId,fieldApi,html)=>
     recordFiles.pruneUnreferenced(client,tenantId,objectApi,recordId,fieldApi,html));
   const systemDefinitions=new SystemDefinitionService(db,rbac);
-  const dashboardSnapshots=new DashboardSnapshotService(db,rbac,records,systemDefinitions);
-  const dashboardSubscriptions=new DashboardSubscriptionService(db,rbac,systemDefinitions,namedCredentials,dashboardSnapshots);
   const oauth=new OAuthAuthorizationService(db,rbac,namedCredentials,integrationActivityWriter);
   const mfa=new MfaService(db,rbac,auth,namedCredentials);
   const tillPins=new TillPinService(db);
@@ -627,7 +599,6 @@ export function createSystemServer(db:SqlPersistence) {
     }});
   registerMcpRoutes(app,{db,rbac,records,definitions,flows,pages,platform:platformTenants},authorize);
   registerConnectedPublicRoutes(app,connected);
-  registerInboundWebhookPublicRoutes(app,db,namedCredentials,flows,rbac,records,integrationActivityWriter);
   // Compiled page scripts: the script fetch carries a one-time ticket instead of a bearer token.
   const pageScriptDeps={db,rbac,records,pages,definitions,namedCredentials,scripts:new PageScriptService(),
     verifyPin:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>tillPins.verify(actor.tenant_id,
@@ -638,9 +609,7 @@ export function createSystemServer(db:SqlPersistence) {
   registerRevolutCheckoutRoutes(app,db,records,namedCredentials,rbac,integrationActivityWriter);
   registerGovernanceRoutes(app,db,rbac,auth,connected,securityMonitor);
   registerIdentityAdminRoutes(app,{sessions:sessionPolicies,federation,passkeys,backups});
-  app.use('/api',countTenantApiRequests(db));
   app.use('/services/data',authorize);
-  app.use('/services/data',countTenantApiRequests(db));
   // Durable notifications: only the addressed user can list or acknowledge them.
   const notificationView=(row:{id:string;recipient_id:string;title:string;body:string;flow_api_name:string;sent_by:string|null;created_at:Date;read_at:Date|null})=>({
     id:row.id,recipientId:row.recipient_id,title:row.title,body:row.body,
@@ -2140,32 +2109,6 @@ export function createSystemServer(db:SqlPersistence) {
     await namedCredentials.remove(actor.tenant_id,actor.user_id,req.params.id);
     res.status(204).end();
   }));
-  app.get('/api/metadata/dashboards/:apiName/snapshots',route(async(req,res)=>{
-    res.json({snapshots:await dashboardSnapshots.list(req.actor!,req.params.apiName)});
-  }));
-  app.post('/api/metadata/dashboards/:apiName/snapshots',route(async(req,res)=>{
-    res.status(201).json({snapshot:await dashboardSnapshots.create(req.actor!,req.params.apiName,req.body)});
-  }));
-  app.delete('/api/metadata/dashboards/:apiName/snapshots/:id',route(async(req,res)=>{
-    await dashboardSnapshots.remove(req.actor!,req.params.apiName,req.params.id);
-    res.status(204).end();
-  }));
-  app.get('/api/metadata/dashboards/:apiName/subscriptions',route(async(req,res)=>{
-    res.json({subscriptions:await dashboardSubscriptions.list(req.actor!,req.params.apiName)});
-  }));
-  app.post('/api/metadata/dashboards/:apiName/subscriptions',route(async(req,res)=>{
-    res.status(201).json({subscription:await dashboardSubscriptions.save(req.actor!,req.params.apiName,req.body)});
-  }));
-  app.put('/api/metadata/dashboards/:apiName/subscriptions/:id',route(async(req,res)=>{
-    res.json({subscription:await dashboardSubscriptions.save(req.actor!,req.params.apiName,req.body,req.params.id)});
-  }));
-  app.delete('/api/metadata/dashboards/:apiName/subscriptions/:id',route(async(req,res)=>{
-    await dashboardSubscriptions.remove(req.actor!,req.params.apiName,req.params.id);
-    res.status(204).end();
-  }));
-  app.post('/api/metadata/dashboards/:apiName/subscriptions/:id/run',route(async(req,res)=>{
-    res.json({subscription:await dashboardSubscriptions.run(req.actor!,req.params.apiName,req.params.id)});
-  }));
   // Universal SQL-backed definition API. Names are compatibility routes, data is SQL.
   app.post('/api/integration-connections/:id/test',route(async(req,res)=>{
     const actor=req.actor!;
@@ -2738,32 +2681,6 @@ export function createSystemServer(db:SqlPersistence) {
   app.post('/api/records/:objectApi/:id/chatter/:postId/comments',route(async(req,res)=>{
     res.status(201).json(await collaboration.addComment(req.actor!,req.params.objectApi,req.params.id,req.params.postId,req.body?.body));
   }));
-  app.post('/api/reports/preview',route(async(req,res)=>{
-    const actor=req.actor!;
-    res.json(await reportRuntime.run(actor,req.body?.report,req.body??{}));
-  }));
-  app.post('/api/reports/:apiName/run',route(async(req,res)=>{
-    const actor=req.actor!;
-    res.json(await reportRuntime.stored(actor,req.params.apiName,req.body??{}));
-  }));
-  // Retention is tenant-configured, defaults to no automatic permanent purge.
-  app.get('/api/recycle-bin/retention',route(async(req,res)=>{
-    const actor=req.actor!;res.setHeader('Cache-Control','private, no-store');
-    res.json(await recordRetention.get(actor.tenant_id,actor.user_id));
-  }));
-  app.put('/api/recycle-bin/retention',route(async(req,res)=>{
-    const actor=req.actor!;
-    if(!req.body||typeof req.body!=='object'||Array.isArray(req.body))
-      throw new Error('Invalid retention configuration');
-    res.setHeader('Cache-Control','private, no-store');
-    res.json(await recordRetention.set(actor.tenant_id,actor.user_id,
-      req.body.retentionDays,req.body.automaticPurgeEnabled));
-  }));
-  app.delete('/api/recycle-bin/records/:objectApi/:id/purge',route(async(req,res)=>{
-    const actor=req.actor!;res.setHeader('Cache-Control','private, no-store');
-    res.json(await recordRetention.purge(actor.tenant_id,actor.user_id,
-      req.params.objectApi,req.params.id));
-  }));
   // Shared, tenant-scoped record Recycle Bin. This is separate from field-definition recovery.
   app.get('/api/recycle-bin/records/:objectApi',route(async(req,res)=>{
     const actor=req.actor!;
@@ -3053,7 +2970,6 @@ export function createSystemServer(db:SqlPersistence) {
     res.status(204).end();
   }));
   registerDynamicApiRoutes(app,db,rbac,records,flows);
-  registerTenantInspectionRoutes(app,db,rbac,platformTenants);
   registerPackageApiController(app,metadataPackages);
   registerOpenApiExternalServiceRoutes(app,externalServices);
   registerDurableJobAdminRoutes(app,db,rbac);
@@ -3073,7 +2989,6 @@ export function createSystemServer(db:SqlPersistence) {
   registerBusinessContextRoutes(app,db,rbac,records);
   registerOutboundWebhookRoutes(app,db,rbac);
   registerDockerMailAdminRoutes(app,db,rbac,adminMailAccess,platformTenants);
-  registerInboundWebhookAdminRoutes(app,db,namedCredentials,rbac);
   app.use('/api',(_req,res)=>{res.status(404).json({error:'API endpoint not implemented in SQL runtime'});});
   registerSecurityWebHost(app,db,process.env.METADRIVE_WEB_DIST);
   app.use((err:Error,_req:Request,res:Response,_next:NextFunction)=>{
@@ -3110,6 +3025,7 @@ export function createSystemServer(db:SqlPersistence) {
       ||err.message.startsWith('Field definition changed after migration')
       ||err.message.startsWith('Field type is used by'))
       res.status(409).json({error:err.message});
+    else if(err.message==='Changing a field type is switched off for now')res.status(400).json({error:err.message});
     else if(/^(Field datatype|Field datatype conversion|Existing value|Numeric value|Only ISO|Migration to Rich Text|Required field migration|Roll-Up Summary|SUM roll-ups|MIN\/MAX roll-ups|Invalid roll-up|Formula |Invalid formula|Unsupported formula|PIN must|Invalid user id)/.test(err.message))
       res.status(400).json({error:err.message});
     else if(err.message==='Page already exists'||err.message==='Page API name already exists (archived)'||err.message==='Field already exists'||err.message==='Object already exists'||err.message==='Page layout revision conflict'||err.message==='Page layout draft revision conflict'||err.message==='Page revision conflict'||err.message==='Record has changed since it was loaded')res.status(409).json({error:err.message});
@@ -3186,23 +3102,18 @@ export async function startSystemServer() {
   const port=Number(process.env.PORT??10000);
   if(!Number.isInteger(port)||port<1||port>65535) throw new Error('Invalid PORT');
   const definitions=new ObjectDefinitionService(db);
-  const retention=new RecordRetentionService(db,new RbacEngine(db));
   await definitions.purgeExpiredFields();
-  await retention.purgeExpired();
   const purgeTimer=setInterval(()=>{
-    void Promise.all([definitions.purgeExpiredFields(),retention.purgeExpired()]).catch(error=>{
-      console.error('Expired metadata/record cleanup failed:',error);
+    void definitions.purgeExpiredFields().catch(error=>{
+      console.error('Expired metadata cleanup failed:',error);
     });
   },60*60*1000);
   purgeTimer.unref();
   const dispatcherRbac=new RbacEngine(db);
   const calloutDispatcher=new NamedCredentialService(db,dispatcherRbac);
-  const dispatcherOutbox=new IntegrationCommunicationOutbox(
-   db,createIntegrationCommunicationWriter(db));
-  calloutDispatcher.setIntegrationActivityWriter(dispatcherOutbox.write);
   const calloutTimer=setInterval(()=>{
     void Promise.all([calloutDispatcher.dispatchOne(),calloutDispatcher.dispatchOneFlowEmail(),
-     calloutDispatcher.dispatchOneQuickActionEmail(),dispatcherOutbox.dispatchOne()])
+     calloutDispatcher.dispatchOneQuickActionEmail()])
       .catch(error=>console.error('Durable outbound dispatch failed:',error));
   },1000);
   calloutTimer.unref();

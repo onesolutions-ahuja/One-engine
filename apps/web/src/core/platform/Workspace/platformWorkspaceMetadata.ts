@@ -70,8 +70,6 @@ export function validatePlatformEditorBinding(
 const workspaceAliases:Readonly<Record<string,string>>={
  'Currencies':'company-settings',
  'Users':'rbac','Roles':'rbac','Public Groups':'rbac','Profiles':'rbac',
- 'Reports Builder':'report-builder','Reports View':'report-builder',
- 'Dashboard Builder':'dashboard-builder','Dashboard View':'dashboard-builder',
  'Records':'home',
  'Permission Sets':'rbac','Permission Set Groups':'rbac',
  'Sharing Settings':'rbac','Sharing Rules':'rbac',

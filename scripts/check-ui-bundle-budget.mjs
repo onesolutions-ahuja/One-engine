@@ -6,8 +6,8 @@ const root=new URL('../apps/web/dist/',import.meta.url);
 const html=readFileSync(new URL('index.html',root),'utf8');
 const assets=new URL('assets/',root);
 const names=readdirSync(assets.href.replace(/^file:\/\//,'')).filter(n=>n.endsWith('.js'));
-const optional=['pageBuilderView-','FlowBuilder-','DashboardBuilder-',
- 'reportBuilderView-','objectManagerView-','MailWebmail-'];
+const optional=['pageBuilderView-','FlowBuilder-',
+ 'objectManagerView-','MailWebmail-'];
 for(const name of optional)
  assert.ok(names.some(file=>file.startsWith(name)),`Optional entry chunk missing: ${name}`);
 const eager=[...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+\.js)"[^>]*>/g)]

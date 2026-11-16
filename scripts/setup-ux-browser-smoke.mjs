@@ -11,15 +11,6 @@ page.on('pageerror',error=>errors.push(error.message));
 const base=process.env.SETUP_UX_BASE_URL || 'http://127.0.0.1:5173';
 async function open(view,extra='') { console.log('Checking',view,extra); await page.goto(`${base}/test/setup-ux-fixture.html?view=${view}${extra}`); }
 try {
- await open('dashboard');
- assert.equal(await page.getByRole('button',{name:'Create dashboard',exact:true}).last().isDisabled(),true);
- await page.getByRole('status').filter({hasText:'Ask an administrator'}).waitFor();
- await open('dashboard','&allowed=true');
- await page.getByRole('button',{name:'Create dashboard',exact:true}).last().click();
- await page.getByRole('dialog',{name:'Create a dashboard'}).waitFor();
- await page.getByRole('dialog').getByLabel('Dashboard name').fill('Audit dashboard');
- await page.getByRole('dialog').getByRole('button',{name:'Create dashboard',exact:true}).click();
- assert.equal(await page.getByRole('dialog').count(),0);
  await open('offline');
  const save=page.getByRole('button',{name:'Save selections'});
  assert.equal(await save.isDisabled(),true);
@@ -350,5 +341,5 @@ try {
  await screenshot('smart-card-grid-height-rows-mobile');
  await page.setViewportSize({width:1365,height:768});
  assert.deepEqual(errors,[]);
- console.log('PASS: dashboard permission/create, offline object/record/save, tenant draft/footer/discard, credential width/details, history details, flow dialog/create, record route chunk import, MFA policy control, OAuth grids, audit table, deep-linked company settings, monitoring, licences, SSO, password, sessions, credential modal, and real Schema Builder (1365px/390px)');
+ console.log('PASS: offline object/record/save, tenant draft/footer/discard, credential width/details, history details, flow dialog/create, record route chunk import, MFA policy control, OAuth grids, audit table, deep-linked company settings, monitoring, licences, SSO, password, sessions, credential modal, and real Schema Builder (1365px/390px)');
 } finally { await browser.close(); }

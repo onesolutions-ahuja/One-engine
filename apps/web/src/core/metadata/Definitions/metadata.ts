@@ -1041,8 +1041,6 @@ export const workspaces: WorkspaceMetadata[] = [
   { id: 'object-manager', label: 'Object Manager', icon: Database },
   { id: 'data-loader', label: 'Universal Data Loader', icon: Database },
   { id: 'page-builder', label: 'Page Builder', icon: LayoutTemplate },
-  { id: 'dashboard-builder', label: 'Dashboards', icon: BarChart3 },
-  { id: 'report-builder', label: 'Reports', icon: FileText },
   { id: 'flow-builder', label: 'Flows', icon: Workflow },
   { id: 'automation-settings', label: 'Process Automation Settings', icon: Workflow },
   { id: 'scheduled-actions', label: 'Scheduled Actions', icon: Workflow },
@@ -1058,9 +1056,8 @@ export const setupNavigation = [
   { group: 'Platform Administration', items: ['Tenant Management'] },
   { group: 'Company Settings', items: ['Company Settings', 'Security & Recovery', 'Connected Apps', 'Audit Trail'] },
   { group: 'Platform Tools', items: ['Setup Home', 'Object Manager', 'Records', 'Universal Data Loader', 'Page Builder', 'App Manager', 'AppExchange'] },
-  { group: 'Integrations', items: ['Named Credentials', 'Webhook Endpoints', 'Named Devices'] },
+  { group: 'Integrations', items: ['Named Credentials', 'Named Devices'] },
   { group: 'Automation', items: ['Flows', 'Paused and Waiting Interviews', 'Scheduled Actions', 'Scheduled Flows', 'Flow History', 'Process Automation Settings'] },
-  { group: 'Analytics', items: ['Reports Builder', 'Reports View', 'Dashboard Builder', 'Dashboard View'] },
   { group: 'Security', items: ['Users', 'Roles', 'Public Groups', 'Profiles', 'Permission Sets', 'Permission Set Groups', 'Sharing Settings', 'Sharing Rules'] }
 ];
 
@@ -1207,8 +1204,6 @@ export const setupShortcuts = [
   { title: 'Object Manager', description: 'Manage objects, fields, and relationships', workspace: 'object-manager' as const, icon: Database },
   { title: 'Page Builder', description: 'Create and edit app pages', workspace: 'page-builder' as const, icon: LayoutTemplate },
   { title: 'Flows', description: 'Build automated business processes', workspace: 'flow-builder' as const, icon: Workflow },
-  { title: 'Reports', description: 'Create, customize, and run reports', workspace: 'report-builder' as const, icon: FileText },
-  { title: 'Dashboards', description: 'Visualize key business metrics', workspace: 'dashboard-builder' as const, icon: BarChart3 },
   { title: 'AppExchange', description: 'Discover and manage organization apps', workspace: 'app-exchange' as const, icon: Store },
   { title: 'Company Settings', description: 'Manage company settings, tax and currencies', workspace: 'company-settings' as const, icon: Building2 },
   { title: 'Permission Sets', description: 'Manage access to apps and data', workspace: 'rbac' as const, icon: ShieldCheck }

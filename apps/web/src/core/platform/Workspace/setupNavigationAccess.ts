@@ -16,7 +16,6 @@ export const setupMenuTokens: Readonly<Record<string, readonly string[]>> = {
   'App Manager':['setup:AppManager:view'],
   'AppExchange':['setup:AppExchange:view'],
   'Named Credentials':['setup:NamedCredentials:view'],
-  'Webhook Endpoints':['setup:WebhookEndpoints:view'],
   'Named Devices':['setup:NamedDevices:view'],
   'Flows':['setup:Flows:view'],
   'Paused and Waiting Interviews':['setup:PausedInterviews:view'],
@@ -24,13 +23,6 @@ export const setupMenuTokens: Readonly<Record<string, readonly string[]>> = {
   'Scheduled Flows':['setup:ScheduledFlows:view'],
   'Flow History':['setup:FlowHistory:view'],
   'Process Automation Settings':['setup:ProcessAutomation:view'],
-  // A view grant reveals the destination, but does not grant Builder mutation APIs.
-  'Reports':['setup:ReportsView:view','setup:ReportsBuilder:view'],
-  'Dashboards':['setup:DashboardsView:view','setup:DashboardBuilder:view'],
-  'Reports Builder':['setup:ReportsBuilder:view'],
-  'Reports View':['setup:ReportsView:view'],
-  'Dashboard Builder':['setup:DashboardBuilder:view'],
-  'Dashboard View':['setup:DashboardsView:view'],
   'Users':['setup:Users:view'],
   'Roles':['setup:Roles:view'],
   'Public Groups':['setup:PublicGroups:view'],
@@ -56,12 +48,8 @@ export function canOpenSetupRoute(route:AppRoute,permissions:readonly string[]):
     'automation-settings':'Process Automation Settings','tenant-management':'Tenant Management'
   };
   if(simple[route.workspace])return canSeeSetupItem(simple[route.workspace]!,permissions);
-  if(route.workspace==='report-builder')
-    return canSeeSetupItem(route.resourceApiName==='viewer'?'Reports View':'Reports Builder',permissions);
-  if(route.workspace==='dashboard-builder')
-    return canSeeSetupItem(route.dashboardView||route.resourceApiName==='viewer'?'Dashboard View':'Dashboard Builder',permissions);
   if(route.workspace==='named-credentials')
-    return canSeeSetupItem(route.resourceApiName==='Webhooks'?'Webhook Endpoints':
+    return route.resourceApiName!=='Webhooks' && canSeeSetupItem(
       route.resourceApiName==='NamedDevices'?'Named Devices':'Named Credentials',permissions);
   if(route.workspace==='company-settings'){
     if(route.resourceApiName!=='security')return canSeeSetupItem('Company Settings',permissions);

@@ -41,7 +41,6 @@ import FlowScreenContent from '../../automation/FlowScreen/FlowScreenContent';
 import FlowLogs from '../../automation/FlowLogs/FlowLogs';
 import FlowInterviews from '../../automation/FlowInterviews/FlowInterviews';
 import ScheduledFlows from '../../automation/ScheduledFlows/ScheduledFlows';
-import DashboardBuilder from '../DashboardBuilder/DashboardBuilder';
 import ComponentLibrary from '../../components/ComponentLibrary/ComponentLibrary';
 import RegisteredComponent from '../../components/RegisteredComponent/RegisteredComponent';
 import CustomComponentPropertyEditor from '../ComponentProperties/CustomComponentPropertyEditor';
@@ -66,14 +65,11 @@ import {useDismissOnOutside} from '../../accessibility/Dismiss/useDismissOnOutsi
 import { pageIsAvailableInApp, resolvePageActionRoute } from '../../pages/PageRuntime/pageActionRouting';
 import NamedCredentials from '../../integrations/NamedCredentials/NamedCredentials';
 import TenantManagement from '../../platform/TenantManagement/TenantManagement';
-import TenantDomains from '../../platform/TenantDomains/TenantDomains';
 import TenantRecoveryPanel from '../../platform/TenantRecoveryPanel/TenantRecoveryPanel';
-import TenantUsagePanel from '../../platform/TenantUsagePanel/TenantUsagePanel';
 import DeveloperAccountSettings from '../../settings/DeveloperAccountSettings/DeveloperAccountSettings';
 import SettingsViewRow from '../../settings/SettingsViewRow/SettingsViewRow';
 import ApprovalProcessManager from '../../automation/ApprovalProcessManager/ApprovalProcessManager';
 import { standardPageComponents } from '../../components/Catalog/index';
-import EmbeddedDashboard from '../../pages/EmbeddedDashboard/EmbeddedDashboard';
 import { inspectPageDependencies } from '../../pages/PageRuntime/pageDependencies';
 import {
   canvasDimensionsForOrientation,
@@ -612,17 +608,14 @@ function ObjectManager({
         crossFilter.childObjectApiName === draft.apiName
         && crossFilter.filters.some((filter) => filter.fieldApiName === field.apiName));
       if (referencesBaseField || referencesCrossFilter) {
-        addDependency(report.label, field.apiName, 'Report', { workspace: 'report-builder', resourceApiName: report.apiName });
+        addDependency(report.label, field.apiName, 'Report');
       }
     }
   }
   for (const dashboard of dashboards) {
     for (const filter of dashboard.filters) {
       if (filter.objectApiName === draft.apiName && draft.fields.some((field) => field.apiName === filter.fieldApiName)) {
-        addDependency(dashboard.label, filter.fieldApiName, 'Dashboard Filter', {
-          workspace: 'dashboard-builder',
-          resourceApiName: dashboard.apiName
-        });
+        addDependency(dashboard.label, filter.fieldApiName, 'Dashboard Filter');
       }
     }
     for (const component of dashboard.components) {
@@ -633,10 +626,7 @@ function ObjectManager({
             || component.xAxisFieldApiName === field.apiName
             || component.displayFieldApiNames.includes(field.apiName)
             || hasFieldReference(component.properties, field.apiName))) {
-          addDependency(dashboard.label, field.apiName, 'Dashboard Component', {
-            workspace: 'dashboard-builder',
-            resourceApiName: dashboard.apiName
-          });
+          addDependency(dashboard.label, field.apiName, 'Dashboard Component');
         }
       }
     }

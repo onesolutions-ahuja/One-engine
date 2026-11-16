@@ -32,6 +32,10 @@ jobs:
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
         run: node --import tsx apps/server/scripts/native-object-copy-sql-smoke.mjs
+      - name: Native storage RecordEngine PostgreSQL tests
+        env:
+          METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
+        run: node --import tsx apps/server/scripts/native-object-runtime-sql-smoke.mjs
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30

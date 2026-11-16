@@ -12,6 +12,9 @@ export type RecordFilter = {
 
 export type QueryField = {
   api_name: string;
+  /** Trusted server-generated SQL for an activated typed object table. Never request input. */
+  nativeValue?: string;
+  nativeText?: string;
   data_type: string;
   rollup_source_data_type?: string | null;
   /** Formula fields: simple numeric formulas can be filtered in SQL (see numericFormulaSql). */
@@ -74,6 +77,7 @@ export function numericFormulaSql(expression:string,fields:ReadonlyMap<string,Qu
     const field=fields.get(api);
     const type=field?.data_type==='rollup'?field.rollup_source_data_type??'number':field?.data_type;
     if(!field||field.via||!numericTypes.has(type??''))throw 0;
+    if(field.nativeValue)return field.nativeValue;
     return `(SELECT fx.value_number FROM md_record_values fx WHERE fx.tenant_id=r.tenant_id AND fx.record_id=r.id
       AND fx.object_api=r.object_api AND fx.field_api=${bind(api)})`;
   };
@@ -305,17 +309,22 @@ export function compileRecordFilters(
     const typed = sourceType ? typedColumns[sourceType] : undefined;
     const fieldParameter = `$${firstParameter + parameters.length}`;
     parameters.push(filter.field);
+    const exists=(condition:string,negated=false)=>{
+      if(field.nativeValue&&field.nativeText){
+        const direct=condition.replace(/fv\.reference_record_id::text/g,field.nativeText)
+          .replace(/fv\.value_text/g,field.nativeText)
+          .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,field.nativeValue);
+        return `${negated?'NOT ':''}COALESCE((${fieldParameter}::text IS NOT NULL AND (${direct})),FALSE)`;
+      }
+      return `${negated?'NOT ':''}EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
+        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
+        AND ${condition})`;
+    };
+
     if(filter.operator==='isBlank'||filter.operator==='isNotBlank'){
       if(filter.value!=='')throw new Error('Blank filters require an empty value');
       const hasValue=`COALESCE(fv.value_text,fv.reference_record_id::text,'')<>''`;
-      const valuePredicate=filter.operator==='isBlank'
-        ?`NOT EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-          AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-          AND ${hasValue})`
-        :`EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-          AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-          AND ${hasValue})`;
-      return valuePredicate;
+      return exists(hasValue,filter.operator==='isBlank');
     }
     const valueParameter = `$${firstParameter + parameters.length}`;
     // A date-only selection (or a relative period) denotes a whole local-calendar
@@ -348,10 +357,7 @@ export function compileRecordFilters(
         gt: column + '>=' + boundary(end),
         gte: column + '>=' + boundary(start),
       };
-      const existence = 'EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id' +
-        ' AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=' + fieldParameter +
-        ' AND (' + comparisons[filter.operator] + '))';
-      return filter.operator === 'ne' ? 'NOT ' + existence : existence;
+      return exists('('+comparisons[filter.operator]+')',filter.operator==='ne');
     }
     if (typeof filter.value === 'string' && relativeDatePeriods[filter.value] &&
         typed && sourceType !== 'date' && sourceType !== 'datetime')
@@ -363,9 +369,7 @@ export function compileRecordFilters(
       parameters.push(filter.value);
       const column = typed ? `fv.${typed.column}` : `COALESCE(fv.value_text,fv.reference_record_id::text)`;
       const cast = typed ? `::${typed.cast}[]` : '::text[]';
-      return `EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-        AND ${column}=ANY(${valueParameter}${cast}))`;
+      return exists(`${column}=ANY(${valueParameter}${cast})`);
     }
     if (typeof filter.value !== 'string' || filter.value.length > 2000)
       throw new Error('Invalid record filter value');
@@ -391,18 +395,14 @@ export function compileRecordFilters(
       // Like the Excel wildcard criterion "*", omit blank text cells.
       const nonblank=filter.value.includes('*')||filter.value.includes('?')
         ? " AND fv.value_text<>''" : '';
-      return `EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-        AND lower(fv.value_text) LIKE lower(${valueParameter}) ESCAPE '\\'${nonblank})`;
+      return exists(`fv.value_text ILIKE ${valueParameter} ESCAPE '\\'${nonblank}`);
     }
     if (filter.operator === 'contains' || filter.operator === 'startsWith') {
       if (!['text', 'email', 'phone', 'url', 'picklist'].includes(field.data_type))
         throw new Error('Text operators require a text field');
       const escapedValue = filter.value.replace(/[\\%_]/g, '\\$&');
       parameters.push(filter.operator === 'contains' ? `%${escapedValue}%` : `${escapedValue}%`);
-      return `EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-        AND lower(fv.value_text) LIKE lower(${valueParameter}) ESCAPE '\\')`;
+      return exists(`fv.value_text ILIKE ${valueParameter} ESCAPE '\\'`);
     }
     if (filter.operator === 'includes'||filter.operator==='excludes')
       throw new Error('Includes requires a multi-select picklist');
@@ -411,9 +411,7 @@ export function compileRecordFilters(
       const comparison = typed
         ? `fv.${typed.column}=${valueParameter}::${typed.cast}`
         : `COALESCE(fv.value_text,fv.reference_record_id::text)=${valueParameter}`;
-      return `NOT EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-        AND ${comparison})`;
+      return exists(comparison,true);
     }
     const sqlOperators: Record<string, string> = { eq: '=', lt: '<', lte: '<=', gt: '>', gte: '>=' };
     const sqlOperator = sqlOperators[filter.operator];
@@ -424,16 +422,14 @@ export function compileRecordFilters(
       : `COALESCE(fv.value_text,fv.reference_record_id::text)${sqlOperator}${valueParameter}`;
     // Tenant-configured exact equality indexes are a search accelerator only:
     // retain the full source-value comparison to protect against hash collisions.
-    const exactIndex=filter.operator==='eq'&&!typed
+    const exactIndex=!field.nativeValue&&filter.operator==='eq'&&!typed
       &&['text','email','phone','url','picklist'].includes(field.data_type)
       &&exactIndexedFields.has(filter.field)
       ?` AND EXISTS(SELECT 1 FROM md_field_exact_index_entries ix
          WHERE ix.tenant_id=fv.tenant_id AND ix.object_api=fv.object_api
          AND ix.field_api=fv.field_api AND ix.record_id=fv.record_id
          AND ix.value_hash=md5(${valueParameter}))`:'';
-    return `EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-      AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-      AND ${comparison}${exactIndex})`;
+    return exists(comparison+exactIndex);
   });
   const expression = parseFilterLogic(logic, filters.length);
   const predicate = expression.replace(/f(\d+)/g, (_, index: string) => predicates[Number(index)]);

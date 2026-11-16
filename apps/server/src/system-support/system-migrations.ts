@@ -1,3 +1,4 @@
+import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
 import {createHash} from 'node:crypto';
 import {REVOLUT_PAYMENT_DDL} from './revolut-checkout-service.js';
 import {readdirSync,readFileSync} from 'node:fs';
@@ -823,9 +824,11 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      END IF;
     END $$;
   `);
+  await client.query(NATIVE_OBJECT_DDL);
   // Cover setup tables introduced by later migrations in the same transaction.
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });
+   await applyNativeObjectStorage(db);
    return;
   } catch(error) {
    // A rolling deploy may overlap with the old instance's SQL work.

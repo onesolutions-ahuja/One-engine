@@ -3,7 +3,7 @@ import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
-import { apiBase, getAccessToken, setAccessToken, apiRequest, prefetchPageEditorDraft, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
+import { apiBase, getAccessToken, setAccessToken, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
 
 
@@ -171,6 +171,7 @@ function App() {
         if (response.ok) {
           const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string };
           setAccessToken(session.access_token);
+          if (!session.landing) prefetchLandingBootstrap();
           setAuthError('');
           setEntryTiming({ kind: 'restore', startedAt: restoreStartedAt, authenticatedAt: performance.now(), landing: session.landing, landingAppApi: session.landingAppApi });
           setAuthState('authenticated');

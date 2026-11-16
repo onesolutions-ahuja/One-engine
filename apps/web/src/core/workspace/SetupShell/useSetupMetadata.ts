@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Tenant-scoped bootstrap: core metadata first, optional admin metadata afterwards.
 import { useEffect, useRef } from 'react';
+import { takeLandingPrefetch } from '../../authentication/Client/authClient';
 import { resolveSqlComponentLibrary, prefetchSqlComponentIndex } from '../../components/Registry/bundledRegistryClient';
 import { setAuthenticatedFormulaBindingContext } from '../../components/RegisteredComponent/fieldExpressionRuntime';
 import { saveVerifiedMetadata, type MetadataPublicationResponse } from '../../metadata/Cache/verifiedMetadataCache';
@@ -179,7 +180,7 @@ export function useSetupMetadata(ctx: any) {
       // Login can carry the bootstrap directly. Session restoration deliberately
       // returns its token promptly, then obtains the same RBAC-checked snapshot
       // through one authenticated request instead of four independent reads.
-      let landing = entryTiming?.landing;
+      let landing = entryTiming?.landing ?? await takeLandingPrefetch<NonNullable<NonNullable<typeof entryTiming>['landing']>>();
       if (!landing) {
         try {
           landing = (await apiRequest<{ landing?: NonNullable<typeof landing> }>('/metadata/landing-bootstrap')).landing;

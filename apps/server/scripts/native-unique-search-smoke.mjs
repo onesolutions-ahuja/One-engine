@@ -52,7 +52,7 @@ try{
   {Name:'Copper zephyr lantern',Code:'SECOND',Exact:'alpha'});
  const found=await records.list(tenant,user,object,50,0,{search:'copper zephyr lantern'});
  assert.equal(found.total,1,'search must find a record created after native activation');
- assert.equal(found.records[0]?.id,fresh,'search must return the new record');
+ assert.equal(found.records[0]?.Id,fresh,'search must return the new record');
 
  const duplicate=(await db.query('INSERT INTO md_records(tenant_id,object_api,owner_id) VALUES($1,$2,$3) RETURNING id',
   [tenant,object,user])).rows[0].id;

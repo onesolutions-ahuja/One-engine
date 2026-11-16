@@ -8,6 +8,7 @@ import {ObjectDefinitionService} from '../src/system-files/object-definition.ts'
 import {RecordEngine} from '../src/system-files/record-engine.ts';
 import {RbacEngine} from '../src/system-files/rbac-engine.ts';
 import {nativeTableName} from '../src/system-files/native-object-copy.ts';
+import {loadNativeFields,nativeTableSql} from '../src/system-files/native-object-query.ts';
 
 const url=process.env.METADRIVE_SQL_TEST_DATABASE_URL;
 if(!url||new URL(url).pathname!=='/metadrive_native_copy_test')throw Error('Disposable SQL database required');
@@ -62,6 +63,28 @@ try{
  await definitions.addField(a,object,'Added','Text(80)');
  await records.update(a,actor,object,id,{Added:'builder-created'});
  assert.equal((await records.get(a,actor,object,id)).Added,'builder-created');
+ const meta=await loadNativeFields(db,a,object);
+ const table=nativeTableSql(meta);
+ const nativeAdded=(await db.query(`SELECT extras->>'Added' AS value FROM ${table}
+   WHERE tenant_id=$1 AND id=$2`,[a,id])).rows[0];
+ assert.equal(nativeAdded.value,'builder-created','new custom field stores native values');
+ await definitions.deleteField(a,object,'Added');
+ const deleted=(await db.query(`SELECT extras ? 'Added' AS has_extra,
+   'Added'=ANY(present_fields) AS is_present FROM ${table}
+   WHERE tenant_id=$1 AND id=$2`,[a,id])).rows[0];
+ assert.equal(deleted.has_extra,false,'deleted field is removed from native extras');
+ assert.equal(deleted.is_present,false,'deleted field is removed from present_fields');
+ assert.equal((await db.query(`SELECT 1 FROM md_native_fields WHERE tenant_id=$1
+   AND object_api=$2 AND field_api='Added'`,[a,object])).rowCount,0,
+   'deleted field has no native field metadata');
+ await definitions.restoreField(a,object,'Added');
+ await records.update(a,actor,object,id,{Added:'builder-restored'});
+ assert.equal((await records.get(a,actor,object,id)).Added,'builder-restored',
+   'restored field is configured for native writes again');
+ await definitions.addField(a,object,'MustFill','Text(80)');
+ await assert.rejects(definitions.updateField(a,object,'MustFill',{label:'MustFill',required:true}),
+   /Required field cannot be enabled while records have no value/,
+   'native presence check prevents enabling required on empty records');
  // Field denies apply to native output AND filtering; revocation is immediate.
  await db.query("INSERT INTO md_permission_rules(tenant_id,permission_set_id,resource,action,effect) VALUES($1,$2,$3,'read','deny')",[a,sets[0],object+'.Secret']);
  assert(!Object.hasOwn(await records.get(a,actor,object,id),'Secret'));
@@ -79,5 +102,19 @@ try{
  await db.query("INSERT INTO md_sharing_settings(tenant_id,object_api,default_access) VALUES($1,$2,'Private') ON CONFLICT(tenant_id,object_api) DO UPDATE SET default_access='Private'",[a,object]);
  assert.equal((await records.list(a,reader,object)).total,0);
  await assert.rejects(records.get(a,reader,object,id),/not found/i);
- console.info('Native RecordEngine integration passed: CRUD, numeric/text/date filters, rollback, uniqueness, builder-added field, soft deletion/restore, tenant/object/field/record security');
+ // The typed Name column is shared across tenants of this Object API.
+ // Dropping it for one tenant must not damage the other tenant's metadata.
+ const typed=(await db.query(`SELECT column_name FROM md_native_fields
+   WHERE tenant_id=$1 AND object_api=$2 AND field_api='Name'`,[a,object])).rows[0].column_name;
+ const columnExists=async()=>Boolean((await db.query(`SELECT 1 FROM pg_attribute
+   WHERE attrelid=to_regclass($1) AND attname=$2 AND NOT attisdropped`,
+   [nativeTableName(object),typed])).rowCount);
+ assert(await columnExists(),'typed column exists before field deletion');
+ await definitions.deleteField(a,object,'Name');
+ assert(await columnExists(),'deleting one tenant field must preserve the shared typed column');
+ await definitions.deleteField(b,object,'Name');
+ assert.equal(await columnExists(),false,'typed column drops after its final tenant reference');
+ await definitions.restoreField(b,object,'Name');
+ assert(await columnExists(),'restoring a field recreates its native typed column');
+ console.info('Native RecordEngine integration passed: CRUD, numeric/text/date filters, rollback, uniqueness, native field add/delete/restore, required-value check, shared typed column safety, soft deletion/restore, tenant/object/field/record security');
 }finally{await db.close();}

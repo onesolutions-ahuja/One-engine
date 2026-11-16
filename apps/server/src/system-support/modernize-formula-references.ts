@@ -7,6 +7,7 @@
  *   $session(.id)   -> @ThisPage.Session.Id        $session.cartId -> @ThisTenant.User.CartId
  *   $session.user.* -> @ThisTenant.User.*          $session.tenant.* / $tenant.* -> @ThisTenant.Company.*
  *   $flow.X         -> FLOW(X)                     TABLE(@P, Name) -> TABLE(@P, @P.Name)
+ *   @ThisPage.Input.x -> @ThisPage.<Owner>.x when a component saves x (e.g. STATE(x, …))
  *
  * Covers every page layout version, Lightning page and page component of every
  * tenant. Idempotent: running it twice changes nothing more. Quoted text is
@@ -43,7 +44,7 @@ const SOURCES:Source[]=[
   update:`UPDATE md_lightning_page_node_properties SET value_text=$2
    WHERE tenant_id||'|'||page_id=$1 AND component_key=$3 AND property_path=$4 AND value_text=$5`}
 ];
-const OLD=/\$(?:state|session|component|tenant|flow)\b|@[A-Za-z][A-Za-z0-9_]*\.state\.[A-Za-z]|@(?:state|session)\.[A-Za-z]|\bTABLE\s*\(/;
+const OLD=/\$(?:state|session|component|tenant|flow)\b|@[A-Za-z][A-Za-z0-9_]*\.state\.[A-Za-z]|@(?:state|session)\.[A-Za-z]|\bTABLE\s*\(|@ThisPage\.Input\./;
 
 /** Pure part (tested): rewrite one page's rows. */
 export function modernizePageRows(rows:readonly Row[]):Array<Omit<Change,'table'|'group'>>{

@@ -300,3 +300,22 @@ test('one-time saved-formula rewrite names the owning component and is idempoten
  for(const change of changes)
   assert.doesNotThrow(()=>change.path.includes('actionFlows')?compileActionFormula(change.after,''):compileDisplayFormula(change.after));
 });
+
+test('values saved with STATE() belong to that component; rewrite moves them off Input', async ()=>{
+ const {modernizePageRows}=await import('../../server/src/system-support/modernize-formula-references');
+ const {encodeMetadataValue}=await import('../../server/src/system-files/component-runtime');
+ const encode=(component:string,type:string,props:Record<string,unknown>)=>{
+  const out:Array<{path:string;kind:string;text:string|null}>=[];
+  encodeMetadataValue(props,'/props',out);
+  return out.map(item=>({group_key:'g',component_key:component,component_type:type,
+   property_path:item.path,value_kind:item.kind,value_text:item.text}));
+ };
+ const rows=[
+  ...encode('b1','smart_button',{navigatorName:'ResumeButton',actionFlows:{click:{actionType:'Formula',
+   formula:'=IF(COUNTIFS(CartLine, Status, "Open") > 0, STATE(heldError, "Hold or finish the current sale first"), CLOSESCREEN())'}}}),
+  ...encode('t1','smart_text',{navigatorName:'Error1',textSource:'=@ThisPage.Input.heldError & @ThisPage.Input.recordId'})
+ ];
+ const changes=modernizePageRows(rows as never);
+ assert.deepEqual(changes.map(change=>change.after),['=@ThisPage.ResumeButton.heldError & @ThisPage.Input.recordId']);
+ assert.match(compileDisplayFormula(changes[0].after).js,/\$\.pageValue\("ResumeButton", "heldError"\)/);
+});

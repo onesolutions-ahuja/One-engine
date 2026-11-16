@@ -36,6 +36,8 @@ export function savedKeysOf(properties:Readonly<Record<string,unknown>>,bound=fa
   const formula=typeof binding.formula==='string'?binding.formula.trim():'';
   const assigned=/^@(?:state|ThisPage\.[A-Za-z_][A-Za-z0-9_]{0,79})\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/i.exec(formula);
   if(binding.actionType==='Formula'&&assigned)add(assigned[1]);
+  // STATE(heldError, "…") inside any action formula saves heldError too.
+  for(const match of formula.matchAll(/\bSTATE\s*\(\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*,/gi))add(match[1]);
   for(const target of Object.values(record(binding.outputs)??{}))add(target);
  }
  if(bound)for(const target of Object.values(record(properties.stateBindings)??{}))add(target);

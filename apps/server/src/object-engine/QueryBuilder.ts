@@ -318,21 +318,13 @@ export function compileRecordFilters(
     const typed = sourceType ? typedColumns[sourceType] : undefined;
     const fieldParameter = `$${firstParameter + parameters.length}`;
     parameters.push(filter.field);
+    if(!field.nativeValue||!field.nativeText)throw new Error('Object has no native table');
     const exists=(condition:string,negated=false)=>{
-      if(field.nativeValue&&field.nativeText){
-        const direct=condition.replace(/fv\.reference_record_id::text/g,field.nativeText)
-          .replace(/fv\.value_text/g,field.nativeText)
-          .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,field.nativeValue);
-        // Filter logic is AND/OR only, so in WHERE a NULL counts as false: the plain
-        // comparison keeps native column indexes (btree/trigram) usable.
-        return negated?`NOT COALESCE((${fieldParameter}::text IS NOT NULL AND (${direct})),FALSE)`
-          :`(${fieldParameter}::text IS NOT NULL AND (${direct}))`;
-      }
-      return `${negated?'NOT ':''}EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-        AND ${condition})`;
+      const direct=condition.replace(/fv\.reference_record_id::text/g,field.nativeText!)
+        .replace(/fv\.value_text/g,field.nativeText!)
+        .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,field.nativeValue!);
+      return negated?`NOT COALESCE((${direct}),FALSE)`:`(${direct})`;
     };
-
     if(filter.operator==='isBlank'||filter.operator==='isNotBlank'){
       if(filter.value!=='')throw new Error('Blank filters require an empty value');
       const hasValue=`COALESCE(fv.value_text,fv.reference_record_id::text,'')<>''`;
@@ -432,16 +424,7 @@ export function compileRecordFilters(
     const comparison = typed
       ? `fv.${typed.column}${sqlOperator}${valueParameter}::${typed.cast}`
       : `COALESCE(fv.value_text,fv.reference_record_id::text)${sqlOperator}${valueParameter}`;
-    // Tenant-configured exact equality indexes are a search accelerator only:
-    // retain the full source-value comparison to protect against hash collisions.
-    const exactIndex=!field.nativeValue&&filter.operator==='eq'&&!typed
-      &&['text','email','phone','url','picklist'].includes(field.data_type)
-      &&exactIndexedFields.has(filter.field)
-      ?` AND EXISTS(SELECT 1 FROM md_field_exact_index_entries ix
-         WHERE ix.tenant_id=fv.tenant_id AND ix.object_api=fv.object_api
-         AND ix.field_api=fv.field_api AND ix.record_id=fv.record_id
-         AND ix.value_hash=md5(${valueParameter}))`:'';
-    return exists(comparison+exactIndex);
+    return exists(comparison);
   });
   const expression = parseFilterLogic(logic, filters.length);
   const predicate = expression.replace(/f(\d+)/g, (_, index: string) => predicates[Number(index)]);

@@ -1,6 +1,7 @@
 import {compileRecordFilters,type QueryField,type RecordFilter} from './QueryBuilder.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 
 type Field=QueryField & {related_object?:string|null};
 type Stats={eligible:true;total:number;numericCount:number;sum:number;min:number;max:number};
@@ -28,7 +29,13 @@ export async function computeFilteredNumericAggregate(
  const sourceType=target.data_type==='rollup'?target.rollup_source_data_type:target.data_type;
  if(!['number','currency','percent'].includes(String(sourceType)))
   return {eligible:false};
- const allowedFields=new Map<string,QueryField>(byApi);
+ const native=await loadNativeFields(db,tenantId,objectApi);
+ const table=nativeTableSql(native);
+ const allowedFields=new Map<string,QueryField>(fields.map(field=>[
+  field.api_name,{...field,...(native.fields.has(field.api_name)
+    ?{nativeValue:nativeValueSql(native,field.api_name,'nr'),
+      nativeText:nativeValueSql(native,field.api_name,'nr',true)}:{})}
+ ]));
  for(const filter of filters){
   const path=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(filter.field);
   if(!path){
@@ -47,24 +54,26 @@ export async function computeFilteredNumericAggregate(
    throw Error('Field is not readable');
   const related=(await fieldsFor(lookup.related_object)).find(field=>field.api_name===path[2]);
   if(!related)throw Error('Invalid list field');
+  const relatedNative=await loadNativeFields(db,tenantId,lookup.related_object);
+  const relatedField=relatedNative.fields.get(related.api_name);
+  if(!relatedField)throw Error('Invalid list field');
   allowedFields.set(filter.field,{...related,
+   native_table:relatedNative.table,native_column:relatedField.column,
+   native_type:relatedField.sqlType,
    via:{lookupField:lookup.api_name,access:"md_record_access($1,$3,rel.id,'read')"}});
  }
  const compiled=compileRecordFilters(filters,filterLogic,allowedFields,4);
- const fieldParameter='$'+(4+compiled.parameters.length);
  const predicate=compiled.predicate?' AND ('+compiled.predicate+')':'';
- // No unauthorized rows or values are transferred to the client.
+ const numeric=nativeValueSql(native,fieldApi,'n');
+ // Filter and aggregate the same authorized rows, without an EAV value join.
  const sql=`WITH authorized AS MATERIALIZED (
-   SELECT r.id FROM md_records r
+   SELECT r.id FROM md_records r JOIN ${table} nr
+     ON nr.tenant_id=r.tenant_id AND nr.id=r.id
    WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
-     AND md_record_access($1,$3,r.id,'read')${predicate}
+     AND nr.is_deleted=false AND md_record_access($1,$3,r.id,'read')${predicate}
  ), numeric_rows AS (
-   SELECT a.id,COALESCE(v.value_number,
-     CASE WHEN v.value_text ~ '^-?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)$'
-       THEN v.value_text::numeric ELSE NULL END) AS number_value
-   FROM authorized a
-   LEFT JOIN md_record_values v
-     ON v.tenant_id=$1 AND v.object_api=$2 AND v.record_id=a.id AND v.field_api=${fieldParameter}
+   SELECT a.id,${numeric} AS number_value FROM authorized a
+   JOIN ${table} n ON n.tenant_id=$1 AND n.id=a.id
  )
  SELECT count(*)::text AS total,count(number_value)::text AS numeric_count,
    sum(number_value)::text AS numeric_sum,min(number_value)::text AS numeric_min,
@@ -73,7 +82,7 @@ export async function computeFilteredNumericAggregate(
  const {rows}=await db.query<{
   total:string;numeric_count:string;numeric_sum:string|null;
   numeric_min:string|null;numeric_max:string|null
- }>(sql,[tenantId,objectApi,userId,...compiled.parameters,fieldApi]);
+ }>(sql,[tenantId,objectApi,userId,...compiled.parameters]);
  const row=rows[0];
  const stats:Stats={eligible:true,total:Number(row?.total??0),
   numericCount:Number(row?.numeric_count??0),

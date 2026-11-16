@@ -276,18 +276,24 @@ export function compileRecordFilters(
     }
     const field = fields.get(filter.field);
     if (field?.via) {
-      // Lookup path: evaluate the same predicate against the related record
-      // (alias rel) reached through the lookup value, with its record access.
-      const lookupParameter = `$${firstParameter + parameters.length}`;
-      parameters.push(field.via.lookupField);
-      const inner = compileRecordFilters([{ ...filter, field: field.api_name }], undefined,
-        new Map([[field.api_name, { ...field, via: undefined }]]), firstParameter + parameters.length);
+      const lookup=fields.get(field.via.lookupField);
+      if(!lookup?.nativeValue)throw new Error('Object has no native table');
+      const related:NativeFieldsMetadata={table:field.native_table??'',fields:new Map([[
+        field.api_name,{column:field.native_column??null,sqlType:field.native_type??'',
+          dataType:field.data_type}
+      ]])};
+      const relatedTable=nativeTableSql(related);
+      const inner=compileRecordFilters([{...filter,field:field.api_name}],undefined,
+        new Map([[field.api_name,{...field,via:undefined,
+          nativeValue:nativeValueSql(related,field.api_name,'rv'),
+          nativeText:nativeValueSql(related,field.api_name,'rv',true)}]]),
+        firstParameter+parameters.length);
       parameters.push(...inner.parameters);
-      return `EXISTS(SELECT 1 FROM md_record_values lk JOIN md_records rel
-        ON rel.tenant_id=lk.tenant_id AND rel.id=lk.reference_record_id AND rel.is_deleted=false
-        WHERE lk.tenant_id=r.tenant_id AND lk.record_id=r.id AND lk.object_api=r.object_api
-          AND lk.field_api=${lookupParameter} AND ${field.via.access}
-          AND ${inner.predicate.replace(/\br\./g, 'rel.')})`;
+      return `EXISTS(SELECT 1 FROM md_records rel
+        JOIN ${relatedTable} rv ON rv.tenant_id=rel.tenant_id AND rv.id=rel.id
+        WHERE rel.tenant_id=r.tenant_id AND rel.id=${lookup.nativeValue}
+          AND rel.is_deleted=false AND rv.is_deleted=false AND ${field.via.access}
+          AND ${inner.predicate.replace(/\br\./g,'rel.')})`;
     }
     if (filter.field.includes('.')) throw new Error('Invalid list field');
     if (field?.data_type==='formula'&&field.formula_expression&&numericTypes.has(String(field.formula_return_type).toLowerCase())) {

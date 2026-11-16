@@ -2009,16 +2009,28 @@ export class RecordEngine {
         await this.rbac.require(tenantId,userId,item.object_api,'delete');
         await this.rbac.requireRecord(tenantId,userId,item.object_api,item.id,'delete');
       }
-      // A previously deleted master outside this group must not be resurrected implicitly.
-      const external=await client.query(`
-        SELECT 1 FROM md_record_values v
-        JOIN md_field_definitions f ON f.tenant_id=v.tenant_id
-          AND f.object_api=v.object_api AND f.api_name=v.field_api
-          AND f.relationship_type='Master-Detail' AND f.deleted_at IS NULL
-        JOIN md_records parent ON parent.tenant_id=v.tenant_id AND parent.id=v.reference_record_id
-        WHERE v.tenant_id=$1 AND v.record_id=ANY($2::uuid[])
-          AND parent.is_deleted=true AND parent.deletion_group_id IS DISTINCT FROM $3::uuid
-        LIMIT 1`,[tenantId,rows.map(row=>row.id),record.deletion_group_id]);
+      // A deleted master outside this group must not be resurrected. Resolve
+      // each affected Object through its validated native metadata, then check
+      // all Objects in one SQL query (not one query per record or field).
+      const groupObjects=[...new Set(rows.map(row=>row.object_api))];
+      const externalParts=await Promise.all(groupObjects.map(async (name,index)=>{
+        const meta=await this.nativeMeta(tenantId,name,client);
+        return `SELECT 1 FROM md_records r
+          ${readNativeValueRows(meta,'r')}
+          JOIN md_field_definitions f ON f.tenant_id=r.tenant_id
+            AND f.object_api=r.object_api AND f.api_name=v.field_api
+            AND f.relationship_type='Master-Detail' AND f.deleted_at IS NULL
+          JOIN md_records parent ON parent.tenant_id=r.tenant_id
+            AND parent.id=v.reference_record_id
+          WHERE r.tenant_id=$1 AND r.object_api=${index+4}
+            AND r.id=ANY($2::uuid[])
+            AND parent.is_deleted=true
+            AND parent.deletion_group_id IS DISTINCT FROM $3::uuid`;
+      }));
+      const external=externalParts.length?await client.query(`
+        SELECT 1 FROM (${externalParts.join(' UNION ALL ')}) blocked_masters LIMIT 1`,
+        [tenantId,rows.map(row=>row.id),record.deletion_group_id,...groupObjects]
+      ):{rowCount:0};
       if(external.rowCount)throw new Error('Restore the master record first');
       // md_records is authoritative for deletion state; its native-row trigger
       // restores is_deleted at the same time, without touching EAV flags.

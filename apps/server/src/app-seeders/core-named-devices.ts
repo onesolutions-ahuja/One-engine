@@ -18,6 +18,13 @@ export const NAMED_DEVICE_OBJECTS=[
   {api:'Active',label:'Active',type:'boolean'},
   {api:'Notes',label:'Notes',type:'text'}
  ]},
+ // Payment hand-off between the till and the customer screen (card prompt, PayPal QR).
+ {object:'Cart',label:'Cart',fields:[
+  {api:'PaymentStatus',label:'Payment Status (blank, Card, QR, Paid, Failed)',type:'text'},
+  {api:'PaymentLink',label:'Payment Link (QR)',type:'text'},
+  {api:'PaymentReference',label:'Payment Reference',type:'text'},
+  {api:'PaymentOrderId',label:'Payment Order ID',type:'text'}
+ ]},
  {object:'IncomingWebhook',label:'Incoming Webhook',fields:[
   {api:'Name',label:'Name',type:'text'},
   {api:'Connector',label:'Connector',type:'text'},

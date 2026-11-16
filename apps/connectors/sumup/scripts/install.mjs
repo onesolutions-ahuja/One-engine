@@ -26,7 +26,8 @@ export default Object.freeze({
       "body":"{\"total_amount\":{\"currency\":\"{!public_currency}\",\"minor_unit\":2,\"value\":\"{!AmountMinor}\"},\"description\":\"{!Reference}\",\"affiliate\":{\"app_id\":\"{!public_appId}\",\"key\":\"{!public_affiliateKey}\",\"foreign_transaction_id\":\"{!CalloutKey}\"}}",
       "outputs":{"PaymentId":"data.client_transaction_id"}},
     "CheckStatus":{"label":"Check payment status","method":"GET","path":"v2.1/merchants/{!public_merchantCode}/transactions?client_transaction_id={!PaymentId}",
-      "outputs":{"Status":"status","TransactionCode":"transaction_code","Amount":"amount"}},
+      "outputs":{"Status":"status","TransactionCode":"transaction_code","Amount":"amount"},
+      "results":{"Paid":["SUCCESSFUL"],"Failed":["FAILED","CANCELLED"]}},
     "Cancel":{"label":"Cancel payment on reader","method":"POST","path":"v0.1/merchants/{!public_merchantCode}/readers/{!DeviceId}/terminate","body":"{}"}
   },
   "docs": "https://developer.sumup.com/terminal-payments/cloud-api",

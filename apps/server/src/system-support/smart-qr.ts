@@ -8,7 +8,8 @@ const QR_RULES:Array<[string,string|null]>=[
  ['backgroundColor',json('#ffffff')],['borderColor',null],['radius','12'],['shadow',null],
  ['width',null],['height',null],['x',null],['y',null],
  ['label',null],['headerTextColor',json('#1d1d1f')],['headerTextSize','13'],
- ['labelColor',json('#1d1d1f')],['objectApiName',null],['collectionFormula',null],['textSource',null]
+ ['labelColor',json('#1d1d1f')],['objectApiName',null],['collectionFormula',null],['textSource',null],
+ ['filterFormula',null],['autoRecordScope',null],['visibilityRules',null]
 ];
 const QR_DESIGN:Array<[string,string,string]>=[
  ['Body','fill','backgroundColor'],['Body','border','borderColor'],['Body','radius','radius'],

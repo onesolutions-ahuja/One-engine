@@ -330,7 +330,7 @@ test('shared payment orders support independent providers, retries, and verified
 
 // CALLOUT / LOOP / REPEAT action formulas and payment connector manifests.
 import {compileActionPlan,executeActionPlan} from '../../src/expression-engine/ActionFormulas.ts';
-import {calloutVariables,readCalloutPath} from '../../src/system-support/action-formula-callout-service.ts';
+import {calloutVariables,readCalloutPath,runActionCallout} from '../../src/system-support/action-formula-callout-service.ts';
 import {webhookSummary} from '../../src/system-support/inbound-webhook-routes.ts';
 
 test('CALLOUT, LOOP and REPEAT compile into no-code action steps',()=>{
@@ -389,4 +389,28 @@ test('payment connector manifests declare valid operations',async()=>{
    if(operation.body)assert.equal(typeof JSON.parse(operation.body),'object',folder+'.'+name);
   }
  }
+});
+
+test('Card.* runs the default reader connector, chains before-steps and normalises Result',async()=>{
+ const dojo=(await import('../../../connectors/dojo/scripts/install.mjs')).default;
+ const sent=[];
+ const deps={
+  rbac:{require:async()=>{}},
+  query:{find:async(_t,_u,object,conditions)=>object==='NamedDevice'
+   ?[{DeviceType:'Card Reader',Connector:'DojoConnector',DeviceId:'tm_1',IsDefault:true,Active:true}]:[]},
+  db:{query:async(sql,params)=>/md_named_credentials/.test(sql)?{rows:[{id:'00000000-0000-4000-8000-000000000009'}]}
+   :{rows:[{api_name:'DojoConnector',properties:{operations:dojo.operations,credentialName:'onesys_dojo'}}]}},
+  callout:async(_t,_u,config,variables)=>{sent.push([config.path,{...variables}]);
+   return config.path==='payment-intents'?{status:200,body:'{"id":"pi_1","status":"Created"}'}
+    :config.path==='terminal-sessions'?{status:200,body:'{"id":"ts_1","status":"InitiateRequested"}'}
+    :{status:200,body:'{"status":"Captured"}'};}
+ };
+ const start=await runActionCallout(deps,'t','u','Card.StartPayment',{Amount:9.99,Reference:'S9'},'key-12345678');
+ assert.deepEqual(sent.map(item=>item[0]),['payment-intents','terminal-sessions']);
+ assert.equal(sent[1][1].IntentId,'pi_1');
+ assert.equal(sent[1][1].DeviceId,'tm_1');
+ assert.equal(sent[0][1].AmountMinor,999);
+ assert.equal(start.PaymentId,'ts_1');
+ const check=await runActionCallout(deps,'t','u','Card.CheckStatus',{PaymentId:'ts_1',OrderId:''},'key-87654321');
+ assert.equal(check.Result,'Paid');
 });

@@ -17,7 +17,7 @@ type Field={apiName:string;label:string;required:boolean;defaultValue:string};
 /** body: JSON template whose {!Name} blanks CALLOUT fills by name; outputs: friendly reply
  * names mapped to JSON paths in the provider response (e.g. "Status":"data.state"). */
 type Operation={method:'GET'|'POST'|'PUT'|'PATCH'|'DELETE';path:string;headers?:string;
- body?:string;outputs?:Record<string,string>;label?:string;
+ body?:string;outputs?:Record<string,string>;label?:string;before?:string;results?:Record<string,string[]>;
  communicationFields?:{recipient?:string;sender?:string;body?:string;responseId?:string}};
 /** Payment role shown in Company Settings and Named Devices. */
 export const PROVIDER_TYPES=['Card Terminal','QR Payment','Online Payment','Delivery','Messaging','Other'] as const;
@@ -59,7 +59,12 @@ function validate(value:Definition,apiName:string):Definition{
      ||definition.headers.split(/\r?\n/).some(line=>
        !/^(?:X-[A-Za-z0-9-]+|Revolut-Api-Version|Square-Version|version|software-house-id|reseller-id|PayPal-Request-Id): (?:[A-Za-z0-9._:-]{1,128}|\{!(?:public_)?[A-Za-z][A-Za-z0-9_]*\})$/i.test(line))))
    ||(definition.body!==undefined&&!validBodyTemplate(definition.body))
-   ||(definition.outputs!==undefined&&!validOutputs(definition.outputs)))
+   ||(definition.outputs!==undefined&&!validOutputs(definition.outputs))
+   ||(definition.before!==undefined&&(typeof definition.before!=='string'||!value.operations[definition.before]
+     ||value.operations[definition.before].before!==undefined))
+   ||(definition.results!==undefined&&(typeof definition.results!=='object'||Array.isArray(definition.results)
+     ||Object.entries(definition.results).some(([name,list])=>!['Paid','Failed','Pending'].includes(name)
+      ||!Array.isArray(list)||list.some(item=>typeof item!=='string'||item.length>40)))))
     throw Error('Invalid connector operation: '+apiName+'.'+operation);
  }
  return value;

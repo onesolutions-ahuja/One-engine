@@ -35,6 +35,26 @@ export function formulaScreenWidth(canvas?:{canvasWidth?:number;canvasHeight?:nu
  return `min(94vw, ${Math.round(width)}px, calc((94vh - 4px) * ${(width/height).toFixed(4)}))`;
 }
 
+/** macOS-style genie: the popup pinches into the bottom centre (and grows back out). */
+const GENIE:Keyframe[]=[
+ {transform:'translateY(0) scale(1,1)',clipPath:'polygon(0 0,100% 0,100% 100%,0 100%)',opacity:1},
+ {transform:'translateY(12%) scale(.86,.9)',clipPath:'polygon(0 0,100% 0,64% 100%,36% 100%)',opacity:1,offset:.45},
+ {transform:'translateY(60vh) scale(.06,.12)',clipPath:'polygon(32% 0,68% 0,52% 100%,48% 100%)',opacity:0}
+];
+const reducedMotion=()=>typeof window!=='undefined'&&typeof window.matchMedia==='function'
+ &&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function genie(el:HTMLElement|null|undefined,closing:boolean,done?:()=>void){
+ if(!el||typeof el.animate!=='function'||reducedMotion()){done?.();return;}
+ el.style.transformOrigin='50% 100%';
+ const animation=el.animate(closing?GENIE:[...GENIE].reverse().map(frame=>frame.offset===undefined?frame:{...frame,offset:1-Number(frame.offset)}),
+  {duration:closing?300:340,easing:closing?'cubic-bezier(.5,0,.75,.15)':'cubic-bezier(.2,.8,.3,1)',fill:closing?'forwards':'none'});
+ if(!done)return;
+ let finished=false;
+ const finish=()=>{if(!finished){finished=true;done();}};
+ animation.onfinish=finish;animation.oncancel=finish;
+ window.setTimeout(finish,450);
+}
+
 /**
  * Formula SCREEN(...,popup) host. Popups are true modals: the rest of the page is
  * blurred and inert until the popup closes (Close button, Escape or CLOSESCREEN()).
@@ -51,8 +71,17 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
  const [fullPage]=React.useState(()=>frameDevice==='Phone'||(!inFrame&&phoneWidth()));
  const ref=React.useRef<HTMLDialogElement>(null);
  const frameRef=React.useRef<HTMLDivElement>(null);
- const close=React.useRef(onClose);
- close.current=onClose;
+ const closing=React.useRef(false);
+ const popupBox=()=>inFrame?frameRef.current?.querySelector<HTMLElement>('.formula-screen-card'):ref.current;
+ // Every close path (×, Back, Escape, CLOSESCREEN) plays the genie, then closes.
+ const animatedClose=()=>{
+  if(closing.current)return;
+  closing.current=true;
+  if(fullPage||screen.print)onClose();else genie(popupBox(),true,onClose);
+ };
+ const close=React.useRef(animatedClose);
+ close.current=animatedClose;
+ React.useEffect(()=>{if(!fullPage&&!screen.print)genie(popupBox(),false);},[]);
  React.useEffect(()=>{
   const dialog=ref.current;
   // A print preview opened from a popup (Reprint receipt) must sit above that popup,
@@ -93,7 +122,7 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
   {children}
  </dialog>;
  const back=<div className="formula-screen-bar">
-  <button type="button" aria-label="Back" onClick={onClose}><span aria-hidden="true">‹</span> Back</button>
+  <button type="button" aria-label="Back" onClick={()=>close.current()}><span aria-hidden="true">‹</span> Back</button>
  </div>;
  if(inFrame)return fullPage
   ?<div ref={frameRef} data-formula-screen-frame="" className="formula-screen-frame formula-screen-page" role="dialog" aria-modal="true" aria-label={screen.page}>
@@ -103,17 +132,17 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
     <style>{modalStyles}</style>
     <div className="formula-screen-card" role="dialog" aria-modal="true" aria-label={screen.page}
      style={{width:formulaScreenWidth(canvas)}}>
-     <button type="button" className="formula-screen-close" aria-label="Close" onClick={onClose}>×</button>
+     <button type="button" className="formula-screen-close" aria-label="Close" onClick={()=>close.current()}>×</button>
      {children}
     </div>
    </div>;
  return <dialog ref={ref} className={'formula-screen-modal'+(fullPage?' formula-screen-page':'')}
   aria-label={screen.page} aria-modal="true"
   style={fullPage?undefined:{width:formulaScreenWidth(canvas)}}
-  onCancel={event=>{event.preventDefault();onClose();}}>
+  onCancel={event=>{event.preventDefault();close.current();}}>
   <style>{modalStyles}</style>
   {fullPage?<>{back}<div className="formula-screen-body">{children}</div></>:<>
-   <button type="button" className="formula-screen-close" aria-label="Close" onClick={onClose}>×</button>
+   <button type="button" className="formula-screen-close" aria-label="Close" onClick={()=>close.current()}>×</button>
    {children}</>}
  </dialog>;
 }

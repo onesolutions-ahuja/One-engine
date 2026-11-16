@@ -51,25 +51,16 @@ export class RecordMatching {
     if(crossObject&&(!matchedField||!/^[A-Za-z][A-Za-z0-9_]*$/.test(matchedField)))
       throw new Error('Invalid cross-object matching field');
     if(crossObject)await this.rbac.require(tenantId,userId,targetObject+'.'+matchedField,'read');
-    params.push(matchedField,normalized??value.trim());
-    const col=params.length-1, val=params.length;
+    const column=nativeValueSql(native,matchedField,'nr',true);
+    params.push(normalized??value.trim());
+    const val=params.length;
     const comparison=field.match_type==='Fuzzy'
-      ?`md_fuzzy_unicode_match(v.value_text,$${val},${field.max_distance===2?2:1})`
+      ?`md_fuzzy_unicode_match(${column},$${val},${field.max_distance===2?2:1})`
       :normalized!==null
-      ?`regexp_replace(lower(normalize(v.value_text, NFC)), '[^[:alnum:]]', '', 'g')=$${val}`
-      :field.case_sensitive?'v.value_text=$'+val:'lower(v.value_text)=lower($'+val+')';
-    // The physical index stores only hashes (bounded even for long values).
-    // Recheck the actual Record value to rule out a hash collision. Record RBAC
-    // remains enforced by md_record_access on the final candidate query.
-    const indexed=normalized===null&&indexedFields.has(targetObject+'.'+matchedField)
-      ?` AND EXISTS(SELECT 1 FROM md_field_exact_index_entries ix
-        WHERE ix.tenant_id=r.tenant_id AND ix.object_api=r.object_api
-        AND ix.field_api=$${col} AND ix.record_id=r.id
-        AND ix.${field.case_sensitive?'value_hash':'folded_hash'}=
-        md5(${field.case_sensitive?'$'+val:'lower($'+val+')'}))`:'';
-    clauses.push(`EXISTS(SELECT 1 FROM md_record_values v WHERE v.tenant_id=r.tenant_id
-     AND v.object_api=r.object_api AND v.record_id=r.id AND v.field_api=$${col}
-     AND ${comparison}${indexed})`);
+      ?`regexp_replace(lower(normalize(${column}, NFC)), '[^[:alnum:]]', '', 'g')=$${val}`
+      :field.case_sensitive?`${column}=$${val}`:`lower(${column})=lower($${val})`;
+    // Hash indexes populated by legacy writes may lag direct native writes.
+    clauses.push(`(${column} IS NOT NULL AND ${comparison})`);
    }
    if(!clauses.length)continue;
    const filter=rule.match_mode==='All'?clauses.join(' AND '):'('+clauses.join(' OR ')+')';

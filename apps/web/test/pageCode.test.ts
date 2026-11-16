@@ -263,8 +263,10 @@ test('new-style actions: state, filter, navigation, WAIT, LOCATION, CREATEPDF, m
  assert.match(pdf.js,/v\["here"\] = await \$\.service\("LOCATION", \[\]\)/);
  const email=compileActionFormula('=EMAIL(Mailer, @ThisTenant.User.Email, "Receipt", @ThisTenant.Company.Name)','Cart');
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", \$\.session\("user\.email"\), "Receipt", \$\.tenant\("name"\)\]\)/);
- const sms=compileActionFormula('=SMS(Texter, @ThisPage.MessageBox.value)','Cart');
- assert.match(sms.js,/\$\.service\("SMS", \["Texter", \$\.component\("MessageBox", "value"\)\]\)/);
+ const sms=compileActionFormula('=SMS(Texter, @ThisPage.Input.phone, @ThisPage.MessageBox.value)','Cart');
+ assert.match(sms.js,/\$\.service\("SMS", \["Texter", \$\.state\("phone"\), \$\.component\("MessageBox", "value"\)\]\)/);
+ // Same counts as the save check (credential + values): a 2-value SMS has no recipient.
+ assert.throws(()=>compileActionFormula('=SMS(Texter, "Hi")','Cart'));
  const whatsapp=compileActionFormula('=WHATSAPP(Chat, @ThisPage.Input.phone, "Hi")','Cart');
  assert.match(whatsapp.js,/\$\.service\("WHATSAPP", \["Chat", \$\.state\("phone"\), "Hi"\]\)/);
  const pay=compileActionFormula('=RECORDPAYMENT(@ThisPage.Input.recordId, @ThisPage.PayButton.CartTotal, "Cash", AS(p))','Invoice');

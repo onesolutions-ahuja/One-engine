@@ -6,7 +6,6 @@ import {isRowDisplayProperty,resolveComponentFormulaProps} from
 
 type Row=Record<string,unknown>;
 type Code=Map<string,(row:Row)=>unknown>;
-const lookup=()=>undefined;
 
 function evaluateRows(
  source:string,rows:Row[],code:Code
@@ -29,7 +28,7 @@ test('Card Grid: row-bound names, prices, images and buttons are never pre-evalu
   imageSource:'@Product.Image',cardValue:'=TEXT(@Product.Price)',
   cardButtonText:'=UPPER(@Product.Name)',
   label:'=SUMIFS(CartLine, LineTotal, Status, "Open")'};
- const props=resolveComponentFormulaProps(source,'smart_card_grid',code,lookup);
+ const props=resolveComponentFormulaProps(source,'smart_card_grid',code);
  assert.equal(props.textSource,source.textSource);
  assert.equal(props.imageSource,source.imageSource);
  assert.equal(props.cardValue,source.cardValue);
@@ -46,7 +45,7 @@ test('Tabs and Selector: different category rows keep different captions',()=>{
  const code:Code=new Map([['@MenuCategory.Name',row=>row.Name]]);
  for(const component of ['smart_tabs','smart_selector','smart_navigation']){
   const props=resolveComponentFormulaProps(
-   {records,objectApiName:'MenuCategory',textSource:'@MenuCategory.Name'},component,code,lookup);
+   {records,objectApiName:'MenuCategory',textSource:'@MenuCategory.Name'},component,code);
   assert.equal(props.textSource,'@MenuCategory.Name',component);
   assert.deepEqual(evaluateRows(props.textSource as string,records,code),
    ['Desserts','Drinks','Snacks'],component);
@@ -67,7 +66,7 @@ test('Cart: lookup names, quantities, amounts, and row action labels keep their 
  const source={records,objectApiName:'CartLine',textSource:'@Product.Name',
   column2Source:'=TEXT(@CartLine.UnitPrice)',column3Source:'@CartLine.Quantity',
   rowSupportingSource:'@Product.Name',totalValue:'=SUMIFS(CartLine, LineTotal, Status, "Open")'};
- const props=resolveComponentFormulaProps(source,'smart_cart',code,lookup);
+ const props=resolveComponentFormulaProps(source,'smart_cart',code);
  assert.equal(props.totalValue,7.99,'Cart summary remains page-wide');
  assert.equal(props.textSource,'@Product.Name');
  assert.equal(props.column2Source,source.column2Source);
@@ -85,14 +84,14 @@ test('Table, Chart and Calendar defer all per-row projections but not page-level
  ]);
  for(const component of ['smart_chart','smart_table']){
   const props=resolveComponentFormulaProps({records:rows,objectApiName:'Event',
-   textSource:'@Event.Name',column2Source:'@Event.Value'},component,code,lookup);
+   textSource:'@Event.Name',column2Source:'@Event.Value'},component,code);
   assert.equal(props.column2Source,'@Event.Value');
   if(component==='smart_chart')assert.equal(props.textSource,'@Event.Name');
   assert.deepEqual(evaluateRows(props.column2Source as string,rows,code),[4,8]);
  }
  const calendar=resolveComponentFormulaProps({records:rows,objectApiName:'Event',
   calendarStartSource:'@Event.StartAt',calendarTitleSource:'@Event.Name'},
-  'smart_calendar',code,lookup);
+  'smart_calendar',code);
  assert.equal(calendar.calendarStartSource,'@Event.StartAt');
  assert.equal(calendar.calendarTitleSource,'@Event.Name');
 });
@@ -100,7 +99,7 @@ test('Table, Chart and Calendar defer all per-row projections but not page-level
 test('Single-record displays still run their compiled binding once',()=>{
  const code:Code=new Map([['@Product.Name',row=>row.Name]]);
  const props=resolveComponentFormulaProps({record:{Id:'p',Name:'Cola'},
-  objectApiName:'Product',textSource:'@Product.Name'},'smart_text',code,lookup);
+  objectApiName:'Product',textSource:'@Product.Name'},'smart_text',code);
  assert.equal(props.textSource,'Cola');
  assert.equal(isRowDisplayProperty('smart_text','textSource',{records:[{Name:'Cola'}]}),false);
 });
@@ -110,7 +109,7 @@ test('Authored collection and filter expressions survive intact rather than bein
  const props=resolveComponentFormulaProps({records:[],objectApiName:'Product',
   collectionFormula:'=COLLECTION("Tabs", "Drinks", "Food")',
   filterFormula:'@ThisPage.Tabs1.Selected.Id',selectorOptionsFormula:'=COLLECTION("Tabs", "Drinks", "Food")'},
-  'smart_tabs',code,lookup);
+  'smart_tabs',code);
  assert.equal(props.collectionFormula,'=COLLECTION("Tabs", "Drinks", "Food")');
  assert.equal(props.filterFormula,'@ThisPage.Tabs1.Selected.Id');
  assert.equal(props.selectorOptionsFormula,'=COLLECTION("Tabs", "Drinks", "Food")');
@@ -119,6 +118,6 @@ test('Authored collection and filter expressions survive intact rather than bein
 test('No-row-data components preserve their existing scalar behaviour',()=>{
  const code:Code=new Map([['@ThisTenant.Company.Name',()=> 'Shop Ltd']]);
  const props=resolveComponentFormulaProps({textSource:'@ThisTenant.Company.Name'},
-  'smart_tabs',code,lookup);
+  'smart_tabs',code);
  assert.equal(props.textSource,'Shop Ltd');
 });

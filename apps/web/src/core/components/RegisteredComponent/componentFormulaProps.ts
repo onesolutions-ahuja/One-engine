@@ -1,5 +1,5 @@
 import {convertedFormula} from '../../../component-libraries/shared/formulaCodeLookup.js';
-import {isSelectedSqlFormula} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
+import {isSelectedSqlFormula} from '../../../component-libraries/shared/formulaKinds.js';
 
 /** Configuration and data, not scalar display formulas. Keep the original bindings. */
 const nonDisplayProperties=new Set([
@@ -32,12 +32,10 @@ export function isRowDisplayProperty(apiName:string,key:string,props:Readonly<Re
   &&(Array.isArray(props.records)||Array.isArray(props.items)||props.dataCollection));
 }
 
-type FormulaResult={value?:unknown;loading?:boolean;error?:string}|null|undefined;
 export function resolveComponentFormulaProps(
  configuredProps:Record<string,unknown>,
  apiName:string,
- codeFunctions:Map<string,(row:Record<string,unknown>)=>unknown>|null,
- sqlLookup:(source:string,record:Record<string,unknown>|undefined)=>FormulaResult
+ codeFunctions:Map<string,(row:Record<string,unknown>)=>unknown>|null
 ):Record<string,unknown>{
  const result:Record<string,unknown>={...configuredProps};
  const sqlRecord=configuredProps.record&&typeof configuredProps.record==='object'&&!Array.isArray(configuredProps.record)
@@ -59,8 +57,8 @@ export function resolveComponentFormulaProps(
   if(typeof configuredProps.fieldAllowed==='function'&&
    !(configuredProps.fieldAllowed as (key:string,row:Record<string,unknown>)=>boolean)(key,sqlRecord??{}))
    continue;
-  const answer=sqlLookup(source,sqlRecord);
-  result[key]=answer?.loading?'':answer?.error?'FORMULAERROR':answer?.value??'';
+  // A total over Objects with no page code was not converted: never another engine.
+  result[key]='FORMULAERROR';
  }
  return result;
 }

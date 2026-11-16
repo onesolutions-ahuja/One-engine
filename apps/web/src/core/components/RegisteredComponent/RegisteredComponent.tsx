@@ -13,7 +13,6 @@ import './registeredComponentAppearance.css';
 import {pagePropertyIssues} from '../Properties/pagePropertyContract';
 import {resolveRegisteredTextProperties} from './fieldExpressionRuntime';
 import {FieldExpressionEvaluationError} from '../../../component-libraries/shared/FieldExpression.js';
-import {useSqlFormulaDisplay} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
 import {resolveComponentFormulaProps} from './componentFormulaProps';
 import {validatePrimitiveMetadata, primitiveAccessibilityProps} from './sharedPrimitiveMetadata';
 import {loadSharedSmartRenderer} from './sharedSmartRenderer';
@@ -125,7 +124,6 @@ function sameBuilderPreview(previous:RegisteredComponentProps,next:RegisteredCom
 export default React.memo(RegisteredComponent,sameBuilderPreview);
 function RegisteredComponent({ definition, props, formulaInstanceId, layoutTransparent=false, editorPreview=false }: RegisteredComponentProps) {
   const [rendered,setRendered]=useState<Readonly<Record<string,string>>>({});
-  const sqlLookup=useSqlFormulaDisplay(props,React);
   const formulaScope=usePageFormulaScope();
   useFormulaDependencyVersion(formulaScope,props);
   const [asset, setAsset] = useState<{apiName:string;version:number;compiledJs:string;scopedCss:string;defaultProps?:Record<string,unknown>;sharedSmartRuntime?:boolean;sharedRuntimePath?:string}|null>(null);
@@ -248,7 +246,7 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const formulaCode=(props.__formulaCode as {functions?:unknown}|undefined)?.functions;
   const codeFunctions=formulaCode instanceof Map
     ?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
-  const sqlProps=resolveComponentFormulaProps(configuredProps,definition.apiName,codeFunctions,sqlLookup);
+  const sqlProps=resolveComponentFormulaProps(configuredProps,definition.apiName,codeFunctions);
   let effectiveProps:Record<string,unknown>;
   try{
     effectiveProps=resolveRegisteredTextProperties(definitions,applyRecordViewAdapter(sqlProps),undefined,formulaScope?.read);

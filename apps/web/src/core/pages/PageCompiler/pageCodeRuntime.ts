@@ -16,7 +16,7 @@ import {F,O,aggregateRows,fieldValue,rowMatches} from '../../../../../server/src
 import {readComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {isConnected} from '../../../../../server/src/expression-engine/FormulaConnections.js';
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
-import {optimisticIdPrefix} from '../PageRuntime/predictActionPlan';
+import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
 
 type Row=Record<string,unknown>;
 type Criteria=Array<[string,unknown]>;

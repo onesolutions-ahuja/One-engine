@@ -4,7 +4,7 @@ import {
  type FormulaBindingContext
 } from '../../../component-libraries/shared/FieldExpression.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
-import {isSelectedSqlFormula} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
+import {isSelectedSqlFormula} from '../../../component-libraries/shared/formulaKinds.js';
 
 let authenticatedFormulaBindingContext:FormulaBindingContext|null=null;
 export function setAuthenticatedFormulaBindingContext(user:unknown):void {

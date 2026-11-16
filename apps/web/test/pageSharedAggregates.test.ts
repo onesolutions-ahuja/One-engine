@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {compilePage} from '../src/core/pages/PageCompiler/compilePage';
 import {createCompiledDataLayer} from '../src/core/pages/PageCompiler/compiledPageStore';
-import {evaluatePageActionSql} from '../src/component-libraries/shared/SqlFormulaPageRequest.js';
 import {noteSharedMutation,clearSharedAggregates} from '../src/component-libraries/shared/PageFormulaShare.js';
 import type {LightningPageMetadata,ObjectMetadata} from '../src/core/metadata/Definitions/metadata';
 
@@ -51,47 +50,6 @@ test('nothing falls back to the previous runtime, even in strict mode',()=>{
  const compiled=compilePage(relatedPage,objects,{strictLegacy:true});
  assert.equal(compiled.components[0].mode,'compiled');
  assert.deepEqual(compiled.diagnostics,[]);
-});
-
-test('the same total inside many different formulas is asked for once',async()=>{
- clearSharedAggregates();
- let calls=0;
- const request=async(_path:string,init:{body:string})=>{
-  calls++;
-  const body=JSON.parse(init.body);
-  assert.ok(/^SUMIFS\(/.test(body.formula),'only the bare aggregate is sent');
-  return {value:body.formula.includes('Quantity')?3:12.5};
- };
- const ask=(formula:string)=>evaluatePageActionSql(request as never,formula,{},{},'','',[],'session-1',{});
- const answers=await Promise.all([
-  ...Array.from({length:30},(_,i)=>ask('ROUND('+total+' * '+(i+1)+', 2)')),
-  ask(total),ask('ROUND('+qty+' * 2, 2)')]);
- assert.equal(answers[0],12.5);assert.equal(answers[1],25);assert.equal(answers[30],12.5);assert.equal(answers[31],6);
- assert.equal(calls,2,'two distinct aggregates, two requests');
-});
-
-test('a write drops the shared answer so the next ask goes back to the server',async()=>{
- clearSharedAggregates();
- let calls=0,value=10;
- const request=async()=>{calls++;return {value};};
- const ask=()=>evaluatePageActionSql(request as never,'ROUND('+total+', 2)',{},{},'','',[],'session-2',{});
- assert.equal(await ask(),10);assert.equal(await ask(),10);
- assert.equal(calls,1);
- value=20;
- noteSharedMutation('session-2',{objectApiNames:['Product']});
- assert.equal(await ask(),10,'unrelated Object write keeps the answer');
- noteSharedMutation('session-2',{objectApiNames:['CartLine']});
- assert.equal(await ask(),20);
- assert.equal(calls,2);
-});
-
-test('anything the shared path cannot answer falls back to the original request',async()=>{
- clearSharedAggregates();
- const sent:string[]=[];
- const request=async(_p:string,init:{body:string})=>{sent.push(JSON.parse(init.body).formula);return {value:null};};
- await evaluatePageActionSql(request as never,'ROUND('+total+', 2)',{},{},'','',[],'session-3',{});
- assert.equal(sent.length,2,'null aggregate: shared ask, then the unchanged whole-formula request');
- assert.ok(sent[1].startsWith('ROUND('));
 });
 
 test('refreshing a data source with identical rows does not redraw its readers',async()=>{

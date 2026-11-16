@@ -39,6 +39,7 @@ jobs:
       - name: Till tap SQL round trips (PostgreSQL)
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
+          TRIPS_TRACE: '1'
         run: node --import tsx apps/server/scripts/record-trips-probe.mjs
   build:
     runs-on: ubuntu-latest

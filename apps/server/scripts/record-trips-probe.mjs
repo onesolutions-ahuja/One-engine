@@ -3,7 +3,7 @@
 // fails if a step regresses past its budget. Run in CI with a disposable database.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {Pool} from 'pg';
+import pg,{Pool} from 'pg';
 import {SqlPersistence} from '../src/system-files/sql-persistence.ts';
 import {applySystemMigrations} from '../src/system-support/system-migrations.ts';
 import {activateNativeObject} from '../src/system-support/native-object-storage.ts';
@@ -45,9 +45,17 @@ try{
  const cart=await records.create(tenant,user,'ProbeCart',{Name:'Cart 1',Status:'Open'});
  const line=await records.create(tenant,user,'ProbeLine',{Name:'Cola',CartId:cart,ProductId:product,Qty:1,Amount:1.5});
  const steps=[];
+ // TRIPS_TRACE=1 prints each statement of the page-code-scope tap (first 110 characters).
+ let trace=null;
+ const originalQuery=pg.Client.prototype.query;
+ pg.Client.prototype.query=function(...args){
+  if(trace&&typeof args[0]==='string')trace.push(args[0].replace(/\s+/g,' ').slice(0,110));
+  return originalQuery.apply(this,args);
+ };
  const tap=()=>db.transaction(async()=>{
   const measure=async(name,run)=>{
    const timing=auditContext().timing,before=timing.dbTrips;
+   if(trace)trace.push('--- '+name);
    const value=await run();steps.push([name,timing.dbTrips-before]);return value;
   };
   const p=await measure('get product',()=>records.get(tenant,user,'ProbeProduct',product));
@@ -70,7 +78,9 @@ try{
   return total;
  };
  await run(false);
+ if(process.env.TRIPS_TRACE)trace=[];
  const scoped=await run(true);
+ if(trace){console.info(trace.join('\n'));trace=null;}
  // Budget for one till tap inside the page-code scope (was far higher before batching).
  assert(scoped<=Number(process.env.TRIPS_BUDGET??999),'SQL trips over budget: '+scoped);
  const lines=await records.list(tenant,user,'ProbeLine',100,0,{filters:[{field:'CartId',operator:'eq',value:cart}]});

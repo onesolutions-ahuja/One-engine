@@ -15,8 +15,9 @@ import {withAuditContext,auditContext} from '../src/system-support/audit-context
 const url=process.env.METADRIVE_SQL_TEST_DATABASE_URL;
 if(!url||new URL(url).pathname!=='/metadrive_native_copy_test')throw Error('Disposable SQL database required');
 const setup=new Pool({connectionString:url});
+// Extensions (pgcrypto, pg_trgm) were created by the earlier native test in its schema.
 await setup.query('CREATE SCHEMA trips_probe');await setup.end();
-const isolated=new URL(url);isolated.searchParams.set('options','-c search_path=trips_probe,public');
+const isolated=new URL(url);isolated.searchParams.set('options','-c search_path=trips_probe,native_api_test,public');
 const db=new SqlPersistence(isolated.toString());
 try{
  await db.query(readFileSync(new URL('../src/system-files/schema.sql',import.meta.url),'utf8'));

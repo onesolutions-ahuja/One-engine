@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS md_object_definitions (id uuid PRIMARY KEY DEFAULT ge
 ALTER TABLE md_object_definitions ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 CREATE TABLE IF NOT EXISTS md_field_definitions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES md_tenants(id), object_api text NOT NULL, api_name text NOT NULL, label text, data_type text NOT NULL, related_object text, track_history boolean NOT NULL DEFAULT false, max_length integer CHECK (max_length BETWEEN 1 AND 1000000), required boolean NOT NULL DEFAULT false, UNIQUE(tenant_id,object_api,api_name), UNIQUE(tenant_id,object_api,id), FOREIGN KEY(tenant_id,object_api) REFERENCES md_object_definitions(tenant_id,api_name), FOREIGN KEY(tenant_id,related_object) REFERENCES md_object_definitions(tenant_id,api_name));
 CREATE TABLE IF NOT EXISTS md_records (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES md_tenants(id), object_api text NOT NULL, is_clone boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now(), is_deleted boolean NOT NULL DEFAULT false, deleted_at timestamptz, deleted_by uuid, deletion_group_id uuid, deletion_root_id uuid, UNIQUE(tenant_id,id), UNIQUE(tenant_id,id,object_api), FOREIGN KEY(tenant_id,object_api) REFERENCES md_object_definitions(tenant_id,api_name));
-CREATE TABLE IF NOT EXISTS md_record_values (tenant_id uuid NOT NULL REFERENCES md_tenants(id), record_id uuid NOT NULL, object_api text NOT NULL, field_api text NOT NULL, value_text text, reference_record_id uuid, PRIMARY KEY(tenant_id,record_id,field_api), FOREIGN KEY(tenant_id,record_id,object_api) REFERENCES md_records(tenant_id,id,object_api) ON DELETE CASCADE, FOREIGN KEY(tenant_id,object_api,field_api) REFERENCES md_field_definitions(tenant_id,object_api,api_name), FOREIGN KEY(tenant_id,reference_record_id) REFERENCES md_records(tenant_id,id));
 -- Recycle Bin storage is relational and tenant-scoped. Also maintained by the
 -- upgrade-safe 20261105 migration for existing installations.
 CREATE INDEX IF NOT EXISTS md_records_active_lookup
@@ -823,29 +822,6 @@ CREATE INDEX IF NOT EXISTS md_field_rollup_filters_lookup
   ON md_field_rollup_filters(tenant_id,object_api,rollup_field_api,sort_order);
 CREATE INDEX IF NOT EXISTS md_field_definitions_recycle_bin
   ON md_field_definitions(tenant_id,deleted_at) WHERE deleted_at IS NOT NULL;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS is_unique boolean NOT NULL DEFAULT false;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS case_sensitive boolean NOT NULL DEFAULT false;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS geo_latitude double precision;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS geo_longitude double precision;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS address_street text;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS address_city text;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS address_state text;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS address_postal_code text;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS address_country text;
-ALTER TABLE md_record_values ADD COLUMN IF NOT EXISTS record_is_deleted boolean NOT NULL DEFAULT false;
-CREATE UNIQUE INDEX IF NOT EXISTS md_record_values_unique_ci
-  ON md_record_values(tenant_id,object_api,field_api,lower(value_text))
-  WHERE is_unique AND NOT case_sensitive AND value_text IS NOT NULL AND record_is_deleted=false;
-CREATE UNIQUE INDEX IF NOT EXISTS md_record_values_unique_cs
-  ON md_record_values(tenant_id,object_api,field_api,value_text)
-  WHERE is_unique AND case_sensitive AND value_text IS NOT NULL AND record_is_deleted=false;
--- Field lookups remain indexed even when External ID is not Unique.
-CREATE INDEX IF NOT EXISTS md_record_values_lookup_ci
- ON md_record_values(tenant_id,object_api,field_api,lower(value_text))
- WHERE value_text IS NOT NULL AND record_is_deleted=false;
-CREATE INDEX IF NOT EXISTS md_record_values_lookup_cs
- ON md_record_values(tenant_id,object_api,field_api,value_text)
- WHERE value_text IS NOT NULL AND record_is_deleted=false;
 CREATE TABLE IF NOT EXISTS md_record_multi_values (
   tenant_id uuid NOT NULL,
   record_id uuid NOT NULL,
@@ -1365,13 +1341,30 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
    OR (m.member_kind='RoleAndSubordinates' AND m.member_id IN(SELECT role_id FROM md_user_role_tree(t,u))))
 $$;
 CREATE OR REPLACE FUNCTION md_record_field(t uuid,r uuid,f text)
-RETURNS text LANGUAGE sql STABLE AS $$
- SELECT CASE f WHEN 'Id' THEN rec.id::text WHEN 'OwnerId' THEN COALESCE(rec.owner_id,rec.owner_queue_id)::text
-  WHEN 'RecordTypeId' THEN rec.record_type_id
-  ELSE (SELECT COALESCE(v.reference_record_id::text,v.value_text) FROM md_record_values v
-    WHERE v.tenant_id=t AND v.record_id=r AND v.field_api=f) END
- FROM md_records rec WHERE rec.tenant_id=t AND rec.id=r
-$$;
+RETURNS text LANGUAGE plpgsql STABLE AS $$
+DECLARE rec record; tab text; col text; expression text; result text;
+BEGIN
+ SELECT object_api,id,owner_id,owner_queue_id,record_type_id INTO rec
+ FROM md_records WHERE tenant_id=t AND id=r;
+ IF NOT FOUND THEN RETURN NULL; END IF;
+ IF f='Id' THEN RETURN rec.id::text; END IF;
+ IF f='OwnerId' THEN RETURN COALESCE(rec.owner_id,rec.owner_queue_id)::text; END IF;
+ IF f='RecordTypeId' THEN RETURN rec.record_type_id; END IF;
+ SELECT n.table_name,m.column_name INTO tab,col FROM md_native_objects n
+ JOIN md_native_fields m ON m.tenant_id=n.tenant_id AND m.object_api=n.object_api
+ WHERE n.tenant_id=t AND n.object_api=rec.object_api AND m.field_api=f;
+ IF tab IS NULL THEN RETURN NULL; END IF;
+ IF tab !~ '^md_object_[a-f0-9]{32}$'
+    OR (col IS NOT NULL AND col !~ '^f_[a-f0-9]{32}$') THEN
+  RAISE EXCEPTION 'Invalid native field mapping';
+ END IF;
+ expression:=CASE WHEN col IS NULL THEN 'extras->>$3'
+  ELSE format('%I::text',col) END;
+ EXECUTE format('SELECT CASE WHEN $3=ANY(present_fields) THEN %s ELSE NULL END
+   FROM %I WHERE tenant_id=$1 AND id=$2',expression,tab)
+   INTO result USING t,r,f;
+ RETURN result;
+END $$;
 CREATE OR REPLACE FUNCTION md_policy_matches(t uuid,p text,r uuid)
 RETURNS boolean LANGUAGE sql STABLE AS $$
  WITH comparisons AS (
@@ -2670,7 +2663,7 @@ CREATE OR REPLACE FUNCTION md_install_setup_audit() RETURNS void LANGUAGE plpgsq
 DECLARE n text;
 BEGIN
  FOR n IN SELECT tablename FROM pg_tables WHERE schemaname=current_schema() AND starts_with(tablename,'md_')
-  AND tablename NOT IN('md_records','md_record_values','md_record_multi_values','md_deleted_lookup_links','md_record_files','md_record_activities','md_record_chatter_posts','md_record_chatter_comments','md_record_history','md_record_lifecycle_audit','md_record_retention_audit','md_auto_number_counters','md_sessions','md_refresh_sessions','md_security_events','md_setup_audit_events','md_setup_audit_tables','md_monitor_events','md_security_rule_windows','md_rbac_revisions','md_password_history','md_password_reset_challenges','md_mfa_login_challenges','md_mfa_enrollment_tokens','md_mfa_backup_codes','md_webauthn_challenges','md_federation_requests','md_federation_tickets','md_saml_request_ids','md_oauth_codes','md_oauth_tokens','md_oauth_consents','md_oauth_consent_scopes','md_notifications','md_approval_requests','md_dashboard_snapshots','md_flow_runs','md_flow_run_inputs','md_flow_interview_state','md_flow_interview_values','md_flow_interview_records','md_flow_interview_record_fields','md_flow_interview_loop_state','md_flow_execution_audit','md_flow_execution_requests','md_flow_execution_result_values','md_flow_email_jobs','md_http_callout_jobs','md_http_callout_job_values','md_platform_event_deliveries','md_platform_event_messages','md_platform_event_values','md_webhook_deliveries','md_durable_jobs','md_durable_job_events','md_durable_job_values','md_encrypted_field_access_audit','md_tenant_recovery_cases','md_tenant_recovery_case_proofs','md_tenant_recovery_approvals','md_tenant_lifecycle_audit','md_global_value_set_audit','md_tenant_provisioning_requests','md_bootstrap_password_repairs','md_initial_password_rotations','md_system_migrations','md_schema_migrations','md_migrations','md_tenant_api_usage_daily','md_api_usage_daily','md_api_request_counts','md_offline_sync_receipts','md_data_import_jobs','md_data_import_rows','md_data_export_jobs') LOOP
+  AND tablename NOT IN('md_records','md_record_multi_values','md_deleted_lookup_links','md_record_files','md_record_activities','md_record_chatter_posts','md_record_chatter_comments','md_record_history','md_record_lifecycle_audit','md_record_retention_audit','md_auto_number_counters','md_sessions','md_refresh_sessions','md_security_events','md_setup_audit_events','md_setup_audit_tables','md_monitor_events','md_security_rule_windows','md_rbac_revisions','md_password_history','md_password_reset_challenges','md_mfa_login_challenges','md_mfa_enrollment_tokens','md_mfa_backup_codes','md_webauthn_challenges','md_federation_requests','md_federation_tickets','md_saml_request_ids','md_oauth_codes','md_oauth_tokens','md_oauth_consents','md_oauth_consent_scopes','md_notifications','md_approval_requests','md_dashboard_snapshots','md_flow_runs','md_flow_run_inputs','md_flow_interview_state','md_flow_interview_values','md_flow_interview_records','md_flow_interview_record_fields','md_flow_interview_loop_state','md_flow_execution_audit','md_flow_execution_requests','md_flow_execution_result_values','md_flow_email_jobs','md_http_callout_jobs','md_http_callout_job_values','md_platform_event_deliveries','md_platform_event_messages','md_platform_event_values','md_webhook_deliveries','md_durable_jobs','md_durable_job_events','md_durable_job_values','md_encrypted_field_access_audit','md_tenant_recovery_cases','md_tenant_recovery_case_proofs','md_tenant_recovery_approvals','md_tenant_lifecycle_audit','md_global_value_set_audit','md_tenant_provisioning_requests','md_bootstrap_password_repairs','md_initial_password_rotations','md_system_migrations','md_schema_migrations','md_migrations','md_tenant_api_usage_daily','md_api_usage_daily','md_api_request_counts','md_offline_sync_receipts','md_data_import_jobs','md_data_import_rows','md_data_export_jobs') LOOP
   EXECUTE format('DROP TRIGGER IF EXISTS md_capture_setup_mutation ON %I',n);
   EXECUTE format('CREATE TRIGGER md_capture_setup_mutation AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION md_capture_setup_mutation()',n);
   INSERT INTO md_setup_audit_tables VALUES(n) ON CONFLICT DO NOTHING;
@@ -2847,37 +2840,7 @@ DROP TRIGGER IF EXISTS md_limit_field_sets ON md_object_field_sets;
 CREATE TRIGGER md_limit_field_sets AFTER INSERT ON md_object_field_sets
  FOR EACH ROW EXECUTE FUNCTION md_enforce_object_metadata_limit();
 
--- Phase 2C: enforce relationship target object and active-record integrity at storage.
--- Existing tenant FK alone prevents cross-tenant IDs but not same-tenant wrong-object IDs.
-CREATE OR REPLACE FUNCTION md_validate_relationship_record_target()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE target_object text;
-BEGIN
- IF NEW.reference_record_id IS NULL THEN RETURN NEW; END IF;
- SELECT f.related_object INTO target_object
- FROM md_field_definitions f
- WHERE f.tenant_id=NEW.tenant_id AND f.object_api=NEW.object_api
-   AND f.api_name=NEW.field_api AND f.data_type='reference' AND f.deleted_at IS NULL;
- IF target_object IS NULL OR NOT EXISTS(
-   SELECT 1 FROM md_records r
-   WHERE r.tenant_id=NEW.tenant_id AND r.object_api=target_object
-     AND r.id=NEW.reference_record_id AND r.is_deleted=false
-   FOR SHARE
- ) THEN RAISE EXCEPTION 'Invalid relationship target for field %',NEW.field_api
-   USING ERRCODE='23503';
- END IF;
- RETURN NEW;
-END $$;
-DROP TRIGGER IF EXISTS md_validate_relationship_target_record ON md_record_values;
-CREATE TRIGGER md_validate_relationship_target_record
- BEFORE INSERT OR UPDATE OF reference_record_id,object_api,field_api
- ON md_record_values FOR EACH ROW
- EXECUTE FUNCTION md_validate_relationship_record_target();
-
--- Inbound deletes, inverse related lists and relationship metadata traversal stay indexed.
-CREATE INDEX IF NOT EXISTS md_record_values_relationship_inbound
- ON md_record_values(tenant_id,reference_record_id,object_api,field_api,record_id)
- WHERE reference_record_id IS NOT NULL;
+-- Native relationship integrity is enforced by md_native_validate_relationship.
 CREATE INDEX IF NOT EXISTS md_field_definitions_relationship_inbound
  ON md_field_definitions(tenant_id,related_object,object_api,api_name)
  WHERE data_type='reference' AND deleted_at IS NULL;

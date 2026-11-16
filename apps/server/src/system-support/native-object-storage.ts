@@ -29,18 +29,23 @@ BEGIN
  IF obj IS NULL THEN RETURN NEW; END IF;
  DELETE FROM md_record_search_values
   WHERE tenant_id=NEW.tenant_id AND record_id=NEW.id AND object_api=obj;
+ DELETE FROM md_field_exact_index_entries
+  WHERE tenant_id=NEW.tenant_id AND record_id=NEW.id AND object_api=obj;
  IF NEW.is_deleted THEN RETURN NEW; END IF;
  stored:=to_jsonb(NEW);
  FOR field IN
   SELECT n.field_api,n.column_name FROM md_native_fields n
-   JOIN md_search_layout_fields s ON s.tenant_id=n.tenant_id
-    AND s.object_api=n.object_api AND s.field_api=n.field_api
    WHERE n.tenant_id=NEW.tenant_id AND n.object_api=obj
+    AND (EXISTS(SELECT 1 FROM md_search_layout_fields sl
+      WHERE sl.tenant_id=n.tenant_id AND sl.object_api=n.object_api AND sl.field_api=n.field_api)
+      OR EXISTS(SELECT 1 FROM md_field_exact_indexes ex
+       WHERE ex.tenant_id=n.tenant_id AND ex.object_api=n.object_api AND ex.field_api=n.field_api AND ex.enabled))
  LOOP
   IF field.field_api=ANY(NEW.present_fields) THEN
    raw_value:=CASE WHEN field.column_name IS NULL THEN NEW.extras->>field.field_api
     ELSE stored->>field.column_name END;
    PERFORM md_refresh_record_search_value(NEW.tenant_id,NEW.id,obj,field.field_api,raw_value);
+   PERFORM md_sync_field_exact_entry(NEW.tenant_id,obj,field.field_api,NEW.id,raw_value,false);
   END IF;
  END LOOP;
  RETURN NEW;
@@ -92,11 +97,44 @@ BEGIN
  RETURN NEW;
 END $$;
 
+-- Validate native references against live same-tenant target records.
+CREATE OR REPLACE FUNCTION md_native_validate_relationship() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE obj text; f record; data jsonb; target text;
+BEGIN
+ IF NEW.is_deleted THEN RETURN NEW; END IF;
+ SELECT object_api INTO obj FROM md_native_objects
+  WHERE tenant_id=NEW.tenant_id AND table_name=TG_TABLE_NAME;
+ IF obj IS NULL THEN RETURN NEW; END IF;
+ data:=to_jsonb(NEW);
+ FOR f IN SELECT d.api_name,d.related_object,n.column_name FROM md_field_definitions d
+  JOIN md_native_fields n ON n.tenant_id=d.tenant_id AND n.object_api=d.object_api
+    AND n.field_api=d.api_name
+  WHERE d.tenant_id=NEW.tenant_id AND d.object_api=obj
+    AND d.data_type='reference' AND d.deleted_at IS NULL
+ LOOP
+  IF NOT f.api_name=ANY(NEW.present_fields) THEN CONTINUE; END IF;
+  target:=CASE WHEN f.column_name IS NULL THEN NEW.extras->>f.api_name
+    ELSE data->>f.column_name END;
+  IF target IS NOT NULL AND NOT EXISTS(SELECT 1 FROM md_records r
+    WHERE r.tenant_id=NEW.tenant_id AND r.object_api=f.related_object
+     AND r.id=target::uuid AND NOT r.is_deleted FOR SHARE)
+  THEN RAISE EXCEPTION 'Invalid relationship target for field %',f.api_name
+    USING ERRCODE='23503';
+  END IF;
+ END LOOP;
+ RETURN NEW;
+END $$;
+
 CREATE OR REPLACE FUNCTION md_native_install_value_triggers(tab text) RETURNS void
  LANGUAGE plpgsql AS $$
 BEGIN
  IF tab !~ '^md_object_[a-f0-9]{32}$' THEN
   RAISE EXCEPTION 'Invalid native table name';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_trigger
+  WHERE tgrelid=to_regclass(format('%I',tab)) AND tgname='md_native_relationship_check_trigger') THEN
+  EXECUTE format('CREATE TRIGGER md_native_relationship_check_trigger BEFORE INSERT OR UPDATE
+   ON %I FOR EACH ROW EXECUTE FUNCTION md_native_validate_relationship()',tab);
  END IF;
  IF NOT EXISTS(SELECT 1 FROM pg_trigger
   WHERE tgrelid=to_regclass(format('%I',tab)) AND tgname='md_native_unique_check_trigger') THEN
@@ -184,58 +222,6 @@ BEGIN
  END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION md_native_write_value(v md_record_values,removed boolean) RETURNS void
- LANGUAGE plpgsql AS $$
-DECLARE tab text; f md_native_fields; val jsonb;
-BEGIN
- SELECT table_name INTO tab FROM md_native_objects WHERE tenant_id=v.tenant_id AND object_api=v.object_api;
- IF tab IS NULL THEN RETURN; END IF;
- SELECT * INTO f FROM md_native_fields WHERE tenant_id=v.tenant_id AND object_api=v.object_api AND field_api=v.field_api;
- IF NOT FOUND THEN
-  PERFORM md_native_configure_field(v.tenant_id,v.object_api,v.field_api);
-  SELECT * INTO f FROM md_native_fields WHERE tenant_id=v.tenant_id AND object_api=v.object_api AND field_api=v.field_api;
-  IF NOT FOUND THEN
-   IF removed THEN RETURN; END IF;
-   RAISE EXCEPTION 'Native field metadata unavailable for %.%',v.object_api,v.field_api;
-  END IF;
- END IF;
- IF removed THEN val:='null'::jsonb;
- ELSIF f.sql_type='numeric' THEN val:=to_jsonb(COALESCE(v.value_number,NULLIF(v.value_text,'')::numeric));
- ELSIF f.sql_type='boolean' THEN val:=to_jsonb(COALESCE(v.value_boolean,v.value_text::boolean));
- ELSIF f.sql_type='date' THEN val:=to_jsonb(COALESCE(v.value_date,v.value_text::date));
- ELSIF f.sql_type='timestamptz' THEN val:=to_jsonb(COALESCE(v.value_datetime,v.value_text::timestamptz));
- ELSIF f.sql_type='uuid' THEN val:=to_jsonb(COALESCE(v.reference_record_id,v.value_text::uuid));
- ELSIF f.sql_type='double precision[]' THEN val:=to_jsonb(ARRAY[v.geo_latitude,v.geo_longitude]);
- ELSIF f.sql_type='text[]' THEN val:=to_jsonb(ARRAY[v.address_street,v.address_city,v.address_state,v.address_postal_code,v.address_country]);
- ELSE val:=to_jsonb(COALESCE(v.reference_record_id::text,v.value_text)); END IF;
- val:=COALESCE(val,'null'::jsonb);
- IF f.column_name IS NULL THEN
-  EXECUTE format('UPDATE %I SET extras=CASE WHEN $5 THEN extras-$3 ELSE extras||jsonb_build_object($3,$4) END,
-   present_fields=CASE WHEN $5 THEN array_remove(present_fields,$3)
-    WHEN $3=ANY(present_fields) THEN present_fields ELSE array_append(present_fields,$3) END
-   WHERE tenant_id=$1 AND id=$2',tab) USING v.tenant_id,v.record_id,v.field_api,val,removed;
- ELSE
-  EXECUTE format('UPDATE %I SET %I=(jsonb_populate_record(NULL::%I,jsonb_build_object(%L,$4))).%I,
-   extras=extras-$3,present_fields=CASE WHEN $5 THEN array_remove(present_fields,$3)
-    WHEN $3=ANY(present_fields) THEN present_fields ELSE array_append(present_fields,$3) END
-   WHERE tenant_id=$1 AND id=$2',tab,f.column_name,tab,f.column_name,f.column_name)
-   USING v.tenant_id,v.record_id,v.field_api,val,removed;
- END IF;
-END $$;
-
-CREATE OR REPLACE FUNCTION md_native_value_changed() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
- IF TG_OP='DELETE' THEN PERFORM md_native_write_value(OLD,true); RETURN OLD; END IF;
- IF TG_OP='UPDATE' AND (OLD.tenant_id,OLD.record_id,OLD.object_api,OLD.field_api)
-   IS DISTINCT FROM (NEW.tenant_id,NEW.record_id,NEW.object_api,NEW.field_api) THEN
-  PERFORM md_native_write_value(OLD,true);
- END IF;
- PERFORM md_native_write_value(NEW,false); RETURN NEW;
-END $$;
-DROP TRIGGER IF EXISTS md_native_value_changed ON md_record_values;
-CREATE TRIGGER md_native_value_changed AFTER INSERT OR UPDATE OR DELETE ON md_record_values
- FOR EACH ROW EXECUTE FUNCTION md_native_value_changed();
-
 CREATE OR REPLACE FUNCTION md_native_record_changed() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE tab text; columns text:='tenant_id,id,created_at,updated_at,owner_id,owner_queue_id,record_type_id,is_clone,is_deleted,deleted_at,deleted_by,deletion_group_id,deletion_root_id';
 BEGIN
@@ -261,19 +247,39 @@ CREATE TRIGGER md_native_record_changed AFTER INSERT OR UPDATE OR DELETE ON md_r
  FOR EACH ROW EXECUTE FUNCTION md_native_record_changed();
 
 CREATE OR REPLACE FUNCTION md_native_field_changed() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE v md_record_values;
 BEGIN
- IF NOT EXISTS(SELECT 1 FROM md_native_objects WHERE tenant_id=NEW.tenant_id AND object_api=NEW.object_api) THEN RETURN NEW; END IF;
- PERFORM md_native_configure_field(NEW.tenant_id,NEW.object_api,NEW.api_name);
- IF NEW.data_type<>'formula' THEN
-  FOR v IN SELECT * FROM md_record_values WHERE tenant_id=NEW.tenant_id AND object_api=NEW.object_api AND field_api=NEW.api_name
-   LOOP PERFORM md_native_write_value(v,false); END LOOP;
+ IF EXISTS(SELECT 1 FROM md_native_objects
+   WHERE tenant_id=NEW.tenant_id AND object_api=NEW.object_api) THEN
+  PERFORM md_native_configure_field(NEW.tenant_id,NEW.object_api,NEW.api_name);
  END IF;
  RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS md_native_field_changed ON md_field_definitions;
 CREATE TRIGGER md_native_field_changed AFTER INSERT OR UPDATE OF data_type,rollup_operation,rollup_source_field,rollup_child_object,is_unique,case_sensitive
  ON md_field_definitions FOR EACH ROW EXECUTE FUNCTION md_native_field_changed();
+
+-- Newly created Objects must become natively writable immediately.
+CREATE OR REPLACE FUNCTION md_native_object_created() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE tab text;
+BEGIN
+ tab:='md_object_'||substr(encode(digest(NEW.api_name,'sha256'),'hex'),1,32);
+ EXECUTE format('CREATE TABLE IF NOT EXISTS %I(
+  tenant_id uuid NOT NULL REFERENCES md_tenants(id),id uuid NOT NULL,
+  created_at timestamptz NOT NULL,updated_at timestamptz NOT NULL,
+  owner_id uuid,owner_queue_id uuid,record_type_id text,is_clone boolean NOT NULL,
+  is_deleted boolean NOT NULL,deleted_at timestamptz,deleted_by uuid,
+  deletion_group_id uuid,deletion_root_id uuid,present_fields text[] NOT NULL,
+  extras jsonb NOT NULL CHECK(jsonb_typeof(extras)=''object''),
+  PRIMARY KEY(tenant_id,id))',tab);
+ INSERT INTO md_native_objects(tenant_id,object_api,table_name)
+ VALUES(NEW.tenant_id,NEW.api_name,tab)
+ ON CONFLICT(tenant_id,object_api) DO NOTHING;
+ PERFORM md_native_install_value_triggers(tab);
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS md_native_object_created ON md_object_definitions;
+CREATE TRIGGER md_native_object_created AFTER INSERT ON md_object_definitions
+ FOR EACH ROW EXECUTE FUNCTION md_native_object_created();
 `;
 
 export async function activateNativeObject(db:SqlPersistence,tenantId:string,objectApi:string){

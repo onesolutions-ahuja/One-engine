@@ -1,9 +1,9 @@
 import {createHash} from 'node:crypto';
 import type {SqlPersistence} from './sql-persistence.js';
 
-/** Offline, verified COPY stage only. Never select this snapshot for runtime CRUD:
- * it is not kept current after commit. Cutover requires all EAV consumers first.
- * No startup hook: an operator explicitly runs this against a chosen tenant/object.
+/** Native-object row initialization for newly activated objects.
+ * Existing native values are never reconstructed from retired value storage.
+ * The copy plan initializes record headers only; writes use writeNativeValues.
  */
 export type NativeField={api_name:string;data_type:string;standard:boolean;
   rollup_source_data_type?:string|null};
@@ -30,19 +30,6 @@ export function nativeFieldType(field:NativeField):string {
 export const nativeColumnName=(field:NativeField)=>
   'f_'+digest(field.api_name+':'+nativeFieldType(field));
 
-function valueSql(field:NativeField):string {
-  const type=nativeFieldType(field);
-  if(type==='double precision[]')return 'to_jsonb(ARRAY[v.geo_latitude,v.geo_longitude]::double precision[])';
-  if(type==='text[]')return 'to_jsonb(ARRAY[v.address_street,v.address_city,v.address_state,v.address_postal_code,v.address_country])';
-  const text='COALESCE(v.reference_record_id::text,v.value_text)';
-  const value=type==='numeric'?`COALESCE(v.value_number,NULLIF(v.value_text,'')::numeric)`
-    :type==='boolean'?`COALESCE(v.value_boolean,v.value_text::boolean)`
-    :type==='date'?`COALESCE(v.value_date,v.value_text::date)`
-    :type==='timestamptz'?`COALESCE(v.value_datetime,v.value_text::timestamptz)`
-    :type==='uuid'?`(${text})::uuid`:text;
-  return `to_jsonb(${value})`;
-}
-
 const systemColumns=['tenant_id','id','created_at','updated_at','owner_id','owner_queue_id',
   'record_type_id','is_clone','is_deleted','deleted_at','deleted_by','deletion_group_id','deletion_root_id'];
 
@@ -55,13 +42,9 @@ export function nativeCopyPlan(objectApi:string,fields:readonly NativeField[]) {
   for(const field of stored)nativeFieldType(field);
   const columns=stored.filter(f=>f.standard);
   const custom=stored.filter(f=>!f.standard);
-  const cases=stored.map(f=>`WHEN ${literal(f.api_name)} THEN ${valueSql(f)}`).join('\n');
   const source=`SELECT ${systemColumns.map(c=>'r.'+c).join(',')},
-    COALESCE(field_values.data,'{}'::jsonb) AS data
-    FROM md_records r LEFT JOIN LATERAL (
-      SELECT jsonb_object_agg(v.field_api,COALESCE(${cases?`CASE v.field_api ${cases} END`:'NULL::jsonb'},'null'::jsonb)) AS data
-      FROM md_record_values v WHERE v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
-    ) field_values ON true WHERE r.tenant_id=$1 AND r.object_api=$2`;
+    '{}'::jsonb AS data FROM md_records r
+    WHERE r.tenant_id=$1 AND r.object_api=$2`;
   const extract=(f:NativeField)=>{
     const key=literal(f.api_name),type=nativeFieldType(f);
     if(type.endsWith('[]'))return `(CASE WHEN data ? ${key} THEN ARRAY(SELECT jsonb_array_elements_text(data->${key}))::${type} END)`;
@@ -104,9 +87,8 @@ export function nativeCopyPlan(objectApi:string,fields:readonly NativeField[]) {
   };
 }
 
-/** Copy under database locks: includes deleted records and inactive fields, keeps
- * original EAV tables intact, rolls back the entire copy on any mismatch/error.
- * Lock timeout bounds impact on live traffic. This is an offline operation.
+/** Initialize an unactivated native Object with record headers.
+ * Existing Objects already registered in md_native_objects are not overwritten.
  */
 export async function copyNativeObject(db:SqlPersistence,tenantId:string,objectApi:string) {
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId))
@@ -124,7 +106,7 @@ export async function copyNativeObject(db:SqlPersistence,tenantId:string,objectA
     // RecordEngine's advisory lock. Never upgrade a row lock into this table lock.
     await client.query(`LOCK TABLE md_tenants,md_object_definitions,md_field_definitions,
       md_app_package_resources,md_tenant_app_installed_versions,
-      md_records,md_record_values IN SHARE MODE`);
+      md_records IN SHARE MODE`);
     const object=await client.query('SELECT 1 FROM md_object_definitions WHERE tenant_id=$1 AND api_name=$2',[tenantId,objectApi]);
     if(!object.rowCount)throw Error('Object not found');
     const {rows:fields}=await client.query<NativeField>(`SELECT f.api_name,f.data_type,
@@ -136,12 +118,9 @@ export async function copyNativeObject(db:SqlPersistence,tenantId:string,objectA
         (SELECT s.data_type FROM md_field_definitions s WHERE s.tenant_id=f.tenant_id
           AND s.object_api=f.rollup_child_object AND s.api_name=f.rollup_source_field) END AS rollup_source_data_type
       FROM md_field_definitions f WHERE f.tenant_id=$1 AND f.object_api=$2 ORDER BY f.api_name`,[tenantId,objectApi]);
-    // A formula with persisted values or unrecognised metadata must never be
-    // silently omitted by the pivot, even on a previously corrupted database.
-    const invalid=await client.query(`SELECT 1 FROM md_record_values v
-      LEFT JOIN md_field_definitions f ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api AND f.api_name=v.field_api
-      WHERE v.tenant_id=$1 AND v.object_api=$2 AND (f.api_name IS NULL OR f.data_type='formula') LIMIT 1`,[tenantId,objectApi]);
-    if(invalid.rowCount)throw Error('Native copy found values without supported stored-field metadata');
+    // Refuse to overwrite an Object already serving native values.
+    const activated=await client.query('SELECT 1 FROM md_native_objects WHERE tenant_id=$1 AND object_api=$2',[tenantId,objectApi]);
+    if(activated.rowCount)throw Error('Native object already activated');
     const plan=nativeCopyPlan(objectApi,fields);
     await client.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
     await client.query(`CREATE TABLE IF NOT EXISTS md_native_object_copies (

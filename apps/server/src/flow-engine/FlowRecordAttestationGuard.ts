@@ -1,4 +1,5 @@
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 
 const api=/^[A-Za-z][A-Za-z0-9_]*$/;
 type Guard={collectionInput:string;recordObject:string;idInputField:string;
@@ -32,16 +33,23 @@ export async function enforceFlowRecordAttestation(db:SqlPersistence,tenantId:st
   ids.push(recordId);
  }
  const unique=[...new Set(ids)];
+ const meta=await loadNativeFields(db,tenantId,guard.recordObject);
+ // Fail closed if the restricted marker is not a native field.
+ if(!meta.fields.has(guard.restrictedField))
+  throw Error('Attestation restriction field is unavailable');
+ const restricted=nativeValueSql(meta,guard.restrictedField,'nr',true);
+ const ageField=guard.minimumAgeField??'MinimumAge';
+ const age=meta.fields.has(ageField)
+  ?nativeValueSql(meta,ageField,'nr',true):'NULL::text';
  const {rows}=await db.query<{id:string;restricted:boolean}>(`SELECT r.id,
-  (COALESCE(v.value_boolean,false) OR lower(COALESCE(v.value_text,''))='true'
-    OR COALESCE(age.value_number,0)>0) AS restricted
-  FROM md_records r
-  LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id
-   AND v.record_id=r.id AND v.object_api=r.object_api AND v.field_api=$4
-  LEFT JOIN md_record_values age ON age.tenant_id=r.tenant_id
-   AND age.record_id=r.id AND age.object_api=r.object_api AND age.field_api=$5
-  WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=ANY($3::uuid[])
-   AND r.is_deleted=false`,[tenantId,guard.recordObject,unique,guard.restrictedField,guard.minimumAgeField??'MinimumAge']);
+   (COALESCE(lower((${restricted})::text)='true',false)
+     OR COALESCE(NULLIF((${age})::text,'')::numeric,0)>0) AS restricted
+   FROM md_records r JOIN ${nativeTableSql(meta)} nr
+     ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+   WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=ANY($3::uuid[])
+     AND r.is_deleted=false AND nr.is_deleted=false
+     AND md_record_access($1,$4,r.id,'read')`,
+   [tenantId,guard.recordObject,unique,userId]);
  if(rows.length!==unique.length)throw Error('Transaction includes missing or inaccessible products');
  const restricted=rows.some(row=>row.restricted);
  if(!restricted)return;

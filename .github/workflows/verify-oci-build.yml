@@ -41,6 +41,10 @@ jobs:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
           TRIPS_BUDGET: '60'
         run: node --import tsx apps/server/scripts/record-trips-probe.mjs
+      - name: Product grid on 10k products (PostgreSQL)
+        env:
+          METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
+        run: node --import tsx apps/server/scripts/search-10k-probe.mjs
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30

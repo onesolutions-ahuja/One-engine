@@ -1796,29 +1796,47 @@ export class RecordEngine {
       await this.removeRecordTree(client,tenantId,userId,reference.object_api,reference.record_id,
         false,visiting,deletionGroupId,rootId);
     }
+    // Clear lookup links per SOURCE record, not per field. The native row is the
+    // authoritative value, so do not clear a reference changed since it was listed.
+    const lookupClears=new Map<string,{objectApi:string;recordId:string;fields:Set<string>}>();
     for(const reference of references){
       if(reference.relationship_type!=='Hierarchical'
         &&!(reference.relationship_type==='Lookup'&&(reference.delete_behavior??'Clear')==='Clear'))continue;
       await client.query(`INSERT INTO md_deleted_lookup_links
         (tenant_id,deletion_group_id,source_record_id,source_object_api,field_api,target_record_id)
         VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
-      [tenantId,deletionGroupId,reference.record_id,reference.object_api,reference.field_api,id]);
-      const cleared=await client.query<{record_id:string;object_api:string;field_api:string}>(
-        `UPDATE md_record_values SET value_text=NULL,reference_record_id=NULL
-         WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3 AND reference_record_id=$4
-         RETURNING record_id,object_api,field_api`,
-        [tenantId,reference.record_id,reference.field_api,id]);
-      if(!cleared.rowCount)continue;
+        [tenantId,deletionGroupId,reference.record_id,reference.object_api,reference.field_api,id]);
+      const key=JSON.stringify([reference.object_api,reference.record_id]);
+      let entry=lookupClears.get(key);
+      if(!entry){
+        entry={objectApi:reference.object_api,recordId:reference.record_id,fields:new Set()};
+        lookupClears.set(key,entry);
+      }
+      entry.fields.add(reference.field_api);
+    }
+    for(const entry of lookupClears.values()){
+      const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+      const {rows:current}=await client.query<{field_api:string;reference_record_id:string|null}>(`
+        SELECT v.field_api,v.reference_record_id FROM md_records r
+        ${readNativeValueRows(meta,'r')}
+        WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+          AND v.field_api=ANY($4::text[])`,
+        [tenantId,entry.objectApi,entry.recordId,[...entry.fields]]);
+      const clearedFields=current.filter(row=>row.reference_record_id===id)
+        .map(row=>row.field_api);
+      if(!clearedFields.length)continue;
+      const changes=new Map<string,Storable>(clearedFields.map(field=>[field,{
+        value_text:null,reference_record_id:null,is_unique:false,case_sensitive:false
+      }]));
+      await writeNativeValues(client,tenantId,entry.objectApi,entry.recordId,changes);
       await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND id=$2',
-        [tenantId,reference.record_id]);
+        [tenantId,entry.recordId]);
       await client.query(`INSERT INTO md_record_history
         (tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value)
-        VALUES($1,$2,$3,$4,$5,$6,NULL)`,
-      [tenantId,reference.record_id,reference.object_api,reference.field_api,userId,id]);
+        SELECT $1,$2,$3,fields.field_api,$4,$5,NULL
+        FROM unnest($6::text[]) AS fields(field_api)`,
+        [tenantId,entry.recordId,entry.objectApi,userId,id,clearedFields]);
     }
-    await client.query(`UPDATE md_record_values SET record_is_deleted=true
-      WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3`,
-      [tenantId,objectApi,id]);
     await client.query(`UPDATE md_records SET is_deleted=true,deleted_at=now(),deleted_by=$4,
       deletion_group_id=$5,deletion_root_id=$6,updated_at=now()
       WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false`,

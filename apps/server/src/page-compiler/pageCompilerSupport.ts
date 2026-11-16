@@ -123,6 +123,8 @@ export function activePageRecordFilters(properties:Readonly<Record<string,unknow
 }
 
 export function parseActionFormulaAssignment(formula:string):ActionFormulaAssignment|null{
+ // The action bar and CSV may keep the leading "=" of every formula: "=@ThisPage.X.y := …".
+ formula=formula.trim().replace(/^=\s*(?=@)/,'');
  // @ThisPage.PayButton.CartTotal := …  saves CartTotal (owned by PayButton).
  const saved=/^@ThisPage\.([A-Za-z_][A-Za-z0-9_]{0,79})\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/i.exec(formula.trim());
  if(saved){

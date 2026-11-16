@@ -267,6 +267,8 @@ test('new-style actions: state, filter, navigation, WAIT, LOCATION, CREATEPDF, m
  assert.match(sms.js,/\$\.service\("SMS", \["Texter", \$\.state\("phone"\), \$\.component\("MessageBox", "value"\)\]\)/);
  // Same counts as the save check (credential + values): a 2-value SMS has no recipient.
  assert.throws(()=>compileActionFormula('=SMS(Texter, "Hi")','Cart'));
+ // Assignments keep working with the leading "=" the action bar and CSV store.
+ assert.match(compileActionFormula('=@ThisPage.Input.result := "ok"','Cart').js,/\$\.setState\("result", "ok"\)/);
  const whatsapp=compileActionFormula('=WHATSAPP(Chat, @ThisPage.Input.phone, "Hi")','Cart');
  assert.match(whatsapp.js,/\$\.service\("WHATSAPP", \["Chat", \$\.state\("phone"\), "Hi"\]\)/);
  const pay=compileActionFormula('=RECORDPAYMENT(@ThisPage.Input.recordId, @ThisPage.PayButton.CartTotal, "Cash", AS(p))','Invoice');

@@ -1,3 +1,4 @@
+import {convertedFormula} from "../../shared/formulaCodeLookup.js";
 import SmartCart from "../../smart_cart/SmartCart.jsx";
 import SmartNumpad from "../../smart_numpad/SmartNumpad.jsx";
 import SmartScheduleCalendar from "../../smart_calendar/SmartScheduleCalendar.jsx";
@@ -712,7 +713,7 @@ export default function SmartRuntime(p){
  // functions. They run first; a formula without one keeps the shared library path.
  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
  const lookup=code?(v,record)=>{
-  const run=code.get(typeof v==="string"?v.trim():v);
+  const run=convertedFormula(code,v);
   if(run){
    try{return {value:run(record||{})};}
    catch(error){

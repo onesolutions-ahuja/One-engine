@@ -1,4 +1,5 @@
-import {AsyncLocalStorage} from "node:async_hooks";
+import {recordReadScope} from '../system-support/record-read-scope.js';
+export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
 import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
@@ -64,13 +65,6 @@ type FormulaBatch={shared?:Promise<{rows:unknown[];tenants:Array<{id:string;name
   currencyRates:Record<string,number>;actor:{id:string;email:string;display_name:string;time_zone:string;locale:string;
   user_currency_iso_code:string|null;profile_id:string|null;profile_name:string|null;profile_api:string|null};
   fields:Record<string,boolean>;permissions:Record<string,boolean>}>;visible:Map<string,boolean>};
-/** Page-code actions and record-set loads run inside this scope: within it, field
- * definitions and other per-object metadata are read once per Object (metadata does
- * not change during a page action). Outside it, behaviour is unchanged. */
-const recordReadScope=new AsyncLocalStorage<{fields:Map<string,Promise<FieldDefinition[]>>}>();
-export function withRecordReadScope<T>(run:()=>Promise<T>):Promise<T>{
-  return recordReadScope.run({fields:new Map()},run);
-}
 export class RecordEngine {
   private recordTrigger?:RecordTriggerHandler;
   private get declarativeRules(){return new DeclarativeRules(this.rbac);}
@@ -81,6 +75,13 @@ export class RecordEngine {
   constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine,
     private readonly encryptedValueVault?:EncryptedValueVault) {}
   private async lockObjectForWrite(client:PoolClient,tenantId:string,objectApi:string) {
+    // In one page action (one transaction) the Object lock taken first is held to the end.
+    const scope=recordReadScope(),lockKey=tenantId+':'+objectApi;
+    if(scope?.locked.has(lockKey)&&this.db.inTransaction())return;
+    await this.lockObjectForWriteOnce(client,tenantId,objectApi);
+    if(scope&&this.db.inTransaction())scope.locked.add(lockKey);
+  }
+  private async lockObjectForWriteOnce(client:PoolClient,tenantId:string,objectApi:string) {
     const active=await client.query(`SELECT 1 FROM md_matching_rules
       WHERE tenant_id=$1 AND object_api=$2 AND active=true LIMIT 1`,[tenantId,objectApi]);
     // Rules that prevent duplicates need serial writes. Other objects retain shared
@@ -104,6 +105,18 @@ export class RecordEngine {
     this.richTextFilePruner=handler;
   }
   private async fields(tenantId:string,objectApi:string,client?:PoolClient):Promise<FieldDefinition[]> {
+    const scope=recordReadScope();
+    if(!scope)return this.loadFields(tenantId,objectApi,client);
+    const cacheKey=tenantId+'\u0000'+objectApi;
+    let hit=scope.fields.get(cacheKey) as Promise<FieldDefinition[]>|undefined;
+    if(!hit){
+      hit=this.loadFields(tenantId,objectApi,client);
+      scope.fields.set(cacheKey,hit);
+      hit.catch(()=>{if(scope.fields.get(cacheKey)===hit)scope.fields.delete(cacheKey);});
+    }
+    return hit;
+  }
+  private async loadFields(tenantId:string,objectApi:string,client?:PoolClient):Promise<FieldDefinition[]> {
     const executor=client??this.db;
     const {rows}=await executor.query<FieldDefinition&{package_object_retained?:boolean}>(
       `SELECT md_field_definitions.api_name,md_field_definitions.data_type,related_object,relationship_type,allow_reparenting,required,max_length,precision,scale,is_unique,external_id,
@@ -1513,31 +1526,41 @@ export class RecordEngine {
         [tenantId,objectApi,id,writeValues.get('__RecordTypeId__')?.value_text]);
       else await transactionClient.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
         [tenantId,objectApi,id]);
-      for(const [field,value] of writeValues){
-        if(field.startsWith('__'))continue;
-        const previous=await transactionClient.query<{value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null}>(
-          'SELECT value_text,reference_record_id,geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-          [tenantId,id,field]);
-        const before=previous.rows[0]?.reference_record_id??previous.rows[0]?.value_text
-          ??(previous.rows[0]?.geo_latitude!==null&&previous.rows[0]?.geo_latitude!==undefined
-            ?`${previous.rows[0].geo_latitude},${previous.rows[0].geo_longitude??''}`:null);
+      // Field history: previous values of all written fields in ONE read, changed ones in ONE insert.
+      type Previous={field_api:string;value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null};
+      const historyFields=[...writeValues.keys()].filter(field=>!field.startsWith('__'));
+      const previousRows=historyFields.length?(await transactionClient.query<Previous>(
+        'SELECT field_api,value_text,reference_record_id,geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=ANY($3::text[])',
+        [tenantId,id,historyFields])).rows:[];
+      const previousByField=new Map<string,Previous>();
+      for(const row of previousRows)if(!previousByField.has(row.field_api))previousByField.set(row.field_api,row);
+      const history:Array<[string,string|null,string|null]>=[];
+      for(const field of historyFields){
+        const value=writeValues.get(field)!;
+        const prior=previousByField.get(field);
+        const before=prior?.reference_record_id??prior?.value_text
+          ??(prior?.geo_latitude!==null&&prior?.geo_latitude!==undefined
+            ?`${prior.geo_latitude},${prior.geo_longitude??''}`:null);
         const after=value.reference_record_id??value.value_text
           ??(value.geo_latitude!==undefined?`${value.geo_latitude??''},${value.geo_longitude??''}`:null);
-        const oldAddress=value.address_street!==undefined&&previous.rows[0]
-          ?[previous.rows[0].address_street,previous.rows[0].address_city,
-            previous.rows[0].address_state,previous.rows[0].address_postal_code,previous.rows[0].address_country].join('|')
+        const oldAddress=value.address_street!==undefined&&prior
+          ?[prior.address_street,prior.address_city,
+            prior.address_state,prior.address_postal_code,prior.address_country].join('|')
           :undefined;
         const newAddress=value.address_street!==undefined?[value.address_street,value.address_city,
           value.address_state,value.address_postal_code,value.address_country].join('|'):undefined;
-        if(before!==after||oldAddress!==newAddress)await transactionClient.query(
-          'INSERT INTO md_record_history(tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value) '+
-          'SELECT $1,$2,$3,$4,$5,$6,$7 WHERE EXISTS ('+
-          'SELECT 1 FROM md_field_definitions f JOIN md_object_manager_settings settings '+
-          'ON settings.tenant_id=f.tenant_id AND settings.object_api=f.object_api '+
-          'WHERE f.tenant_id=$1 AND f.object_api=$3 AND f.api_name=$4 AND f.track_history=true '+
-          'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL)',
-          [tenantId,id,objectApi,field,userId,oldAddress??before,newAddress??after]);
+        if(before!==after||oldAddress!==newAddress)history.push([field,oldAddress??before??null,newAddress??after??null]);
       }
+      if(history.length)await transactionClient.query(
+        'INSERT INTO md_record_history(tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value) '+
+        'SELECT $1,$2,$3,h.field_api,$4,h.old_value,h.new_value '+
+        'FROM unnest($5::text[],$6::text[],$7::text[]) WITH ORDINALITY AS h(field_api,old_value,new_value,ordinal) '+
+        'WHERE EXISTS (SELECT 1 FROM md_field_definitions f JOIN md_object_manager_settings settings '+
+        'ON settings.tenant_id=f.tenant_id AND settings.object_api=f.object_api '+
+        'WHERE f.tenant_id=$1 AND f.object_api=$3 AND f.api_name=h.field_api AND f.track_history=true '+
+        'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL) '+
+        'ORDER BY h.ordinal',
+        [tenantId,id,objectApi,userId,history.map(h=>h[0]),history.map(h=>h[1]),history.map(h=>h[2])]);
       await writeRecordValues(transactionClient,tenantId,objectApi,id,writeValues,true);
       if(this.richTextFilePruner){
         const richTextFields=(await this.fields(tenantId,objectApi,transactionClient))

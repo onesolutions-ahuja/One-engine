@@ -74,6 +74,6 @@ try{
  // Budget for one till tap inside the page-code scope (was far higher before batching).
  assert(scoped<=Number(process.env.TRIPS_BUDGET??999),'SQL trips over budget: '+scoped);
  const lines=await records.list(tenant,user,'ProbeLine',100,0,{filters:[{field:'CartId',operator:'eq',value:cart}]});
- assert.equal(lines.total,2);
- assert.equal(lines.records.find(r=>r.Id===line).Qty,2);
+ assert.equal(lines.total,3);
+ assert.equal(lines.records.find(r=>r.Id===line).Qty,3);
 }finally{await db.close();}

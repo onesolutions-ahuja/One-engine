@@ -1,4 +1,5 @@
 import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
+import {RECORD_ACCESS_FAST_DDL} from './record-access-fast.js';
 import {createHash} from 'node:crypto';
 import {REVOLUT_PAYMENT_DDL} from './revolut-checkout-service.js';
 import {readdirSync,readFileSync} from 'node:fs';
@@ -825,6 +826,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     END $$;
   `);
   await client.query(NATIVE_OBJECT_DDL);
+  await client.query(RECORD_ACCESS_FAST_DDL);
   // Cover setup tables introduced by later migrations in the same transaction.
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });

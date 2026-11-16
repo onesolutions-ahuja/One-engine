@@ -1,3 +1,4 @@
+import {formulaShape} from '../../../component-libraries/shared/formulaCodeLookup.js';
 /**
  * Browser side of the page code (v2): runs the page's generated functions.
  *
@@ -258,7 +259,11 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   formulasFor(componentId:string):Map<string,(row:Row)=>unknown>{
    const map=new Map<string,(row:Row)=>unknown>();
    for(const key of Object.keys(code.formulas))
-    if(key.startsWith(componentId+':'))map.set(code.sources[key],this.formula(key)!);
+    if(key.startsWith(componentId+':')){
+     map.set(code.sources[key],this.formula(key)!);
+     const shape=formulaShape(code.sources[key]);
+     if(shape)map.set('shape:'+shape,this.formula(key)!);
+    }
    return map;
   },
   /** Component property -> formula function (to match the text after page state was filled in). */

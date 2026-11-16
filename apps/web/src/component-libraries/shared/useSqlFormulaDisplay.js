@@ -1,3 +1,4 @@
+import {convertedFormula} from './formulaCodeLookup.js';
 import {evaluatePageActionSql} from './SqlFormulaPageRequest.js';
 import {getSqlFormulaRequest} from './SqlFormulaRequest.js';
 import {noteSharedMutation} from './PageFormulaShare.js';
@@ -134,7 +135,7 @@ export function useSqlFormulaDisplay(properties,hooks){
    ?properties.__formulaCode.functions:null;
   const sources=Object.entries(properties).filter(([key,value])=>
     !['html','properties','record','records','items','pageState','sessionId','__formulaCode'].includes(key)
-    &&isSelectedSqlFormula(value)&&!(compiled&&typeof value==='string'&&compiled.has(value.trim())));
+    &&isSelectedSqlFormula(value)&&!(compiled&&convertedFormula(compiled,value)));
   const rows=Array.isArray(properties.records)&&properties.records.length
     ?properties.records:Array.isArray(properties.items)&&properties.items.length
       ?properties.items:[properties.record&&typeof properties.record==='object'

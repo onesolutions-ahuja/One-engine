@@ -1087,19 +1087,46 @@ export class ObjectDefinitionService {
     });
     return this.get(tenantId,objectApi);
   }
+  /** Remove one tenant's native values; shared typed columns remain for other tenants. */
+  private async clearNativeField(client:PoolClient,tenantId:string,objectApi:string,fieldApi:string){
+    const activated=await client.query('SELECT 1 FROM md_native_objects WHERE tenant_id=$1 AND object_api=$2',
+      [tenantId,objectApi]);
+    if(!activated.rowCount)return;
+    const meta=await loadNativeFields(client,tenantId,objectApi);
+    const field=meta.fields.get(fieldApi);
+    const table=nativeTableSql(meta);
+    // Typed columns are generated names validated by loadNativeFields.
+    const column=field?.column?'"'+field.column+'"':null;
+    await client.query(`UPDATE ${table} SET ${column?column+'=NULL, ':''}
+      extras=extras-$2,present_fields=array_remove(present_fields,$2)
+      WHERE tenant_id=$1 AND ($2=ANY(present_fields) OR extras ? $2
+        ${column?' OR '+column+' IS NOT NULL':''})`,[tenantId,fieldApi]);
+    await client.query('DELETE FROM md_native_fields WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
+      [tenantId,objectApi,fieldApi]);
+    await client.query('DELETE FROM md_record_search_values WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
+      [tenantId,objectApi,fieldApi]);
+    if(column){
+      const shared=await client.query(`SELECT 1 FROM md_native_fields f
+        JOIN md_native_objects o ON o.tenant_id=f.tenant_id AND o.object_api=f.object_api
+        WHERE o.table_name=$1 AND f.column_name=$2 LIMIT 1`,[meta.table,field!.column]);
+      if(!shared.rowCount)await client.query(`ALTER TABLE ${table} DROP COLUMN IF EXISTS ${column}`);
+    }
+  }
   private async purgeExpiredDeletedFields(client:PoolClient,tenantId:string){
     const expired=await client.query<{object_api:string;api_name:string;id:string}>(`
       SELECT object_api,api_name,id FROM md_field_definitions
       WHERE tenant_id=$1 AND deleted_at<=now()-interval '15 days'
+        -- Until Task H drops the legacy values FK, only empty Objects can safely
+        -- hard-delete field metadata without touching legacy record values.
+        AND NOT EXISTS(SELECT 1 FROM md_records r
+          WHERE r.tenant_id=md_field_definitions.tenant_id AND r.object_api=md_field_definitions.object_api)
       ORDER BY object_api,api_name FOR UPDATE
     `,[tenantId]);
     for(const field of expired.rows){
       await client.query(`DELETE FROM md_record_history
         WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
       [tenantId,field.object_api,field.api_name]);
-      await client.query(`DELETE FROM md_record_values
-        WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
-      [tenantId,field.object_api,field.api_name]);
+      await this.clearNativeField(client,tenantId,field.object_api,field.api_name);
       await client.query(`DELETE FROM md_object_page_layout_fields
         WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3`,
       [tenantId,field.object_api,field.api_name]);
@@ -1150,6 +1177,7 @@ export class ObjectDefinitionService {
           AND deleted_at>now()-interval '15 days' RETURNING id,data_type`,
       [tenantId,objectApi,fieldApi]);
       if(!restored.rowCount)throw new Error('Field not found or recovery period expired');
+      await client.query('SELECT md_native_configure_field($1,$2,$3)',[tenantId,objectApi,fieldApi]);
       // Child rows changed while the Roll-Up Summary was deleted: bring its stored totals up to date.
       if(restored.rows[0]?.data_type==='rollup'&&this.migrationRuntime.recalculateRollup)
         await this.migrationRuntime.recalculateRollup(client,tenantId,objectApi,fieldApi);
@@ -1195,6 +1223,7 @@ export class ObjectDefinitionService {
       await client.query(`UPDATE md_field_definitions SET deleted_at=now()
         WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND deleted_at IS NULL`,
         [tenantId,objectApi,fieldApi]);
+      await this.clearNativeField(client,tenantId,objectApi,fieldApi);
     });
     return this.get(tenantId,objectApi);
   }

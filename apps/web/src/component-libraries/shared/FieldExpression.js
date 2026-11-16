@@ -1,3 +1,4 @@
+import {noteOldEngine} from './oldEngineMeter.js';
 import {executeActionPlan,normalizeFlowCalls} from '../../../../server/src/expression-engine/ActionFormulas.js';
 /** Bounded browser formula evaluator shared by page bindings and UNE renderers.
  * It reads only own properties of the already-authorised record and never evals code.
@@ -603,6 +604,7 @@ export class FieldExpressionEvaluationError extends Error {
  constructor(message){super(message);this.name='FieldExpressionEvaluationError';}
 }
 export function evaluateFieldExpressionDetailed(expression,record,options={}){
+ noteOldEngine("field-expression",expression);
  if(typeof expression!=='string')return {value:''};
  if(expression.length>4000)return {value:'',error:'Formula exceeds the 4000-character limit'};
  const entered=expression.trim();if(!entered)return {value:''};
@@ -659,6 +661,7 @@ export function evaluateFieldExpression(expression,record,options){
 
 /** Returns a named, typed collection instead of coercing it to a text field. */
 export function evaluateCollectionFormula(formula,sourceRecords={},context={}){
+ noteOldEngine("collection",formula);
  const source=typeof formula==='string'?formula.trim().replace(/^=\s*/,''):'';
  if(!source)return {value:null,error:'Enter a collection formula'};
  return evaluateFieldExpressionDetailed(source,context?.record&&typeof context.record==='object'

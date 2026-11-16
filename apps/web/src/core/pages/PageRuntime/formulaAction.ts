@@ -1,3 +1,4 @@
+import {noteOldEngine} from '../../../component-libraries/shared/oldEngineMeter.js';
 import {isActionPlan,splitServerDataActionPlan,PartialActionError,type ActionPlanTiming} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import type {FieldMetadata} from '../../metadata/Definitions/metadata';
 import {executeActionFormula,evaluateFieldExpressionDetailed,type FormulaBindingContext} from '../../../component-libraries/shared/FieldExpression.js';
@@ -79,6 +80,7 @@ export async function executePageFormulaAction(
 ):Promise<{changes:Change[];recordChanged:boolean;mutatedObjectApiNames?:string[];
  recordChanges?:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>}>;
  predictionBatch?:string}>{
+ noteOldEngine('action',binding.formula??binding.actionType);
  const formula=String(binding.formula??'');
  if(cachedIsActionPlan(formula)){
   // Production diagnostics are disabled by default and scoped to this browser session.

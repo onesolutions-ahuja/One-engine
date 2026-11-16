@@ -69,16 +69,20 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    asked.set(key,{kind,object,field,criteria});
    askTimer??=setTimeout(()=>{askTimer=undefined;void askAggregates();},5);
   }
-  return '';
+  // Still loading: the formula shows blank and redraws when the total arrives,
+  // instead of doing arithmetic on an empty value ("Formula result must be finite").
+  return notHeld('Total for '+object+' is loading');
  };
+ /** Empty answer: a count or sum of no rows is 0 (as in Excel); other totals stay blank. */
+ const emptyTotal=(kind:string)=>/^(?:COUNT|SUM)/i.test(kind)?0:'';
  const askAggregates=async()=>{
   const items=[...asked.entries()].slice(0,100);
   if(!items.length)return;
   try{
    const answer=await post<{values?:unknown[]}>('/page-code/aggregates',{...host.build,
     request:requestFor({},''),items:items.map(([,item])=>item)});
-   items.forEach(([key],index)=>{aggregates.set(key,answer.values?.[index]??'');asked.delete(key);});
-  }catch{items.forEach(([key])=>{aggregates.set(key,'');asked.delete(key);});}
+   items.forEach(([key,item],index)=>{aggregates.set(key,answer.values?.[index]??emptyTotal(item.kind));asked.delete(key);});
+  }catch{items.forEach(([key,item])=>{aggregates.set(key,emptyTotal(item.kind));asked.delete(key);});}
   changed();
   if(asked.size)void askAggregates();
  };

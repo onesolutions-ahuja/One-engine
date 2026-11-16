@@ -4,6 +4,8 @@ import {parseComponentStateReference,readComponentState,componentStateMentionPat
  * that can be represented exactly by the existing Record API; there is NO
  * client-side filtering of a partial page and NO eval or arbitrary scripts. */
 import {componentReaderKey,evaluateFieldExpressionDetailed,type FormulaBindingContext} from '../../../component-libraries/shared/FieldExpression.js';
+import {F,O} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
+import {formulaEntry} from '../../../../../server/src/page-compiler/code/formulaDictionary.js';
 import {Parser,type Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
 import {hasExcelWildcardCriteria,parseExcelWildcardPattern} from '../../../../../server/src/expression-engine/FormulaWildcard.js';
@@ -21,13 +23,6 @@ const stateName=(node:Expression):string|null=>
 const valueFunctions=new Set(['TODAY','NOW','TIMENOW','ADDDAYS','ADDMONTHS','DATE','DATEVALUE',
  'WEEKDAY','DAY','MONTH','YEAR','HOUR','MINUTE','VALUE','TEXT','LEFT','RIGHT','UPPER','LOWER',
  'LEN','ROUND','ROUNDUP','ROUNDDOWN','MIN','MAX','BLANKVALUE']);
-const formulaLiteral=(value:unknown):string=>{
- if(value===null||value===undefined||value==='')return '""';
- if(typeof value==='number'&&Number.isFinite(value))return String(value);
- if(typeof value==='boolean')return value?'TRUE':'FALSE';
- if(typeof value==='string'&&!/["\\\r\n]/.test(value))return '"'+value+'"';
- throw Error('Filter value cannot be used inside a function');
-};
 const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=''):unknown=>{
  if(node.kind==='literal')return node.value;
  if(node.kind==='reference'&&node.value.startsWith('$session.')){
@@ -87,14 +82,16 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  // then the shared formula evaluator runs the function. The result is still sent to the
  // server as a plain filter value, so filtering stays server-side and permission-scoped.
  if(node.kind==='call'&&valueFunctions.has(node.name)&&node.args.length<=8){
-  const args=node.args.map(arg=>formulaLiteral(asState(arg,state,sessionId)));
-  // NOW()/TIMENOW() are read at whole-minute precision. A millisecond clock made
-  // the server filter (and so the query) different on every render: each reply
-  // re-rendered the page and fired a new request, ~100 requests a second.
-  const result=evaluateFieldExpressionDetailed(node.name+'('+args.join(',')+')',{},
-   {sessionId,now:new Date(Math.floor(Date.now()/60000)*60000)});
-  if(result.error)throw Error(result.error);
-  return result.value;
+  const values=node.args.map(arg=>asState(arg,state,sessionId));
+  // The formula library function (same as converted page code). NOW()/TIMENOW() are read
+  // at whole-minute precision so the filter (and the query) stays the same between renders.
+  const run=(F as unknown as Record<string,(...args:unknown[])=>unknown>)[node.name];
+  const entry=formulaEntry(node.name);
+  if(node.name==='BLANKVALUE')return O.blank(values[0])?values[1]:values[0];
+  if(typeof run!=='function'||!entry)throw Error('Unsupported filter function '+node.name);
+  const clock={now:()=>new Date(Math.floor(Date.now()/60000)*60000),
+   timeZone:()=>Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
+  return O.out(entry.clock?run(clock,...values):run(...values));
  }
  throw Error('IF condition must use constants or $state values (e.g. ISBLANK($state.categoryId))');
 };

@@ -26,7 +26,7 @@ BEGIN
    FROM %I WHERE tenant_id=$1 AND id=$2',expression,tab)
    INTO result USING t,r,f;
  RETURN result;
-END $;
+END $$;
 
 -- Preserve existing record access checks and recursive Master-Detail access.
 CREATE OR REPLACE FUNCTION md_record_access(t uuid,u uuid,rid uuid,act text)

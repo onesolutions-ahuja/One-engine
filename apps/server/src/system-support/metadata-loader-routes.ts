@@ -438,8 +438,11 @@ export function registerMetadataLoaderRoutes(app:Express,db:SqlPersistence,rbac:
         if(!ids.rows[0])throw Error('Field was not soft-deleted');
         await client.query('DELETE FROM md_record_history WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
          [actor.tenant_id,i.objectApi,i.fieldApi]);
-        await client.query('DELETE FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
-         [actor.tenant_id,i.objectApi,i.fieldApi]);
+        // Until Task H drops the legacy value foreign key, only empty Objects
+        // can hard-delete field metadata. Soft deletion already cleared native values.
+        const hasRecords=await client.query('SELECT 1 FROM md_records WHERE tenant_id=$1 AND object_api=$2 LIMIT 1',
+          [actor.tenant_id,i.objectApi]);
+        if(hasRecords.rowCount)throw Error('Hard Delete blocked: Object has records until native cutover');
         await client.query('DELETE FROM md_object_page_layout_fields WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',
          [actor.tenant_id,i.objectApi,i.fieldApi]);
         await client.query('DELETE FROM md_object_record_type_values WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3',

@@ -169,7 +169,7 @@ export class RecordEngine {
     definitions?:readonly FieldDefinition[]):Promise<NativeFieldsMetadata>{
     const fields=definitions??await this.fields(tenantId,objectApi,client);
     const table=fields.find(field=>field.native_table)?.native_table;
-    if(!table)return scopedMetadata('native-meta\\u0000'+tenantId+'\\u0000'+objectApi,
+    if(!table)return scopedMetadata('native-meta\u0000'+tenantId+'\u0000'+objectApi,
       ()=>loadNativeFields(client??this.db,tenantId,objectApi));
     const meta:NativeFieldsMetadata={table,fields:new Map()};
     for(const field of fields){
@@ -326,6 +326,7 @@ export class RecordEngine {
     const calculated=new Map<string,unknown>();
     const calculating=new Set<string>();
     const referenceCache=new Map<string,unknown>();
+    const relatedMetaCache=new Map<string,Promise<NativeFieldsMetadata>>();
     const visible=batch?.visible??new Map<string,boolean>();
     const canRead=async(targetObject:string,fieldApi:string)=>{
       if(migrationMode)return true;
@@ -343,7 +344,12 @@ export class RecordEngine {
         ||!await canRead(objectApi,relationship.api_name)||!await canRead(targetObject,fieldApi)){
         referenceCache.set(key,null);return;
       }
-      const meta=await this.nativeMeta(tenantId,targetObject,client);
+      let metaPromise=relatedMetaCache.get(targetObject);
+      if(!metaPromise){
+        metaPromise=this.nativeMeta(tenantId,targetObject,client);
+        relatedMetaCache.set(targetObject,metaPromise);
+      }
+      const meta=await metaPromise;
       const result=await (client??this.db).query<{
         value_text:string|null;reference_record_id:string|null;data_type:string|null;
         value_date:string|null;value_datetime:Date|string|null;rollup_source_data_type:string|null;
@@ -591,6 +597,7 @@ export class RecordEngine {
       ORDER BY l.field_api,l.sort_order`,[tenantId,objectApi]));
     if(!rows.length)return;
     const targets=[...new Set(rows.map(row=>row.field_api))];
+    const targetMetaCache=new Map<string,Promise<NativeFieldsMetadata>>();
     const previous=recordId?await executor.query<{field_api:string;reference_record_id:string|null}>(
       'SELECT field_api,reference_record_id FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=ANY($4::text[])',
       [tenantId,objectApi,recordId,targets]):{rows:[]};
@@ -620,7 +627,12 @@ export class RecordEngine {
       const matches:boolean[]=[];
       for(const filter of rows.filter(row=>row.field_api===fieldApi)){
         // Query values through the same tenant boundary without dynamic SQL.
-        const targetMeta=await this.nativeMeta(tenantId,filter.related_object,client);
+        let targetMetaPromise=targetMetaCache.get(filter.related_object);
+        if(!targetMetaPromise){
+          targetMetaPromise=this.nativeMeta(tenantId,filter.related_object,client);
+          targetMetaCache.set(filter.related_object,targetMetaPromise);
+        }
+        const targetMeta=await targetMetaPromise;
         const target=await executor.query<{
           value_text:string|null;reference_record_id:string|null;id:string
         }>(`SELECT r.id,v.value_text,v.reference_record_id FROM md_records r
@@ -1845,8 +1857,14 @@ export class RecordEngine {
       }
       entry.fields.add(reference.field_api);
     }
+    const clearingMeta=new Map<string,Promise<NativeFieldsMetadata>>();
     for(const entry of lookupClears.values()){
-      const meta=await this.nativeMeta(tenantId,entry.objectApi,client);
+      let metaPromise=clearingMeta.get(entry.objectApi);
+      if(!metaPromise){
+        metaPromise=this.nativeMeta(tenantId,entry.objectApi,client);
+        clearingMeta.set(entry.objectApi,metaPromise);
+      }
+      const meta=await metaPromise;
       const {rows:current}=await client.query<{field_api:string;reference_record_id:string|null}>(`
         SELECT v.field_api,v.reference_record_id FROM md_records r
         ${readNativeValueRows(meta,'r')}
@@ -2015,8 +2033,14 @@ export class RecordEngine {
         }
         if(!entry.targets.has(link.field_api))entry.targets.set(link.field_api,link.target_record_id);
       }
+      const restoringMeta=new Map<string,Promise<NativeFieldsMetadata>>();
       for(const entry of restoreBySource.values()){
-        const meta=await this.nativeMeta(tenantId,entry.objectApi,client);
+        let metaPromise=restoringMeta.get(entry.objectApi);
+        if(!metaPromise){
+          metaPromise=this.nativeMeta(tenantId,entry.objectApi,client);
+          restoringMeta.set(entry.objectApi,metaPromise);
+        }
+        const meta=await metaPromise;
         const {rows:current}=await client.query<{
           field_api:string;value_text:string|null;reference_record_id:string|null
         }>(`SELECT v.field_api,v.value_text,v.reference_record_id FROM md_records r

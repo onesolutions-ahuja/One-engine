@@ -777,8 +777,8 @@ export class RecordEngine {
             enforceMasterDetailReparenting(previousId,value,key,field.allow_reparenting);
           }
           await assertLookupTargetExists(client??this.db,tenantId,field.related_object,value,key,userId);
-          // md_record_values.reference_record_id has a foreign key to md_records; users live in
-          // md_users, so a User reference is kept as its validated id in value_text.
+          // User references are kept as validated IDs in their text representation;
+          // other reference fields use native UUID values.
           if(field.related_object==='User'){text=value;reference=null;break;}
           text='';reference=value;break;
         case 'geolocation': {
@@ -829,24 +829,52 @@ export class RecordEngine {
         ...(field.data_type==='boolean'?{value_boolean:value as boolean}:{}),
         ...(field.data_type==='multipicklist'?{multi_values:(value as string).split(';')}:{}),...metadata});
     }
+    // Load persisted fields for dependency and record-type checks at most once.
+    // Reuse the access-checked prior record when supplied by the update caller;
+    // a single native query fills any fields not available in that snapshot.
+    const storedValidationFields=new Map<string,string|null>();
+    if(recordId){
+      const needed=new Set<string>();
+      for(const field of definitions){
+        const controllerApi=field.controller_field_api_name;
+        if(!controllerApi||(!Object.hasOwn(values,field.api_name)
+          &&!Object.hasOwn(values,controllerApi)))continue;
+        if(inputValues[field.api_name]===undefined)needed.add(field.api_name);
+        if(inputValues[controllerApi]===undefined)needed.add(controllerApi);
+      }
+      if(prepared.has('__RecordTypeId__'))
+        for(const field of definitions)
+          if((field.data_type==='picklist'||field.data_type==='multipicklist')
+            &&!prepared.has(field.api_name))needed.add(field.api_name);
+      for(const name of needed){
+        if(!prior||!Object.hasOwn(prior,name))continue;
+        const value=prior[name];
+        if(value===null||typeof value==='string'||typeof value==='number'||typeof value==='boolean'){
+          storedValidationFields.set(name,value===null?null:String(value));
+          needed.delete(name);
+        }
+      }
+      if(needed.size){
+        const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
+        const {rows:stored}=await (client??this.db).query<{field_api:string;value_text:string|null}>(`
+          SELECT v.field_api,v.value_text FROM md_records r
+          ${readNativeValueRows(meta,'r')}
+          WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+            AND v.field_api=ANY($4::text[])`,
+          [tenantId,objectApi,recordId,[...needed]]);
+        for(const row of stored)storedValidationFields.set(row.field_api,row.value_text);
+      }
+    }
     for(const field of definitions){
       const controllerApi=field.controller_field_api_name;
       if(!controllerApi||(!Object.hasOwn(values,field.api_name)&&!Object.hasOwn(values,controllerApi)))continue;
       let dependentValue=inputValues[field.api_name];
-      if(dependentValue===undefined&&recordId){
-        const stored=await (client??this.db).query<{value_text:string|null}>(
-          'SELECT value_text FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-          [tenantId,recordId,field.api_name]);
-        dependentValue=stored.rows[0]?.value_text;
-      }
+      if(dependentValue===undefined&&recordId)
+        dependentValue=storedValidationFields.get(field.api_name);
       if(dependentValue===undefined||dependentValue===null)continue;
       let controllerValue=inputValues[controllerApi];
-      if(controllerValue===undefined&&recordId){
-        const stored=await (client??this.db).query<{value_text:string|null}>(
-          'SELECT value_text FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-          [tenantId,recordId,controllerApi]);
-        controllerValue=stored.rows[0]?.value_text;
-      }
+      if(controllerValue===undefined&&recordId)
+        controllerValue=storedValidationFields.get(controllerApi);
       if(typeof controllerValue==='boolean')controllerValue=String(controllerValue);
       if(typeof controllerValue!=='string'||typeof dependentValue!=='string')
         throw new Error('Invalid dependent picklist value: '+field.api_name);
@@ -875,14 +903,7 @@ export class RecordEngine {
         [tenantId,objectApi,recordId])).rows[0]?.record_type_id:null);
     if(activeType){
       const switched=Boolean(recordId&&prepared.has('__RecordTypeId__'));
-      const persisted=switched?await (client??this.db).query<{field_api:string;value_text:string|null}>(
-        `SELECT v.field_api,v.value_text FROM md_record_values v
-          JOIN md_field_definitions f ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api
-            AND f.api_name=v.field_api AND f.deleted_at IS NULL
-          WHERE v.tenant_id=$1 AND v.object_api=$2 AND v.record_id=$3
-            AND f.data_type IN ('picklist','multipicklist')`,
-        [tenantId,objectApi,recordId]):{rows:[]};
-      const existing=new Map(persisted.rows.map(row=>[row.field_api,row.value_text]));
+      const existing=switched?storedValidationFields:new Map<string,string|null>();
       for(const field of definitions){
         if(field.data_type!=='picklist'&&field.data_type!=='multipicklist')continue;
         const proposed=prepared.get(field.api_name)?.value_text;

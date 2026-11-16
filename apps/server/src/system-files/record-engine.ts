@@ -890,6 +890,8 @@ export class RecordEngine {
           ...lifecycle,recordTypeId:finalValues.get('__RecordTypeId__')?.value_text??null
         });
       const id=await this.insertPrepared(client,tenantId,userId,objectApi,finalValues,isClone);
+      // Records read before this write (e.g. the prior values) are now out of date.
+      forgetScopedRecords();
       await this.recordMatching.save(client,tenantId,objectApi,id,matches);
       if(this.recordTrigger){
         const record=await this.get(tenantId,userId,objectApi,id,client);
@@ -1645,6 +1647,8 @@ export class RecordEngine {
       const matches=await validateAndMatchRecord(this.declarativeRules,this.recordMatching,
         client,tenantId,userId,objectApi,snapshot,loadPrior,id,lifecycle);
       await write(client,writeValues);
+      // Records read before this write (e.g. the prior values) are now out of date.
+      forgetScopedRecords();
       await this.recordMatching.save(client,tenantId,objectApi,id,matches);
       if(runTriggers&&this.recordTrigger){
         const record=await this.get(tenantId,userId,objectApi,id,client);
@@ -1688,6 +1692,8 @@ export class RecordEngine {
             ??(typeof prior.RecordTypeId==='string'?prior.RecordTypeId:null)
         });
       await write(transactionClient,finalPrepared);
+      // Records read before this write (e.g. the prior values) are now out of date.
+      forgetScopedRecords();
       await this.recordMatching.save(transactionClient,tenantId,objectApi,id,matches);
       if(this.recordTrigger){
         const record=await this.get(tenantId,userId,objectApi,id,transactionClient);
@@ -1838,6 +1844,7 @@ export class RecordEngine {
       const deletionGroupId=group.rows[0].id;
       await this.removeRecordTree(transactionClient,tenantId,userId,objectApi,id,
         true,new Set(),deletionGroupId,id);
+      forgetScopedRecords();
       await transactionClient.query(`INSERT INTO md_record_lifecycle_audit
         (tenant_id,record_id,object_api,deletion_group_id,actor_id,operation)
         VALUES($1,$2,$3,$4,$5,'delete')`,

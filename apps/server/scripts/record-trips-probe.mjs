@@ -30,6 +30,8 @@ try{
  await db.query(readFileSync(new URL('../src/system-files/schema.sql',import.meta.url),'utf8'));
  await applySystemMigrations(db);
  const definitions=new ObjectDefinitionService(db),records=new RecordEngine(db,new RbacEngine(db));
+ // As on the server: a record trigger handler is set (it makes saves re-read the record).
+ records.setRecordTriggerHandler(async()=>undefined);
  const tenant=(await db.query("INSERT INTO md_tenants(slug,name) VALUES('trips','trips') RETURNING id")).rows[0].id;
  const user=(await db.query("INSERT INTO md_users(tenant_id,email,password_hash) VALUES($1,'trips@example.invalid','fixture') RETURNING id",[tenant])).rows[0].id;
  const set=(await db.query("INSERT INTO md_permission_sets(tenant_id,api_name) VALUES($1,'Trips') RETURNING id",[tenant])).rows[0].id;
@@ -64,7 +66,9 @@ try{
    {filters:[{field:'CartId',operator:'eq',value:cart},{field:'ProductId',operator:'eq',value:product}]}));
   const l=found.records[0];
   await measure('update line',()=>records.update(tenant,user,'ProbeLine',line,{Qty:Number(l.Qty)+1,Amount:(Number(l.Qty)+1)*p.Price}));
-  await measure('re-read line',()=>records.get(tenant,user,'ProbeLine',line));
+  const reread=await measure('re-read line',()=>records.get(tenant,user,'ProbeLine',line));
+  // The re-read after a save must show the saved values, never the values read before it.
+  assert.equal(Number(reread.Qty),Number(l.Qty)+1,'re-read after save is fresh');
   await measure('create line',()=>records.create(tenant,user,'ProbeLine',{Name:'Tea',CartId:cart,ProductId:product,Qty:1,Amount:1}));
   await measure('cart lines',()=>records.list(tenant,user,'ProbeLine',100,0,{filters:[{field:'CartId',operator:'in',value:[cart]}]}));
   await measure('cart',()=>records.list(tenant,user,'ProbeCart',100,0,{filters:[{field:'Status',operator:'eq',value:'Open'}]}));

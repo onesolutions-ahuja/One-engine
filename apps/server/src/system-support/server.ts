@@ -2487,7 +2487,7 @@ export function createSystemServer(db:SqlPersistence) {
   // The User object is a secure view of md_users, never a second md_records copy.
   const userRecord=async(row:{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null},actor:Actor)=>{
     const fields={Name:row.display_name||row.email,Email:row.email,Username:row.email,
-      IsActive:row.enabled,Tenant:actor.tenant_id,ReportsToId:row.reports_to_user_id};
+      IsActive:row.enabled,Enabled:row.enabled,Tenant:actor.tenant_id,ReportsToId:row.reports_to_user_id};
     const checks=Object.keys(fields).map(field=>({resource:'User.'+field,action:'read'}));
     const allowed=await rbac.allowedMany(actor.tenant_id,actor.user_id,checks);
     return {Id:row.id,...Object.fromEntries(Object.entries(fields).filter((_,i)=>allowed[i])),
@@ -2498,7 +2498,7 @@ export function createSystemServer(db:SqlPersistence) {
       await rbac.require(actor.tenant_id,actor.user_id,'User.'+field,action);
   };
   const userFields=(input:Record<string,unknown>,creating:boolean)=>{
-    const allowed=new Set(['Name','Email','Username','IsActive','Password','Tenant','LandingApp','ReportsToId']);
+    const allowed=new Set(['Name','Email','Username','Enabled','IsActive','Password','Tenant','LandingApp','ReportsToId']);
     for(const key of Object.keys(input))if(!allowed.has(key))throw new Error('Unknown field: '+key);
     const email=input.Email??input.Username;
     if(email!==undefined&&(typeof email!=='string'||!/^\S+@\S+\.\S+$/.test(email)))throw new Error('Invalid user email');
@@ -2508,13 +2508,16 @@ export function createSystemServer(db:SqlPersistence) {
       throw new Error('Invalid reporting manager');
     if(input.Tenant!==undefined&&(typeof input.Tenant!=='string'||!/^[0-9a-f-]{36}$/i.test(input.Tenant)))throw new Error('Invalid tenant');
     if(input.IsActive!==undefined&&typeof input.IsActive!=='boolean')throw new Error('Invalid active flag');
+    if(input.Enabled!==undefined&&typeof input.Enabled!=='boolean')throw new Error('Invalid enabled flag');
+    if(input.IsActive!==undefined&&input.Enabled!==undefined&&input.IsActive!==input.Enabled)
+      throw new Error('Conflicting active flags');
     if(input.LandingApp!==undefined&&(typeof input.LandingApp!=='string'
       ||(input.LandingApp!=='Setup'&&!/^[A-Za-z][A-Za-z0-9_]{0,127}$/.test(input.LandingApp))))
       throw new Error('Invalid landing app');
     if(creating&&(!email||typeof input.Password!=='string'))throw new Error('Invalid user credentials');
     if(!creating&&input.Password!==undefined)throw new Error('Invalid password edit');
     return {email:email as string|undefined,name:input.Name as string|undefined,
-      enabled:input.IsActive as boolean|undefined,password:input.Password as string|undefined,
+      enabled:(input.Enabled??input.IsActive) as boolean|undefined,password:input.Password as string|undefined,
       tenant:input.Tenant as string|undefined,landingApp:input.LandingApp as string|undefined,
       reportingTo:input.ReportsToId as string|null|undefined,role:undefined};
   };

@@ -170,10 +170,16 @@ export async function activateNativeObject(db:SqlPersistence,tenantId:string,obj
 }
 
 export async function applyNativeObjectStorage(db:SqlPersistence){
- // Initial migration cohort requested by the owner; storage functions themselves
- // are generic and every app still uses the shared RecordEngine and RBAC.
- const {rows}=await db.query<{tenant_id:string;api_name:string}>(`SELECT tenant_id,api_name
-  FROM md_object_definitions WHERE api_name=ANY($1::text[]) AND deleted_at IS NULL ORDER BY tenant_id,api_name`,
-  [['Product','MenuCategory','Cart','CartLine','Customer']]);
- for(const row of rows)await activateNativeObject(db,row.tenant_id,row.api_name);
+ // Every Object of every tenant gets its typed table (new Objects on the next start).
+ // An Object whose fields cannot be stored natively yet stays on the record tables
+ // only (reads fall back automatically); it is logged, and the server still starts.
+ const {rows}=await db.query<{tenant_id:string;api_name:string}>(`SELECT o.tenant_id,o.api_name
+  FROM md_object_definitions o WHERE o.deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM md_native_objects n
+   WHERE n.tenant_id=o.tenant_id AND n.object_api=o.api_name) ORDER BY o.tenant_id,o.api_name`);
+ const skipped:string[]=[];
+ for(const row of rows){
+  try{await activateNativeObject(db,row.tenant_id,row.api_name);}
+  catch(error){skipped.push(row.api_name+' ('+(error instanceof Error?error.message:'failed').slice(0,120)+')');}
+ }
+ if(skipped.length)console.warn('[native-storage] kept on record tables: '+skipped.slice(0,50).join('; '));
 }

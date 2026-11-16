@@ -2569,10 +2569,23 @@ export function createSystemServer(db:SqlPersistence) {
     res.setHeader('Cache-Control','private, no-store');
     res.json({userIds:rows.map(row=>row.user_id),users:rows.map(row=>({id:row.user_id,level:row.hierarchy_level}))});
   }));
-  app.get('/api/records/User/:id',route(async(req,res)=>{
+  // create-layout and aggregate are generic Object routes registered later; let them through.
+  app.get('/api/records/User/:id',(req,_res,next)=>
+    next(req.params.id==='create-layout'||req.params.id==='aggregate'?'route':undefined),
+  route(async(req,res)=>{
     const actor=req.actor!;
     await rbac.require(actor.tenant_id,actor.user_id,'User','read');
-    res.json({record:await readUser(actor.tenant_id,actor.user_id,req.params.id)});
+    const record=await readUser(actor.tenant_id,actor.user_id,req.params.id);
+    // Same actions the User create/edit/delete handlers enforce, so the form's Save
+    // button gets real grants instead of none.
+    const [canCreate,canManage,canEdit,canDelete]=await Promise.all([
+      rbac.allowed(actor.tenant_id,actor.user_id,'User','create'),
+      rbac.allowed(actor.tenant_id,actor.user_id,'Security','manage'),
+      rbac.allowed(actor.tenant_id,actor.user_id,'User','edit'),
+      rbac.allowed(actor.tenant_id,actor.user_id,'User','delete')
+    ]);
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({record,recordPermissions:{Create:canCreate&&canManage,Edit:canEdit,Delete:canDelete}});
   }));
   app.post('/api/records/User',route(async(req,res)=>{
     const actor=req.actor!;
@@ -2754,7 +2767,7 @@ export function createSystemServer(db:SqlPersistence) {
       pages.resolveRecordPage(actor.tenant_id,req.params.objectApi,
         String(req.query.appId??'Records'),actorSession.user.profileId,
         recordTypeId,device,'Edit',viewportWidth),
-      rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'update'),
+      rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'edit'),
       rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'delete')
     ]);
     res.setHeader('Cache-Control','private, no-store');
@@ -2800,7 +2813,7 @@ export function createSystemServer(db:SqlPersistence) {
     res.setHeader('Cache-Control','private, no-store');
     const [canCreate,canEdit,canDelete]=await Promise.all([
       rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'create'),
-      rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'update'),
+      rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'edit'),
       rbac.allowed(actor.tenant_id,actor.user_id,req.params.objectApi,'delete')
     ]);
     res.json({record,lightningPage:page,editLightningPage:editPage,

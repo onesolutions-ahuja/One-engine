@@ -1,3 +1,4 @@
+import {AsyncLocalStorage} from "node:async_hooks";
 import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
 import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
@@ -63,6 +64,13 @@ type FormulaBatch={shared?:Promise<{rows:unknown[];tenants:Array<{id:string;name
   currencyRates:Record<string,number>;actor:{id:string;email:string;display_name:string;time_zone:string;locale:string;
   user_currency_iso_code:string|null;profile_id:string|null;profile_name:string|null;profile_api:string|null};
   fields:Record<string,boolean>;permissions:Record<string,boolean>}>;visible:Map<string,boolean>};
+/** Page-code actions and record-set loads run inside this scope: within it, field
+ * definitions and other per-object metadata are read once per Object (metadata does
+ * not change during a page action). Outside it, behaviour is unchanged. */
+const recordReadScope=new AsyncLocalStorage<{fields:Map<string,Promise<FieldDefinition[]>>}>();
+export function withRecordReadScope<T>(run:()=>Promise<T>):Promise<T>{
+  return recordReadScope.run({fields:new Map()},run);
+}
 export class RecordEngine {
   private recordTrigger?:RecordTriggerHandler;
   private get declarativeRules(){return new DeclarativeRules(this.rbac);}

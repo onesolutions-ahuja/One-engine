@@ -4,7 +4,7 @@ export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
 import {activateNativeObject} from '../system-support/native-object-storage.js';
-import {nativeFieldExpression,nativeRecordJoin,nativeValueSql,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
+import {nativeFieldExpression,nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -1113,46 +1113,37 @@ export class RecordEngine {
     const predicates:string[]=[];
     const conditionParams:unknown[]=[];
     if(filterField&&filterValue!==undefined){
-      conditionParams.push(filterField.api_name);
-      const fieldParam='$'+(3+conditionParams.length);
-      conditionParams.push(filterValue);
-      const valueParam='$'+(3+conditionParams.length);
       if(filterOperator!=='Equals'&&filterField.data_type==='multipicklist'){
-        conditionParams[conditionParams.length-1]=multiValues;
+        conditionParams.push(filterField.api_name);
+        const fieldParam='$'+(3+conditionParams.length);
+        conditionParams.push(multiValues);
+        const valueParam='$'+(3+conditionParams.length);
         const membership=`COALESCE((SELECT array_agg(mv.value ORDER BY mv.sort_order)
           FROM md_record_multi_values mv WHERE mv.tenant_id=r.tenant_id AND mv.record_id=r.id
             AND mv.object_api=r.object_api AND mv.field_api=${fieldParam}),ARRAY[]::text[]) @> ${valueParam}::text[]`;
-        predicates.push(filterOperator==='Includes'
-          ?membership
-          :`NOT (${membership})`);
-      }else if(['number','currency','percent'].includes(filterField.data_type)){
-        if(!/^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(filterValue))
-          throw new Error('Invalid numeric list filter');
-        predicates.push(`EXISTS(SELECT 1 FROM md_record_values fv
-          WHERE fv.tenant_id=r.tenant_id AND fv.record_id=r.id AND fv.object_api=r.object_api
-            AND fv.field_api=${fieldParam}
-            AND fv.value_text ~ '^-?[0-9]+(\\.[0-9]+)?$'
-            AND fv.value_text::numeric=${valueParam}::numeric)`);
-      }else predicates.push(`EXISTS(SELECT 1 FROM md_record_values fv
-        WHERE fv.tenant_id=r.tenant_id AND fv.record_id=r.id AND fv.object_api=r.object_api
-          AND fv.field_api=${fieldParam}
-          AND COALESCE(fv.value_text,fv.reference_record_id::text)=${valueParam})`);
+        predicates.push(filterOperator==='Includes'?membership:`NOT (${membership})`);
+      }else{
+        conditionParams.push(filterValue);
+        const valueParam='$'+(3+conditionParams.length);
+        if(['number','currency','percent'].includes(filterField.data_type)){
+          if(!/^-?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)$/.test(filterValue))
+            throw new Error('Invalid numeric list filter');
+          predicates.push(`${nativeValueSql(nativeMeta,filterField.api_name,'nr')}=${valueParam}::numeric`);
+        }else{
+          predicates.push(`${nativeValueSql(nativeMeta,filterField.api_name,'nr',true)}=${valueParam}::text`);
+        }
+      }
     }
     if(relatedField){
-      conditionParams.push(relatedField.api_name);
-      const relationshipParam='$'+(3+conditionParams.length);
       conditionParams.push(options.relatedId!);
       const parentParam='$'+(3+conditionParams.length);
-      predicates.push(`EXISTS(SELECT 1 FROM md_record_values relation
-        WHERE relation.tenant_id=r.tenant_id AND relation.record_id=r.id
-          AND relation.object_api=r.object_api AND relation.field_api=${relationshipParam}
-          AND relation.reference_record_id=${parentParam}::uuid)`);
+      predicates.push(`${nativeValueSql(nativeMeta,relatedField.api_name,'nr')}=${parentParam}::uuid`);
     }
     if(options.filters?.length){
       // One-level lookup paths (e.g. Product.AgeRestricted) are checked against
       // the lookup field, the related Object and the related Field, and the SQL
       // predicate re-applies record access to the related record.
-      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeFieldExpression(f)??undefined,nativeText:nativeFieldExpression(f,'nr',true)??undefined}]));
+      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name):undefined,nativeText:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name,'nr',true):undefined}]));
       for(const filter of options.filters){
         const path=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(filter.field);
         if(!path){
@@ -1236,19 +1227,14 @@ export class RecordEngine {
       resultOrder='r.sort_value DESC,r.id ASC,v.field_api';
     }
     if(sortField){
-      params.push(sortField.api_name);
-      sortJoin=`LEFT JOIN md_record_values sv ON sv.tenant_id=r.tenant_id AND sv.record_id=r.id
-        AND sv.object_api=r.object_api AND sv.field_api=$${params.length}`;
       const direction=options.sortDirection==='desc'?'DESC':'ASC';
       const sortType=sortField.data_type==='rollup'
         ?sortField.rollup_source_data_type:sortField.data_type;
-      const sortValue=['number','currency','percent'].includes(String(sortType))
-        ?'sv.value_number'
-        :sortType==='date'?'sv.value_date'
-          :sortType==='datetime'?'sv.value_datetime'
-            :sortField.data_type==='reference'?'sv.reference_record_id::text'
-              :sortType==='boolean'?'sv.value_boolean'
-                :'lower(COALESCE(sv.value_text,sv.reference_record_id::text))';
+      const nativeExpr=nativeValueSql(nativeMeta,sortField.api_name,'nr');
+      const sortValue=['number','currency','percent','date','datetime','boolean'].includes(String(sortType))
+        ?nativeExpr
+        :sortField.data_type==='reference'?`${nativeExpr}::text`
+          :`lower(${nativeValueSql(nativeMeta,sortField.api_name,'nr',true)})`;
       sortSelection=`${sortValue} AS sort_value`;
       cursorExpression=sortValue;
       cursorValueType=['number','currency','percent'].includes(String(sortType))?'numeric'

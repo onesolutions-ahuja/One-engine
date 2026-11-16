@@ -37,12 +37,12 @@ export async function enforceFlowRecordAttestation(db:SqlPersistence,tenantId:st
  // Fail closed if the restricted marker is not a native field.
  if(!meta.fields.has(guard.restrictedField))
   throw Error('Attestation restriction field is unavailable');
- const restricted=nativeValueSql(meta,guard.restrictedField,'nr',true);
+ const restrictedSql=nativeValueSql(meta,guard.restrictedField,'nr',true);
  const ageField=guard.minimumAgeField??'MinimumAge';
  const age=meta.fields.has(ageField)
   ?nativeValueSql(meta,ageField,'nr',true):'NULL::text';
  const {rows}=await db.query<{id:string;restricted:boolean}>(`SELECT r.id,
-   (COALESCE(lower((${restricted})::text)='true',false)
+   (COALESCE(lower((${restrictedSql})::text)='true',false)
      OR COALESCE(NULLIF((${age})::text,'')::numeric,0)>0) AS restricted
    FROM md_records r JOIN ${nativeTableSql(meta)} nr
      ON nr.tenant_id=r.tenant_id AND nr.id=r.id

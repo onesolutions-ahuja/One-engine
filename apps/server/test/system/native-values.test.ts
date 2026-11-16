@@ -50,13 +50,18 @@ test('native SQL read helpers validate identifiers and produce the EAV-shaped la
  const meta:NativeFieldsMetadata={table,fields:new Map([
   ['Name',{column,sqlType:'text',dataType:'text'}],
   ['Amount',{column:null,sqlType:'numeric',dataType:'number'}],
-  ['Lookup',{column:null,sqlType:'uuid',dataType:'reference'}]
+  ['Lookup',{column:null,sqlType:'uuid',dataType:'reference'}],
+  ['Geo',{column:null,sqlType:'double precision[]',dataType:'geolocation'}],
+  ['Address',{column:null,sqlType:'text[]',dataType:'address'}]
  ])};
  assert.equal(nativeTableSql(meta),'"'+table+'"');
  assert.equal(nativeValueSql(meta,'Name'),'nr."'+column+'"');
  assert.equal(nativeValueSql(meta,'Name','nr',true),'nr."'+column+'"::text');
- assert.equal(nativeValueSql(meta,'Amount'),'((nr.extras->>\'Amount\'))::numeric'.replace('((','(').replace('))',')') );
+ assert.equal(nativeValueSql(meta,'Amount'),"(nr.extras->>'Amount')::numeric");
  assert.match(nativeValueSql(meta,'Lookup'),/::uuid$/);
+ assert.match(nativeValueSql(meta,'Geo'),/jsonb_array_elements_text/);
+ assert.match(nativeValueSql(meta,'Geo'),/::double precision\[\]/);
+ assert.match(nativeValueSql(meta,'Address'),/::text\[\]/);
  const sql=readNativeValueRows(meta,'records');
  assert.match(sql,/LEFT JOIN LATERAL/);
  assert.match(sql,/n.id=records.id/);

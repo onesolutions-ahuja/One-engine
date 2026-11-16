@@ -1,3 +1,5 @@
+import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
+import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
 import {registeredRelationships} from '../relationship-engine/RelationshipRegistry.js';
@@ -35,12 +37,12 @@ import {evaluateResolvedFormulaSql} from '../system-support/formula-sql-runtime.
 import {sanitizeRichText} from './rich-text.js';
 import {formulaFieldReferences,compileRecordFilters,type QueryField,type RecordCursor,type RecordFilter} from '../object-engine/QueryBuilder.js';
 import {computeFilteredNumericAggregate} from '../object-engine/FilteredNumericAggregate.js';
-type FieldDefinition={api_name:string;data_type:string;related_object:string|null;relationship_type:string|null;allow_reparenting:boolean;required:boolean;max_length:number|null;precision:number|null;scale:number|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;default_value:string|null;auto_number_format:string|null;rollup_child_object?:string|null;rollup_relationship_field?:string|null;rollup_operation?:string|null;rollup_source_field?:string|null;rollup_source_data_type?:string|null;formula_expression?:string|null;formula_return_type?:string|null;picklist_restricted?:boolean;controller_field_api_name?:string|null;global_value_set_api?:string|null};
+type FieldDefinition=NativeQueryField&{api_name:string;data_type:string;related_object:string|null;relationship_type:string|null;allow_reparenting:boolean;required:boolean;max_length:number|null;precision:number|null;scale:number|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;default_value:string|null;auto_number_format:string|null;rollup_child_object?:string|null;rollup_relationship_field?:string|null;rollup_operation?:string|null;rollup_source_field?:string|null;rollup_source_data_type?:string|null;formula_expression?:string|null;formula_return_type?:string|null;picklist_restricted?:boolean;controller_field_api_name?:string|null;global_value_set_api?:string|null};
 type EncryptedValueVault={
   encryptOpaque(value:string):{ciphertext:Buffer;keyId:string};
   decryptOpaque(ciphertext:Buffer,keyId:string):string;
 };
-type Storable={value_text:string|null;reference_record_id:string|null;value_number?:string|null;value_date?:string|null;value_datetime?:Date|null;value_boolean?:boolean|null;geo_latitude?:number|null;geo_longitude?:number|null;address_street?:string|null;address_city?:string|null;address_state?:string|null;address_postal_code?:string|null;address_country?:string|null;multi_values?:string[];is_unique:boolean;case_sensitive:boolean};
+type Storable=RecordStoredValue;
 type RecordTriggerHandler=(
   client:PoolClient,tenantId:string,userId:string,objectApi:string,
   operation:'created'|'updated'|'deleted',
@@ -96,7 +98,8 @@ export class RecordEngine {
   private async fields(tenantId:string,objectApi:string,client?:PoolClient):Promise<FieldDefinition[]> {
     const executor=client??this.db;
     const {rows}=await executor.query<FieldDefinition&{package_object_retained?:boolean}>(
-      `SELECT api_name,data_type,related_object,relationship_type,allow_reparenting,required,max_length,precision,scale,is_unique,external_id,
+      `SELECT md_field_definitions.api_name,md_field_definitions.data_type,related_object,relationship_type,allow_reparenting,required,max_length,precision,scale,is_unique,external_id,
+       nf.column_name AS native_column,nf.sql_type AS native_type,no.table_name AS native_table,
        formula_expression,formula_return_type,g.value_set_api AS global_value_set_api,
        EXISTS(SELECT 1 FROM md_metadata_package_components c
          WHERE c.tenant_id=md_field_definitions.tenant_id AND c.component_type='object'
@@ -115,6 +118,8 @@ export class RecordEngine {
        FROM md_field_definitions LEFT JOIN md_field_global_value_sets g
          ON g.tenant_id=md_field_definitions.tenant_id AND g.object_api=md_field_definitions.object_api
           AND g.field_api=md_field_definitions.api_name
+       LEFT JOIN md_native_objects no ON no.tenant_id=md_field_definitions.tenant_id AND no.object_api=md_field_definitions.object_api
+       LEFT JOIN md_native_fields nf ON nf.tenant_id=md_field_definitions.tenant_id AND nf.object_api=md_field_definitions.object_api AND nf.field_api=md_field_definitions.api_name
        WHERE md_field_definitions.tenant_id=$1 AND md_field_definitions.object_api=$2
          AND md_field_definitions.deleted_at IS NULL`,
       [tenantId,objectApi]);
@@ -969,22 +974,7 @@ export class RecordEngine {
       prepared.set(field.api_name,{value_text:value,reference_record_id:null,
         is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive});
     }
-    for(const [field,value] of prepared){if(field.startsWith('__'))continue;await client.query(
-      `INSERT INTO md_record_values
-        (tenant_id,record_id,object_api,field_api,value_text,reference_record_id,is_unique,case_sensitive,
-         geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country,
-         value_number,value_date,value_datetime,value_boolean)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [tenantId,rows[0].id,objectApi,field,value.value_text,value.reference_record_id,
-        value.is_unique,value.case_sensitive,value.geo_latitude??null,value.geo_longitude??null,
-        value.address_street??null,value.address_city??null,value.address_state??null,
-        value.address_postal_code??null,value.address_country??null,value.value_number??null,
-        value.value_date??null,value.value_datetime??null,value.value_boolean??null]);
-      if(value.multi_values)for(const [sortOrder,multiValue] of value.multi_values.entries())
-        await client.query(`INSERT INTO md_record_multi_values
-          (tenant_id,record_id,object_api,field_api,value,sort_order) VALUES($1,$2,$3,$4,$5,$6)`,
-        [tenantId,rows[0].id,objectApi,field,multiValue,sortOrder]);
-    }
+    await writeRecordValues(client,tenantId,objectApi,rows[0].id,prepared,false);
     const parents=await rollupParents(client,tenantId,objectApi,rows[0].id);
     await refreshRollups(client,tenantId,objectApi,parents);
     return rows[0].id;
@@ -1121,7 +1111,7 @@ export class RecordEngine {
       // One-level lookup paths (e.g. Product.AgeRestricted) are checked against
       // the lookup field, the related Object and the related Field, and the SQL
       // predicate re-applies record access to the related record.
-      const filterFields=new Map<string,QueryField>(byApi);
+      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeFieldExpression(f)??undefined,nativeText:nativeFieldExpression(f,'nr',true)??undefined}]));
       for(const filter of options.filters){
         const path=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(filter.field);
         if(!path){
@@ -1259,7 +1249,7 @@ export class RecordEngine {
     }>(`
       WITH authorized AS MATERIALIZED (
         SELECT r.id
-        FROM md_records r
+        FROM md_records r ${nativeRecordJoin(definitions)}
         WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
           AND md_record_access($1,$3,r.id,'read')${where}
       ), totals AS (
@@ -1269,6 +1259,7 @@ export class RecordEngine {
           r.record_type_id,r.is_clone,${sortSelection}
         FROM authorized a JOIN md_records r
           ON r.tenant_id=$1 AND r.object_api=$2 AND r.id=a.id
+        ${nativeRecordJoin(definitions)}
         ${sortJoin}
         ${pageCursorPredicate?`WHERE ${pageCursorPredicate}`:''}
         ORDER BY ${orderBy} LIMIT $${limitParam} OFFSET $${offsetParam}
@@ -1280,10 +1271,10 @@ export class RecordEngine {
         v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,v.address_postal_code,
         v.address_country,f.data_type
       FROM totals LEFT JOIN selected r ON true
-      LEFT JOIN md_record_values v ON v.tenant_id=$1 AND v.record_id=r.id AND v.object_api=$2
+      ${nativeValuesJoin(definitions)??`LEFT JOIN md_record_values v ON v.tenant_id=$1 AND v.record_id=r.id AND v.object_api=$2
         AND EXISTS(SELECT 1 FROM md_field_definitions active_field
           WHERE active_field.tenant_id=v.tenant_id AND active_field.object_api=v.object_api
-            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)
+            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)`}
       LEFT JOIN md_field_definitions f ON f.tenant_id=$1 AND f.object_api=$2 AND f.api_name=v.field_api
         AND f.deleted_at IS NULL
       ORDER BY ${resultOrder}
@@ -1421,7 +1412,7 @@ export class RecordEngine {
   /** Single-record read uses the same tenant and field-level grants as list, without pagination. */
   async get(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient) {
     if(!uuid.test(id))throw new Error('Invalid record ID');
-    await this.rbac.require(tenantId,userId,objectApi,'read');
+    const [,definitions]=await Promise.all([this.rbac.require(tenantId,userId,objectApi,'read'),this.fields(tenantId,objectApi,client)]);
     const query=client??this.db;
     const {rows}=await query.query<{
       id:string;created_at:Date;updated_at:Date;owner_id:string|null;record_type_id:string|null;is_clone:boolean;
@@ -1433,11 +1424,11 @@ export class RecordEngine {
       r.record_type_id,r.is_clone,
       v.field_api,v.value_text,v.reference_record_id,f.data_type,v.value_number,v.value_date,v.value_datetime,v.value_boolean,
       v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,v.address_postal_code,v.address_country
-      FROM md_records r
-      LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
+      FROM md_records r ${nativeRecordJoin(definitions)}
+      ${nativeValuesJoin(definitions)??`LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
         AND EXISTS(SELECT 1 FROM md_field_definitions active_field
           WHERE active_field.tenant_id=v.tenant_id AND active_field.object_api=v.object_api
-            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)
+            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)`}
       LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id AND f.object_api=r.object_api
         AND f.api_name=v.field_api AND f.deleted_at IS NULL
       WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false AND md_record_access($1,$4,r.id,'read') ORDER BY v.field_api`,
@@ -1468,7 +1459,6 @@ export class RecordEngine {
         row.data_type==='date'?(row.value_date??val):
         row.data_type==='datetime'?(row.value_datetime?new Date(row.value_datetime).toISOString():val):val;
     }
-    const definitions=await this.fields(tenantId,objectApi,client);
     if(definitions.some(field=>field.data_type==='formula')){
       const formulaContext=await this.formulaContext(
         tenantId,userId,objectApi,record,definitions,client);
@@ -1540,35 +1530,7 @@ export class RecordEngine {
           'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL)',
           [tenantId,id,objectApi,field,userId,oldAddress??before,newAddress??after]);
       }
-      for(const [field,value] of writeValues){if(field.startsWith('__'))continue;await transactionClient.query(`
-        INSERT INTO md_record_values
-          (tenant_id,record_id,object_api,field_api,value_text,reference_record_id,is_unique,case_sensitive,
-           geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country,
-           value_number,value_date,value_datetime,value_boolean)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-        ON CONFLICT (tenant_id,record_id,field_api)
-        DO UPDATE SET value_text=EXCLUDED.value_text,reference_record_id=EXCLUDED.reference_record_id,
-          is_unique=EXCLUDED.is_unique,case_sensitive=EXCLUDED.case_sensitive,
-          geo_latitude=EXCLUDED.geo_latitude,geo_longitude=EXCLUDED.geo_longitude,
-          address_street=EXCLUDED.address_street,address_city=EXCLUDED.address_city,
-          address_state=EXCLUDED.address_state,address_postal_code=EXCLUDED.address_postal_code,
-          address_country=EXCLUDED.address_country,value_number=EXCLUDED.value_number,
-          value_date=EXCLUDED.value_date,value_datetime=EXCLUDED.value_datetime,
-          value_boolean=EXCLUDED.value_boolean
-      `,[tenantId,id,objectApi,field,value.value_text,value.reference_record_id,
-        value.is_unique,value.case_sensitive,value.geo_latitude??null,value.geo_longitude??null,
-        value.address_street??null,value.address_city??null,value.address_state??null,
-        value.address_postal_code??null,value.address_country??null,value.value_number??null,
-        value.value_date??null,value.value_datetime??null,value.value_boolean??null]);
-        if(value.multi_values){
-          await transactionClient.query('DELETE FROM md_record_multi_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-            [tenantId,id,field]);
-          for(const [sortOrder,multiValue] of value.multi_values.entries())await transactionClient.query(
-            `INSERT INTO md_record_multi_values
-              (tenant_id,record_id,object_api,field_api,value,sort_order) VALUES($1,$2,$3,$4,$5,$6)`,
-            [tenantId,id,objectApi,field,multiValue,sortOrder]);
-        }
-      }
+      await writeRecordValues(transactionClient,tenantId,objectApi,id,writeValues,true);
       if(this.richTextFilePruner){
         const richTextFields=(await this.fields(tenantId,objectApi,transactionClient))
           .filter(field=>field.data_type==='richtext'&&writeValues.has(field.api_name));

@@ -81,7 +81,12 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   try{
    const answer=await post<{values?:unknown[]}>('/page-code/aggregates',{...host.build,
     request:requestFor({},''),items:items.map(([,item])=>item)});
-   items.forEach(([key,item],index)=>{aggregates.set(key,answer.values?.[index]??emptyTotal(item.kind));asked.delete(key);});
+   items.forEach(([key,item],index)=>{
+    // No answer (e.g. a blank criterion such as no customer picked yet): same as no rows.
+    const value=answer.values?.[index];
+    aggregates.set(key,value===undefined||value===null||value===''?emptyTotal(item.kind):value);
+    asked.delete(key);
+   });
   }catch{items.forEach(([key,item])=>{aggregates.set(key,emptyTotal(item.kind));asked.delete(key);});}
   changed();
   if(asked.size)void askAggregates();

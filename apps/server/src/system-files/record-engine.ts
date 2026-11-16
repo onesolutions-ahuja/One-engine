@@ -4,7 +4,7 @@ export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
 import {activateNativeObject} from '../system-support/native-object-storage.js';
-import {nativeFieldExpression,nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
+import {nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -724,9 +724,11 @@ export class RecordEngine {
         case 'reference':
           validateLookupField(value,key,field.related_object);
           if(recordId&&field.relationship_type==='Master-Detail'&&!field.allow_reparenting){
+            const meta=await loadNativeFields(client??this.db,tenantId,objectApi);
             const previous=await (client??this.db).query<{reference_record_id:string|null}>(
-              'SELECT reference_record_id FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-              [tenantId,recordId,key]);
+              `SELECT ${nativeValueSql(meta,key,'nr')} AS reference_record_id
+                FROM ${nativeTableSql(meta)} nr WHERE nr.tenant_id=$1 AND nr.id=$2`,
+              [tenantId,recordId]);
             enforceMasterDetailReparenting(previous.rows[0]?.reference_record_id,value,key,field.allow_reparenting);
           }
           await assertLookupTargetExists(client??this.db,tenantId,field.related_object,value,key,userId);
@@ -1126,7 +1128,7 @@ export class RecordEngine {
         conditionParams.push(filterValue);
         const valueParam='$'+(3+conditionParams.length);
         if(['number','currency','percent'].includes(filterField.data_type)){
-          if(!/^-?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)$/.test(filterValue))
+          if(!/^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(filterValue))
             throw new Error('Invalid numeric list filter');
           predicates.push(`${nativeValueSql(nativeMeta,filterField.api_name,'nr')}=${valueParam}::numeric`);
         }else{

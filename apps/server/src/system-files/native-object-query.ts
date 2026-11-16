@@ -12,6 +12,11 @@ export function nativeFieldExpression(field:NativeQueryField,alias='nr',text=fal
   return alias+'.'+quote(field.native_column)+(text?'::text':'');
  }
  const expression=`(${alias}.extras->>${literal(field.api_name)})`;
+ if(!text&&(field.native_type==='text[]'||field.native_type==='double precision[]')){
+  const json=`(${alias}.extras->${literal(field.api_name)})`;
+  return `CASE WHEN ${json} IS NULL OR jsonb_typeof(${json})='null' THEN NULL
+   ELSE ARRAY(SELECT jsonb_array_elements_text(${json}))::${field.native_type} END`;
+ }
  return text?expression:`${expression}::${field.native_type}`;
 }
 export function nativeRecordJoin(fields:readonly NativeQueryField[],alias='nr'){
@@ -86,6 +91,12 @@ export async function loadNativeFields(executor:{query:(
  return {table,fields};
 }
 
+function validateNativeField(fieldApi:string,field:NativeFieldsMetadata['fields'] extends Map<string,infer V>?V:never){
+ if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(fieldApi)||!types.has(field.sqlType)
+  ||(field.column!==null&&!/^f_[a-f0-9]{32}$/.test(field.column)))
+  throw Error('Invalid native field metadata');
+}
+
 /** Native table names are exclusively generated and retrieved by storage metadata. */
 export function nativeTableSql(meta:NativeFieldsMetadata):string{
  if(!/^md_object_[a-f0-9]{32}$/.test(meta.table))throw Error('Invalid native table');
@@ -97,6 +108,7 @@ export function nativeValueSql(meta:NativeFieldsMetadata,fieldApi:string,alias='
  nativeTableSql(meta);
  const field=meta.fields.get(fieldApi);
  if(!field)throw Error('Native field metadata unavailable: '+fieldApi);
+ validateNativeField(fieldApi,field);
  const sql=nativeFieldExpression({api_name:fieldApi,data_type:field.dataType,
   native_table:meta.table,native_column:field.column,native_type:field.sqlType},alias,asText);
  if(sql===null)throw Error('Invalid native field metadata');
@@ -106,6 +118,7 @@ export function nativeValueSql(meta:NativeFieldsMetadata,fieldApi:string,alias='
 /** EAV-shaped lateral rows for a caller's md_records alias (normally r). */
 export function readNativeValueRows(meta:NativeFieldsMetadata,alias='r'):string{
  nativeTableSql(meta);
+ for(const [fieldApi,field] of meta.fields)validateNativeField(fieldApi,field);
  const fields:NativeQueryField[]=[...meta.fields].map(([api_name,field])=>({
   api_name,data_type:field.dataType,native_table:meta.table,
   native_column:field.column,native_type:field.sqlType

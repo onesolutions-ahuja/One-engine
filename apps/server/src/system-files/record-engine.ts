@@ -517,25 +517,27 @@ export class RecordEngine {
     const formula=definitions.find(field=>field.api_name===fieldApi&&field.data_type==='formula');
     if(!formula||!formula.formula_expression)
       throw new Error('Formula field definition is unavailable for migration');
+    const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
     const {rows}=await client.query<{
-      field_api:string;data_type:string;value_text:string|null;value_number:string|null;
+      field_api:string|null;data_type:string|null;value_text:string|null;value_number:string|null;
       value_boolean:boolean|null;value_date:string|null;value_datetime:Date|string|null;
       reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;
       address_street:string|null;address_city:string|null;address_state:string|null;
-      address_postal_code:string|null;address_country:string|null
+      address_postal_code:string|null;address_country:string|null;is_clone:boolean
     }>(`SELECT v.field_api,f.data_type,v.value_text,v.value_number::text AS value_number,
         v.value_boolean,v.value_date::text AS value_date,v.value_datetime,v.reference_record_id,
         v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,
-        v.address_postal_code,v.address_country
-      FROM md_record_values v JOIN md_field_definitions f
-        ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api AND f.api_name=v.field_api
-      WHERE v.tenant_id=$1 AND v.object_api=$2 AND v.record_id=$3 AND f.deleted_at IS NULL`,
+        v.address_postal_code,v.address_country,r.is_clone
+      FROM md_records r
+      ${readNativeValueRows(meta,'r')}
+      LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id
+        AND f.object_api=r.object_api AND f.api_name=v.field_api AND f.deleted_at IS NULL
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false
+        AND (v.field_api IS NULL OR f.api_name IS NOT NULL)`,
     [tenantId,objectApi,recordId]);
-    const {rows:cloneRows}=await client.query<{is_clone:boolean}>(
-      'SELECT is_clone FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false',
-      [tenantId,objectApi,recordId]);
-    const byApi=new Map(rows.map(row=>[row.field_api,row]));
-    const record:Record<string,unknown>={Id:recordId,__isClone:cloneRows[0]?.is_clone===true};
+    const byApi=new Map(rows.filter(row=>row.field_api!==null)
+      .map(row=>[row.field_api as string,row]));
+    const record:Record<string,unknown>={Id:recordId,__isClone:rows[0]?.is_clone===true};
     for(const field of definitions){
       if(field.data_type==='formula')continue;
       const row=byApi.get(field.api_name);

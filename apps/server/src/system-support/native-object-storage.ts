@@ -74,8 +74,10 @@ BEGIN
    IF TG_OP='UPDATE' THEN old_val:=to_jsonb(OLD)->field.column_name; END IF;
   END IF;
   IF val IS NULL OR val='null'::jsonb THEN CONTINUE; END IF;
-  IF TG_OP='UPDATE' AND NOT OLD.is_deleted AND NEW.tenant_id=OLD.tenant_id
+  IF TG_OP='UPDATE' THEN
+   IF NOT OLD.is_deleted AND NEW.tenant_id=OLD.tenant_id
     AND val IS NOT DISTINCT FROM old_val THEN CONTINUE; END IF;
+  END IF;
   IF field.sql_type='text' AND NOT field.case_sensitive THEN
    EXECUTE format('SELECT EXISTS(SELECT 1 FROM %I WHERE tenant_id=$1 AND id<>$2
     AND NOT is_deleted AND lower(%s)=lower($3))',TG_TABLE_NAME,value_expr)
@@ -155,7 +157,8 @@ BEGIN
   DO UPDATE SET column_name=EXCLUDED.column_name,sql_type=EXCLUDED.sql_type,data_type=EXCLUDED.data_type;
  expression:=CASE WHEN col IS NOT NULL THEN format('%I',col)
   ELSE format('(extras->>%L)',k) END;
- unique_expr:=CASE WHEN col IS NULL AND typ<>'text' THEN format('(extras->%L)',k)
+ unique_expr:=CASE WHEN col IS NULL AND typ<>'text'
+   THEN format('NULLIF(extras->%L,''null''::jsonb)',k)
   ELSE expression END;
  unique_ci:='md_native_u_ci_'||md5(tab||':'||k);
  unique_cs:='md_native_u_cs_'||md5(tab||':'||k);

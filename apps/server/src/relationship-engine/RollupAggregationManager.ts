@@ -111,16 +111,12 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
         const numericValue=sourceType==='date'||sourceType==='datetime'?null:value;
         const dateValue=sourceType==='date'?value:null;
         const dateTimeValue=sourceType==='datetime'?value:null;
-        await client.query(`INSERT INTO md_record_values
-          (tenant_id,record_id,object_api,field_api,value_text,reference_record_id,is_unique,case_sensitive,
-           value_number,value_date,value_datetime)
-          VALUES($1,$2,$3,$4,$5,NULL,false,false,$6::numeric,$7::date,$8::timestamptz)
-          ON CONFLICT(tenant_id,record_id,field_api) DO UPDATE SET value_text=EXCLUDED.value_text,
-            reference_record_id=NULL,geo_latitude=NULL,geo_longitude=NULL,address_street=NULL,
-            address_city=NULL,address_state=NULL,address_postal_code=NULL,address_country=NULL,
-            value_number=EXCLUDED.value_number,value_date=EXCLUDED.value_date,
-            value_datetime=EXCLUDED.value_datetime,value_boolean=NULL`,
-        [tenantId,parentId,rollup.parent_object,rollup.field_api,value,numericValue,dateValue,dateTimeValue]);
+        await writeNativeValues(client,tenantId,rollup.parent_object,parentId,new Map([[
+          rollup.field_api,{value_text:value,reference_record_id:null,
+            value_number:numericValue,value_date:dateValue,
+            value_datetime:dateTimeValue===null?null:new Date(dateTimeValue),
+            is_unique:false,case_sensitive:false}
+        ]]));
         await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
           [tenantId,rollup.parent_object,parentId]);
       }

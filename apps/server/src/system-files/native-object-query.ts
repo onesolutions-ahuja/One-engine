@@ -49,7 +49,7 @@ export function nativeValuesJoin(fields:readonly NativeQueryField[],recordAlias=
   ${arrayItem('text[]',2)} AS address_state,${arrayItem('text[]',3)} AS address_postal_code,
   ${arrayItem('text[]',4)} AS address_country
   FROM ${quote(table)} n CROSS JOIN LATERAL jsonb_each(n.extras${typed.map(x=>' || '+x).join('')}) d
-  WHERE n.tenant_id=$1 AND n.tenant_id=${recordAlias}.tenant_id AND n.id=${recordAlias}.id AND d.key=ANY(ARRAY[${native.map(f=>literal(f.api_name)).join(',')}]::text[])
+  WHERE n.tenant_id=$1 AND n.id=${recordAlias}.id AND d.key=ANY(ARRAY[${native.map(f=>literal(f.api_name)).join(',')}]::text[])
  ) v ON true`;
 }
 

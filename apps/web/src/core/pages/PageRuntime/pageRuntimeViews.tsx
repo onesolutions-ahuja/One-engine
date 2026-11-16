@@ -1,3 +1,4 @@
+import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {runtimeComponentLabel} from './smartComponentLabel';
 import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
@@ -706,7 +707,8 @@ function MetadataBoundPageComponent({
   const rawActions = properties.actionFlows;
   const actionFlows = rawActions && typeof rawActions === 'object' && !Array.isArray(rawActions)
     ? rawActions as Record<string, unknown> : {};
-  const resolveInput = (source: unknown, eventPayload: Record<string, unknown>): unknown => {
+  const resolveInput = (raw: unknown, eventPayload: Record<string, unknown>): unknown => {
+    const source=declarativeSource(raw);
     // Reusable, declarative input formatting. No arbitrary expressions or scripts.
     if (source && typeof source==='object' && !Array.isArray(source)) {
       const option=source as Record<string,unknown>;

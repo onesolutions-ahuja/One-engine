@@ -1,5 +1,6 @@
 import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names.js';
 import {componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
+import {pageReferencesIn,savedValueKey} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {namedCollectionNames} from './pageCollectionSession';
 import {activePageRecordFilters} from './pageComponentBindings';
 
@@ -13,10 +14,12 @@ const collection=(name:string):Channel=>'collection:'+name.toLowerCase();
 
 function references(formula:unknown,inputs:Set<Channel>,available:ReadonlySet<string>):void {
  if(typeof formula!=='string')return;
- for(const match of formula.matchAll(/(?:\$state\.|@state\.)([A-Za-z][A-Za-z0-9_]{0,63})\b/g))
-  inputs.add(state(match[1]));
- for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(?:Id|Name|Value|Text|Field|Criteria)\b/gi))
-  inputs.add(collection(match[1]));
+ if(/@ThisPage/i.test(formula))
+  for(const reference of pageReferencesIn(formula)){
+   if(reference.kind==='selected'){inputs.add(collection(reference.name));continue;}
+   const key=savedValueKey(reference);
+   if(key&&identifier.test(key))inputs.add(state(key));
+  }
  // Direct @NamedCollection reads are dependencies too, including nested IFs.
  for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})(?![.\w])/g))
   if(available.has(match[1].toLowerCase()))inputs.add(collection(match[1]));
@@ -36,7 +39,7 @@ export function pageStateDependencies(components:readonly Component[]):PageState
  const available=new Set(components.flatMap(item=>emitted(item.properties)
   .map(name=>name.replace(/ +/g,'_').toLowerCase())));
  // Every component also publishes its own value under its page name
- // (@CategoryTabs.state.Id), so picking a parent clears what depends on it.
+ // (@ThisPage.CategoryTabs.Selected.Id), so picking a parent clears what depends on it.
  const instanceNames=components.every(item=>typeof item.type==='string')
   ?componentInstanceNames(components as Array<{id:string;type:string;properties:Record<string,unknown>}>)
   :new Map<string,string>();
@@ -84,7 +87,7 @@ export function pageStateDependencies(components:readonly Component[]):PageState
      for(const key of Object.values(action.outputs))
       if(typeof key==='string'&&identifier.test(key))outputs.add(state(key));
     if(action.actionType==='Formula'&&typeof action.formula==='string'){
-     const assignment=/^@state\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/.exec(action.formula.trim());
+     const assignment=/^@ThisPage\.[A-Za-z_][A-Za-z0-9_]{0,79}\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/i.exec(action.formula.trim());
      if(assignment)outputs.add(state(assignment[1]));
     }
    }

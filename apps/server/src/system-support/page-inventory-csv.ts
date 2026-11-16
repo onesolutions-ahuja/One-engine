@@ -65,7 +65,7 @@ const sharedPageSettings:ComponentSettingDefinition[]=[
  {propertyKey:'editorLocked',label:'Lock component in designer',kind:'BOOLEAN',
   defaultValue:false,section:'Arrange'},
  // Data ribbon "Record filter formula": which rows a list shows, e.g.
- // =IF(ISBLANK(@Tabs.state.Id), TRUE, @Product.Category = @Tabs.state.Id)
+ // =IF(ISBLANK(@ThisPage.Tabs.Selected.Id), TRUE, @Product.Category = @ThisPage.Tabs.Selected.Id)
  {propertyKey:'filterFormula',label:'Record filter formula',kind:'TEXT',maxLength:2000,section:'Data'}
 ];
 const pageSettingsFor=(type:string):ComponentSettingDefinition[]=>[

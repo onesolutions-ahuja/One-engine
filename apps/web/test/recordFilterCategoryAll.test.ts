@@ -7,8 +7,8 @@ const fields=[{apiName:'MenuCategory',label:'Category',dataType:'Lookup(MenuCate
  {apiName:'Name',label:'Name',dataType:'Text'}] as unknown as FieldMetadata[];
 
 test('category filter: blank or "*" state shows every category, a tab Id filters to it',()=>{
- for(const formula of ['@Product.MenuCategory = BLANKVALUE($state.category, "*")',
-  '@Product.MenuCategory = IF(ISBLANK($state.category), "*", $state.category)']){
+ for(const formula of ['@Product.MenuCategory = BLANKVALUE(@ThisPage.Input.category, "*")',
+  '@Product.MenuCategory = IF(ISBLANK(@ThisPage.Input.category), "*", @ThisPage.Input.category)']){
   assert.equal(validateRecordFilterFormula(formula,fields),null,formula);
   const all=compileRecordFilterFormula(formula,fields,{});
   assert.equal(all.blocked,false,all.error);
@@ -21,5 +21,5 @@ test('category filter: blank or "*" state shows every category, a tab Id filters
 });
 
 test('a filter on a state that is not picked yet still validates (and so saves)',()=>{
- assert.equal(validateRecordFilterFormula('@Product.MenuCategory = $state.category',fields),null);
+ assert.equal(validateRecordFilterFormula('@Product.MenuCategory = @ThisPage.Input.category',fields),null);
 });

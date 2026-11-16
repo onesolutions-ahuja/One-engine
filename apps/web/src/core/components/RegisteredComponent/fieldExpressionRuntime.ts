@@ -1,3 +1,4 @@
+import {hasPageValue,withoutPageValues} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {
  evaluateFieldExpressionDetailed,FieldExpressionEvaluationError,setAuthenticatedFormulaSession,
  type FormulaBindingContext
@@ -124,7 +125,7 @@ export function resolveRegisteredTextProperties(
   // Binding formulas on repeating rows are resolved by the row renderer.
   const authored=properties.properties;
   const extra=authored&&typeof authored==='object'&&!Array.isArray(authored)
-    ?Object.entries(authored).filter(([key,value])=>typeof value==='string'&&value.includes('$component.')
+    ?Object.entries(authored).filter(([key,value])=>typeof value==='string'&&hasPageValue(value)
       &&!definitions.some(field=>field.propertyKey===key)).map(([propertyKey])=>({propertyKey,kind:'TEXT'})):[];
   for(const definition of [...definitions,...extra]){
     if(!['TEXT','LONG_TEXT','TEXTAREA','STRING'].includes(definition.kind))continue;
@@ -132,7 +133,8 @@ export function resolveRegisteredTextProperties(
     if(typeof value!=='string'||!isFieldExpression(value))continue;
     // Selected functions are resolved by the mounted SQL display adapter.
     if(isSelectedSqlFormula(value))continue;
-    const localRefs=[...value.matchAll(/@([A-Za-z][A-Za-z0-9_]*)/g)].map(match=>match[1]);
+    const fieldText=withoutPageValues(value);
+    const localRefs=[...fieldText.matchAll(/@([A-Za-z][A-Za-z0-9_]*)/g)].map(match=>match[1]);
     // Validate explicit bound Object fields against the authorised metadata,
     // not against returned row keys: a real nullable field may be absent from
     // the record without being invalid. An unbound field remains empty.
@@ -158,10 +160,10 @@ export function resolveRegisteredTextProperties(
         // Existing formula evaluator owns all syntax and complexity errors.
       }
     }
-    if(!hasRecord&&rows&&rows.length>1&&value.includes('$component.')&&localRefs.length)continue;
+    if(!hasRecord&&rows&&rows.length>1&&hasPageValue(value)&&localRefs.length)continue;
     // A Grid/Card/Cart has MANY rows. The renderer, not the enclosing
     // RegisteredComponent, evaluates @Object.Field separately for each row.
-    if(!hasRecord&&/@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(value)
+    if(!hasRecord&&/@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(fieldText)
       &&!/\b(?:COLLECTION|TABLE|SUM|SUMIFS|COUNTIFS|AVERAGEIFS|MINIFS|MAXIFS)\s*\(/i.test(value))continue;
     // SUM may be nested in a text expression (e.g. "£ " & SUM(@LineTotal)).
     // Do not pre-evaluate a partial record page and show a misleading total.
@@ -171,7 +173,7 @@ export function resolveRegisteredTextProperties(
     const hasNamed=Boolean(formulaContext.namedCollections&&Object.keys(formulaContext.namedCollections).length);
     const hasSources=Boolean(formulaContext.collectionSources&&Object.values(formulaContext.collectionSources)
       .some(value=>Array.isArray(value)&&value.length>0));
-    if(!hasRecord&&/@[A-Za-z]/.test(value)&&!hasNamed&&!hasSources
+    if(!hasRecord&&/@[A-Za-z]/.test(fieldText)&&!hasNamed&&!hasSources
       &&!Array.isArray(formulaContext.collectionRows))continue;
     if(!resolvedContext?.timeZone&&requiresAuthenticatedTimeZone(value,record))
       throw new FieldExpressionEvaluationError('Authenticated formula time zone is unavailable');

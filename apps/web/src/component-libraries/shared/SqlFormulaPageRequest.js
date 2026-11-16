@@ -1,5 +1,9 @@
 import {Parser,formulaTruth} from '../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../server/src/expression-engine/FormulaTokenizer.js';
+import {parsePageReference,isBrowserOnlyReference,savedValueKey} from '../../../../server/src/expression-engine/PageReferences.js';
+/** Internal SQL wire name for a bound page input. */
+const inputRef=key=>({kind:'reference',value:'ThisPage.Input.'+key});
+const pageRef=name=>{try{return parsePageReference(name);}catch{return null;}};
 import {SQL_SCALAR_FORMULAS,SQL_RECORD_AGGREGATES,serializeFormulaSqlExpression}
  from '../../../../server/src/expression-engine/FormulaCategories.js';
 import {componentReaderKey,evaluateFieldExpressionDetailed,evaluateParsedExpression} from './FieldExpression.js';
@@ -19,15 +23,16 @@ const verifyLocal=()=>{
  try{return typeof window!=='undefined'&&window.sessionStorage.getItem('metadrive:local-sql-verify')==='1';}
  catch{return false;}
 };
-/** Same inputs the server path binds: $session, $session.cartId and $state values. */
+/** Same inputs the server path binds: session, cart and saved page values. */
 const localReference=(name,pageState,sessionId)=>{
- if(name==='$session'||name==='$session.id')return sessionId;
- if(name==='$session.cartId'){
+ const page=pageRef(name);
+ if(page?.kind==='session')return sessionId;
+ if(page?.kind==='cart'){
   const value=pageState.activeCartId;
   return value===undefined?null:value;
  }
- if(name.startsWith('$state.')){
-  const key=name.slice(7);
+ const key=isBrowserOnlyReference(page)?null:savedValueKey(page);
+ if(key!==null){
   if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)||!Object.prototype.hasOwnProperty.call(pageState,key))
    throw new LocalSqlUnsupported('Unknown state');
   return pageState[key];
@@ -84,7 +89,7 @@ async function sharedServerAggregate(node,request,pageState,sessionId){
    throw new LocalSqlUnsupported('Invalid criterion');
   const key='SqlAgg'+Object.keys(values).length;
   values[key]=value;
-  args.push({kind:'reference',value:'$state.'+key});
+  args.push(inputRef(key));
  });
  const source=serializeFormulaSqlExpression({...node,args});
  if(source.length>4000)throw new LocalSqlUnsupported('Aggregate too long');
@@ -234,8 +239,9 @@ async function evaluatePageActionSqlOnServer(request,expression,ast,payload,page
   throw Error('SQL formula requires a scalar '+label);
  };
  const reservedKeys=new Set(tokenize(expression)
-  .filter(token=>token.kind==='reference'&&token.value.startsWith('$state.'))
-  .map(token=>token.value.slice(7)));
+  .filter(token=>token.kind==='reference')
+  .map(token=>savedValueKey(pageRef(token.value)))
+  .filter(Boolean));
  let sequence=0,generated=0;
  const bind=(value,label)=>{
   let key;
@@ -243,7 +249,7 @@ async function evaluatePageActionSqlOnServer(request,expression,ast,payload,page
   while(reservedKeys.has(key)||Object.prototype.hasOwnProperty.call(pageState,key));
   generated++;
   values[key]=scalar(value,label);
-  return {kind:'reference',value:'$state.'+key};
+  return inputRef(key);
  };
  const rewrite=(node,parent='',position=-1)=>{
   if(node.kind==='reference'){
@@ -253,32 +259,38 @@ async function evaluatePageActionSqlOnServer(request,expression,ast,payload,page
     if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(key))throw Error('Invalid event field');
     return bind(payload[key],'event value');
    }
-   if(name.startsWith('$component.')){
-    const parts=name.split('.');
-    const reader=pageState?.[componentReaderKey];
-    if(parts.length!==3||typeof (reader??formulaContext.readComponent)!=='function')throw Error('Missing component value');
-    return bind((reader??formulaContext.readComponent)(parts[1],parts[2]),
-      'component value');
+   const page=parsePageReference(name);
+   if(page?.kind==='session')return bind(sessionId,'session ID');
+   if(page?.kind==='cart')return bind(pageState.activeCartId,'cart ID');
+   if(page?.kind==='user'||page?.kind==='company')return node;
+   if(page?.kind==='selected')return bind(evaluateParsedExpression(node,{},{...formulaContext,pageState}),'component value');
+   if(page?.kind==='component'){
+    const reader=pageState?.[componentReaderKey]??formulaContext.readComponent;
+    const savedKey=page.key;
+    // A component's live value is bound as a literal; a saved value is passed by key.
+    if(isBrowserOnlyReference(page)||!Object.prototype.hasOwnProperty.call(pageState,savedKey)){
+     if(typeof reader==='function'){
+      try{return bind(reader(page.name,page.key),'component value');}
+      catch(error){if(!/^Unknown component property/.test(error?.message??''))throw error;}
+     }
+     if(isBrowserOnlyReference(page))throw Error('Missing component value');
+    }
    }
-   if(name==='$session'||name==='$session.id')
-    return bind(sessionId,'session ID');
-   if(name==='$session.cartId')
-    return bind(pageState.activeCartId,'cart ID');
-   if(name.startsWith('$state.')){
-    const key=name.slice('$state.'.length);
+   const savedKey=savedValueKey(page);
+   if(savedKey!==null){
+    const key=savedKey;
     if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)||
       !Object.prototype.hasOwnProperty.call(pageState,key)&&!Object.prototype.hasOwnProperty.call(values,key))
-     throw Error('Unknown SQL Page State reference');
-    if(!Object.prototype.hasOwnProperty.call(values,key))values[key]=scalar(pageState[key],'Page State value');
-    return node;
+     throw Error('Unknown page value @'+name);
+    if(!Object.prototype.hasOwnProperty.call(values,key))values[key]=scalar(pageState[key],'page value');
+    return inputRef(key);
    }
-   if(name.startsWith('$session.user.')||name.startsWith('$session.tenant.'))return node;
    if(SQL_RECORD_AGGREGATES.has(parent)){
     const isField=parent==='COUNTIFS'?position===0||position%2===1:
       position===0||position===1||position%2===0;
     if(isField&&/^[A-Za-z][A-Za-z0-9_]*$/.test(name))return node;
    }
-   if(name.startsWith('$'))throw Error('SQL formula cannot query this UI-only reference: '+name);
+   if(page)throw Error('SQL formula cannot query this page-only value: @'+name);
    if(parent==='SUM'&&/^[A-Za-z][A-Za-z0-9_]*\.[A-Za-z][A-Za-z0-9_]*$/.test(name))
     return node;
    const parts=name.split('.');
@@ -306,7 +318,7 @@ async function evaluatePageActionSqlOnServer(request,expression,ast,payload,page
  if(!hasRecordAggregate(rewritten)){
   try{
    local=localSqlResultValue(evaluateLocalSql(rewritten,name=>{
-    const key=name.startsWith('$state.')?name.slice(7):'';
+    const key=savedValueKey(pageRef(name))??'';
     if(key&&Object.prototype.hasOwnProperty.call(values,key))return localTyped(values[key]);
     throw new LocalSqlUnsupported('Reference not bound');
    }));

@@ -109,7 +109,7 @@ export function inspectPageDependencies(page: LightningPageMetadata, scope: Depe
         continue;
       }
 
-      // A Formula action may choose Flows: IF(..., $flow.A, $flow.B). Each one is a dependency.
+      // A Formula action may choose Flows: IF(..., FLOW(A), FLOW(B)). Each one is a dependency.
       if (binding.actionType === 'Formula' && typeof binding.formula === 'string') {
         for (const name of formulaFlowReferences(binding.formula)) {
           const flow = scope.flows.find(item => item.apiName.toLowerCase() === name.toLowerCase());

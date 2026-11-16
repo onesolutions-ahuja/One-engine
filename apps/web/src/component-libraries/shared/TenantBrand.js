@@ -1,4 +1,4 @@
-/** The signed-in tenant's public brand for page formulas: $session.tenant.name and $session.tenant.logo.
+/** The signed-in tenant's public brand for page formulas: @ThisTenant.Company.Name and @ThisTenant.Company.Logo.
  * Smart components run from separately compiled bundles, each with its own copy of
  * this module, so the value lives on ONE well-known global key that every copy shares.
  * It holds only the trading name and logo, never other company data. */
@@ -28,4 +28,4 @@ export function subscribeTenantBrand(listener){
  return ()=>{state.listeners.delete(listener);};
 }
 /** Formula references this store answers. */
-export const TENANT_FORMULA_REFERENCES=Object.freeze(["$session.tenant.name","$session.tenant.logo"]);
+export const TENANT_FORMULA_REFERENCES=Object.freeze(["@ThisTenant.Company.Name","@ThisTenant.Company.Logo"]);

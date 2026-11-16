@@ -37,7 +37,7 @@ export function usePageEditorState(
     libraryComponents, onChange,
   } = props;
 
-  // $tenant.name / $tenant.logo formulas: load the signed-in tenant's brand once.
+  // @ThisTenant.Company.Name / .Logo formulas: load the signed-in tenant's brand once.
   useEffect(()=>{void ensureTenantBrand();},[]);
   const isPhoneBuilder = useFormFactor() === 'Phone';
   // An existing App Page keeps its saved App Default assignment as the builder app, so it can be

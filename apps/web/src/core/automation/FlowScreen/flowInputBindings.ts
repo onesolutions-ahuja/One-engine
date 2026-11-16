@@ -1,3 +1,4 @@
+import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
 import type { FieldMetadata, FlowDefinitionMetadata, FlowResourceMetadata } from '../../metadata/Definitions/metadata';
 
 export type InputSourceKind = 'Unmapped' | 'Literal' | 'Event' | 'Event Field' | 'Record Field' | 'Page State' | 'Numeric Page State' | 'Record Collection' | 'Session' | 'Legacy';
@@ -53,8 +54,9 @@ export function resolveFlowOutputBindings(
 
 /** Reusable declarative Flow input transforms; no runtime POS-specific code. */
 export function resolveStructuredFlowInput(
- option:Record<string,unknown>,resolve:(source:unknown)=>unknown
+ input:Record<string,unknown>,resolve:(source:unknown)=>unknown
 ):unknown {
+ const option:Record<string,unknown>={...input,value:declarativeSource(input.value)};
  if(option.source==='ToNumber'){
   const raw=resolve(option.value);
   if(typeof raw==='number')return Number.isFinite(raw)?raw:undefined;
@@ -86,8 +88,9 @@ export function resolveStructuredFlowInput(
  return undefined;
 }
 
-export function decodeInputSource(value: unknown, hasMapping = true): InputSource {
+export function decodeInputSource(raw: unknown, hasMapping = true): InputSource {
   if (!hasMapping) return { kind: 'Unmapped', detail: '', value: undefined };
+  const value=declarativeSource(raw);
   if (value === '$session'||value==='$session.id')
     return {kind:'Session',detail:'id',value};
   if(typeof value==='string'&&value.startsWith('$session.')){
@@ -115,7 +118,8 @@ export function decodeInputSource(value: unknown, hasMapping = true): InputSourc
       : { kind: 'Legacy', detail: '', value };
   }
   if(value&&typeof value==='object'&&!Array.isArray(value)){
-    const o=value as Record<string,unknown>;
+    const o:Record<string,unknown>={...(value as Record<string,unknown>)};
+    o.value=declarativeSource(o.value);
     if(o.source==='ToNumber'&&typeof o.value==='string'&&/^\$state\.[A-Za-z][A-Za-z0-9_]*$/.test(o.value))
      return {kind:'Numeric Page State',detail:o.value.slice(7),value};
     if(o.source==='ProjectRecords'&&typeof o.value==='string'

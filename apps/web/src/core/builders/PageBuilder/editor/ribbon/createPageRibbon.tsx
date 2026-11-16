@@ -1,4 +1,5 @@
 import { componentInstanceNames } from '../../../../../../../server/src/system-support/page-component-names';
+import { componentStateName } from '../../../../../../../server/src/expression-engine/FormulaComponentState';
 import * as React from 'react';
 import {
 ArrowLeft, Check, ClipboardPaste, Copy, Database, Eye, EyeOff, Filter, Type, MoveHorizontal,
@@ -388,6 +389,7 @@ export function createPageRibbon(
               actions={selectedActions} mixedEventIds={mixedActionEventIds}
               mixedButtonVisibilityKeys={mixedActionButtonVisibilityKeys} eventDefinitions={actionOptions} flows={flows}
               stateOptions={pageStateChoices(page.components)}
+              ownerName={selected?componentStateName(componentInstanceNames(page.components).get(selected.id))??'':''}
               dataFields={objects.find(item=>item.apiName===
                 String(selected?.properties.objectApiName||page.targetObject||''))?.fields??[]}
               selectedEvent={activeActionEvent} disabled={!selected||actionSelectionDisabled}

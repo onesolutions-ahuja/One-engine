@@ -6,9 +6,12 @@ import {resolveFieldText,getAuthenticatedFormulaBindingContext} from './fieldExp
 import {useSqlFormulaDisplay} from '../../../component-libraries/shared/useSqlFormulaDisplay';
 import {componentReaderKey} from '../../../component-libraries/shared/FieldExpression.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
+import {componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
+import {pageReferencesIn,parsePageReference,withoutPageValues} from '../../../../../server/src/expression-engine/PageReferences.js';
+const componentRead=(value:string)=>{try{const page=parsePageReference(value);return page?.kind==='component'?page:null;}catch{return null;}};
 
 type Scalar=string|number|boolean;
-type Entry={id:string;name:string;token:string;keys:string[]};
+type Entry={id:string;name:string;token:string;keys:string[];typeLabel:string};
 type Scope={
  entries:Entry[];
  read:(name:string,key:string)=>Scalar;
@@ -25,7 +28,11 @@ export function publishComponentInput(componentId:string,value:unknown){
 export const usePageFormulaScope=()=>useContext(Context);
 const safeKey=/^[A-Za-z_][A-Za-z0-9_]*$/;
 // Preserve simple names. Reserve a prefix for reversible encoding of legacy names.
+// Formula name: spaces and hyphens become _ (@ThisPage.My_Box.value), the same
+// rule as component selections, so one name works for every page value.
 function nameToken(name:string){
+ const plain=componentStateName(name);
+ if(plain&&!plain.startsWith('__n_'))return plain;
  return safeKey.test(name)&&!name.startsWith('__n_')?name:
   '__n_'+Array.from(name,char=>char.codePointAt(0)!.toString(16)).join('_');
 }
@@ -49,9 +56,9 @@ export function componentFormulaDependencies(source:unknown):string[]{
  const visit=(value:unknown,depth:number,key?:string):void=>{
   if(depth>8||value===null||value===undefined)return;
   if(typeof value==='string'){
-   if(!value.includes('$component.'))return;
-   for(const match of value.matchAll(/\$component\.([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)/g))
-    found.add(match[1]+'.'+match[2]);
+   if(!/@ThisPage\./i.test(value))return;
+   for(const reference of pageReferencesIn(value))
+    if(reference.kind==='component')found.add(reference.name+'.'+reference.key);
   }else if(typeof value==='object'){
    if(depth===1&&key&&nonBindingKeys.has(key))return;
    if(seen.has(value))return;
@@ -95,10 +102,10 @@ export function PageFormulaScope({components,catalog,children}:{
    const keys=Array.from(new Set([...authored,...(definition.propertyDefinitions??[])
     .filter(field=>field.kind!=='GROUP'&&field.kind!=='COLLECTION').map(field=>field.propertyKey)]))
     .filter(key=>safeKey.test(key)&&!['constructor','prototype','__proto__'].includes(key));
-   // Every component exposes its live input as $component.Name.value (typed text, selection).
+   // Every component exposes its live input as @ThisPage.Name.value (typed text, selection).
    if(!keys.includes('value'))keys.push('value');
-   // ...and the one record it is bound to as $component.Name.recordId, so a
-   // screen can say which of several carts it means: SCREEN(Pay,popup,$component.Cart2.recordId).
+   // ...and the one record it is bound to as @ThisPage.Name.recordId, so a
+   // screen can say which of several carts it means: SCREEN(Pay,popup,@ThisPage.Cart2.recordId).
    if(!keys.includes('recordId'))keys.push('recordId');
    if(['smart_image','ui_image'].includes(definition.apiName)){
     for(const key of ['textSource','imageSource','badgeText'])if(!keys.includes(key))keys.push(key);
@@ -107,13 +114,13 @@ export function PageFormulaScope({components,catalog,children}:{
     keys.push('text');
     edges.set(token+'.text',[token+'.textSource']);
    }
-   entries.push({id:item.id,name,token,keys});
+   entries.push({id:item.id,name,token,keys,typeLabel:definition.label||definition.apiName});
    for(const key of keys){
     const value=item.properties[key];
-    if(typeof value!=='string'||!value.includes('$component.'))continue;
+    if(typeof value!=='string'||!/@ThisPage\./i.test(value))continue;
     try{
-     const refs=tokenize(value).filter(t=>t.kind!=='string'&&t.value.startsWith('$component.'));
-     edges.set(token+'.'+key,refs.map(t=>t.value.slice(11)));
+     const refs=tokenize(value).filter(t=>t.kind!=='string').map(t=>componentRead(t.value)).filter(Boolean);
+     edges.set(token+'.'+key,refs.map(ref=>ref!.name+'.'+ref!.key));
     }catch{/* The binding editor reports malformed expressions. */}
    }
   }
@@ -211,8 +218,8 @@ export function PublishedFormulaProperties({id,values,rendered}:{id?:string;valu
    if(typeof bound==='string'&&bound)output[key]=bound;
    continue;
   }
-  if(typeof value==='string'&&(/^(?:=|@|\$component\.|\$state\.|\$session(?:\.|$))/.test(value)||/^[A-Z]+\(/i.test(value))){
-   if(rows.length>1&&!values.record&&/@[A-Za-z]/.test(value)&&!['smart_image','ui_image'].includes(String(values.kind??'')))continue;
+  if(typeof value==='string'&&(/^(?:=|@)/.test(value)||/^[A-Z]+\(/i.test(value))){
+   if(rows.length>1&&!values.record&&/@[A-Za-z]/.test(withoutPageValues(value))&&!['smart_image','ui_image'].includes(String(values.kind??'')))continue;
    const sql=sqlLookup(value,record as Record<string,unknown>|undefined);
    if(sql){
     if(sql.error||sql.loading)continue;

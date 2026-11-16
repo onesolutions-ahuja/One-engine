@@ -523,7 +523,7 @@ function CompanySettings({ canManage, section = 'general' }: { canManage: boolea
     setCompanySaving(true);setCompanyError('');setCompanyNotice('');
     try{const saved=await apiRequest<{profile:CompanyProfile}>('/tenant/company-profile',{method:'PUT',body:JSON.stringify(company)});
       setCompany(saved.profile);setCompanyEditing(false);setCompanyBeforeEdit(null);setCompanyNotice(section==='branding'?'Company logo saved.':'Company details saved.');
-       // Update every $tenant.* image/text formula immediately after a confirmed save.
+       // Update every @ThisTenant.Company image/text formula immediately after a confirmed save.
        void refreshTenantBrand();}
     catch(error){setCompanyError(companyFailureMessage(error));}
     finally{setCompanySaving(false)}

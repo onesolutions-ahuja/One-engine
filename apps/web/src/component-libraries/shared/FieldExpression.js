@@ -13,7 +13,8 @@ import {isExcelWildcardDataReference,matchesExcelWildcard,hasExcelWildcardCriter
 import {validateFormulaFunctions} from '../../../../server/src/expression-engine/FormulaFunctionRegistry.js';
 import {roundFormulaNumber} from '../../../../server/src/expression-engine/FormulaNumeric.js';
 import {isConnected} from '../../../../server/src/expression-engine/FormulaConnections.js';
-import {parseComponentStateReference,readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
+import {readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
+import {parsePageReference,isFlowMarker,isBrowserOnlyReference,legacyReferenceError,FLOW_MARKER} from '../../../../server/src/expression-engine/PageReferences.js';
 import {
  evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
  formulaDateTimeParts,formulaIsoDateTime,formulaNowIsoDateTime,formulaTimeText,
@@ -42,8 +43,6 @@ const authenticatedSessionIdentity=context=>
  context?.user&&context?.organization
   ?{user:context.user,organization:context.organization}
   :globalThis[SESSION_IDENTITY_KEY];
-const SESSION_USER_FIELDS=Object.freeze({id:'Id',name:'Name',email:'Email',
- timeZone:'TimeZone',locale:'Locale',currencyIsoCode:'CurrencyIsoCode'});
 const text=value=>value==null?'':String(value);
 const formulaText=value=>typeof value==='boolean'?value?'TRUE':'FALSE':text(value);
 const textPoints=value=>Array.from(text(value));
@@ -195,92 +194,82 @@ function validateFormulaTimeZone(timeZone){
  if(timeZoneCache.size>=48)timeZoneCache.delete(timeZoneCache.values().next().value);
  timeZoneCache.add(timeZone);
 }
+/** One reader for every @ThisPage / @ThisTenant value (see PageReferences). */
+function readPageReference(page,formulaContext){
+ const state=formulaContext.pageState;
+ const saved=key=>{
+  if(!state||typeof state!=='object'||Array.isArray(state))return '';
+  const descriptor=Object.getOwnPropertyDescriptor(state,key);
+  if(!descriptor||!Object.prototype.hasOwnProperty.call(descriptor,'value')
+    ||descriptor.value===undefined||descriptor.value===null)return '';
+  const value=descriptor.value;
+  if(!['string','number','boolean'].includes(typeof value)
+    ||typeof value==='number'&&!Number.isFinite(value))
+   throw Error('Page value must be a finite scalar');
+  return value;
+ };
+ switch(page.kind){
+  case 'session':return typeof formulaContext.sessionId==='string'?formulaContext.sessionId:'';
+  case 'cart':{
+   const id=state?.activeCartId;
+   return typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)?id:'';
+  }
+  case 'user':{
+   const identity=authenticatedSessionIdentity(formulaContext);
+   if(!identity?.user)throw Error('Authenticated user is unavailable');
+   return identity.user[page.field]??'';
+  }
+  case 'company':{
+   if(page.field==='Id'){
+    const identity=authenticatedSessionIdentity(formulaContext);
+    if(!identity?.organization)throw Error('Authenticated tenant is unavailable');
+    return identity.organization.Id??'';
+   }
+   const tenant=formulaContext.tenant&&typeof formulaContext.tenant==='object'?formulaContext.tenant:getTenantBrand();
+   const brand=getTenantBrand();
+   const value=page.field==='Name'?tenant.name||brand.name||authenticatedSessionIdentity(formulaContext)?.organization?.Name
+    :tenant.logo??brand.logo;
+   return typeof value==='string'?value:'';
+  }
+  // What the user picked, typed or toggled in that component (page-session state).
+  case 'selected':return readComponentState(formulaContext.namedCollectionSelections
+    ??state?.collectionSelections,page.name,page.field);
+  case 'input':return saved(page.key);
+  case 'component':{
+   // A component's own live value/property first; otherwise a value its action saved.
+   if(formulaContext.readComponent){
+    try{return formulaContext.readComponent(page.name,page.key);}
+    catch(error){if(!/^Unknown component property/.test(error?.message??''))throw error;}
+   }else if(isBrowserOnlyReference(page))
+    throw Error('Invalid component reference or missing page context');
+   return saved(page.key);
+  }
+ }
+ return '';
+}
 function parse(source,record,formulaContext){
  const parsed=parsedSyntax(source);
- const expression=formulaContext.flowReferences?normalizeFlowCalls(parsed):parsed;
+ const expression=normalizeFlowCalls(parsed);
  return evaluateParsedExpression(expression,record,formulaContext);
 }
 export function evaluateParsedExpression(expression,record,formulaContext){
  validateFormulaFunctions(expression,'ribbon_binding');
  const resolveReference=(reference,currentRecord=record)=>{
    // Page-local globals are scoped inputs; never read storage or arbitrary records.
-   if(reference.startsWith('$component.')){
-    const parts=reference.split('.');
-    if(parts.length!==3||!formulaContext.readComponent)throw Error('Invalid component reference or missing page context');
-    return formulaContext.readComponent(parts[1],parts[2]);
-   }
-   if(reference==='$session'||reference==='$session.id')
-    return typeof formulaContext.sessionId==='string'?formulaContext.sessionId:'';
-   if(reference.startsWith('$session.')){
-    if(reference==='$session.cartId'){
-     const id=formulaContext.pageState?.activeCartId;
-     return typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)?id:'';
-    }
-    // Session identity is not an Object field and cannot be traversed freely.
-    const identity=authenticatedSessionIdentity(formulaContext);
-    const userKey=reference.startsWith('$session.user.')
-     ?reference.slice('$session.user.'.length):'';
-    if(Object.hasOwn(SESSION_USER_FIELDS,userKey)){
-     if(!identity?.user)throw Error('Authenticated user is unavailable');
-     return identity.user[SESSION_USER_FIELDS[userKey]]??'';
-    }
-    if(reference==='$session.tenant.id'){
-     if(!identity?.organization)throw Error('Authenticated tenant is unavailable');
-     return identity.organization.Id??'';
-    }
-    if(reference==='$session.tenant.name'){
-     if(!identity?.organization)throw Error('Authenticated tenant is unavailable');
-     return formulaContext.tenant?.name||getTenantBrand().name||identity.organization.Name||'';
-    }
-    if(reference==='$session.tenant.logo'){
-     if(!identity?.organization)throw Error('Authenticated tenant is unavailable');
-     return formulaContext.tenant?.logo??getTenantBrand().logo??'';
-    }
-    throw Error('Unsupported session reference: '+reference);
-   }
-   if(reference.startsWith('$state.')){
-    const key=reference.slice(7);
-    if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key))
-     throw Error('Invalid Page State reference');
-    const state=formulaContext.pageState;
-    if(!state||typeof state!=='object'||Array.isArray(state))return '';
-    const descriptor=Object.getOwnPropertyDescriptor(state,key);
-    if(!descriptor||!Object.prototype.hasOwnProperty.call(descriptor,'value')
-      ||descriptor.value===undefined||descriptor.value===null)return '';
-    const value=descriptor.value;
-    if(!['string','number','boolean'].includes(typeof value)
-      ||typeof value==='number'&&!Number.isFinite(value))
-     throw Error('Page State formula value must be a finite scalar');
-    return value;
-   }
-   // The signed-in tenant's public brand (Company Settings trading name and logo).
-   if(reference.toLowerCase()==='$tenant.name'||reference.toLowerCase()==='$tenant.logo'){
-    const tenant=formulaContext.tenant&&typeof formulaContext.tenant==='object'
-     ?formulaContext.tenant:getTenantBrand();
-    const value=reference.toLowerCase()==='$tenant.name'?tenant.name:tenant.logo;
-    return typeof value==='string'?value:'';
-   }
-   if(/^\$tenant(?:\.|$)/i.test(reference))
-    throw Error('Unsupported tenant reference: '+reference+' (use $tenant.name or $tenant.logo)');
-   if(reference==='$state')
-    throw Error('Unsupported Page State reference: '+reference);
-   // $flow.ApiName exists only in the Action formula bar, which passes the runnable
-   // Flow names. It evaluates to the text "$flow.ApiName" for the action runtime.
-   if(/^\$flow(?:\.|$)/i.test(reference)){
+   // @ThisPage… / @ThisTenant…: page-local values, never storage or arbitrary records.
+   const page=parsePageReference(reference);
+   if(page)return readPageReference(page,formulaContext);
+   // FLOW(Name) exists only in the Action formula bar, which passes the runnable
+   // Flow names. It evaluates to the internal Flow marker for the action runtime.
+   if(isFlowMarker(reference)){
     const flows=formulaContext.flowReferences;
     if(!Array.isArray(flows))
-     throw Error('$flow is only available in the Action formula bar');
-    const name=reference.slice(6);
+     throw Error('FLOW() is only available in the Action formula bar');
+    const name=reference.slice(FLOW_MARKER.length);
     const match=flows.find(item=>typeof item==='string'&&item.toLowerCase()===name.toLowerCase());
     if(!match)throw Error('Unknown or inactive Flow: '+name);
-    return '$flow.'+match;
+    return FLOW_MARKER+match;
    }
-   // Named COLLECTION() results are no longer accessible via @CollectionName.
-   // @ComponentName.state.Id/Value/Name/Text: what the user picked, typed or
-   // toggled in that component, from the authorised page-session state.
-   const selected=parseComponentStateReference(reference);
-   if(selected)return readComponentState(formulaContext.namedCollectionSelections
-     ??formulaContext.pageState?.collectionSelections,selected.name,selected.field);
    // Event values of the action being run: @recordId (the clicked row/card),
    // @value (tab Id, typed or scanned text), @index, @label.
    if(['recordId','value','index','label'].includes(reference)&&currentRecord&&typeof currentRecord==='object'
@@ -531,6 +520,8 @@ export function evaluateParsedExpression(expression,record,formulaContext){
      throw Error('TABLE columns must be Object fields');
     const reference=argument.value;
     const parts=reference.split('.');
+    if(parts.length===1)
+     throw Error('TABLE columns are written @'+object+'.'+reference+' (like every other field)');
     if(parts.length>2||parts.length===2&&parts[0].toLowerCase()!==object.toLowerCase()
       ||parts.some(part=>!/^[A-Za-z][A-Za-z0-9_]*$/.test(part)))
      throw Error('TABLE field does not belong to source '+object);
@@ -615,7 +606,10 @@ export function evaluateFieldExpressionDetailed(expression,record,options={}){
  if(explicit&&!input)return {value:'',error:'Complete the formula after ='};
  if(!explicit&&!options?.collectionResult&&/^COLLECTION\s*\(/i.test(input))
   return {value:expression};
- if(!/^(?:TRUE|FALSE|NULL|PI)$/i.test(input)&&!/@[A-Za-z]/.test(input)&&!input.startsWith('@')&&!/^\$(?:component|state|session|tenant|flow)(?:\.|$)/i.test(input)&&!/^[A-Za-z][A-Za-z0-9_]*\s*\(/.test(input)
+ // Old $state / $session / @Tabs.state spellings: say how to write it now.
+ const legacy=(explicit||/^[$@]/.test(input))?legacyReferenceError(input):null;
+ if(legacy)return {value:'',error:legacy};
+ if(!/^(?:TRUE|FALSE|NULL|PI)$/i.test(input)&&!/@[A-Za-z]/.test(input)&&!input.startsWith('@')&&!/^[A-Za-z][A-Za-z0-9_]*\s*\(/.test(input)
   &&!/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+(?:\s*\(|$)/.test(input)
   &&!/^(?:["(]|[-+]?\d+(?:\.\d+)?\s*[+*\/%^<>=!-])/.test(input)
   &&!/\s(?:[&+*/%^<>=!]|AND\b|OR\b)\s/i.test(input))return {value:expression};
@@ -677,7 +671,7 @@ export function evaluateCollectionFormula(formula,sourceRecords={},context={}){
 export function executeActionFormula(formula,record,context,services){
  return executeActionPlan(formula,{...record,sessionId:context?.sessionId??''},
   (node,scope,aliases,state)=>evaluateParsedExpression(node,scope,{...context,actionAliases:aliases,
-   // Actions read the same page inputs as bindings: $component.X.prop and TABLE()/COLLECTION() sources.
+   // Actions read the same page inputs as bindings: @ThisPage.X.prop and TABLE()/COLLECTION() sources.
    readComponent:context?.readComponent??context?.pageState?.[componentReaderKey],
    collectionSources:context?.collectionSources??{},
    pageState:state&&Object.keys(state).length?{...(context?.pageState??{}),...state}:context?.pageState}),services);

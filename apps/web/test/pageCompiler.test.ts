@@ -25,7 +25,7 @@ const card=(id:string)=>({id,type:'Custom:smart_card_grid',label:id,visible:true
  properties:{objectApiName:'Product',filters:[{field:'Category',operator:'Equals',value:'Drinks'}],
   titleFieldApiName:'Name',label:'=UPPER("menu") & " " & 2',
   actionFlows:{click:{actionType:'Formula',
-   formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, $state.activeCartId), UPDATERECORD(Cart, $state.activeCartId, Name, "x"))'}}}});
+   formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, @ThisPage.Input.activeCartId), UPDATERECORD(Cart, @ThisPage.Input.activeCartId, Name, "x"))'}}}});
 const page={apiName:'till',label:'Till',targetObject:'',pageType:'App Page',layoutMode:'free-canvas',
  canvasWidth:1000,canvasHeight:800,status:'Draft',devices:['Desktop'],components:[
   card('grid1'),card('grid2'),card('grid3'),
@@ -39,7 +39,7 @@ const page={apiName:'till',label:'Till',targetObject:'',pageType:'App Page',layo
    collectionFormula:'=COLLECTION("Menu", Product.Category)'}},
   {id:'broken',type:'Custom:smart_text',label:'Broken',visible:true,properties:{textSource:'=IF(1,'}},
   {id:'mention',type:'Custom:smart_text',label:'Mention',visible:true,properties:{objectApiName:'Product',
-   textSource:'@Product.Name',label:'=$session.user.email & " / " & $session.cartId'}},
+   textSource:'@Product.Name',label:'=@ThisTenant.User.Email & " / " & @ThisTenant.User.CartId'}},
   {id:'related',type:'Custom:smart_table',label:'Related',visible:true,properties:{objectApiName:'CartLine',relatedFilterKey:'activeCartId'}}
  ]} as unknown as LightningPageMetadata;
 
@@ -234,7 +234,7 @@ test('qualified scalar fields and COLLECTION datasets have different contexts',(
  assert.match(evaluateFieldExpressionDetailed('@Menu',products[0],{
   ...options,namedCollections:{Menu:{name:'Menu',items:['Tea']}}}).error??'',/named collection/);
  // @Name.state.* reads what that component (or named collection) published.
- assert.equal(evaluateFieldExpressionDetailed('@Menu.state.Value',products[0],{
+ assert.equal(evaluateFieldExpressionDetailed('@ThisPage.Menu.Selected.Value',products[0],{
   ...options,namedCollectionSelections:{Menu:{Value:'Tea'}}}).value,'Tea');
  const result=evaluateCollectionFormula('=COLLECTION("Menu", 2, 3)',{Product:products},{
   primaryObject:'Product',collectionSourceFields:{Product:['Id','Name','Price']}});
@@ -290,7 +290,7 @@ test('Tabs, Navigation, Toggle and Search Box values filter other components via
   {apiName:'Category',dataType:'Lookup(Category)',relationship:{targetObject:'Category'}},
   {apiName:'Active',dataType:'Checkbox'}] as never;
  const picked=(name:string,value:unknown)=>({collectionSelections:{[name]:componentStateFromEvent(value)}});
- const formula='=IF(ISBLANK(@CategoryTabs.state.Id), TRUE, @Product.Category = @CategoryTabs.state.Id)';
+ const formula='=IF(ISBLANK(@ThisPage.CategoryTabs.Selected.Id), TRUE, @Product.Category = @ThisPage.CategoryTabs.Selected.Id)';
  assert.equal(validateRecordFilterFormula(formula,fields),null,'builder accepts it');
  assert.deepEqual(compileRecordFilterFormula(formula,fields,{}).filters,[],'nothing picked: every product');
  assert.deepEqual(compileRecordFilterFormula(formula,fields,picked('CategoryTabs',{value:'c1',record:{Id:'c1',Name:'Drinks'}})).filters,
@@ -298,10 +298,10 @@ test('Tabs, Navigation, Toggle and Search Box values filter other components via
  assert.deepEqual(compileRecordFilterFormula(formula,fields,picked('CategoryTabs',{value:'*',record:{Id:'*',Name:'All'}})).filters,
   [{field:'Category',operator:'isNotBlank',value:''}],'All tab');
  // OR with a pure state test, and a Toggle.
- const all=compileRecordFilterFormula('=OR(@CategoryTabs.state.Id = "*", @Product.Category = @CategoryTabs.state.Id)',
+ const all=compileRecordFilterFormula('=OR(@ThisPage.CategoryTabs.Selected.Id = "*", @Product.Category = @ThisPage.CategoryTabs.Selected.Id)',
   fields,picked('CategoryTabs',{value:'*',record:{Id:'*'}}));
  assert.equal(all.blocked,false);assert.deepEqual(all.filters,[]);
- assert.deepEqual(compileRecordFilterFormula('=@Product.Active = @ActiveOnly.state.Value',fields,picked('ActiveOnly',true)).filters,
+ assert.deepEqual(compileRecordFilterFormula('=@Product.Active = @ThisPage.ActiveOnly.Selected.Value',fields,picked('ActiveOnly',true)).filters,
   [{field:'Active',operator:'eq',value:'true'}]);
 
  // The filter panel's "State value" uses the same channel.
@@ -312,9 +312,9 @@ test('Tabs, Navigation, Toggle and Search Box values filter other components via
  assert.equal(JSON.stringify(query).includes('c2'),true,'filter panel reads the tab');
 
  // Display formulas read it too.
- assert.equal(evaluateFieldExpressionDetailed('="Showing " & @CategoryTabs.state.Name',{},
+ assert.equal(evaluateFieldExpressionDetailed('="Showing " & @ThisPage.CategoryTabs.Selected.Name',{},
   {pageState:picked('CategoryTabs',{value:'c1',label:'Drinks',record:{Id:'c1',Name:'Drinks'}})}).value,'Showing Drinks');
- assert.equal(evaluateFieldExpressionDetailed('@CategoryTabs.state.Id',{},{}).value,'','nothing picked reads blank');
+ assert.equal(evaluateFieldExpressionDetailed('@ThisPage.CategoryTabs.Selected.Id',{},{}).value,'','nothing picked reads blank');
 
  // Every named component is offered in the builder, and picking a parent
  // clears a child that depends on it (Category tabs → Sub-category tabs).
@@ -335,7 +335,7 @@ test('compiled data sources reload when a filter formula reads @Name.state.*',()
   {apiName:'Id',label:'Id',dataType:'Id'},{apiName:'Category',label:'Category',dataType:'Lookup(Category)'}]}] as never;
  const compiled=compilePage({apiName:'Till',label:'Till',components:[
   {id:'grid',type:'Custom:smart_card_grid',label:'Grid',visible:true,properties:{objectApiName:'Product',
-   filterFormula:'=IF(ISBLANK(@CategoryTabs.state.Id), TRUE, @Product.Category = @CategoryTabs.state.Id)'}}]} as never,objects);
+   filterFormula:'=IF(ISBLANK(@ThisPage.CategoryTabs.Selected.Id), TRUE, @Product.Category = @ThisPage.CategoryTabs.Selected.Id)'}}]} as never,objects);
  const source=compiled.dataSources.find(item=>item.components.includes('grid'));
  assert.ok(source?.stateInputs.map(key=>key.toLowerCase()).includes('categorytabs'));
 });

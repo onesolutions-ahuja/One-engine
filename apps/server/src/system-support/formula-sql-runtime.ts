@@ -11,6 +11,7 @@ import {evaluateFormulaBinary,evaluateFormulaUnary,formulaTruth} from '../expres
 import {createNamedFormulaCollection} from '../expression-engine/FormulaCollection.js';
 import type {FormulaExpressionContext} from '../expression-engine/FormulaFunctionRegistry.js';
 import type {RecordFilter} from '../object-engine/QueryBuilder.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql,type NativeFieldsMetadata} from '../system-files/native-object-query.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Database=Pick<SqlPersistence,'query'>;
@@ -276,6 +277,11 @@ export async function evaluateFormulaSql(
    const kind=info.data_type;
    if(!numericTypes.has(kind))throw Error('SQL SUM requires a numeric metadata field');
   }
+  const native=new Map<string,NativeFieldsMetadata>();
+  for(const reference of [...references,...sums]){
+   const {object}=parts(reference);
+   if(!native.has(object))native.set(object,await loadNativeFields(db,actor.tenant_id,object));
+  }
   const sqlReference=(reference:string):string=>{
    const page=parsePageReference(reference);
    const identity=page?.kind==='user'?'user.'+page.field:page?.kind==='company'?'company.'+page.field:'';
@@ -295,27 +301,29 @@ export async function evaluateFormulaSql(
    if(field==='Id')return 'r.id::text';
    const info=fields.get(object+'.'+field);
    if(!info)throw Error('Unverified Formula field');
-   const fieldParam=bind(field)+'::text';
    const kind=info.data_type;
-   const column=numericTypes.has(kind)?'v.value_number':
-    kind==='boolean'?'v.value_boolean':
-    kind==='date'?'v.value_date::text':
-    kind==='datetime'?"to_char(v.value_datetime AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')":
-    kind==='geolocation'?"jsonb_build_object('latitude',v.geo_latitude,'longitude',v.geo_longitude)":
-    'COALESCE(v.value_text,v.reference_record_id::text)';
-   return '(SELECT '+column+' FROM md_record_values v WHERE v.tenant_id=r.tenant_id'+
-     ' AND v.object_api=r.object_api AND v.record_id=r.id'+
-     ' AND v.field_api='+fieldParam+' LIMIT 1)';
+   const meta=native.get(object);
+   if(!meta)throw Error('Native Formula Object is unavailable');
+   const value=nativeValueSql(meta,field,'nr');
+   const column=numericTypes.has(kind)?`(${value})::numeric`:
+    kind==='boolean'?`(${value})::boolean`:
+    kind==='date'?`(${value})::date::text`:
+    kind==='datetime'?`to_char((${value})::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`:
+    kind==='geolocation'?`jsonb_build_object('latitude',(${value})[1],'longitude',(${value})[2])`:
+    `(${value})::text`;
+   return '(SELECT '+column+' FROM '+nativeTableSql(meta)+' nr WHERE nr.tenant_id=r.tenant_id'+
+    ' AND nr.id=r.id LIMIT 1)';
   };
   const sumSql=(reference:string)=>{
    const {object,field}=parts(reference);
    if(!fields.has(object+'.'+field))throw Error('SUM source field was not authorised');
-   const source=bind(object)+'::text',column=bind(field)+'::text';
-   return '(SELECT COALESCE(SUM(sv.value_number),0) FROM md_records sr'+
-     ' LEFT JOIN md_record_values sv ON sv.tenant_id=sr.tenant_id'+
-     ' AND sv.object_api=sr.object_api AND sv.record_id=sr.id AND sv.field_api='+column+
+   const meta=native.get(object);
+   if(!meta)throw Error('Native SUM Object is unavailable');
+   const source=bind(object)+'::text',numeric=nativeValueSql(meta,field,'nr');
+   return '(SELECT COALESCE(SUM(('+numeric+')::numeric),0) FROM md_records sr'+
+     ' JOIN '+nativeTableSql(meta)+' nr ON nr.tenant_id=sr.tenant_id AND nr.id=sr.id'+
      ' WHERE sr.tenant_id=$1 AND sr.object_api='+source+
-     " AND sr.is_deleted=false AND md_record_access($1,$2,sr.id,'read'))";
+     " AND sr.is_deleted=false AND nr.is_deleted=false AND md_record_access($1,$2,sr.id,'read'))";
   };
   const expression=compileFormulaSql(resolved,{bind,field:sqlReference,sum:sumSql,timeZone:timezone});
   // $1/$2 are always the authenticated actor and $3 is the trusted timezone.

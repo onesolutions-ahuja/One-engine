@@ -68,6 +68,12 @@ export async function applySystemMigrations(db:SqlPersistence) {
    checksum text NOT NULL,
    applied_at timestamptz NOT NULL DEFAULT now()
   )`);
+  // The immutable historical baseline needs its former value table on first replay.
+  // This temporary definition is stored in migration history only.
+  const baselineReceipt=await client.query(
+   'SELECT 1 FROM md_system_migrations WHERE version=$1',['20261107-core-baseline.sql']);
+  if(!baselineReceipt.rowCount)
+   await client.query(readFileSync(new URL('./migrations/native-storage-compat.sql',import.meta.url),'utf8'));
   for(const name of files){
    const source=readFileSync(new URL('./migrations/'+name,import.meta.url),'utf8');
    const checksum=createHash('sha256').update(source).digest('hex');
@@ -834,6 +840,19 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });
    await applyNativeObjectStorage(db);
+   // Task H: retire the old table only after every live Object has a native table.
+   await db.transaction(async client=>{
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['metadrive:native:cutover']);
+    const missing=await client.query<{tenant_id:string;api_name:string}>(`
+     SELECT o.tenant_id,o.api_name FROM md_object_definitions o
+     LEFT JOIN md_native_objects n ON n.tenant_id=o.tenant_id AND n.object_api=o.api_name
+     WHERE o.deleted_at IS NULL AND
+      (n.table_name IS NULL OR to_regclass(quote_ident(n.table_name)) IS NULL)
+     LIMIT 1`);
+    if(missing.rows.length)throw Error('Native storage cutover blocked: '+missing.rows[0].api_name+
+     ' has no native table');
+    await client.query(readFileSync(new URL('./migrations/native-storage-cutover.sql',import.meta.url),'utf8'));
+   });
    return;
   } catch(error) {
    // A rolling deploy may overlap with the old instance's SQL work.

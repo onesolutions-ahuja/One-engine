@@ -10,6 +10,7 @@ import {activateNativeObject} from '../src/system-support/native-object-storage.
 import {ObjectDefinitionService} from '../src/system-files/object-definition.ts';
 import {RecordEngine} from '../src/system-files/record-engine.ts';
 import {RbacEngine} from '../src/system-files/rbac-engine.ts';
+import {loadNativeFields,nativeTableSql} from '../src/system-files/native-object-query.ts';
 
 const url=process.env.METADRIVE_SQL_TEST_DATABASE_URL;
 if(!url||new URL(url).pathname!=='/metadrive_native_copy_test')throw Error('Disposable SQL database required');
@@ -33,16 +34,22 @@ try{
   {apiName:'Barcode',label:'Barcode',dataType:'Text(40)'},
   {apiName:'Grp',label:'Group',dataType:'Text(40)'},
   {apiName:'Price',label:'Price',dataType:'Number(12,2)'}]);
- // Bulk load straight into the record tables (the copy step then fills the native table).
+ // Native Object creation installs its physical table and field metadata.
+ const native=await loadNativeFields(db,tenant,object);
+ const table=nativeTableSql(native);
+ const nameColumn=native.fields.get('Name')?.column;
+ if(!nameColumn||!/^f_[a-f0-9]{32}$/.test(nameColumn))throw Error('Expected typed Name column');
  await db.transaction(async client=>{
   await client.query(`INSERT INTO md_records(tenant_id,object_api,owner_id)
    SELECT $1,$2,$3 FROM generate_series(1,$4)`,[tenant,object,user,COUNT]);
-  await client.query(`WITH numbered AS (SELECT id,row_number() OVER (ORDER BY created_at,id) AS n
-    FROM md_records WHERE tenant_id=$1 AND object_api=$2)
-   INSERT INTO md_record_values(tenant_id,record_id,object_api,field_api,value_text,value_number,is_unique,case_sensitive)
-   SELECT $1,id,$2,f.field_api,f.value_text,f.value_number,false,false FROM numbered
-   CROSS JOIN LATERAL (VALUES ('Name','Item '||n,NULL::numeric),('Barcode',lpad(n::text,12,'0'),NULL),
-    ('Grp','G'||(n%10),NULL),('Price',(n%50)::text,(n%50)::numeric)) AS f(field_api,value_text,value_number)`,[tenant,object]);
+  await client.query(`WITH numbered AS (
+   SELECT id,row_number() OVER(ORDER BY created_at,id) AS n
+   FROM md_records WHERE tenant_id=$1 AND object_api=$2)
+   UPDATE ${table} nr SET "${nameColumn}"='Item '||numbered.n,
+    extras=jsonb_build_object('Barcode',lpad(numbered.n::text,12,'0'),
+     'Grp','G'||(numbered.n%10),'Price',numbered.n%50),
+    present_fields=ARRAY['Name','Barcode','Grp','Price']::text[]
+   FROM numbered WHERE nr.tenant_id=$1 AND nr.id=numbered.id`,[tenant,object]);
  });
  await activateNativeObject(db,tenant,object);
  await db.query('ANALYZE');

@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import {Pool} from 'pg';
-import {REVOLUT_PAYMENT_DDL} from '../src/system-support/revolut-checkout-service.ts';
-import {PAYMENT_ORDER_DDL,LEGACY_REVOLUT_PAYMENT_COPY,
- paymentOrderStatus,recordVerifiedPaymentEvent} from '../src/system-support/payment-order-service.ts';
+import {REVOLUT_PAYMENT_DDL,LEGACY_REVOLUT_PAYMENT_COPY} from '../src/system-support/revolut-payment-legacy-migration.ts';
+import {PAYMENT_ORDER_DDL,paymentOrderStatus,recordVerifiedPaymentEvent} from '../src/system-support/payment-order-service.ts';
 
 // Uses the disposable CI PostgreSQL database. Transaction rolls back every fixture.
 const url=process.env.METADRIVE_SQL_TEST_DATABASE_URL;

@@ -2,6 +2,7 @@ import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {saveDuplicateMatches} from './DuplicateDetectionEngine.js';
 import type {PoolClient} from 'pg';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 type Values=Record<string,unknown>;
 type Rule={api_name:string;match_mode:'All'|'Any';action:'Alert'|'Block';target_object_api?:string|null};
 type RuleField={rule_api:string;field_api:string;target_field_api?:string|null;case_sensitive:boolean;match_type:'Exact'|'Normalized'|'Fuzzy';max_distance:number};
@@ -21,20 +22,13 @@ export class RecordMatching {
   const columns=await client.query<RuleField>(`SELECT rule_api,field_api,target_field_api,case_sensitive,match_type,max_distance
     FROM md_matching_rule_fields WHERE tenant_id=$1 AND object_api=$2 ORDER BY rule_api,field_api`,
    [tenantId,objectApi]);
-  // One metadata lookup for all target Objects. Index enrollment is optional;
-  // unconfigured fields retain the original shared Record Engine comparison.
-  const targetObjects=[...new Set(result.rows.map(rule=>rule.target_object_api??objectApi))];
-  const enrolled=await client.query<{object_api:string;field_api:string}>(`
-   SELECT object_api,field_api FROM md_field_exact_indexes
-   WHERE tenant_id=$1 AND object_api=ANY($2::text[]) AND enabled`,
-   [tenantId,targetObjects]);
-  const indexedFields=new Set(enrolled.rows.map(row=>row.object_api+'.'+row.field_api));
   const matches:Array<{ruleApi:string;recordId:string;matchedObjectApi?:string}>=[];
   for(const rule of result.rows){
    const fields=columns.rows.filter(x=>x.rule_api===rule.api_name);
    if(!fields.length)continue;
    const targetObject=rule.target_object_api??objectApi;
    const crossObject=targetObject!==objectApi;
+   const native=await loadNativeFields(client,tenantId,targetObject);
    if(crossObject)await this.rbac.require(tenantId,userId,targetObject,'read');
    const clauses:string[]=[];
    const params:unknown[]=[tenantId,targetObject,crossObject?null:excludeId??null];

@@ -235,6 +235,8 @@ export function modernizeReferences(code:string,ownerOf:(key:string)=>string|und
   .replace(/@([A-Za-z][A-Za-z0-9_]*)\.state\.(Id|Name|Value|Text|Field|Criteria)\b/gi,(_m,name,field)=>
    '@ThisPage.'+name+'.Selected.'+(pick(COMPONENT_STATE_FIELDS,field)??field))
   .replace(/[$@]state\.([A-Za-z][A-Za-z0-9_]*)/g,(_m,key)=>saved(key))
+  // A value first filed under Input that a component turns out to save.
+  .replace(/@ThisPage\.Input\.([A-Za-z][A-Za-z0-9_]*)\b/g,(match,key)=>ownerOf(key)?saved(key):match)
   .replace(/\$session\.cartId\b/g,'@ThisTenant.User.CartId')
   .replace(/\$session\.user\.([A-Za-z]+)\b/g,(_m,key)=>{
    const field=(Object.keys(USER_FIELDS) as UserField[]).find(item=>USER_FIELDS[item]===key);

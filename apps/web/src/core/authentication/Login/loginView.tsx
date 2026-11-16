@@ -1,7 +1,7 @@
 import { useEffect,useState, type FormEvent, type CSSProperties } from 'react';
 import { readSubmittedLogin } from './readSubmittedLogin';
 import type { ObjectMetadata, LightningPageMetadata, LightningAppMetadata } from '../../metadata/Definitions/metadata';
-import { apiRequest, setAccessToken } from '../Client/authClient';
+import { apiRequest, setAccessToken, setSessionUserId } from '../Client/authClient';
 import LoginRecovery from './LoginRecovery';
 import { UneBrandLogo } from '../../branding/UneBrandLogo';
 import { Eye, EyeOff } from 'lucide-react';
@@ -78,7 +78,7 @@ export function createLoginView(logoUrl: string) {
       if(session.mfa_required&&session.challenge_token){setPassword('');setChallenge({...session,challenge_token:session.challenge_token});return;}
       if(!session.access_token)throw Error('Authentication did not return an access token');
       if(session.till_device)saveTillPerson(session.till_device);
-      setAccessToken(session.access_token);onSuccess?.({kind:'login',startedAt,authenticatedAt:performance.now(),landing:session.landing,landingAppApi:session.landingAppApi});
+      setAccessToken(session.access_token);setSessionUserId(undefined);onSuccess?.({kind:'login',startedAt,authenticatedAt:performance.now(),landing:session.landing,landingAppApi:session.landingAppApi});
     };
     useEffect(()=>{
       let active=true;

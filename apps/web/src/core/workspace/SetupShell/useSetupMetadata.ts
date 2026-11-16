@@ -1,7 +1,7 @@
 // @ts-nocheck
 // Tenant-scoped bootstrap: core metadata first, optional admin metadata afterwards.
 import { useEffect, useRef } from 'react';
-import { takeLandingPrefetch } from '../../authentication/Client/authClient';
+import { cachedLanding, rememberLanding, takeLandingPrefetch } from '../../authentication/Client/authClient';
 import { resolveSqlComponentLibrary, prefetchSqlComponentIndex } from '../../components/Registry/bundledRegistryClient';
 import { setAuthenticatedFormulaBindingContext } from '../../components/RegisteredComponent/fieldExpressionRuntime';
 import { saveVerifiedMetadata, type MetadataPublicationResponse } from '../../metadata/Cache/verifiedMetadataCache';
@@ -178,15 +178,29 @@ export function useSetupMetadata(ctx: any) {
       // Login can carry the bootstrap directly. Session restoration deliberately
       // returns its token promptly, then obtains the same RBAC-checked snapshot
       // through one authenticated request instead of four independent reads.
-      let landing = entryTiming?.landing ?? await takeLandingPrefetch<NonNullable<NonNullable<typeof entryTiming>['landing']>>();
-      if (!landing) {
-        try {
-          landing = (await apiRequest<{ landing?: NonNullable<typeof landing> }>('/metadata/landing-bootstrap')).landing;
-        } catch {
-          // Fall back to the existing individual endpoints and their error states.
-        }
-      }
-      if (landing) {
+      type Landing = NonNullable<NonNullable<typeof entryTiming>['landing']>;
+      const freshLanding: Promise<Landing | undefined> = entryTiming?.landing
+        ? Promise.resolve(entryTiming.landing)
+        : (takeLandingPrefetch<Landing>() ?? apiRequest<{ landing?: Landing }>('/metadata/landing-bootstrap')
+            .then(response => response.landing)).catch(() => undefined);
+      void freshLanding.then(fresh => { if (fresh) rememberLanding(fresh); });
+      // App pages draw at once from this browser's last bootstrap (same user only) and take
+      // the fresh one in the background. Setup screens always wait for the fresh answer.
+      const saved = !entryTiming?.landing && route.kind !== 'setup' ? cachedLanding<Landing>() : undefined;
+      let landing = saved ?? await freshLanding;
+      if (saved) {
+        // The full load below applies the fresh objects/pages/apps/session when they arrive.
+        const fromFresh = <T,>(path: string, pick: (value: Landing) => T, fallback: T): Promise<T> =>
+          freshLanding.then(fresh => {
+            if (fresh) return pick(fresh);
+            pending.delete(path);
+            return recover(path, fallback);
+          });
+        pending.set('/metadata/objects', fromFresh('/metadata/objects', value => ({ objects: value.objects }), { objects: [] }));
+        pending.set('/metadata/pages', fromFresh('/metadata/pages', value => ({ pages: value.pages }), { pages: [] }));
+        pending.set('/metadata/apps', fromFresh('/metadata/apps', value => ({ apps: value.apps }), { apps: [] }));
+        pending.set('/auth/me', fromFresh('/auth/me', value => ({ user: value.user }), { user: landing.user }));
+      } else if (landing) {
         pending.set('/metadata/objects', Promise.resolve({ objects: landing.objects }));
         pending.set('/metadata/pages', Promise.resolve({ pages: landing.pages }));
         pending.set('/metadata/apps', Promise.resolve({ apps: landing.apps }));

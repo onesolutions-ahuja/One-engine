@@ -504,7 +504,7 @@ export function createSystemServer(db:SqlPersistence) {
       const session=await auth.refresh(token,{ip:req.ip});
       res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
       if(req.query.landing==='1')res.setHeader('Cache-Control','no-store');
-      res.json({access_token:session.accessToken,expires_in:session.expiresIn,landingAppApi:await landingPreference(session.tenant_id,session.user_id),...(req.query.landing==='1'?await landingBootstrap(session.tenant_id,session.user_id):{})});
+      res.json({access_token:session.accessToken,expires_in:session.expiresIn,userId:session.user_id,landingAppApi:await landingPreference(session.tenant_id,session.user_id),...(req.query.landing==='1'?await landingBootstrap(session.tenant_id,session.user_id):{})});
     } catch {res.status(401).json({error:'Invalid refresh session'});}
   }));
   app.get('/api/auth/password-reset/options',route(async(req,res)=>{

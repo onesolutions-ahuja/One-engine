@@ -353,6 +353,32 @@ export function prefetchLandingBootstrap() {
     .then(response => response?.landing)
     .catch(() => undefined);
 }
+// The last bootstrap is kept in this browser for the signed-in user, so an app page
+// can draw at once and take the fresh answer in the background. It holds metadata
+// only (no records); the server still checks every permission on every request.
+const landingCacheKey = 'une.landing.v1';
+let sessionUserId: string | undefined;
+export function setSessionUserId(id: string | undefined) { sessionUserId = id || undefined; }
+export function cachedLanding<T>(): T | undefined {
+  try {
+    const raw = sessionUserId ? localStorage.getItem(landingCacheKey) : null;
+    if (!raw) return undefined;
+    const saved = JSON.parse(raw) as { userId?: string; landing?: T };
+    return saved.userId === sessionUserId ? saved.landing : undefined;
+  } catch { return undefined; }
+}
+export function rememberLanding(landing: unknown) {
+  try {
+    const userId = (landing as { user?: { id?: string } } | undefined)?.user?.id;
+    if (!userId) return;
+    sessionUserId = userId;
+    localStorage.setItem(landingCacheKey, JSON.stringify({ userId, landing }));
+  } catch { /* storage full or blocked: the page simply waits for the server */ }
+}
+export function forgetLanding() {
+  sessionUserId = undefined;
+  try { localStorage.removeItem(landingCacheKey); } catch { /* blocked storage */ }
+}
 export function takeLandingPrefetch<T>(): Promise<T | undefined> | undefined {
   const prefetched = landingPrefetch as Promise<T | undefined> | undefined;
   landingPrefetch = undefined;

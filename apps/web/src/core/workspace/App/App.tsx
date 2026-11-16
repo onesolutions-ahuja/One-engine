@@ -3,7 +3,7 @@ import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
-import { apiBase, getAccessToken, setAccessToken, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
+import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLanding, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
 
 
@@ -169,8 +169,9 @@ function App() {
         }
 
         if (response.ok) {
-          const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string };
+          const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string; userId?: string };
           setAccessToken(session.access_token);
+          setSessionUserId(session.userId);
           if (!session.landing) prefetchLandingBootstrap();
           setAuthError('');
           setEntryTiming({ kind: 'restore', startedAt: restoreStartedAt, authenticatedAt: performance.now(), landing: session.landing, landingAppApi: session.landingAppApi });
@@ -305,6 +306,7 @@ function App() {
   const onLogout=()=>{
     sessionGeneration.current += 1;
     setAccessToken(undefined);
+    forgetLanding();
     // Logout links navigate to /login. Do not render a half-reset workspace
     // during that navigation, which can trip the global workspace boundary.
     if (window.location.pathname !== '/login') {

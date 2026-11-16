@@ -305,8 +305,15 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   case 'FLOW':scope.ui.add('FLOW');return ['await $.ui("FLOW", '+q(literalName(args[0],'Flow name'))+');'];
   // Device steps (GPS, PDF drawn in the browser) and WAIT (resumes later) stay with the
   // action engine: the page keeps working, this action is listed in codeIssues.
-  // WAIT resumes later: it stays with the action engine (no page uses it today).
-  case 'WAIT':return fail(node.name+' runs in the action engine');
+  // WAIT: the steps after it are saved as a scheduled action (durable server job) in the
+  // same transaction, and run later; this run stops here.
+  case 'WAIT':{
+   if(scope.loop)return fail('WAIT cannot run inside FOREACH');
+   if(args.length!==2)return fail('WAIT needs minutes and seconds');
+   scope.data=true;scope.ui.add('WAIT');
+   const ordinal=(scope as {waits?:number}).waits??0;(scope as {waits?:number}).waits=ordinal+1;
+   return ['await $.service("WAIT", ['+args.map(value).join(', ')+', '+ordinal+', '+q((scope as {source?:string}).source??'')+'], v);','return;'];
+  }
   // Device steps: the server asks the browser (GPS, PDF drawn from the print template)
   // and runs the action again with the answer; nothing is saved until every step is done.
   case 'LOCATION':case 'CREATEPDF':{
@@ -355,6 +362,7 @@ export function compileActionFormula(source:string,rowObject=''):CompiledActionC
  const aliases=new Set<string>();
  const scope:ActionScope={rowObject,row:'$.row',aliases,aliasesMutable:aliases,async:true,functions:new Set(),
   references:new Set(),sets:[],reads:new Set(),writes:new Set(),ui:new Set(),data:false,loop:false,aliasSets:new Map()};
+ (scope as {source?:string}).source=source;
  // Aliases are visible to later steps: collect them first (AS names are unique per action).
  // `@state.x := value`, `@filter.x := value`, `@navigate.page|list|home := value`.
  const assignment=parseActionFormulaAssignment(source);

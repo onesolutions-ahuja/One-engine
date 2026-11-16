@@ -20,6 +20,8 @@ import {loadConnectionSnapshot} from './tenant-connections.js';
 import {withRecordReadScope} from './record-read-scope.js';
 import {randomUUID} from 'node:crypto';
 import {recordInvoicePayment} from './record-payment-service.js';
+import {ScheduledActionService} from './scheduled-action-service.js';
+import {compileActionPlan} from '../expression-engine/ActionFormulas.js';
 import {sendActionCommunication,type CommunicationChannel} from './action-formula-communication-service.js';
 import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
@@ -247,7 +249,22 @@ class ServerScope{
   this.stateChanges[name]=value;
  }
  async ui(name:string,...args:unknown[]){this.effects.push({name,args});}
- async service(name:string,args:unknown[]=[]){
+ async service(name:string,args:unknown[]=[],variables?:Record<string,unknown>){
+  if(name==='WAIT'){
+   const [minutes,seconds,ordinal,formula]=args;
+   if(typeof formula!=='string'||!formula)throw Error('WAIT is unavailable');
+   // The n-th WAIT of the formula: the scheduled action resumes at the step after it.
+   const steps=compileActionPlan(formula);
+   let seen=-1,index=-1;
+   for(const [i,step] of steps.entries())if(step.name==='WAIT'&&++seen===ordinal){index=i;break;}
+   if(index<0)throw Error('WAIT step not found');
+   if(index===steps.length-1)return {};
+   const total=Number(minutes)*60+Number(seconds);
+   await new ScheduledActionService(this.services.db!).schedule(this.actor.tenant_id,this.actor.user_id,{
+    formula,nextStep:index+1,seconds:total,scope:{...this.eventRecord,sessionId:this.request.sessionId},
+    variables:{...(variables??{})},sessionId:this.request.sessionId});
+   return {};
+  }
   if(name==='EMAIL'||name==='WHATSAPP'||name==='SMS'){
    const [credential,...values]=args;
    if(typeof credential!=='string'||!credential)throw Error(name+' needs a Named Credential');

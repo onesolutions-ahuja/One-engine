@@ -584,7 +584,7 @@ export class RecordEngine {
    * imports, and Flows. Optional criteria remain advisory to the lookup picker. */
   private async enforceRequiredLookupFilters(
     tenantId:string,objectApi:string,prepared:Map<string,Storable>,
-    client?:PoolClient,recordId?:string
+    client?:PoolClient,recordId?:string,definitions?:readonly FieldDefinition[]
   ):Promise<void>{
     const executor=client??this.db;
     const {rows}=await scopedMetadata('lookup-filters\u0000'+tenantId+'\u0000'+objectApi,()=>executor.query<{
@@ -600,22 +600,25 @@ export class RecordEngine {
     if(!rows.length)return;
     const targets=[...new Set(rows.map(row=>row.field_api))];
     const targetMetaCache=new Map<string,Promise<NativeFieldsMetadata>>();
-    const previous=recordId?await executor.query<{field_api:string;reference_record_id:string|null}>(
-      'SELECT field_api,reference_record_id FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=ANY($4::text[])',
-      [tenantId,objectApi,recordId,targets]):{rows:[]};
+    // Read all previous references and source fields together, not one SELECT per
+    // dynamic filter. The metadata comes from the prepare() field query.
+    const names=[...new Set([...targets,...rows.map(row=>row.value_field_api)
+      .filter((name):name is string=>typeof name==='string')])];
+    const sourceMeta=recordId?await this.nativeMeta(tenantId,objectApi,client,definitions):null;
+    const previous=sourceMeta?await executor.query<{
+      field_api:string;value_text:string|null;reference_record_id:string|null
+    }>(`SELECT v.field_api,v.value_text,v.reference_record_id
+      FROM md_records r ${readNativeValueRows(sourceMeta,'r')}
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+        AND v.field_api=ANY($4::text[])`,
+      [tenantId,objectApi,recordId,names]):{rows:[]};
     const previousMap=new Map(previous.rows.map(row=>[row.field_api,row.reference_record_id]));
-    const sourceCache=new Map<string,string|null>();
+    const sourceCache=new Map(previous.rows.map(row=>[
+      row.field_api,row.reference_record_id??row.value_text??null]));
     const sourceValue=async(name:string):Promise<string|null>=>{
       const preparedValue=prepared.get(name);
       if(preparedValue)return preparedValue.reference_record_id??preparedValue.value_text??null;
-      if(sourceCache.has(name))return sourceCache.get(name)??null;
-      if(!recordId)return null;
-      const stored=await executor.query<{value_text:string|null;reference_record_id:string|null}>(
-        'SELECT value_text,reference_record_id FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=$4',
-        [tenantId,objectApi,recordId,name]);
-      const value=stored.rows[0]?.reference_record_id??stored.rows[0]?.value_text??null;
-      sourceCache.set(name,value);
-      return value;
+      return sourceCache.get(name)??null;
     };
     const ruleLogic=await executor.query<{field_api:string;logic:'All'|'Any'}>(
       'SELECT field_api,logic FROM md_object_lookup_filter_logic WHERE tenant_id=$1 AND object_api=$2',
@@ -900,7 +903,7 @@ export class RecordEngine {
       }
     }
     if(definitions.some(field=>field.data_type==='reference'))
-      await this.enforceRequiredLookupFilters(tenantId,objectApi,prepared,client,recordId);
+      await this.enforceRequiredLookupFilters(tenantId,objectApi,prepared,client,recordId,definitions);
     return prepared;
   }
   async create(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>) {
@@ -1591,8 +1594,9 @@ export class RecordEngine {
         throw new Error('Record has changed since it was loaded');
       // Recheck required relationship rules under the record write lock to close
       // the interval between UI/API validation and transactional persistence.
-      if((await this.fields(tenantId,objectApi,transactionClient)).some(f=>f.data_type==='reference'))
-        await this.enforceRequiredLookupFilters(tenantId,objectApi,writeValues,transactionClient,id);
+      const recordFields=await this.fields(tenantId,objectApi,transactionClient);
+      if(recordFields.some(f=>f.data_type==='reference'))
+        await this.enforceRequiredLookupFilters(tenantId,objectApi,writeValues,transactionClient,id,recordFields);
       const affectedParents=await rollupParents(transactionClient,tenantId,objectApi,id);
       if(writeValues.has('__OwnerId__')){
         const queue=writeValues.get('__OwnerQueue__')?.value_text==='true',owner=writeValues.get('__OwnerId__')?.value_text;

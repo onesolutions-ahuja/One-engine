@@ -1,12 +1,11 @@
 import type {PoolClient} from 'pg';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 
 type Queryable=Pick<PoolClient,'query'>|Pick<SqlPersistence,'query'>;
 type RelationshipRow={api_name:string;related_object:string;relationship_name:string|null};
 type ValueRow={reference_record_id:string|null};
-type OutputRow={data_type:string;value_text:string|null;reference_record_id:string|null;
- value_number:string|null;value_boolean:boolean|null;value_date:string|null;
- value_datetime:Date|string|null};
+type OutputRow={data_type:string;value_text:string|null};
 
 /** Resolve a field through metadata-defined reference edges, never by guessing
  * the first field that happens to point at a target object.
@@ -53,10 +52,11 @@ export async function resolveRelationshipFieldPath(
   if(index===0&&Object.hasOwn(sourceValues,relationship.api_name))
    reference=sourceValues[relationship.api_name];
   else if(currentId){
+   const native=await loadNativeFields(db,tenantId,currentObject);
+   const referenceSql=nativeValueSql(native,relationship.api_name,'nr');
    const found=await db.query<ValueRow>(
-    `SELECT reference_record_id FROM md_record_values
-     WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=$4`,
-    [tenantId,currentObject,currentId,relationship.api_name]);
+    `SELECT ${referenceSql} AS reference_record_id FROM ${nativeTableSql(native)} nr
+     WHERE nr.tenant_id=$1 AND nr.id=$2`,[tenantId,currentId]);
    reference=found.rows[0]?.reference_record_id??null;
   }
   if(typeof reference!=='string')return null;
@@ -81,21 +81,21 @@ export async function resolveRelationshipFieldPath(
  // rather than by a fictitious Object.Id field permission.
  if(final==='Id')return currentId;
  if(!await readable(currentObject,final))return null;
- const result=await db.query<OutputRow>(`SELECT f.data_type,v.value_text,
-   v.reference_record_id,v.value_number::text AS value_number,v.value_boolean,
-   v.value_date::text AS value_date,v.value_datetime
-   FROM md_field_definitions f
-   LEFT JOIN md_record_values v ON v.tenant_id=f.tenant_id
-     AND v.object_api=f.object_api AND v.field_api=f.api_name AND v.record_id=$3
+ const native=await loadNativeFields(db,tenantId,currentObject);
+ if(!native.fields.has(final))return null;
+ const valueSql=nativeValueSql(native,final,'nr',true);
+ const result=await db.query<OutputRow>(`SELECT f.data_type,${valueSql} AS value_text
+   FROM md_field_definitions f JOIN ${nativeTableSql(native)} nr
+     ON nr.tenant_id=f.tenant_id AND nr.id=$3
    WHERE f.tenant_id=$1 AND f.object_api=$2 AND f.api_name=$4
      AND f.deleted_at IS NULL`,[tenantId,currentObject,currentId,final]);
  const value=result.rows[0];
  if(!value||value.data_type==='encryptedtext')return null;
  if(['number','currency','percent'].includes(value.data_type))
-  return value.value_number===null?null:Number(value.value_number);
- if(value.data_type==='boolean')return value.value_boolean;
- if(value.data_type==='date')return value.value_date;
+  return value.value_text===null?null:Number(value.value_text);
+ if(value.data_type==='boolean')return value.value_text===null?null:value.value_text==='true';
+ if(value.data_type==='date')return value.value_text;
  if(value.data_type==='datetime')
-  return value.value_datetime===null?null:new Date(value.value_datetime).toISOString();
- return value.reference_record_id??value.value_text;
+  return value.value_text===null?null:new Date(value.value_text).toISOString();
+ return value.value_text;
 }

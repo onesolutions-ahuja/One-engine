@@ -245,8 +245,9 @@ test('Revolut checkout is a Page Builder block without an installed application 
 
 test('shared payment orders support independent providers, retries, and verified completion',async()=>{
  const {createPaymentOrder,paymentOrderStatus,recordVerifiedPaymentEvent,
-  nextPaymentStatus,paymentAmountMinor,PAYMENT_ORDER_DDL,LEGACY_REVOLUT_PAYMENT_COPY}
+  nextPaymentStatus,paymentAmountMinor,PAYMENT_ORDER_DDL}
   =await import('../../src/system-support/payment-order-service.ts');
+ const {LEGACY_REVOLUT_PAYMENT_COPY}=await import('../../src/system-support/revolut-payment-legacy-migration.ts');
  const tenant='11111111-1111-4111-8111-111111111111';
  const user='22222222-2222-4222-8222-222222222222';
  const credential='33333333-3333-4333-8333-333333333333';

@@ -30,20 +30,6 @@ CREATE INDEX IF NOT EXISTS md_payment_orders_source
  ON md_payment_orders(tenant_id,source_object,source_record_id);
 `;
 
-/** One-time-compatible, repeatable copy of checkout receipts from the old Revolut table.
- * The original table remains untouched for rollback and historic reconciliation. */
-export const LEGACY_REVOLUT_PAYMENT_COPY=`
-INSERT INTO md_payment_orders
- (id,tenant_id,provider,credential_id,created_by,source_object,source_record_id,
-  attempt_key,provider_order_id,checkout_token,amount_minor,currency,status,
-  last_event,created_at,updated_at)
-SELECT id,tenant_id,'Revolut',credential_id,created_by,source_object,source_record_id,
- attempt_key,revolut_order_id::text,public_token,amount_minor,currency,status,
- last_event,created_at,updated_at
-FROM md_revolut_checkout_orders
-ON CONFLICT DO NOTHING;
-`;
-
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const NAME=/^[A-Za-z][A-Za-z0-9_]{0,127}$/;
 const PROVIDER=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;

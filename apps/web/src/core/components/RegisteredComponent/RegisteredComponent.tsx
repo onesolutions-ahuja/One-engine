@@ -13,10 +13,8 @@ import './registeredComponentAppearance.css';
 import {pagePropertyIssues} from '../Properties/pagePropertyContract';
 import {resolveRegisteredTextProperties} from './fieldExpressionRuntime';
 import {FieldExpressionEvaluationError} from '../../../component-libraries/shared/FieldExpression.js';
-import {useSqlFormulaDisplay,isSelectedSqlFormula} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
-import {convertedFormula} from '../../../component-libraries/shared/formulaCodeLookup.js';
-/** Not display text: never replaced by a formula result. */
-const codeSkip=new Set(['html','properties','record','records','items','pageState','sessionId','__formulaCode','actionFlows','componentId','pageSessionKey']);
+import {useSqlFormulaDisplay} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
+import {resolveComponentFormulaProps} from './componentFormulaProps';
 import {validatePrimitiveMetadata, primitiveAccessibilityProps} from './sharedPrimitiveMetadata';
 import {loadSharedSmartRenderer} from './sharedSmartRenderer';
 
@@ -247,30 +245,10 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const {configuredProps,issues}=cachedConfiguredSettings(props,definitions,appDefaults,editorPreview===true,
     definition.apiName);
   if(issues.length)return <div role="alert" className="registered-component-error">Invalid component settings: {issues.map(i=>i.path+' '+i.message).join('; ')}</div>;
-  const sqlProps:Record<string,unknown>={...configuredProps};
-  const sqlRecord=props.record&&typeof props.record==='object'&&!Array.isArray(props.record)
-    ?props.record as Record<string,unknown>:Array.isArray(props.records)&&props.records.length
-      ?props.records[0] as Record<string,unknown>:undefined;
-  // Page code: formulas the page converter turned into plain functions.
   const formulaCode=(props.__formulaCode as {functions?:unknown}|undefined)?.functions;
-  const codeFunctions=formulaCode instanceof Map?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
-  for(const [key,source] of Object.entries(sqlProps)){
-    if(typeof source!=='string'||codeSkip.has(key))continue;
-    // Converted page code first, for @ references and formulas alike (exact text, then same parsed form).
-    const formulaLike=/^\s*=/.test(source)||/^\s*@[A-Za-z]/.test(source);
-    const run=codeFunctions&&formulaLike?codeFunctions.get(source.trim())??convertedFormula(codeFunctions,source)??undefined:undefined;
-    if(!run&&!isSelectedSqlFormula(source))continue;
-    if(run){
-      try{sqlProps[key]=run(sqlRecord??{})??"";}
-      catch(error){sqlProps[key]=(error as {notHeld?:boolean})?.notHeld?'':'FORMULAERROR';}
-      continue;
-    }
-    if(typeof props.fieldAllowed==='function'&&
-      !(props.fieldAllowed as (key:string,row:Record<string,unknown>)=>boolean)(key,sqlRecord??{}))
-      continue;
-    const result=sqlLookup(source,sqlRecord);
-    sqlProps[key]=result?.loading?'':result?.error?'FORMULAERROR':result?.value??'';
-  }
+  const codeFunctions=formulaCode instanceof Map
+    ?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
+  const sqlProps=resolveComponentFormulaProps(configuredProps,definition.apiName,codeFunctions,sqlLookup);
   let effectiveProps:Record<string,unknown>;
   try{
     effectiveProps=resolveRegisteredTextProperties(definitions,applyRecordViewAdapter(sqlProps),undefined,formulaScope?.read);

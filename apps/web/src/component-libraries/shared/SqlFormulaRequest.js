@@ -1,3 +1,4 @@
+import {noteOldEngine} from './oldEngineMeter.js';
 /** Core registers its authenticated API callback, not tokens or tenant data.
  * The Symbol is shared across separately bundled published components.
  * OneEngine permissions remain enforced by the server on every request. */
@@ -44,7 +45,7 @@ function batched(request){
  const flush=group=>{
   groups.delete(group.key);
   const jobs=group.jobs;
-  const single=job=>request('/formulas/evaluate',job.init).then(job.resolve,job.reject);
+  const single=job=>{noteOldEngine('sql-formula',job.init&&job.init.body);return request('/formulas/evaluate',job.init).then(job.resolve,job.reject);};
   if(jobs.length===1){single(jobs[0]);return;}
   request('/formulas/evaluate-batch',{method:'POST',body:JSON.stringify({
    formula:group.base.formula,objectApi:group.base.objectApi,state:group.base.state,
@@ -103,6 +104,7 @@ function coalesced(request,legacy){
  const sendLegacy=entries=>entries.forEach(entry=>
   legacy('/formulas/evaluate',entry.init).then(entry.resolve,entry.reject));
  const send=(items,targets)=>{
+  items.forEach(item=>noteOldEngine('sql-formula',item&&item.formula));
   request('/formulas/evaluate-many',{method:'POST',body:JSON.stringify({items})})
    .then(result=>{
     const list=result&&Array.isArray(result.results)?result.results:null;

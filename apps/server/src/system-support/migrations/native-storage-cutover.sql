@@ -30,7 +30,7 @@ END $;
 
 -- Preserve existing record access checks and recursive Master-Detail access.
 CREATE OR REPLACE FUNCTION md_record_access(t uuid,u uuid,rid uuid,act text)
-RETURNS boolean LANGUAGE sql STABLE AS $
+RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT COALESCE((
  SELECT
  -- Object/record denies and restrictions also narrow ownership and broad grants.
@@ -98,7 +98,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $
  LEFT JOIN md_sharing_settings setting ON setting.tenant_id=t AND setting.object_api=rec.object_api
  WHERE rec.tenant_id=t AND rec.id=rid
  ),false)
-$;
+$$;
 
 -- Search-layout weight changes rebuild from native fields, not the retired table.
 CREATE OR REPLACE FUNCTION md_search_layout_fields_sync()

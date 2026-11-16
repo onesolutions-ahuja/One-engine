@@ -27,7 +27,7 @@ export type PageCode={formulas:Record<string,(row:Row,scope:unknown)=>unknown>;s
 export type PageCodeModule={codeVersion?:number;createCode?:(f:typeof F,o:typeof O)=>PageCode};
 export type RecordChange={objectApiName:string;operation:'create'|'update'|'delete';record:Row};
 export type Effect={name:string;args:unknown[]};
-type ServerResult={ok:boolean;stale?:boolean;error?:string;changes:RecordChange[];state:Record<string,unknown>;
+type ServerResult={ok:boolean;stale?:boolean;error?:string;needs?:{name:string;args:unknown[];key:string};changes:RecordChange[];state:Record<string,unknown>;
  effects:Effect[];sets:Record<string,{rows:Row[];complete:boolean}>};
 
 /** A lookup the held rows cannot answer exactly: no prediction (the server answers). */
@@ -241,6 +241,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   async run(key:string,ev:Row,rowObject:string,io:{
    show(update:{changes:RecordChange[];state:Record<string,unknown>;optimistic?:string;replaces?:string;failed?:boolean}):void;
    effects(effects:Effect[]):Promise<void>;
+   /** A device step the server asked for (LOCATION, CREATEPDF): its answer. */
+   device?(step:{name:string;args:unknown[]}):Promise<unknown>;
   }){
    const action=code.actions[key];
    if(!action)throw Error('Unknown page action '+key);
@@ -275,7 +277,18 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(early.length)void io.effects(early).catch(()=>undefined);
    }
    let result:ServerResult;
-   try{result=await saving;}
+   try{
+    result=await saving;
+    // Device steps: run each in the browser when asked, then send the action again
+    // with the answers. Nothing is saved until the whole action can run.
+    const device:Record<string,unknown>={};
+    for(let round=0;result.needs&&round<5;round++){
+     if(!io.device)throw Error(result.needs.name+' is not available here');
+     device[result.needs.key]=await io.device(result.needs);
+     result=await post<ServerResult>('/page-code/execute',{...host.build,key,request:{...requestFor(event,rowObject),device}});
+    }
+    if(result.needs)throw Error('Too many device steps in one action');
+   }
    catch(error){result={ok:false,error:error instanceof Error?error.message:'The save failed',changes:[],state:{},effects:[],sets:{}};}
    if(!result.ok){
     // Undo the screen change: the held rows and lists go back to what SQL has.

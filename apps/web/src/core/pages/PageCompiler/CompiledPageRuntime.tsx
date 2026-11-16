@@ -1,6 +1,8 @@
 import * as React from 'react';
 import {createContext,useContext,useEffect,useMemo,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
 import RegisteredComponent from '../../components/RegisteredComponent/RegisteredComponent';
+import {readDeviceLocation} from '../../../../../server/src/expression-engine/ActionFormulas.js';
+import {createTemplatePdf} from '../PageRuntime/createTemplatePdf';
 import type {LibraryComponentMetadata,ObjectMetadata,PageComponentMetadata,LightningAppMetadata,LightningPageMetadata,FlowDefinitionMetadata} from '../../metadata/Definitions/metadata';
 import {resolveMetadataProperties} from '../../metadata/Definitions/metadataReferences';
 import {bindPageStateProperties,resolvePageStatePath} from '../PageRuntime/pageComponentBindings';
@@ -652,7 +654,20 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();
      else if(effect.name==='PRINT')await previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId);
      else if(effect.name==='FLOW')await runSequenceFlow(first,availableFlows,runtime.request,onLaunchFlow);
+     else if(effect.name==='NAVIGATE')await navigateTo(first,effect.args[1]);
+     else if(effect.name==='FILTER')await selectFilter(first,second,second);
     }
+   };
+   // Device steps the server asks for: GPS position, or a PDF drawn from a Print Template.
+   const device=async(step:{name:string;args:unknown[]})=>{
+    if(step.name==='LOCATION')return readDeviceLocation();
+    if(step.name==='CREATEPDF'){
+     const [template,id]=step.args.map(value=>value===null||value===undefined?'':String(value));
+     if(!template||!id)throw Error('CREATEPDF needs a Print Template and a record Id');
+     return createTemplatePdf(template,id,runtime.request as never,
+      ()=>previewPrintTemplate(template,id,runtime.pageSessionKey,session,currentAppId),{width:794,height:1123});
+    }
+    throw Error(step.name+' is not a device step');
    };
    try{
     await runtime.code.run(codeKey,payload,objectApiName,{
@@ -672,7 +687,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
       }
       if(!update.optimistic)runtime.broadcastSaved({objectApiNames:[...new Set(update.changes.map(change=>change.objectApiName))]});
      },
-     effects:runEffects
+     effects:runEffects,
+     device
     });
     return {updated:true};
    }catch(error){

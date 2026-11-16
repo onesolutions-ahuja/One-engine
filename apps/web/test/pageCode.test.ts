@@ -189,6 +189,19 @@ test('messages and payments run on the server; device steps stay with the action
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", "a@b\.co", "Receipt", "Thanks"\]\)/);
  const pay=compileActionFormula('=RECORDPAYMENT(@recordId, 10, "Cash", AS(p))','Invoice');
  assert.deepEqual(pay.writes.sort(),['CashLedger','Invoice']);
- for(const step of ['WAIT(1, 0)','LOCATION(AS(here))','CREATEPDF(receipt, @recordId)'])
-  assert.throws(()=>compileActionFormula('='+step,'Cart'),/action engine/);
+ assert.throws(()=>compileActionFormula('=WAIT(1, 0)','Cart'),/action engine/);
+ const pdf=compileActionFormula('=ACTIONS(CREATEPDF(Receipt, $state.recordId, AS(pdf)), LOCATION(AS(here)))','Cart');
+ assert.equal(pdf.data,true);
+ assert.match(pdf.js,/\$\.service\("CREATEPDF", \["Receipt", /);
+ assert.match(pdf.js,/v\["here"\] = await \$\.service\("LOCATION", \[\]\)/);
+});
+
+test('assignment actions convert: state, filter and navigation', ()=>{
+ const state=compileActionFormula('@state.calendarDate := TODAY()','');
+ assert.equal(state.data,false);
+ assert.match(state.js,/\$\.setState\("calendarDate", /);
+ const nav=compileActionFormula('@navigate.list := "Customer"','');
+ assert.deepEqual(nav.ui,['NAVIGATE']);
+ assert.match(nav.js,/\$\.ui\("NAVIGATE", "list", "Customer"\)/);
+ assert.match(compileActionFormula('@state.notes := @event.value','').js,/setState\("notes", /);
 });

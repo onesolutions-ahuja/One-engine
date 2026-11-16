@@ -1,10 +1,20 @@
-import {useMemo} from "react";
 import {convertedFormula} from "../shared/formulaCodeLookup.js";
 import {evaluateFieldExpression} from "../shared/FieldExpression.js";
 import {encodeQr} from "./qrEncode.mjs";
 
 /** Smart QR: Text Source is any formula (a field such as @Sale.PaymentLink, page state or
  * text). With an Object it reads the first loaded record, like Smart Image loads a photo. */
+// Small cache: re-renders with the same value never re-encode.
+const cache=new Map();
+function matrixFor(text){
+ if(!text)return null;
+ if(cache.has(text))return cache.get(text);
+ let matrix=null;
+ try{matrix=encodeQr(text);}catch{matrix=null;}
+ if(cache.size>20)cache.clear();
+ cache.set(text,matrix);
+ return matrix;
+}
 export default function SmartComponent(p){
  const records=Array.isArray(p.records)?p.records:Array.isArray(p.items)?p.items:[];
  const row=records[0]||p.record||{};
@@ -21,7 +31,7 @@ export default function SmartComponent(p){
  }
  const allowed=typeof p.fieldAllowed!=="function"||p.fieldAllowed("textSource",row);
  const text=allowed&&value!==null&&value!==undefined?String(value):"";
- const matrix=useMemo(()=>{try{return text?encodeQr(text):null;}catch{return null;}},[text]);
+ const matrix=matrixFor(text);
  const dark=p.labelColor||"#1d1d1f",light=p.backgroundColor||"#ffffff";
  const caption=typeof p.label==="string"?p.label:"";
  if(!matrix)return <div className="smart-qr smart-qr-empty" style={{background:light,borderRadius:p.radius}}>

@@ -189,7 +189,10 @@ test('messages and payments run on the server; device steps stay with the action
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", "a@b\.co", "Receipt", "Thanks"\]\)/);
  const pay=compileActionFormula('=RECORDPAYMENT(@recordId, 10, "Cash", AS(p))','Invoice');
  assert.deepEqual(pay.writes.sort(),['CashLedger','Invoice']);
- assert.throws(()=>compileActionFormula('=WAIT(1, 0)','Cart'),/action engine/);
+ const wait=compileActionFormula('=ACTIONS(STATE(a, 1), WAIT(1, 0), STATE(b, 2))','Cart');
+ assert.equal(wait.data,true);
+ assert.match(wait.js,/\$\.service\("WAIT", \[1, 0, 0, "=ACTIONS/);
+ assert.match(wait.js,/return;/);
  const pdf=compileActionFormula('=ACTIONS(CREATEPDF(Receipt, $state.recordId, AS(pdf)), LOCATION(AS(here)))','Cart');
  assert.equal(pdf.data,true);
  assert.match(pdf.js,/\$\.service\("CREATEPDF", \["Receipt", /);

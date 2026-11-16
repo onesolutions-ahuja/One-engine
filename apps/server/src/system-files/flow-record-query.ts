@@ -1,5 +1,6 @@
 import type {RbacEngine} from './rbac-engine.js';
 import type {SqlExecutor,SqlPersistence} from './sql-persistence.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql,readNativeValueRows} from './native-object-query.js';
 
 export type FlowRecordCondition = {
   field: unknown;
@@ -63,6 +64,8 @@ export class FlowRecordQuery {
       'SELECT api_name,data_type FROM md_field_definitions WHERE tenant_id=$1 AND object_api=$2',
       [tenantId,objectApi]);
     const definitions=new Map(fields.map(field=>[field.api_name,field]));
+    const native=await loadNativeFields(executor,tenantId,objectApi);
+    const table=nativeTableSql(native);
     const params:unknown[]=[tenantId,objectApi,userId];
     const predicates:string[]=[];
     for(const item of conditions){
@@ -76,13 +79,8 @@ export class FlowRecordQuery {
         throw new Error('Flow filter field is not readable: '+field.api_name);
       const operator=String(item.operator??'Equals').trim().toLowerCase().replace(/[\s_-]+/g,'');
       const valueExpression=item.field==='Id'?'r.id::text'
-        :item.field==='OwnerId'?'COALESCE(r.owner_id,r.owner_queue_id)::text':`(
-        SELECT COALESCE(v.value_text,v.reference_record_id::text,v.value_boolean::text,v.value_number::text,v.value_date::text,v.value_datetime::text)
-        FROM md_record_values v
-        WHERE v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
-          AND v.field_api=${'$'+(params.length+1)}
-      )`;
-      if(field)params.push(field.api_name);
+        :item.field==='OwnerId'?'COALESCE(r.owner_id,r.owner_queue_id)::text'
+        :native.fields.has(item.field)?nativeValueSql(native,item.field,'nr',true):'NULL::text';
       const expression=valueExpression;
       if(operator==='isnull'||operator==='isnotnull'){
         predicates.push(expression+(operator==='isnull'?' IS NULL':' IS NOT NULL'));
@@ -153,28 +151,25 @@ export class FlowRecordQuery {
       sort=options.sortField==='Id'?`r.id ${direction}`:
         options.sortField==='OwnerId'?`COALESCE(r.owner_id,r.owner_queue_id) ${direction} NULLS LAST,r.id ASC`:
         options.sortField==='CreatedAt'?`r.created_at ${direction},r.id ASC`:
-        options.sortField==='LastModifiedDate'?`r.updated_at ${direction},r.id ASC`:`(
-        SELECT COALESCE(sv.value_text,sv.reference_record_id::text,sv.value_boolean::text,sv.value_number::text,sv.value_date::text,sv.value_datetime::text)
-        FROM md_record_values sv
-        WHERE sv.tenant_id=$1 AND sv.record_id=r.id AND sv.object_api=$2
-          AND sv.field_api=${'$'+(params.length+1)}
-      ) ${direction} NULLS LAST,r.id ASC`;
-      if(sortField)params.push(sortField.api_name);
+        options.sortField==='LastModifiedDate'?`r.updated_at ${direction},r.id ASC`:
+        `${sortField&&native.fields.has(sortField.api_name)?
+          nativeValueSql(native,sortField.api_name,'nr',true):'NULL::text'} ${direction} NULLS LAST,r.id ASC`;
     }
     params.push(limit);
     const result=await executor.query<ValueRow>(`
       WITH matching AS (
         SELECT r.id,r.created_at,r.updated_at,COALESCE(r.owner_id,r.owner_queue_id) AS owner_id,
           r.record_type_id
-        FROM md_records r
-        WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false AND md_record_access($1,$3,r.id,'read')
+        FROM md_records r JOIN ${table} nr ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+        WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false AND nr.is_deleted=false
+          AND md_record_access($1,$3,r.id,'read')
           AND (${logic}) AND (${ownerPredicate})
         ORDER BY ${sort} LIMIT $${params.length}
       )
       SELECT m.id,m.created_at,m.updated_at,m.owner_id,m.record_type_id,
         v.field_api,v.value_text,v.reference_record_id,v.value_number,v.value_boolean,v.value_date,v.value_datetime,f.data_type
       FROM matching m
-      LEFT JOIN md_record_values v ON v.tenant_id=$1 AND v.record_id=m.id AND v.object_api=$2
+      ${readNativeValueRows(native,'m')}
       LEFT JOIN md_field_definitions f ON f.tenant_id=$1 AND f.object_api=$2 AND f.api_name=v.field_api
       ORDER BY m.created_at,m.id,v.field_api
     `,params);

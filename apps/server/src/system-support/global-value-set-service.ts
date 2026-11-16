@@ -1,6 +1,7 @@
 import {requireAvailableMetadataName} from './metadata-name-guard.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 
 export type GlobalValueSetActor = Readonly<{tenant_id:string;user_id:string}>;
 export type GlobalValueSetValueInput = Readonly<{
@@ -196,16 +197,27 @@ export class GlobalValueSetService {
         const nextValues=new Set(data.values.map(value=>value.value));
         const removed=currentValues.rows.map(value=>value.value).filter(value=>!nextValues.has(value));
         if(removed.length){
-          const inUse=await tx.query(`SELECT 1 FROM md_field_global_value_sets g
-            JOIN md_field_definitions f ON f.tenant_id=g.tenant_id AND f.object_api=g.object_api
-              AND f.api_name=g.field_api
-            JOIN md_record_values r ON r.tenant_id=f.tenant_id AND r.object_api=f.object_api
-              AND r.field_api=f.api_name
-            WHERE g.tenant_id=$1 AND g.value_set_api=$2 AND (
-              (f.data_type='multipicklist' AND string_to_array(r.value_text,';') && $3::text[])
-              OR (f.data_type<>'multipicklist' AND r.value_text=ANY($3::text[]))
-            ) LIMIT 1`,[actor.tenant_id,row.api_name,removed]);
-          if(inUse.rowCount)throw new Error('Cannot remove global values used by records');
+          const {rows:usedFields}=await tx.query<{object_api:string;field_api:string;data_type:string}>(`
+            SELECT f.object_api,f.api_name AS field_api,f.data_type
+            FROM md_field_global_value_sets g
+            JOIN md_field_definitions f ON f.tenant_id=g.tenant_id
+              AND f.object_api=g.object_api AND f.api_name=g.field_api
+            WHERE g.tenant_id=$1 AND g.value_set_api=$2 AND f.deleted_at IS NULL`,
+            [actor.tenant_id,row.api_name]);
+          let inUse=false;
+          for(const field of usedFields){
+            const native=await loadNativeFields(tx,actor.tenant_id,field.object_api);
+            const value=nativeValueSql(native,field.field_api,'nr',true);
+            const comparison=field.data_type==='multipicklist'
+              ?`string_to_array(${value},';') && $3::text[]`
+              :`${value}=ANY($3::text[])`;
+            const found=await tx.query(`SELECT 1 FROM ${nativeTableSql(native)} nr
+              WHERE nr.tenant_id=$1 AND $2=ANY(nr.present_fields)
+                AND (${comparison}) LIMIT 1`,
+              [actor.tenant_id,field.field_api,removed]);
+            if(found.rowCount){inUse=true;break;}
+          }
+          if(inUse)throw new Error('Cannot remove global values used by records');
         }
       }
       const updated=await tx.query<SetRow>(`UPDATE md_global_value_sets SET

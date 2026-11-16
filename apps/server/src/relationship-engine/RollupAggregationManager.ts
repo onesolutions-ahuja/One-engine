@@ -1,5 +1,7 @@
 import type {PoolClient} from 'pg';
 import {scopedMetadata} from '../system-support/record-read-scope.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
+import {writeNativeValues} from '../system-files/native-values.js';
 /** The existing SQL rollup implementation, extracted verbatim from RecordEngine. */
 export async function rollupParents(client:PoolClient,tenantId:string,childObject:string,recordId:string) {
     const {rows}=await scopedMetadata('rollup-parents\u0000'+tenantId+'\u0000'+childObject,()=>client.query<{
@@ -13,10 +15,14 @@ export async function rollupParents(client:PoolClient,tenantId:string,childObjec
       &&typeof config.relationship_field==='string');
     if(!configs.length)return parents;
     const fields=[...new Set(configs.map(config=>config.relationship_field))];
-    const values=await client.query<{field_api:string;reference_record_id:string|null}>(
-      `SELECT field_api,reference_record_id FROM md_record_values
-       WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=ANY($4::text[])`,
-      [tenantId,childObject,recordId,fields]);
+    const native=await loadNativeFields(client,tenantId,childObject);
+    const slots=fields.map((field,index)=>
+      `(${nativeValueSql(native,field,'nr')},$${index+3}::text)`).join(',');
+    const values=await client.query<{field_api:string;reference_record_id:string|null}>(`
+      SELECT found.field_api,found.reference_record_id
+      FROM ${nativeTableSql(native)} nr
+      JOIN LATERAL (VALUES ${slots}) AS found(reference_record_id,field_api) ON true
+      WHERE nr.tenant_id=$1 AND nr.id=$2`,[tenantId,recordId,...fields]);
     const parentForField=new Map(configs.map(config=>[config.relationship_field,config.parent_object]));
     for(const value of values.rows){
       const parentObject=parentForField.get(value.field_api);
@@ -44,6 +50,8 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
       FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
         AND rollup_child_object=$2 AND deleted_at IS NULL`,
     [tenantId,childObject]));
+    const native=await loadNativeFields(client,tenantId,childObject);
+    const table=nativeTableSql(native);
     const rollups=rows.filter(rollup=>typeof rollup.parent_object==='string'
       &&typeof rollup.field_api==='string'&&typeof rollup.relationship_field==='string'
       &&typeof rollup.operation==='string');
@@ -62,74 +70,53 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
               AND d.api_name=f.filter_field_api AND d.deleted_at IS NULL
           WHERE f.tenant_id=$1 AND f.object_api=$2 AND f.rollup_field_api=$3
           ORDER BY f.sort_order`,[tenantId,rollup.parent_object,rollup.field_api]);
-        const filterParams:unknown[]=[tenantId,childObject,rollup.relationship_field,
-          rollup.source_field,parentId];
-        const filterJoins:string[]=[];
+        const filterParams:unknown[]=[tenantId,childObject,parentId];
         const filterPredicates:string[]=[];
-        for(const [index,filter] of filters.entries()){
-          const alias=`rf${index}`;
-          const fieldParameter=`$${filterParams.length+1}`;
-          filterParams.push(filter.field_api);
-          filterJoins.push(`LEFT JOIN md_record_values ${alias}
-            ON ${alias}.tenant_id=c.tenant_id AND ${alias}.record_id=c.id
-              AND ${alias}.object_api=c.object_api AND ${alias}.field_api=${fieldParameter}`);
-          const valueColumn:['value_text'|'value_number'|'value_boolean'|'value_date'|'value_datetime'|'reference_record_id'][number]=
-            ['number','currency','percent'].includes(filter.data_type)?'value_number':
-            filter.data_type==='boolean'?'value_boolean':filter.data_type==='date'?'value_date':
-            filter.data_type==='datetime'?'value_datetime':filter.data_type==='reference'
-              ?'reference_record_id':'value_text';
+        for(const filter of filters){
+          const typed=['number','currency','percent','boolean','date','datetime','reference'].includes(filter.data_type);
+          const expression=nativeValueSql(native,filter.field_api,'n',!typed);
           if(filter.operator==='Is Null'||filter.operator==='Is Not Null'){
-            filterPredicates.push(`${alias}.${valueColumn} IS ${filter.operator==='Is Null'?'':'NOT '}NULL`);
+            filterPredicates.push(`${expression} IS ${filter.operator==='Is Null'?'':'NOT '}NULL`);
             continue;
           }
-          const parameter=`$${filterParams.length+1}`;
           filterParams.push(filter.value_text);
+          const parameter=`$${filterParams.length}`;
           const cast=filter.data_type==='date'?'::date':filter.data_type==='datetime'?'::timestamptz':
             filter.data_type==='time'?'::time':filter.data_type==='boolean'?'::boolean':
-            ['number','currency','percent'].includes(filter.data_type)?'::numeric':'';
+            ['number','currency','percent'].includes(filter.data_type)?'::numeric':
+            filter.data_type==='reference'?'::uuid':'';
           const operator=filter.operator==='Equals'?'=':filter.operator==='Not Equal To'?'IS DISTINCT FROM':
-            filter.operator==='Greater Than'?'>':filter.operator==='Less Than'?'<':
-            filter.operator==='Contains'?null:null;
-          if(filter.operator==='Contains'){
-            filterPredicates.push(`position(${parameter} in ${alias}.${valueColumn})>0`);
-          }else if(operator){
-            filterPredicates.push(`${alias}.${valueColumn} ${operator} ${parameter}${cast}`);
-          }else throw new Error('Invalid roll-up filter operator');
+            filter.operator==='Greater Than'?'>':filter.operator==='Less Than'?'<':null;
+          if(filter.operator==='Contains')
+            filterPredicates.push(`position(${parameter} in ${expression})>0`);
+          else if(operator)
+            filterPredicates.push(`${expression} ${operator} ${parameter}${cast}`);
+          else throw new Error('Invalid roll-up filter operator');
         }
         const filterPredicate=filterPredicates.length
           ?` AND (${filterPredicates.join(rollup.filter_logic==='Any'?' OR ':' AND ')})`:'';
         const sourceType=rollup.source_data_type;
-        const valueColumn=sourceType==='date'?'sv.value_date':
-          sourceType==='datetime'?'sv.value_datetime':'sv.value_number';
+        const relation=nativeValueSql(native,rollup.relationship_field,'n');
+        const source=operation==='COUNT'?null:nativeValueSql(native,rollup.source_field!,'n');
         const aggregate=operation==='COUNT'?'count(*)::text':
-          operation==='SUM'
-            ?`COALESCE(sum(CASE WHEN sv.value_text ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN sv.value_number END),0)::text`
-            :`${operation.toLowerCase()}(${valueColumn})::text`;
+          operation==='SUM'?`COALESCE(sum(${source}),0)::text`:
+            `${operation.toLowerCase()}(${source})::text`;
         const result=await client.query<{value:string|null}>(`
           SELECT ${aggregate} AS value
-          FROM md_records c
-          JOIN md_record_values rel ON rel.tenant_id=c.tenant_id AND rel.record_id=c.id
-            AND rel.object_api=c.object_api AND rel.field_api=$3
-          LEFT JOIN md_record_values sv
-            ON sv.tenant_id=c.tenant_id AND sv.record_id=c.id AND sv.object_api=c.object_api
-              AND sv.field_api=$4
-          ${filterJoins.join('\n')}
-          WHERE c.tenant_id=$1 AND c.object_api=$2 AND c.is_deleted=false AND rel.reference_record_id=$5${filterPredicate}
+          FROM md_records c JOIN ${table} n ON n.tenant_id=c.tenant_id AND n.id=c.id
+          WHERE c.tenant_id=$1 AND c.object_api=$2 AND c.is_deleted=false AND NOT n.is_deleted
+            AND ${relation}=$3${filterPredicate}
         `,filterParams);
         const value=result.rows[0]?.value??(operation==='COUNT'||operation==='SUM'?'0':null);
         const numericValue=sourceType==='date'||sourceType==='datetime'?null:value;
         const dateValue=sourceType==='date'?value:null;
         const dateTimeValue=sourceType==='datetime'?value:null;
-        await client.query(`INSERT INTO md_record_values
-          (tenant_id,record_id,object_api,field_api,value_text,reference_record_id,is_unique,case_sensitive,
-           value_number,value_date,value_datetime)
-          VALUES($1,$2,$3,$4,$5,NULL,false,false,$6::numeric,$7::date,$8::timestamptz)
-          ON CONFLICT(tenant_id,record_id,field_api) DO UPDATE SET value_text=EXCLUDED.value_text,
-            reference_record_id=NULL,geo_latitude=NULL,geo_longitude=NULL,address_street=NULL,
-            address_city=NULL,address_state=NULL,address_postal_code=NULL,address_country=NULL,
-            value_number=EXCLUDED.value_number,value_date=EXCLUDED.value_date,
-            value_datetime=EXCLUDED.value_datetime,value_boolean=NULL`,
-        [tenantId,parentId,rollup.parent_object,rollup.field_api,value,numericValue,dateValue,dateTimeValue]);
+        await writeNativeValues(client,tenantId,rollup.parent_object,parentId,new Map([[
+          rollup.field_api,{value_text:value,reference_record_id:null,
+            value_number:numericValue,value_date:dateValue,
+            value_datetime:dateTimeValue===null?null:new Date(dateTimeValue),
+            is_unique:false,case_sensitive:false}
+        ]]));
         await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
           [tenantId,rollup.parent_object,parentId]);
       }

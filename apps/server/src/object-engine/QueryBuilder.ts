@@ -1,4 +1,5 @@
 import {excelWildcardSqlLike} from '../expression-engine/FormulaWildcard.js';
+import {nativeTableSql,nativeValueSql,type NativeFieldsMetadata} from '../system-files/native-object-query.js';
 
 export type RecordFilterOperator =
   | 'eq' | 'ne' | 'lt' | 'lte' | 'gt' | 'gte'
@@ -15,6 +16,9 @@ export type QueryField = {
   /** Trusted server-generated SQL for an activated typed object table. Never request input. */
   nativeValue?: string;
   nativeText?: string;
+  native_table?: string|null;
+  native_column?: string|null;
+  native_type?: string|null;
   data_type: string;
   rollup_source_data_type?: string | null;
   /** Formula fields: simple numeric formulas can be filtered in SQL (see numericFormulaSql). */
@@ -77,9 +81,8 @@ export function numericFormulaSql(expression:string,fields:ReadonlyMap<string,Qu
     const field=fields.get(api);
     const type=field?.data_type==='rollup'?field.rollup_source_data_type??'number':field?.data_type;
     if(!field||field.via||!numericTypes.has(type??''))throw 0;
-    if(field.nativeValue)return field.nativeValue;
-    return `(SELECT fx.value_number FROM md_record_values fx WHERE fx.tenant_id=r.tenant_id AND fx.record_id=r.id
-      AND fx.object_api=r.object_api AND fx.field_api=${bind(api)})`;
+    // Metadata-only validation callers have no executable native expressions.
+    return field.nativeValue??'NULL::numeric';
   };
   const args=()=>{take('(');const out=[expr()];while(peek()===','){take(',');out.push(expr());}take(')');return out;};
   const primary=():string=>{
@@ -247,7 +250,7 @@ export function compileRecordFilters(
   const parameters: unknown[] = [];
   const predicates = filters.map((filter, index) => {
     if (!filterFieldPath.test(filter.field)) throw new Error('Invalid list field');
-    // Id is a system column, not a value in md_record_values. Keep it inside
+    // Id is a system column, not a stored field value. Keep it inside
     // the normal tenant/record-access-scoped query so extra filters still apply.
     if (filter.field === 'Id') {
       if (filter.operator === 'isBlank' || filter.operator === 'isNotBlank') {
@@ -273,18 +276,24 @@ export function compileRecordFilters(
     }
     const field = fields.get(filter.field);
     if (field?.via) {
-      // Lookup path: evaluate the same predicate against the related record
-      // (alias rel) reached through the lookup value, with its record access.
-      const lookupParameter = `$${firstParameter + parameters.length}`;
-      parameters.push(field.via.lookupField);
-      const inner = compileRecordFilters([{ ...filter, field: field.api_name }], undefined,
-        new Map([[field.api_name, { ...field, via: undefined }]]), firstParameter + parameters.length);
+      const lookup=fields.get(field.via.lookupField);
+      if(!lookup?.nativeValue)throw new Error('Object has no native table');
+      const related:NativeFieldsMetadata={table:field.native_table??'',fields:new Map([[
+        field.api_name,{column:field.native_column??null,sqlType:field.native_type??'',
+          dataType:field.data_type}
+      ]])};
+      const relatedTable=nativeTableSql(related);
+      const inner=compileRecordFilters([{...filter,field:field.api_name}],undefined,
+        new Map([[field.api_name,{...field,via:undefined,
+          nativeValue:nativeValueSql(related,field.api_name,'rv'),
+          nativeText:nativeValueSql(related,field.api_name,'rv',true)}]]),
+        firstParameter+parameters.length);
       parameters.push(...inner.parameters);
-      return `EXISTS(SELECT 1 FROM md_record_values lk JOIN md_records rel
-        ON rel.tenant_id=lk.tenant_id AND rel.id=lk.reference_record_id AND rel.is_deleted=false
-        WHERE lk.tenant_id=r.tenant_id AND lk.record_id=r.id AND lk.object_api=r.object_api
-          AND lk.field_api=${lookupParameter} AND ${field.via.access}
-          AND ${inner.predicate.replace(/\br\./g, 'rel.')})`;
+      return `EXISTS(SELECT 1 FROM md_records rel
+        JOIN ${relatedTable} rv ON rv.tenant_id=rel.tenant_id AND rv.id=rel.id
+        WHERE rel.tenant_id=r.tenant_id AND rel.id=${lookup.nativeValue}
+          AND rel.is_deleted=false AND rv.is_deleted=false AND ${field.via.access}
+          AND ${inner.predicate.replace(/\br\./g,'rel.')})`;
     }
     if (filter.field.includes('.')) throw new Error('Invalid list field');
     if (field?.data_type==='formula'&&field.formula_expression&&numericTypes.has(String(field.formula_return_type).toLowerCase())) {
@@ -309,21 +318,17 @@ export function compileRecordFilters(
     const typed = sourceType ? typedColumns[sourceType] : undefined;
     const fieldParameter = `$${firstParameter + parameters.length}`;
     parameters.push(filter.field);
+    // List-view metadata validation invokes this compiler without SQL expressions.
+    // A typed NULL can validate operators without ever reading legacy record values.
+    const nativeValue=field.nativeValue??('NULL::'+(typed?.cast??'text'));
+    const nativeText=field.nativeText??'NULL::text';
     const exists=(condition:string,negated=false)=>{
-      if(field.nativeValue&&field.nativeText){
-        const direct=condition.replace(/fv\.reference_record_id::text/g,field.nativeText)
-          .replace(/fv\.value_text/g,field.nativeText)
-          .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,field.nativeValue);
-        // Filter logic is AND/OR only, so in WHERE a NULL counts as false: the plain
-        // comparison keeps native column indexes (btree/trigram) usable.
-        return negated?`NOT COALESCE((${fieldParameter}::text IS NOT NULL AND (${direct})),FALSE)`
-          :`(${fieldParameter}::text IS NOT NULL AND (${direct}))`;
-      }
-      return `${negated?'NOT ':''}EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
-        AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}
-        AND ${condition})`;
+      const direct=condition.replace(/fv\.reference_record_id::text/g,nativeText)
+        .replace(/fv\.value_text/g,nativeText)
+        .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,nativeValue);
+      return negated?`(${fieldParameter}::text IS NOT NULL AND NOT COALESCE((${direct}),FALSE))`
+        :`(${fieldParameter}::text IS NOT NULL AND (${direct}))`;
     };
-
     if(filter.operator==='isBlank'||filter.operator==='isNotBlank'){
       if(filter.value!=='')throw new Error('Blank filters require an empty value');
       const hasValue=`COALESCE(fv.value_text,fv.reference_record_id::text,'')<>''`;
@@ -423,16 +428,7 @@ export function compileRecordFilters(
     const comparison = typed
       ? `fv.${typed.column}${sqlOperator}${valueParameter}::${typed.cast}`
       : `COALESCE(fv.value_text,fv.reference_record_id::text)${sqlOperator}${valueParameter}`;
-    // Tenant-configured exact equality indexes are a search accelerator only:
-    // retain the full source-value comparison to protect against hash collisions.
-    const exactIndex=!field.nativeValue&&filter.operator==='eq'&&!typed
-      &&['text','email','phone','url','picklist'].includes(field.data_type)
-      &&exactIndexedFields.has(filter.field)
-      ?` AND EXISTS(SELECT 1 FROM md_field_exact_index_entries ix
-         WHERE ix.tenant_id=fv.tenant_id AND ix.object_api=fv.object_api
-         AND ix.field_api=fv.field_api AND ix.record_id=fv.record_id
-         AND ix.value_hash=md5(${valueParameter}))`:'';
-    return exists(comparison+exactIndex);
+    return exists(comparison);
   });
   const expression = parseFilterLogic(logic, filters.length);
   const predicate = expression.replace(/f(\d+)/g, (_, index: string) => predicates[Number(index)]);

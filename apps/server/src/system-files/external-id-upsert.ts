@@ -3,6 +3,7 @@ import type {SqlPersistence} from './sql-persistence.js';
 import type {RbacEngine} from './rbac-engine.js';
 import type {RecordEngine} from './record-engine.js';
 import {normalizeNumberField} from '../field-engine/types/NumberField.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from './native-object-query.js';
 /** Atomic external-ID lookup and write, sharing the generic record CRUD engine. */
 export class ExternalIdUpsert {
  constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine,
@@ -34,12 +35,13 @@ export class ExternalIdUpsert {
    // Serialize equal keys (including absent keys) without locking unrelated tenant keys.
    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
     [tenantId+':'+objectApi+':'+fieldApi+':'+(caseSensitive?normalizedKey:normalizedKey.toLowerCase())]);
+   const native=await loadNativeFields(client,tenantId,objectApi);
+   const stored=nativeValueSql(native,fieldApi,'nr',!numeric);
    const {rows}=await client.query<{id:string}>(`SELECT r.id FROM md_records r
-    JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.object_api=r.object_api
-      AND v.record_id=r.id AND v.field_api=$3
+    JOIN ${nativeTableSql(native)} nr ON nr.tenant_id=r.tenant_id AND nr.id=r.id
     WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
-      AND ${caseSensitive?'v.value_text=$4':'lower(v.value_text)=lower($4)'}
-    ORDER BY r.id LIMIT 2`,[tenantId,objectApi,fieldApi,normalizedKey]);
+      AND ${numeric?`${stored}=$3::numeric`:caseSensitive?`${stored}=$3`:`lower(${stored})=lower($3)`}
+    ORDER BY r.id LIMIT 2`,[tenantId,objectApi,normalizedKey]);
    if(rows.length>1)throw new Error('Duplicate external ID matches');
    const payload={...values,[fieldApi]:numeric?Number(normalizedKey):normalizedKey};
    if(rows.length){

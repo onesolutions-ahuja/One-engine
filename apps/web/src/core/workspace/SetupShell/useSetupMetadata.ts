@@ -26,7 +26,7 @@ export function useSetupMetadata(ctx: any) {
   const permissionRequestStarted = useRef(false);
   useEffect(() => {
     const needsPermissionSnapshot = route.kind === 'setup' &&
-      ['rbac', 'object-manager', 'data-loader', 'page-builder', 'report-builder', 'dashboard-builder', 'flow-builder']
+      ['rbac', 'object-manager', 'data-loader', 'page-builder', 'flow-builder']
         .includes(workspace);
     if (!needsPermissionSnapshot || permissionRequestStarted.current) return;
     permissionRequestStarted.current = true;
@@ -47,7 +47,7 @@ export function useSetupMetadata(ctx: any) {
     // Direct analytics/automation lists fetch immediately, rather than waiting
     // for the unrelated editor/component-library bootstrap to finish.
     const directDataRoute=route.kind === 'setup' &&
-      ['report-builder', 'dashboard-builder', 'scheduled-flows'].includes(workspace);
+      ['scheduled-flows'].includes(workspace);
     if (!advancedMetadataLoaded && !directDataRoute) return;
     const currentPage = pages.filter((page) =>
       (route.kind === 'app-page' && page.apiName === route.pageApiName)
@@ -58,10 +58,8 @@ export function useSetupMetadata(ctx: any) {
     const components = currentPage.flatMap((page) => page.components ?? []);
     const adminDependencies = route.kind === 'setup' &&
       ['page-builder', 'object-manager'].includes(workspace);
-    const dashboardNeeded = adminDependencies || (route.kind === 'setup' && workspace === 'dashboard-builder')
-      || components.some((component) => component.type === 'Dashboard');
-    const reportNeeded = dashboardNeeded || adminDependencies || (route.kind === 'setup' && workspace === 'report-builder')
-      || components.some((component) => component.type === 'Report Chart');
+    const dashboardNeeded = adminDependencies || components.some((component) => component.type === 'Dashboard');
+    const reportNeeded = dashboardNeeded || adminDependencies || components.some((component) => component.type === 'Report Chart');
     // Administration is a separate workspace, not a dependency of a Till-only tenant.
     const isAdmin = route.kind === 'setup';
     const needsFlowDefinitions = shouldLoadFlowDefinitions(isAdmin, workspace,

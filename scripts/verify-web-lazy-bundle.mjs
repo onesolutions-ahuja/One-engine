@@ -30,7 +30,7 @@ const publicEager = [...eager];
 const authenticatedEntries = files.filter(name => /^App-[^.]+\.js$/.test(name));
 assert(authenticatedEntries.length, 'Missing authenticated application chunk');
 authenticatedEntries.forEach(visit);
-const optional = ['FlowBuilder', 'DashboardBuilder', 'reportBuilderView', 'pageBuilderView', 'objectManagerView', 'ComponentLibrary', 'recordWorkspaceViews'];
+const optional = ['FlowBuilder', 'pageBuilderView', 'objectManagerView', 'ComponentLibrary', 'recordWorkspaceViews'];
 const names = files.filter(name => optional.some(marker => name.includes(marker)));
 const eagerOptional = names.filter(name => eager.has(name));
 assert.equal(eagerOptional.length, 0, 'Optional runtime assets imported eagerly: ' + eagerOptional.join(', '));

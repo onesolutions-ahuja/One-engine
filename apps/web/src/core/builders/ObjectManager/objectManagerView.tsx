@@ -612,17 +612,14 @@ function ObjectManager({
         crossFilter.childObjectApiName === draft.apiName
         && crossFilter.filters.some((filter) => filter.fieldApiName === field.apiName));
       if (referencesBaseField || referencesCrossFilter) {
-        addDependency(report.label, field.apiName, 'Report', { workspace: 'report-builder', resourceApiName: report.apiName });
+        addDependency(report.label, field.apiName, 'Report');
       }
     }
   }
   for (const dashboard of dashboards) {
     for (const filter of dashboard.filters) {
       if (filter.objectApiName === draft.apiName && draft.fields.some((field) => field.apiName === filter.fieldApiName)) {
-        addDependency(dashboard.label, filter.fieldApiName, 'Dashboard Filter', {
-          workspace: 'dashboard-builder',
-          resourceApiName: dashboard.apiName
-        });
+        addDependency(dashboard.label, filter.fieldApiName, 'Dashboard Filter');
       }
     }
     for (const component of dashboard.components) {
@@ -633,10 +630,7 @@ function ObjectManager({
             || component.xAxisFieldApiName === field.apiName
             || component.displayFieldApiNames.includes(field.apiName)
             || hasFieldReference(component.properties, field.apiName))) {
-          addDependency(dashboard.label, field.apiName, 'Dashboard Component', {
-            workspace: 'dashboard-builder',
-            resourceApiName: dashboard.apiName
-          });
+          addDependency(dashboard.label, field.apiName, 'Dashboard Component');
         }
       }
     }

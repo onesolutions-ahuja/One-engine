@@ -44,8 +44,6 @@ recovery:ReactNode;mfa:ReactNode;emailRecovery:ReactNode;locks:ReactNode;session
   {label:'Flow Interviews',workspace:'flow-interviews',description:'In-progress Screen Flow interviews',allowed:!!rights?.flows},
   {label:'Flow Logs',workspace:'flow-logs',description:'Automation executions and errors',allowed:!!rights?.flows},
   {label:'Automation Settings',workspace:'automation-settings',description:'Automation configuration',allowed:!!rights?.flows},
-  {label:'Dashboard Builder',workspace:'dashboard-builder',description:'Dashboards and visualisations',allowed:!!rights?.dashboards},
-  {label:'Report Builder',workspace:'report-builder',description:'Reports and data analysis',allowed:!!rights?.reports},
   {label:'OneEngine Permissions',workspace:'rbac',description:'Developer and builder access policies',allowed:!!rights?.security}
  ];
  const available=destinations.filter(item=>item.allowed);

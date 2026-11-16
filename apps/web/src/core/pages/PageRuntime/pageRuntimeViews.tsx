@@ -113,7 +113,6 @@ import { pageIsAvailableInApp } from './pageActionRouting';
 import {executeOpenPageActionNode} from './OpenPageActionNode';
 import ApprovalProcessManager from '../../automation/ApprovalProcessManager/ApprovalProcessManager';
 import { standardPageComponents } from '../../components/Catalog/index';
-import EmbeddedDashboard from '../EmbeddedDashboard/EmbeddedDashboard';
 import {StandardRecordList,StandardRichText,StandardFlowLauncher} from './StandardPageBlocks';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import ResponsivePageCanvas from './ResponsivePageCanvas';
@@ -245,60 +244,13 @@ function componentRowNeed(rows:string|undefined,properties:Readonly<Record<strin
   return 'none';
 }
 export function createPageRuntimeViews(apiRequest: <T>(path:string, init?:RequestInit) => Promise<T>) {
-function RuntimeReportChart({ report, objects, recordContext }: {
-  report: ReportMetadata | undefined; objects: ObjectMetadata[];
-  recordContext?: {objectApiName:string;recordId:string;relationshipFieldApiName?:string};
-}) {
-  const [run, setRun] = useState<ReportRunMetadata | null>(null);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!report) {
-      setRun(null);
-      setError('');
-      return;
-    }
-    let active = true;
-    setRun(null);
-    setError('');
-    void apiRequest<ReportRunMetadata>(`/reports/${encodeURIComponent(report.apiName)}/run`, {
-      method: 'POST',
-      body: JSON.stringify({ offset: 0, limit: 100, ...(recordContext ? {recordContext} : {}) })
-    }).then((result) => {
-      if (active) setRun(result);
-    }).catch((failure: unknown) => {
-      if (active) setError(failure instanceof Error ? failure.message : 'Unable to run the selected report');
-    });
-    return () => { active = false; };
-  }, [report?.apiName,recordContext?.objectApiName,recordContext?.recordId,recordContext?.relationshipFieldApiName]);
-  if (!report) return <div className="records-empty">Choose a saved report in the page component properties.</div>;
-  if (error) return <div className="records-message" role="alert">{error}</div>;
-  if (!run) return <div className="records-loading">Running {report.label}…</div>;
-  const object = objects.find((item) => item.apiName === report.objectApiName);
-  const groupedApiName = report.groupByFieldApiNames[0]
-    ?? report.fieldApiNames.find((name) => !/^(Number|Currency|Percent)(\(|$)/.test(object?.fields.find((field) => field.apiName === name)?.dataType ?? ''));
-  const measureApiName = report.fieldApiNames.find((name) =>
-    /^(Number|Currency|Percent)(\(|$)/.test(object?.fields.find((field) => field.apiName === name)?.dataType ?? ''));
-  const grouped = new Map<string, number>();
-  for (const row of run.rows) {
-    const label = groupedApiName ? String(row[groupedApiName] ?? 'No value') : `Row ${grouped.size + 1}`;
-    const value = measureApiName ? Number(row[measureApiName]) : 1;
-    grouped.set(label, (grouped.get(label) ?? 0) + (Number.isFinite(value) ? value : 0));
-  }
-  const bars = [...grouped.entries()].slice(0, 12);
-  const maximum = Math.max(1, ...bars.map(([, value]) => Math.abs(value)));
-  return <div className="runtime-report-chart">
-    <div className="runtime-report-chart-heading"><strong>{report.label}</strong><span>{run.totalRows} report row{run.totalRows === 1 ? '' : 's'}</span></div>
-    {bars.length === 0 ? <div className="records-empty">The selected report returned no rows.</div>
-      : <div className="runtime-report-chart-bars" role="img" aria-label={`${report.label} report chart`}>
-        {bars.map(([label, value]) => <div className="runtime-report-chart-bar" key={label} title={`${label}: ${value}`}>
-          <span className="runtime-report-chart-value">{new Intl.NumberFormat().format(value)}</span>
-          <span className="runtime-report-chart-track"><i style={{ height: `${Math.max(3, Math.abs(value) / maximum * 100)}%` }} /></span>
-          <span className="runtime-report-chart-label">{label}</span>
-        </div>)}
-      </div>}
-    {run.truncated && <small className="runtime-report-chart-note">Chart uses the first {run.pageSize} report rows.</small>}
-  </div>;
-}
+ // TODO(native): SQL report execution is disabled while storage switches to native tables.
+ function RuntimeReportChart(_props: {
+   report: ReportMetadata | undefined; objects: ObjectMetadata[];
+   recordContext?: {objectApiName:string;recordId:string;relationshipFieldApiName?:string};
+ }) {
+   return <div className="records-empty">Report charts are temporarily unavailable.</div>;
+ }
 
 function MetadataBoundPageComponent({
   definition, component, objects, apps, pages, currentAppId, pageSessionKey, pageComponents, reports, availableFlows, formFactor, onNavigate, onLaunchFlow, disableActions = false, builderPreview = false, defaultObjectApiName = '', recordId = '', initialPageState, sessionIdOverride, children
@@ -1524,10 +1476,9 @@ function LightningAppRuntime({
               onFinished={()=>window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
                 detail:{pageSessionKey:runtimeSessionKey}}))}/>
           </React.Suspense>;
-    if (component.type === 'Dashboard') return <section className="record-fields-card surface" key={component.id}>
-      <EmbeddedDashboard dashboardApiName={String(component.properties.dashboardApiName ?? '')}
-        request={apiRequest} libraryComponents={libraryComponents} />
-    </section>;
+     if (component.type === 'Dashboard') return <section className="record-fields-card surface" key={component.id}>
+       <div className="records-empty">Embedded dashboards are temporarily unavailable.</div>
+     </section>;
     if (component.type === 'Report Chart') {
       const reportApiName = typeof component.properties.reportApiName === 'string' ? component.properties.reportApiName : '';
       return <section className="record-fields-card surface" key={component.id}>

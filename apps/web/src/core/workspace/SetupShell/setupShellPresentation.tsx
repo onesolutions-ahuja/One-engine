@@ -16,7 +16,6 @@ import { appPageOpensOn } from './appPageDevices';
 import { type ObjectMetadata, type LightningPageMetadata, type LightningAppMetadata } from '../../metadata/Definitions/metadata';
 import type { RecordData } from '../../records/RecordWorkspace/recordMetadataUtils';
 const UniversalDataLoaderWorkspace=React.lazy(()=>import('./UniversalDataLoaderWorkspace'));
-const ReportReadOnlyView=React.lazy(()=>import('../../builders/ReportBuilder/ReportReadOnlyView'));
 
 export function renderSetupShell(ctx: any) {
   const { setupRouteAllowed, setupPermissions, setupAccessNotice, AppExchange, AppManager, ComponentLibrary, FieldWizardModal, FlowInterviews, FlowLogs, NamedCredentials, ScheduledFlows, ScheduledActionRecords, SetupFlowDialogs, SetupObjectDialogs, AccountSessionSecurity, ApprovalProcessManager, AutomationSettingsWorkspace, Bell, Check, ChevronLeft, ChevronRight, CircleHelp, CompanySettings, ConnectionHealthIndicator, DashboardBuilder, Database, DeveloperAccountSettings, FlowBuilderWorkspace, GlobalRecordSearch, History, LightningAppRuntime, Monitor, NavigationLoadTime, ObjectManager, PageBuilder, Permissions, PlatformPageSlot, PlatformWorkspaceSurface, ProfilePasswordMenu, RecordObjectPicker, RecordWorkspace, ReportBuilder, Search, SetupHome, TenantDomains, TenantEmailRecoverySettings, TenantManagement, TenantMfaSettings, TenantRecoveryPanel, TenantSecurityAudit, TenantUsagePanel, TenantUserLockSettings, X, accessControl, accessControlError, accessControlLoaded, activationAppIds, activeUtility, addField, addFlowElement, advancedMetadataLoaded, apiRequest, appUtilityRef, approvalBusyId, approvalProcesses, approvalRequests, apps, setApps, setPages, authorizeNamedCredential, canCreateDashboards, canManageApprovalProcesses, canManageApps, canReadMetadata, canReadSecurity, canManageDashboardTerritories, canManageDashboards, canManageFlows, canManageLibrary, canManageNamedCredentials, canManagePlatformTenants, canManageReportFolders, canManageUserIdentities, canRunFlows, canScheduleDashboards, cancelFlowInterview, changePage, cloneFlow, commitFlow, connectorProviders, connectorRights, connectorRightsLoaded, connectorRightsError, createDashboardSnapshot, createFlow, createObject, currentApp, currentAppNavigation, currentFieldAccess, currentProfileId, currentRecordTypeAccess, customTabObject, customTabStyle, customTabStyles, customTabAppIds, setCustomTabAppIds, dashboardFolders, dashboardRunningUserIds, dashboardTerritories, dashboardUserId, dashboards, deactivateFlow, decideApproval, defaultLightningPage, deleteApp, deleteApprovalProcess, deleteDashboard, deleteDashboardFolder, deleteDashboardSnapshot, deleteDashboardSubscription, deleteEmailAlert, deletePage, deleteField, deleteFlow, deleteLibraryComponent, deleteNamedCredential, deleteObject, restoreObject, deletePlatformEvent, deleteReport, emailAlerts, executeConnectorAppLifecycleFlow, exitDashboardViewer, exportFlow, fetchFlowListPage, filteredSetupGroups, flow, flowDefinitionsLoaded, flowDefinitionsError, reportsLoaded, reportsError, dashboardsLoaded, dashboardsError, flowDebug, flowHasUnsavedChanges, flowHistory, flowInterviews, flowInterviewsLoading, flowLogs, flowLogsLoading, flowRun, flowRunnerError, flowRunnerSubmitting, flowToolTab, flowValidation, flows, formulaEditorRef, goBackFlowScreen, grantConnectorLicence, importFlow, insertFormulaText, integrationConnections, isStandaloneMetadataPage, launchCustomTabWizard, libraryComponents, loadAppCommunicationHistory, loadConnectorMarketplaceApps, loadDashboardRecords, loadDashboardSnapshots, loadDashboardSubscriptions, loadFlowScreenRecords, loadNotifications, logout, markNotificationRead, metadataLoadError, metadataLoaded, namedCredentials, setNamedCredentials, namedCredentialsLoaded, namedCredentialsError, namedCredentialsReadinessError, namedCredentialsEncryptionReady, navigateRoute, navigateSetupItem, newFieldAllowReparenting, newFieldApiName, newFieldCaseSensitive, newFieldChildRelationshipName, newFieldConfigurationError, newFieldController, newFieldControllerApiName, newFieldControllerValues, newFieldDefaultValue, newFieldDeleteBehavior, newFieldDescription, newFieldExternalId, newFieldFormula, newFieldFormulaValidation, newFieldHasDefault, newFieldHelpText, newFieldLabel, newFieldLayoutIds, newFieldLookupFilterLogic, newFieldLookupFilters, newFieldPicklistOptions, newFieldPicklistRestricted, newFieldPicklistValues, newFieldPrecision, newFieldRelationshipName, newFieldRelationshipTarget, newFieldRequired, newFieldReturnType, newFieldScale, newFieldStage, newFieldTextLength, newFieldType, newFieldUnique, newFieldValueSettings, newObjectDescription, newObjectLabel, newObjectPluralLabel, newObjectRecordNameLabel, newObjectSettings, notificationRef, notifications, notificationsLoading, notificationsOpen, notificationsUnreadCount, notify, object, objectSearch, objectSetting, objects, onLogout, openDashboardViewer, openFlowDebug, openPageForObject, openSetupWorkspace, page, pageCreationAppContext, pageRouteApiName, pages, pageDefinitionCache, platformEvents, previewReport, protectedPageRuntime, publishLibraryComponent, quickFind, readableRecordObjects, recentRoutes, recordSearch, redoFlow, refreshFlowInterviews, refreshObject, relatedLookupFilterOperators, removeFlowElement, reportFolders, reports, resetNewFieldDraft, restoreFlowVersion, rollbackLibraryComponent, rotateNamedCredential, route, routeAliasError, routeTiming, runDashboardSubscription, runFlow, runFlowDebug, runReport, runSavedFlowTests, runtimeFormFactor, saveAccessControl, saveApp, saveApprovalProcess, saveConnectorProvider, saveCustomTab, saveDashboard, saveDashboardFolder, saveDashboardSubscription, saveDashboardTerritories, saveEmailAlert, saveField, saveFlow, saveIntegrationConnection, saveLibraryComponent, saveNamedCredential, saveObject, savePage, savePageFromBuilder, updatePageDetailsFromBuilder, publishPageFromBuilder, deactivatePageFromBuilder, savePlatformEvent, saveReport, saveReportFolder, selectDashboard, selectFlow, selectedFlowId, setActiveUtility, setCustomTabObject, setCustomTabStyle, setFlowDebug, setFlowRun, setFlowRunnerError, setFlowToolTab, setLaunchCustomTabWizard, setNewFieldAllowReparenting, setNewFieldCaseSensitive, setNewFieldChildRelationshipName, setNewFieldControllerApiName, setNewFieldDefaultValue, setNewFieldDeleteBehavior, setNewFieldDescription, setNewFieldExternalId, setNewFieldFormula, setNewFieldFormulaValidation, setNewFieldHasDefault, setNewFieldHelpText, setNewFieldLabel, setNewFieldLayoutIds, setNewFieldLookupFilterLogic, setNewFieldLookupFilters, setNewFieldPicklistRestricted, setNewFieldPicklistValues, setNewFieldPrecision, setNewFieldRelationshipName, setNewFieldRelationshipTarget, setNewFieldRequired, setNewFieldReturnType, setNewFieldScale, setNewFieldStage, setNewFieldTextLength, setNewFieldType, setNewFieldUnique, setNewFieldValueSettings, setNewObjectDescription, setNewObjectLabel, setNewObjectPluralLabel, setNewObjectRecordNameLabel, setNewObjectSettings, setObject, setObjectSearch, setPage, setPageCreationAppContext, setQuickFind, setRecordSearch, setSelectedFlowId, setSetupSidebarCollapsed, setShowNewField, setShowNewObject, setShowCustomTabWizard, setStandalonePageMode, setupSidebarCollapsed, showCustomTabWizard, showNewField, showNewObject, standalonePageMode, submitFlowScreen, testIntegrationConnection, testNamedCredential, toast, setToast, toggleNamedCredentialEnabled, toggleNotifications, undoFlow, uneSolutionsLogoUrl, updateFlowConfig, updateFlowLabel, validateFlow, validateNewFieldFormula, workspace } = ctx;
@@ -217,9 +216,7 @@ export function renderSetupShell(ctx: any) {
                       || (workspace === 'flow-interviews' && item === 'Paused and Waiting Interviews')
                       || (workspace === 'scheduled-actions' && item === 'Scheduled Actions')
                       || (workspace === 'scheduled-flows' && item === 'Scheduled Flows')
-                      || (workspace === 'flow-logs' && item === 'Flow History')
-                      || (workspace === 'report-builder' && item === (route.kind==='setup' && route.resourceApiName==='viewer'?'Reports View':'Reports Builder'))
-                      || (workspace === 'dashboard-builder' && item === (route.kind==='setup' && (route.dashboardView || route.resourceApiName==='viewer')?'Dashboard View':'Dashboard Builder'));
+                      || (workspace === 'flow-logs' && item === 'Flow History');
                     return <button key={item}
                       className={isSelected ? 'tree-item selected' : 'tree-item'}
                       aria-current={isSelected ? 'page' : undefined}
@@ -467,54 +464,6 @@ export function renderSetupShell(ctx: any) {
           {route.kind === 'setup' && workspace === 'app-manager' && advancedMetadataLoaded && <PlatformWorkspaceSurface workspace="app-manager" componentRuntime={protectedPageRuntime} permitted={canReadMetadata} resolving={!sessionPermissionsLoaded} pages={pages} libraryComponents={libraryComponents} device={runtimeFormFactor} canEditSystemPage={canManagePlatformTenants} onEditSystemPage={(apiName: string)=>{const selected=pages.find(p=>p.apiName===apiName);if(selected)setPage(selected);navigateRoute({kind:'setup',workspace:'page-builder',resourceApiName:apiName});}}><AppManager apps={apps} objects={objects} pages={pages} flows={flows} libraryComponents={libraryComponents} reports={reports} dashboards={dashboards}
             onSave={saveApp} onDelete={deleteApp} request={apiRequest} canPublish={canManagePlatformTenants}
             onOpenWorkspace={(destination) => navigateRoute({kind:'setup', workspace:destination})} /></PlatformWorkspaceSurface>}
-          {route.kind === 'setup' && workspace === 'dashboard-builder' && (
-            dashboardsError ? <section className="setup-card" role="alert">Unable to load dashboards: {dashboardsError}</section> :
-            !dashboardsLoaded || !advancedMetadataLoaded ? <SetupLoadingState label="Dashboards" /> :
-            <DashboardBuilder
-            dashboards={dashboards}
-            dashboardFolders={dashboardFolders}
-            objects={objects}
-            libraryComponents={libraryComponents}
-            reports={reports}
-            smtpCredentials={namedCredentials.filter((credential) => credential.protocol === 'SMTP')}
-            canSchedule={canScheduleDashboards}
-            shareUsers={accessControlError ? [] : accessControl.users.filter((user) => user.id !== dashboardUserId)}
-            shareGroups={accessControlError ? [] : accessControl.permissionSetGroups}
-            folderPublicGroups={accessControlError ? [] : accessControl.publicGroups}
-            folderRoles={accessControlError ? [] : accessControl.roles}
-            folderPermissionSetGroups={accessControlError ? [] : accessControl.permissionSetGroups}
-            dashboardTerritories={dashboardTerritories}
-            canManageTerritories={canManageDashboardTerritories}
-            subscriptionUsers={accessControlError ? [] : accessControl.users}
-            runningUserIds={dashboardRunningUserIds}
-            userId={dashboardUserId}
-            canCreate={canCreateDashboards}
-            canManageAll={canManageDashboards}
-            viewerMode={route.kind === 'setup' && (route.dashboardView === true || route.resourceApiName==='viewer')}
-            selectedApiName={route.kind === 'setup' ? (route.resourceApiName==='viewer'?dashboards[0]?.apiName:route.resourceApiName) : undefined}
-            onSelect={(apiName:string)=>setupPermissions.includes('setup:DashboardBuilder:view')
-              ?selectDashboard(apiName)
-              :navigateRoute({kind:'setup',workspace:'dashboard-builder',resourceApiName:apiName,dashboardView:true})}
-            onOpenViewer={openDashboardViewer}
-            onExitViewer={(apiName:string)=>setupPermissions.includes('setup:DashboardBuilder:view')
-              ?exitDashboardViewer(apiName)
-              :navigateRoute({kind:'setup',workspace:'dashboard-builder',resourceApiName:'viewer'})}
-            onLoadRecords={loadDashboardRecords}
-            onRunReport={runReport}
-            onLoadSnapshots={loadDashboardSnapshots}
-            onCreateSnapshot={createDashboardSnapshot}
-            onDeleteSnapshot={deleteDashboardSnapshot}
-            onLoadSubscriptions={loadDashboardSubscriptions}
-            onSaveSubscription={saveDashboardSubscription}
-            onDeleteSubscription={deleteDashboardSubscription}
-            onRunSubscription={runDashboardSubscription}
-            onSave={saveDashboard}
-            onDelete={deleteDashboard}
-            onSaveFolder={saveDashboardFolder}
-            onDeleteFolder={deleteDashboardFolder}
-            onSaveTerritories={saveDashboardTerritories}
-            onNotify={notify}
-          />)}
           {route.kind === 'setup' && workspace === 'named-credentials' && (
             route.resourceApiName==='NamedDevices'
               ? <section className="setup-card md-access-locked" role="alert" aria-label="Named Devices access required">
@@ -528,7 +477,6 @@ export function renderSetupShell(ctx: any) {
               ? <section className="setup-card" role="alert">Named Credentials could not be verified: {namedCredentialsError}</section> :
             <PlatformWorkspaceSurface workspace="named-credentials" componentRuntime={protectedPageRuntime} permitted={canReadMetadata} resolving={!sessionPermissionsLoaded} pages={pages} libraryComponents={libraryComponents} device={runtimeFormFactor} canEditSystemPage={canManagePlatformTenants} onEditSystemPage={(apiName: string)=>{const selected=pages.find(p=>p.apiName===apiName);if(selected)setPage(selected);navigateRoute({kind:'setup',workspace:'page-builder',resourceApiName:apiName});}}><PlatformPageSlot slotKey="credentials"><NamedCredentials
             credentials={namedCredentials}
-            webhookOnly={route.resourceApiName === 'Webhooks'}
             canManage={canManageNamedCredentials}
             encryptionReady={namedCredentialsEncryptionReady}
             onSave={saveNamedCredential}
@@ -605,12 +553,6 @@ export function renderSetupShell(ctx: any) {
             onOpenFlow={selectFlow}
             onOpenRecord={(objectName,id) => navigateRoute({kind:'record-detail', objectApiName:objectName, recordId:id})}
           /></PlatformWorkspaceSurface>)}
-          {route.kind === 'setup' && workspace === 'report-builder' && (
-            reportsError ? <section className="setup-card" role="alert">Unable to load reports: {reportsError}</section> :
-            !reportsLoaded || !advancedMetadataLoaded ? <section className="setup-card" role="status">Loading live reports…</section> :
-            route.resourceApiName==='viewer'
-              ? <React.Suspense fallback={<section className="setup-card" role="status">Loading reports view…</section>}><ReportReadOnlyView reports={reports} folders={reportFolders} onRun={runReport}/></React.Suspense>
-              : <ReportBuilder reports={reports} reportFolders={reportFolders} canManageReportFolders={canManageReportFolders} accessControl={accessControl} objects={objects} onSave={saveReport} onSaveFolder={saveReportFolder} onDelete={deleteReport} onRun={runReport} onPreview={previewReport} onNotify={notify} />)}
           {route.kind === 'setup' && workspace === 'scheduled-flows' && (
             flowDefinitionsError ? <section className="setup-card" role="alert">Unable to load saved flows: {flowDefinitionsError}</section> :
             <ScheduledFlows flows={flows} objects={objects} loading={!flowDefinitionsLoaded || !advancedMetadataLoaded} onEdit={selectFlow}
@@ -709,7 +651,7 @@ export function renderSetupShell(ctx: any) {
 securitySubsection={route.resourceId}
 onSelectSection={(section)=>navigateRoute({kind:'setup',workspace:'company-settings',...(section?{resourceApiName:section}:{})})}
 onSelectSecurityArea={area=>navigateRoute({kind:'setup',workspace:'company-settings',resourceApiName:'security',resourceId:area})}
-onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:target})} developerAccess={{metadata:canReadMetadata,apps:canManageApps,flows:canManageFlows,dashboards:canManageDashboards,reports:canReadMetadata,approvals:canManageApprovalProcesses,security:canReadSecurity}} company={<CompanySettings canManage={canManageUserIdentities} />} domains={<PlatformPageSlot slotKey="domains"><TenantDomains request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>} developer={<PlatformPageSlot slotKey="developer-accounts"><DeveloperAccountSettings request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>} usage={<PlatformPageSlot slotKey="usage"><TenantUsagePanel request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>} recovery={<PlatformPageSlot slotKey="recovery"><TenantRecoveryPanel request={apiRequest} operator={false} permitted={canManageUserIdentities} /></PlatformPageSlot>} mfa={<PlatformPageSlot slotKey="mfa"><TenantMfaSettings onReauthenticate={onLogout} canManage={canManageUserIdentities} governanceTab={route.resourceId === 'connected-apps' ? 'connected apps' : 'audit'} governanceFocus={route.resourceId === 'connected-apps' || route.resourceId === 'audit-trail'} /></PlatformPageSlot>} emailRecovery={<PlatformPageSlot slotKey="email-recovery"><TenantEmailRecoverySettings canManage={canManageUserIdentities} /></PlatformPageSlot>} locks={<PlatformPageSlot slotKey="locks"><TenantUserLockSettings /></PlatformPageSlot>} sessions={<PlatformPageSlot slotKey="sessions"><AccountSessionSecurity onReauthenticate={onLogout} /></PlatformPageSlot>} audit={<PlatformPageSlot slotKey="audit"><TenantSecurityAudit /></PlatformPageSlot>} /></PlatformWorkspaceSurface>}
+onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:target})} developerAccess={{metadata:canReadMetadata,apps:canManageApps,flows:canManageFlows,dashboards:canManageDashboards,reports:canReadMetadata,approvals:canManageApprovalProcesses,security:canReadSecurity}} company={<CompanySettings canManage={canManageUserIdentities} />} domains={<p>Custom domain inspection is temporarily unavailable.</p>} developer={<PlatformPageSlot slotKey="developer-accounts"><DeveloperAccountSettings request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>} usage={<p>Tenant usage inspection is temporarily unavailable.</p>} recovery={<PlatformPageSlot slotKey="recovery"><TenantRecoveryPanel request={apiRequest} operator={false} permitted={canManageUserIdentities} /></PlatformPageSlot>} mfa={<PlatformPageSlot slotKey="mfa"><TenantMfaSettings onReauthenticate={onLogout} canManage={canManageUserIdentities} governanceTab={route.resourceId === 'connected-apps' ? 'connected apps' : 'audit'} governanceFocus={route.resourceId === 'connected-apps' || route.resourceId === 'audit-trail'} /></PlatformPageSlot>} emailRecovery={<PlatformPageSlot slotKey="email-recovery"><TenantEmailRecoverySettings canManage={canManageUserIdentities} /></PlatformPageSlot>} locks={<PlatformPageSlot slotKey="locks"><TenantUserLockSettings /></PlatformPageSlot>} sessions={<PlatformPageSlot slotKey="sessions"><AccountSessionSecurity onReauthenticate={onLogout} /></PlatformPageSlot>} audit={<PlatformPageSlot slotKey="audit"><TenantSecurityAudit /></PlatformPageSlot>} /></PlatformWorkspaceSurface>}
           {route.kind === 'setup' && workspace === 'tenant-management' && !sessionPermissionsLoaded && <section className="setup-card" role="status">Checking access…</section>}
           {route.kind === 'setup' && workspace === 'tenant-management' && sessionPermissionsLoaded && !canManagePlatformTenants && <PlatformWorkspaceSurface
             workspace="company-settings" componentRuntime={protectedPageRuntime}
@@ -724,9 +666,9 @@ onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:t
               </header>
               <CompanySettingsWorkspace objects={readableRecordObjects} mobile={runtimeFormFactor === 'Phone'} onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:target})} developerAccess={{metadata:canReadMetadata,apps:canManageApps,flows:canManageFlows,dashboards:canManageDashboards,reports:canReadMetadata,approvals:canManageApprovalProcesses,security:canReadSecurity}}
                 company={<CompanySettings canManage={canManageUserIdentities} />}
-                domains={<PlatformPageSlot slotKey="domains"><TenantDomains request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>}
+                domains={<p>Custom domain inspection is temporarily unavailable.</p>}
                 developer={<PlatformPageSlot slotKey="developer-accounts"><DeveloperAccountSettings request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>}
-                usage={<PlatformPageSlot slotKey="usage"><TenantUsagePanel request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>}
+                usage={<p>Tenant usage inspection is temporarily unavailable.</p>}
                 recovery={<PlatformPageSlot slotKey="recovery"><TenantRecoveryPanel request={apiRequest} operator={false} permitted={canManageUserIdentities} /></PlatformPageSlot>}
                 mfa={<PlatformPageSlot slotKey="mfa"><TenantMfaSettings onReauthenticate={onLogout} canManage={canManageUserIdentities} /></PlatformPageSlot>}
                 emailRecovery={<PlatformPageSlot slotKey="email-recovery"><TenantEmailRecoverySettings canManage={canManageUserIdentities} /></PlatformPageSlot>}

@@ -90,12 +90,9 @@ export function parseAppRoute(pathname: string, search = ''): AppRoute {
     if (segments.length === 4 && segments[0] === 'apps' && segments[2] === 'pages') {
       return { kind: 'app-page', appId: decodeURIComponent(segments[1]), pageApiName: decodeURIComponent(segments[3]) };
     }
-    if (segments.length === 2 && segments[0] === 'dashboards') {
-      return { kind: 'setup', workspace: 'dashboard-builder', resourceApiName: decodeURIComponent(segments[1]), dashboardView: true };
-    }
     if (segments[0] === 'setup') {
       const workspace = decodeURIComponent(segments[1] ?? 'home') as WorkspaceId | 'connector-settings';
-      const validWorkspaces: WorkspaceId[] = ['home', 'object-manager', 'data-loader', 'page-builder', 'dashboard-builder', 'report-builder', 'flow-builder', 'flow-interviews', 'scheduled-actions', 'scheduled-flows', 'flow-logs', 'automation-settings', 'app-manager', 'app-exchange', 'named-credentials', 'company-settings', 'tenant-management', 'rbac'];
+      const validWorkspaces: WorkspaceId[] = ['home', 'object-manager', 'data-loader', 'page-builder', 'flow-builder', 'flow-interviews', 'scheduled-actions', 'scheduled-flows', 'flow-logs', 'automation-settings', 'app-manager', 'app-exchange', 'named-credentials', 'company-settings', 'tenant-management', 'rbac'];
       if (workspace === 'connector-settings') return { kind: 'setup', workspace: 'named-credentials' };
       if (!validWorkspaces.includes(workspace)) return { kind: 'setup', workspace: 'home' };
       if (workspace === 'object-manager') {
@@ -158,9 +155,6 @@ export function appRoutePath(route: AppRoute): string {
 
 export function appRoutePathWithoutBase(route: AppRoute): string {
   if (route.kind === 'setup') {
-    if (route.dashboardView && route.resourceApiName) {
-      return `/une/dashboards/${encodeURIComponent(route.resourceApiName)}`;
-    }
     const segments = ['/une/setup', encodeURIComponent(route.workspace)];
     if (route.workspace === 'object-manager') {
       if (route.objectApiName) segments.push(encodeURIComponent(route.objectApiName));

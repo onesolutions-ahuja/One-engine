@@ -261,6 +261,13 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(key.startsWith(componentId+':'))map.set(code.sources[key],this.formula(key)!);
    return map;
   },
+  /** Component property -> formula function (to match the text after page state was filled in). */
+  formulasByProperty(componentId:string):Map<string,(row:Row)=>unknown>{
+   const map=new Map<string,(row:Row)=>unknown>();
+   for(const key of Object.keys(code.formulas))
+    if(key.startsWith(componentId+':'))map.set(key.slice(componentId.length+1),this.formula(key)!);
+   return map;
+  },
   hasAction:(key:string)=>Object.prototype.hasOwnProperty.call(code.actions,key),
   /** Load every record set for the current state (one request). */
   async loadSets(rowObject=''){

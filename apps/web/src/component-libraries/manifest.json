@@ -22,6 +22,7 @@
     "smart_icon/component.json",
     "smart_keyboard/component.json",
     "smart_dock/component.json",
-    "smart_chart/component.json"
+    "smart_chart/component.json",
+    "smart_qr/component.json"
   ]
 }

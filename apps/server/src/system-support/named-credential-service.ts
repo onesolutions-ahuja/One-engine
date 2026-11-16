@@ -1092,8 +1092,14 @@ export class NamedCredentialService {
     const colon=line.indexOf(':');
     if(colon<1)throw new Error('Invalid HTTP header');
     const name=line.slice(0,colon).trim(),value=substitute(line.slice(colon+1).trim());
+    const lower=name.toLowerCase();
+    // Provider version and partner-id headers used by payment connectors (Revolut, Square,
+    // Dojo, PayPal). They select an API version or identify the integrator, nothing more.
     if(!/^X-[a-z0-9-]+$/i.test(name)
-      &&!(name.toLowerCase()==='revolut-api-version'&&/^\d{4}-\d{2}-\d{2}$/.test(value))
+      &&!((lower==='revolut-api-version'||lower==='square-version'||lower==='version')
+        &&/^\d{4}-\d{2}-\d{2}$/.test(value))
+      &&!((lower==='software-house-id'||lower==='reseller-id'||lower==='paypal-request-id')
+        &&/^[A-Za-z0-9._:-]{1,128}$/.test(value))
       ||/[\r\n]/.test(value))throw new Error('Restricted HTTP header');
     header[name]=value;
    }

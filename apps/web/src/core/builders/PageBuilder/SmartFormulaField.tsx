@@ -33,7 +33,7 @@ export function splitSmartFormula(value:string){
 function tokenEndsInComponentPrefix(source:string){
  return /@This(?:Page|Tenant)(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.$/i.test(source);
 }
-export default function SmartFormulaField({value,onChange,fields,disabled,label,objects=[],rootObjectApiName='',singleFieldOnly=false,selectedSourceObjects,mentionKind='text',validate,stateOptions=[],flowReferences,actionPages=[],actionCredentials=[]}:{
+export default function SmartFormulaField({value,onChange,fields,disabled,label,objects=[],rootObjectApiName='',singleFieldOnly=false,selectedSourceObjects,mentionKind='text',validate,stateOptions=[],flowReferences,actionPages=[],actionCredentials=[],actionCallouts=[]}:{
  value:string;onChange:(next:string)=>void;fields:readonly FieldMetadata[];disabled:boolean;label:string;
  objects?:readonly ObjectMetadata[];rootObjectApiName?:string;singleFieldOnly?:boolean;selectedSourceObjects?:readonly ObjectMetadata[];mentionKind?:MentionKind;
  validate?:(formula:string)=>string|null;
@@ -42,6 +42,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   * everywhere else, so normal formula bars never suggest FLOW(). */
  actionPages?:readonly {apiName:string;label:string;pageType:string;status:string}[];
  actionCredentials?:readonly {apiName:string;label:string}[];
+ actionCallouts?:readonly {apiName:string;label:string;fields?:readonly string[];outputs?:readonly string[]}[];
  flowReferences?:readonly {apiName:string;label:string}[]
 }){
  const scope=usePageFormulaScope();
@@ -116,7 +117,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  // TABLE's first argument is an @Object; columns are that Object's fields,
  // written like every other field: TABLE(@Product, @Product.Name, @Product.Price).
  const tableArg=Boolean(tableSourcePrompt||tableObject);
- const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials):null;
+ const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials,actionCallouts):null;
  const availableMentions:PageValueSuggestion[]=actionArgs&&matches?.prefix===''?actionArgs.choices.map(item=>({reference:item.apiName,label:item.label}))
   :tableArg?recordMentions:recordMentions;
  const filtered:PageValueSuggestion[]=!matches?[]:pageMentions?pageMentions.slice(0,200):[...rootMentions,...availableMentions
@@ -174,7 +175,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
    // Picking a column inserts @Object.Field, the same spelling as everywhere else.
    const tableField=tablePart&&/^@?[A-Za-z0-9_]*$/.test(last)
     ?{start:caret-last.length,end:caret,query:last.replace(/^@/,'')}:null;
-   const args=flowReferences?actionArgumentSuggestions(before,objects,flowReferences,actionPages,actionCredentials):null;
+   const args=flowReferences?actionArgumentSuggestions(before,objects,flowReferences,actionPages,actionCredentials,actionCallouts):null;
    setMatches(args?{start:caret-args.query.length,end:caret,query:args.query,prefix:''}:mention?{start:caret-mention[0].length,end:caret,query:mention[1],prefix:'@'}:
     tableField?{...tableField,prefix:''}:null);
    const name=next.trimStart().startsWith('=')?formulaFunctionPrefix(before):null;

@@ -327,3 +327,66 @@ test('shared payment orders support independent providers, retries, and verified
  assert.match(PAYMENT_ORDER_DDL,/UNIQUE\(tenant_id,provider,created_by,attempt_key\)/);
  assert.match(LEGACY_REVOLUT_PAYMENT_COPY,/FROM md_revolut_checkout_orders/);
 });
+
+// CALLOUT / LOOP / REPEAT action formulas and payment connector manifests.
+import {compileActionPlan,executeActionPlan} from '../../src/expression-engine/ActionFormulas.ts';
+import {calloutVariables,readCalloutPath} from '../../src/system-support/action-formula-callout-service.ts';
+import {webhookSummary} from '../../src/system-support/inbound-webhook-routes.ts';
+
+test('CALLOUT, LOOP and REPEAT compile into no-code action steps',()=>{
+ const plan=compileActionPlan(`ACTIONS(CALLOUT('SumUp.StartPayment','Amount',12.5,AS(pay)),
+  REPEAT(CALLOUT('SumUp.CheckStatus','PaymentId',pay.PaymentId,AS(chk)),chk.Status<>"PENDING",2,60),
+  LOOP(3,AS(i),CREATERECORD(Task,Name,"Line")))`);
+ assert.deepEqual(plan.map(step=>step.name),['CALLOUT','REPEAT','LOOP']);
+ assert.equal(plan[0].object,'SumUp.StartPayment');
+ assert.equal(plan[1].body[0].name,'CALLOUT');
+ assert.equal(plan[2].body[0].name,'CREATERECORD');
+ assert.throws(()=>compileActionPlan("CALLOUT('NoDot','A',1)"),/Connector\.Operation/);
+ assert.throws(()=>compileActionPlan("LOOP(2,AS(i),LOOP(2,AS(j),STATE(a,1)))"),/cannot be nested/);
+ assert.throws(()=>compileActionPlan("REPEAT(STATE(a,1),TRUE,1)"),/REPEAT requires/);
+});
+
+test('REPEAT stops when its condition is true and LOOP runs a fixed count',async()=>{
+ const calls=[];let checks=0;
+ const evaluate=(node,scope)=>{
+  const ev=x=>x.kind==='literal'?x.value:x.kind==='reference'?x.value.split('.').reduce((o,k)=>o?.[k],scope)
+   :x.kind==='binary'&&x.operator==='<>'?ev(x.left)!==ev(x.right):null;
+  return ev(node);
+ };
+ await executeActionPlan(`ACTIONS(REPEAT(CALLOUT('Square.CheckStatus','PaymentId',"p1",AS(chk)),chk.Status<>"PENDING",1,5),
+  LOOP(2,AS(i),CREATERECORD(Task,Name,"x")))`,{},evaluate,{
+  request:async(path,init)=>{calls.push(path);
+   if(path==='/action-formulas/callout')return {Status:++checks<2?'PENDING':'COMPLETED'};
+   return {record:{Id:'00000000-0000-4000-8000-000000000001'}};}});
+ assert.equal(checks,2);
+ assert.equal(calls.filter(path=>path==='/records/Task').length,2);
+});
+
+test('CALLOUT values add pence and decimal helpers and read friendly replies',()=>{
+ const vars=calloutVariables({Amount:12.5,Reference:'S1'},'key-123456');
+ assert.equal(vars.AmountMinor,1250);
+ assert.equal(vars.AmountDecimal,'12.50');
+ assert.equal(vars.CalloutKey,'key-123456');
+ assert.throws(()=>calloutVariables({public_secret:'x'},'k'),/Invalid CALLOUT field/);
+ assert.throws(()=>calloutVariables({Amount:{}},'k'),/must be text/);
+ assert.equal(readCalloutPath({links:[{href:'a'},{href:'b'}]},'links[1].href'),'b');
+ assert.equal(readCalloutPath([{terminalId:'t1'}],'[0].terminalId'),'t1');
+ assert.equal(readCalloutPath({},'missing.path'),null);
+});
+
+test('incoming webhooks summarise common provider payloads',()=>{
+ assert.deepEqual(webhookSummary({event_type:'CHECKOUT.ORDER.APPROVED',resource:{id:'O1',status:'APPROVED'}}),
+  {eventType:'CHECKOUT.ORDER.APPROVED',reference:'O1',status:'APPROVED'});
+ assert.equal(webhookSummary({type:'terminal.checkout.updated',data:{id:'C1',object:{checkout:{id:'C1',status:'COMPLETED'}}}}).status,'COMPLETED');
+});
+
+test('payment connector manifests declare valid operations',async()=>{
+ for(const folder of ['paypal','sumup','dojo','square','zeller','revolut']){
+  const {default:manifest}=await import('../../../connectors/'+folder+'/scripts/install.mjs');
+  assert.ok(['Card Terminal','QR Payment'].includes(manifest.providerType),folder);
+  for(const [name,operation] of Object.entries(manifest.operations)){
+   assert.ok(!operation.path.startsWith('/'),folder+'.'+name);
+   if(operation.body)assert.equal(typeof JSON.parse(operation.body),'object',folder+'.'+name);
+  }
+ }
+});

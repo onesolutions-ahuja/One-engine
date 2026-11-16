@@ -48,6 +48,7 @@ export function writeCanvasBinding(properties:Props,target:Pick<CanvasBindingTar
 /** A single user-facing name for each metadata binding, shared by the selected
  * field icon and the existing Data ribbon. Property IDs remain unchanged. */
 const bindingLabels:Record<string,Record<string,string>>={
+ smart_qr:{textSource:'QR value',label:'Caption',collectionFormula:'Record source'},
  smart_chart:{collectionFormula:'Chart data source',textSource:'Label (category)',column2Source:'Value',
   chartValuePrefix:'Value prefix',label:'Chart title'},
  smart_dock:Object.fromEntries([1,2,3,4,5,6].flatMap(n=>[

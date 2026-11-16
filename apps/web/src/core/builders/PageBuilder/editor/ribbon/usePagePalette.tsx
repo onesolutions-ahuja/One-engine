@@ -1,7 +1,7 @@
 import { libraryComponentLabel } from '../../../../components/Registry/componentLibraryDiscovery';
 import { useEffect } from 'react';
 import {
-CalendarDays, Grid2X2, Type, Square, Image as ImageIcon, MousePointer2, BarChart3, FormInput,
+CalendarDays, Grid2X2, Type, Square, Image as ImageIcon, MousePointer2, BarChart3, QrCode, FormInput,
 ToggleRight, List, Puzzle, Search, Star, Layers3, ShoppingCart, PanelsTopLeft, MessageCircle,
 BadgeCheck, Table2, Menu, Repeat, Keyboard, PanelBottom
 } from 'lucide-react';
@@ -85,6 +85,7 @@ export function usePagePalette(
       case 'Custom:smart_dock':return <PanelBottom size={15}/>;
       case 'Custom:smart_search':return <Search size={15}/>;
       case 'Custom:smart_chart':return <BarChart3 size={15}/>;
+      case 'Custom:smart_qr':return <QrCode size={15}/>;
     }
     const name = `${component.label} ${component.type}`.toLowerCase();
     if (/\b(text|heading|paragraph|rich text|label)\b/.test(name)) return <Type size={15} />;

@@ -98,10 +98,14 @@ export default function PageBuilderActionRibbon({
 }) {
  const active=Boolean(selectedEvent&&Object.prototype.hasOwnProperty.call(actions,selectedEvent));
  const [credentials,setCredentials]=useState<Array<{apiName:string;label:string}>>([]);
+ const [callouts,setCallouts]=useState<Array<{apiName:string;label:string;fields?:string[];outputs?:string[]}>>([]);
  useEffect(()=>{
   let active=true;
   if(request)void request<Array<{apiName:string;label:string}>>('/action-formulas/credentials')
    .then(items=>{if(active)setCredentials(items);}).catch(()=>{if(active)setCredentials([]);});
+  // Installed connector operations for CALLOUT('Connector.Operation', ...): names, blanks and reply fields.
+  if(request)void request<Array<{apiName:string;label:string;fields?:string[];outputs?:string[]}>>('/action-formulas/callouts')
+   .then(items=>{if(active)setCallouts(Array.isArray(items)?items:[]);}).catch(()=>{if(active)setCallouts([]);});
   return ()=>{active=false;};
  },[request]);
  const selected=asBinding(actions[selectedEvent]);
@@ -236,7 +240,7 @@ export default function PageBuilderActionRibbon({
        <span className="page-action-formula-menu" aria-hidden="true"><SlidersHorizontal size={15}/></span>
        <span className="page-action-formula-symbol" aria-hidden="true"
          title={'Formula: @CartLine.Quantity + 1; @ThisPage.'+(ownerName||'Button1')+'.key := @event.value; @filter.key := @event.value; @navigate.page := "App/Page"; IF(@ThisPage.Cart1.Total > 500, FLOW(ApplePay), FLOW(CardMachine))'}>ƒx</span>
-       <SmartFormulaField label="Selected action formula" fields={formulaFields} objects={objects} actionPages={pages} actionCredentials={credentials}
+       <SmartFormulaField label="Selected action formula" fields={formulaFields} objects={objects} actionPages={pages} actionCredentials={credentials} actionCallouts={callouts}
          stateOptions={stateOptions}
          flowReferences={availableFlows.map(flow=>({apiName:flow.apiName,label:flow.label}))}
          validate={value=>!isActionPlan(value)&&isFlowActionFormula(value)?validateFlowActionFormula(value,flows):null}

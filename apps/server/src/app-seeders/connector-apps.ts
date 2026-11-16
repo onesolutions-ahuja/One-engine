@@ -7,22 +7,40 @@ import type {SqlPersistence} from '../system-files/sql-persistence.js';
 export const connectorApps=Object.freeze({
  WhatsAppConnector:'whatsapp',SmsGateConnector:'sms-gate',BrevoConnector:'brevo',
  UberEatsConnector:'uber-eats',DeliverooConnector:'deliveroo',JustEatConnector:'just-eat',
- RevolutConnector:'revolut'
+ RevolutConnector:'revolut',PayPalConnector:'paypal',SumUpConnector:'sumup',
+ DojoConnector:'dojo',SquareConnector:'square',ZellerConnector:'zeller'
 } as const);
 export type ConnectorAppName=keyof typeof connectorApps;
 export const isConnectorApp=(name:string):name is ConnectorAppName=>
  Object.prototype.hasOwnProperty.call(connectorApps,name);
 type Field={apiName:string;label:string;required:boolean;defaultValue:string};
+/** body: JSON template whose {!Name} blanks CALLOUT fills by name; outputs: friendly reply
+ * names mapped to JSON paths in the provider response (e.g. "Status":"data.state"). */
 type Operation={method:'GET'|'POST'|'PUT'|'PATCH'|'DELETE';path:string;headers?:string;
+ body?:string;outputs?:Record<string,string>;label?:string;
  communicationFields?:{recipient?:string;sender?:string;body?:string;responseId?:string}};
+/** Payment role shown in Company Settings and Named Devices. */
+export const PROVIDER_TYPES=['Card Terminal','QR Payment','Online Payment','Delivery','Messaging','Other'] as const;
 type Definition={folder:string;appApi:string;label:string;description:string;credential:string;url:string;
  auth:string;header:string;allowedUrls?:string[];fields:Field[];operations:Record<string,Operation>;docs:string;notes:string;
- communicationChannel?:string;defaultCommunicationFields?:Record<string,string>};
+ communicationChannel?:string;defaultCommunicationFields?:Record<string,string>;
+ providerType?:typeof PROVIDER_TYPES[number]};
 const id=/^[A-Za-z][A-Za-z0-9_]*$/;
+function validBodyTemplate(body:unknown):boolean{
+ if(typeof body!=='string'||body.length>8192)return false;
+ try{const parsed=JSON.parse(body);return Boolean(parsed)&&typeof parsed==='object';}catch{return false;}
+}
+function validOutputs(outputs:unknown):boolean{
+ if(!outputs||typeof outputs!=='object'||Array.isArray(outputs))return false;
+ const entries=Object.entries(outputs);
+ return entries.length<=30&&entries.every(([name,path])=>id.test(name)&&typeof path==='string'
+  &&/^([A-Za-z_][A-Za-z0-9_]*|\[\d+\])(\.[A-Za-z_][A-Za-z0-9_]*|\[\d+\])*$/.test(path));
+}
 function validate(value:Definition,apiName:string):Definition{
  if(value.appApi!==apiName||!id.test(value.credential)||!value.label||!value.description
   ||!['Bearer','Basic','API Key','OAuth Client Credentials','OAuth Authorization Code','Authorization Scheme'].includes(value.auth)
   ||new URL(value.url).protocol!=='https:'
+  ||(value.providerType!==undefined&&!PROVIDER_TYPES.includes(value.providerType))
   ||(value.allowedUrls!==undefined&&(!Array.isArray(value.allowedUrls)
     ||value.allowedUrls.length>3||value.allowedUrls.some(url=>
       typeof url!=='string'||!/^https:\/\/[a-z0-9.-]+\/$/i.test(url)))))
@@ -39,8 +57,10 @@ function validate(value:Definition,apiName:string):Definition{
    ||(definition.headers!==undefined&&(typeof definition.headers!=='string'
      ||definition.headers.length>512
      ||definition.headers.split(/\r?\n/).some(line=>
-       !/^(?:X-[A-Za-z0-9-]+|Revolut-Api-Version): [A-Za-z0-9._:-]{1,128}$/i.test(line)))))
-    throw Error('Invalid connector operation: '+apiName);
+       !/^(?:X-[A-Za-z0-9-]+|Revolut-Api-Version|Square-Version|version|software-house-id|reseller-id|PayPal-Request-Id): (?:[A-Za-z0-9._:-]{1,128}|\{!(?:public_)?[A-Za-z][A-Za-z0-9_]*\})$/i.test(line))))
+   ||(definition.body!==undefined&&!validBodyTemplate(definition.body))
+   ||(definition.outputs!==undefined&&!validOutputs(definition.outputs)))
+    throw Error('Invalid connector operation: '+apiName+'.'+operation);
  }
  return value;
 }
@@ -155,6 +175,7 @@ export async function installConnectorApp(client:PoolClient,tenantId:string,name
   approvedOrigins:[d.url,...(d.allowedUrls??[])].map(url=>new URL(url).origin),
   operations:d.operations,documentation:d.docs,
   channelId:systemChannelId,credentialName,
+  ...(d.providerType?{providerType:d.providerType}:{}),
   ...(d.communicationChannel?{communicationChannel:d.communicationChannel}:{}),
   ...(d.defaultCommunicationFields?{defaultCommunicationFields:d.defaultCommunicationFields}:{})};
  await client.query(`INSERT INTO md_system_definitions

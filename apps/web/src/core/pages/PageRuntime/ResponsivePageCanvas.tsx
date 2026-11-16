@@ -1,7 +1,7 @@
 import {useLayoutEffect,useRef,useState,type CSSProperties,type ReactNode} from 'react';
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import {isStandalonePagePresentation,pageCanvasPresentationStyle} from './pageRuntimePresentation';
-import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth} from './runtimeCanvasSizing';
+import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth} from './runtimeCanvasSizing';
 
 /**
  * Published pages and compiled Builder Preview use the same width-first layout.
@@ -20,6 +20,9 @@ export default function ResponsivePageCanvas({
 }) {
   const frame=useRef<HTMLDivElement>(null);
   const [availableWidth,setAvailableWidth]=useState(page.canvasWidth);
+  // Last small width step (a scrollbar appearing/disappearing), to stop a loop:
+  // new width -> new scale -> new height -> scrollbar toggles -> width flips back.
+  const lastStep=useRef<{from:number;at:number}|null>(null);
 
   useLayoutEffect(()=>{
     const target=frame.current;
@@ -28,7 +31,8 @@ export default function ResponsivePageCanvas({
       // Layout width, not getBoundingClientRect(): the parent preview device
       // frame can be transformed to fit the editor without changing CSS pixels.
       const next=Math.max(1,target.clientWidth||page.canvasWidth);
-      setAvailableWidth(previous=>Math.abs(previous-next)<.5?previous:next);
+      setAvailableWidth(previous=>settleCanvasWidth(previous,next,lastStep.current,
+        typeof performance!=='undefined'?performance.now():Date.now(),step=>{lastStep.current=step;}));
     };
     update();
     const observer=new ResizeObserver(update);

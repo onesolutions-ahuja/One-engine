@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
 import {X,Delete} from 'lucide-react';
-import {apiRequest,ApiRequestError,setAccessToken} from '../Client/authClient';
+import {apiRequest,ApiRequestError,setAccessToken,setSessionUserId} from '../Client/authClient';
 import {forgetTillPerson,initials,restoreTillWork,setActiveTillUser,tillPeople,type TillPerson} from './tillDevice';
 import './tillLock.css';
 
@@ -27,7 +27,7 @@ export function TillLockScreen({onUnlocked,onUseEmail}:{
   try{
    const session=await apiRequest<{access_token:string;landingAppApi?:string}>('/auth/till-device/unlock',
     {method:'POST',body:JSON.stringify({key:chosen.key,pin:value})});
-   setAccessToken(session.access_token);
+   setAccessToken(session.access_token);setSessionUserId(chosen.userId);
    restoreTillWork(chosen.userId);setActiveTillUser(chosen.userId);
    onUnlocked(session);
   }catch(error){

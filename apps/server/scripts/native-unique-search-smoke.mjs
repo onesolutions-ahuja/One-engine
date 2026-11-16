@@ -16,7 +16,7 @@ const setup=new Pool({connectionString:url});
 await setup.query('CREATE SCHEMA native_unique_search_test');
 await setup.end();
 const isolated=new URL(url);
-isolated.searchParams.set('options','-c search_path=native_unique_search_test,public');
+isolated.searchParams.set('options','-c search_path=native_unique_search_test,native_api_test,public');
 const db=new SqlPersistence(isolated.toString());
 try{
  await db.query(readFileSync(new URL('../src/system-files/schema.sql',import.meta.url),'utf8'));

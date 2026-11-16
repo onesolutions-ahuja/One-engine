@@ -1,16 +1,38 @@
 import type {PoolClient} from 'pg';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 /** SQL, not this module, owns tenant relationship metadata. */
 export async function registeredRelationships(client:PoolClient,tenantId:string,relatedObject:{recordId:string;objectApi:string}){
- const {rows}=await client.query<{record_id:string;object_api:string;field_api:string;relationship_type:string;delete_behavior:string|null;required:boolean}>(`
- SELECT r.id AS record_id,r.object_api,f.api_name AS field_api,
- COALESCE(f.relationship_type,'Lookup') AS relationship_type,f.delete_behavior,f.required
- FROM md_record_values v
- JOIN md_records r ON r.tenant_id=v.tenant_id AND r.id=v.record_id AND r.is_deleted=false
- JOIN md_field_definitions f ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api AND f.api_name=v.field_api AND f.deleted_at IS NULL AND f.data_type='reference'
- WHERE v.tenant_id=$1 AND v.reference_record_id=$2 AND f.related_object=$3
- ORDER BY f.relationship_type,r.object_api,r.id`,[tenantId,relatedObject.recordId,relatedObject.objectApi]);
- return rows;
+ const {rows:fields}=await client.query<{object_api:string;api_name:string}>(`
+  SELECT f.object_api,f.api_name FROM md_field_definitions f
+  WHERE f.tenant_id=$1 AND f.data_type='reference' AND f.related_object=$2
+    AND f.deleted_at IS NULL ORDER BY f.object_api,f.api_name`,
+  [tenantId,relatedObject.objectApi]);
+ type Relationship={record_id:string;object_api:string;field_api:string;relationship_type:string;
+  delete_behavior:string|null;required:boolean};
+ const found:Relationship[]=[];
+ const objects=[...new Set(fields.map(field=>field.object_api))];
+ for(const objectApi of objects){
+  const native=await loadNativeFields(client,tenantId,objectApi);
+  const available=fields.filter(field=>field.object_api===objectApi&&native.fields.has(field.api_name));
+  if(!available.length)continue;
+  const entries=available.map((field,index)=>
+   `(${nativeValueSql(native,field.api_name,'nr')},$${index+4}::text)`).join(',');
+  const {rows}=await client.query<Relationship>(`SELECT r.id AS record_id,r.object_api,
+    f.api_name AS field_api,COALESCE(f.relationship_type,'Lookup') AS relationship_type,
+    f.delete_behavior,f.required
+    FROM md_records r JOIN ${nativeTableSql(native)} nr
+     ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+    JOIN LATERAL (VALUES ${entries}) AS links(reference_record_id,field_api) ON true
+    JOIN md_field_definitions f ON f.tenant_id=r.tenant_id AND f.object_api=r.object_api
+      AND f.api_name=links.field_api AND f.deleted_at IS NULL AND f.data_type='reference'
+    WHERE r.tenant_id=$1 AND r.object_api=$3 AND NOT r.is_deleted
+      AND links.reference_record_id=$2
+   `,[tenantId,relatedObject.recordId,objectApi,...available.map(f=>f.api_name)]);
+  found.push(...rows);
+ }
+ return found.sort((a,b)=>a.relationship_type.localeCompare(b.relationship_type)
+  ||a.object_api.localeCompare(b.object_api)||a.record_id.localeCompare(b.record_id));
 }
 
 /** Public tenant-scoped relationship contract shared by Object Manager and

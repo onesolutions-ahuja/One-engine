@@ -517,25 +517,27 @@ export class RecordEngine {
     const formula=definitions.find(field=>field.api_name===fieldApi&&field.data_type==='formula');
     if(!formula||!formula.formula_expression)
       throw new Error('Formula field definition is unavailable for migration');
+    const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
     const {rows}=await client.query<{
-      field_api:string;data_type:string;value_text:string|null;value_number:string|null;
+      field_api:string|null;data_type:string|null;value_text:string|null;value_number:string|null;
       value_boolean:boolean|null;value_date:string|null;value_datetime:Date|string|null;
       reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;
       address_street:string|null;address_city:string|null;address_state:string|null;
-      address_postal_code:string|null;address_country:string|null
+      address_postal_code:string|null;address_country:string|null;is_clone:boolean
     }>(`SELECT v.field_api,f.data_type,v.value_text,v.value_number::text AS value_number,
         v.value_boolean,v.value_date::text AS value_date,v.value_datetime,v.reference_record_id,
         v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,
-        v.address_postal_code,v.address_country
-      FROM md_record_values v JOIN md_field_definitions f
-        ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api AND f.api_name=v.field_api
-      WHERE v.tenant_id=$1 AND v.object_api=$2 AND v.record_id=$3 AND f.deleted_at IS NULL`,
+        v.address_postal_code,v.address_country,r.is_clone
+      FROM md_records r
+      ${readNativeValueRows(meta,'r')}
+      LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id
+        AND f.object_api=r.object_api AND f.api_name=v.field_api AND f.deleted_at IS NULL
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false
+        AND (v.field_api IS NULL OR f.api_name IS NOT NULL)`,
     [tenantId,objectApi,recordId]);
-    const {rows:cloneRows}=await client.query<{is_clone:boolean}>(
-      'SELECT is_clone FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false',
-      [tenantId,objectApi,recordId]);
-    const byApi=new Map(rows.map(row=>[row.field_api,row]));
-    const record:Record<string,unknown>={Id:recordId,__isClone:cloneRows[0]?.is_clone===true};
+    const byApi=new Map(rows.filter(row=>row.field_api!==null)
+      .map(row=>[row.field_api as string,row]));
+    const record:Record<string,unknown>={Id:recordId,__isClone:rows[0]?.is_clone===true};
     for(const field of definitions){
       if(field.data_type==='formula')continue;
       const row=byApi.get(field.api_name);
@@ -582,7 +584,7 @@ export class RecordEngine {
    * imports, and Flows. Optional criteria remain advisory to the lookup picker. */
   private async enforceRequiredLookupFilters(
     tenantId:string,objectApi:string,prepared:Map<string,Storable>,
-    client?:PoolClient,recordId?:string
+    client?:PoolClient,recordId?:string,definitions?:readonly FieldDefinition[]
   ):Promise<void>{
     const executor=client??this.db;
     const {rows}=await scopedMetadata('lookup-filters\u0000'+tenantId+'\u0000'+objectApi,()=>executor.query<{
@@ -598,22 +600,25 @@ export class RecordEngine {
     if(!rows.length)return;
     const targets=[...new Set(rows.map(row=>row.field_api))];
     const targetMetaCache=new Map<string,Promise<NativeFieldsMetadata>>();
-    const previous=recordId?await executor.query<{field_api:string;reference_record_id:string|null}>(
-      'SELECT field_api,reference_record_id FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=ANY($4::text[])',
-      [tenantId,objectApi,recordId,targets]):{rows:[]};
+    // Read all previous references and source fields together, not one SELECT per
+    // dynamic filter. The metadata comes from the prepare() field query.
+    const names=[...new Set([...targets,...rows.map(row=>row.value_field_api)
+      .filter((name):name is string=>typeof name==='string')])];
+    const sourceMeta=recordId?await this.nativeMeta(tenantId,objectApi,client,definitions):null;
+    const previous=sourceMeta?await executor.query<{
+      field_api:string;value_text:string|null;reference_record_id:string|null
+    }>(`SELECT v.field_api,v.value_text,v.reference_record_id
+      FROM md_records r ${readNativeValueRows(sourceMeta,'r')}
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+        AND v.field_api=ANY($4::text[])`,
+      [tenantId,objectApi,recordId,names]):{rows:[]};
     const previousMap=new Map(previous.rows.map(row=>[row.field_api,row.reference_record_id]));
-    const sourceCache=new Map<string,string|null>();
+    const sourceCache=new Map(previous.rows.map(row=>[
+      row.field_api,row.reference_record_id??row.value_text??null]));
     const sourceValue=async(name:string):Promise<string|null>=>{
       const preparedValue=prepared.get(name);
       if(preparedValue)return preparedValue.reference_record_id??preparedValue.value_text??null;
-      if(sourceCache.has(name))return sourceCache.get(name)??null;
-      if(!recordId)return null;
-      const stored=await executor.query<{value_text:string|null;reference_record_id:string|null}>(
-        'SELECT value_text,reference_record_id FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=$4',
-        [tenantId,objectApi,recordId,name]);
-      const value=stored.rows[0]?.reference_record_id??stored.rows[0]?.value_text??null;
-      sourceCache.set(name,value);
-      return value;
+      return sourceCache.get(name)??null;
     };
     const ruleLogic=await executor.query<{field_api:string;logic:'All'|'Any'}>(
       'SELECT field_api,logic FROM md_object_lookup_filter_logic WHERE tenant_id=$1 AND object_api=$2',
@@ -772,8 +777,8 @@ export class RecordEngine {
             enforceMasterDetailReparenting(previousId,value,key,field.allow_reparenting);
           }
           await assertLookupTargetExists(client??this.db,tenantId,field.related_object,value,key,userId);
-          // md_record_values.reference_record_id has a foreign key to md_records; users live in
-          // md_users, so a User reference is kept as its validated id in value_text.
+          // User references are kept as validated IDs in their text representation;
+          // other reference fields use native UUID values.
           if(field.related_object==='User'){text=value;reference=null;break;}
           text='';reference=value;break;
         case 'geolocation': {
@@ -824,24 +829,52 @@ export class RecordEngine {
         ...(field.data_type==='boolean'?{value_boolean:value as boolean}:{}),
         ...(field.data_type==='multipicklist'?{multi_values:(value as string).split(';')}:{}),...metadata});
     }
+    // Load persisted fields for dependency and record-type checks at most once.
+    // Reuse the access-checked prior record when supplied by the update caller;
+    // a single native query fills any fields not available in that snapshot.
+    const storedValidationFields=new Map<string,string|null>();
+    if(recordId){
+      const needed=new Set<string>();
+      for(const field of definitions){
+        const controllerApi=field.controller_field_api_name;
+        if(!controllerApi||(!Object.hasOwn(values,field.api_name)
+          &&!Object.hasOwn(values,controllerApi)))continue;
+        if(inputValues[field.api_name]===undefined)needed.add(field.api_name);
+        if(inputValues[controllerApi]===undefined)needed.add(controllerApi);
+      }
+      if(prepared.has('__RecordTypeId__'))
+        for(const field of definitions)
+          if((field.data_type==='picklist'||field.data_type==='multipicklist')
+            &&!prepared.has(field.api_name))needed.add(field.api_name);
+      for(const name of needed){
+        if(!prior||!Object.hasOwn(prior,name))continue;
+        const value=prior[name];
+        if(value===null||typeof value==='string'||typeof value==='number'||typeof value==='boolean'){
+          storedValidationFields.set(name,value===null?null:String(value));
+          needed.delete(name);
+        }
+      }
+      if(needed.size){
+        const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
+        const {rows:stored}=await (client??this.db).query<{field_api:string;value_text:string|null}>(`
+          SELECT v.field_api,v.value_text FROM md_records r
+          ${readNativeValueRows(meta,'r')}
+          WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+            AND v.field_api=ANY($4::text[])`,
+          [tenantId,objectApi,recordId,[...needed]]);
+        for(const row of stored)storedValidationFields.set(row.field_api,row.value_text);
+      }
+    }
     for(const field of definitions){
       const controllerApi=field.controller_field_api_name;
       if(!controllerApi||(!Object.hasOwn(values,field.api_name)&&!Object.hasOwn(values,controllerApi)))continue;
       let dependentValue=inputValues[field.api_name];
-      if(dependentValue===undefined&&recordId){
-        const stored=await (client??this.db).query<{value_text:string|null}>(
-          'SELECT value_text FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-          [tenantId,recordId,field.api_name]);
-        dependentValue=stored.rows[0]?.value_text;
-      }
+      if(dependentValue===undefined&&recordId)
+        dependentValue=storedValidationFields.get(field.api_name);
       if(dependentValue===undefined||dependentValue===null)continue;
       let controllerValue=inputValues[controllerApi];
-      if(controllerValue===undefined&&recordId){
-        const stored=await (client??this.db).query<{value_text:string|null}>(
-          'SELECT value_text FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-          [tenantId,recordId,controllerApi]);
-        controllerValue=stored.rows[0]?.value_text;
-      }
+      if(controllerValue===undefined&&recordId)
+        controllerValue=storedValidationFields.get(controllerApi);
       if(typeof controllerValue==='boolean')controllerValue=String(controllerValue);
       if(typeof controllerValue!=='string'||typeof dependentValue!=='string')
         throw new Error('Invalid dependent picklist value: '+field.api_name);
@@ -870,14 +903,7 @@ export class RecordEngine {
         [tenantId,objectApi,recordId])).rows[0]?.record_type_id:null);
     if(activeType){
       const switched=Boolean(recordId&&prepared.has('__RecordTypeId__'));
-      const persisted=switched?await (client??this.db).query<{field_api:string;value_text:string|null}>(
-        `SELECT v.field_api,v.value_text FROM md_record_values v
-          JOIN md_field_definitions f ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api
-            AND f.api_name=v.field_api AND f.deleted_at IS NULL
-          WHERE v.tenant_id=$1 AND v.object_api=$2 AND v.record_id=$3
-            AND f.data_type IN ('picklist','multipicklist')`,
-        [tenantId,objectApi,recordId]):{rows:[]};
-      const existing=new Map(persisted.rows.map(row=>[row.field_api,row.value_text]));
+      const existing=switched?storedValidationFields:new Map<string,string|null>();
       for(const field of definitions){
         if(field.data_type!=='picklist'&&field.data_type!=='multipicklist')continue;
         const proposed=prepared.get(field.api_name)?.value_text;
@@ -898,7 +924,7 @@ export class RecordEngine {
       }
     }
     if(definitions.some(field=>field.data_type==='reference'))
-      await this.enforceRequiredLookupFilters(tenantId,objectApi,prepared,client,recordId);
+      await this.enforceRequiredLookupFilters(tenantId,objectApi,prepared,client,recordId,definitions);
     return prepared;
   }
   async create(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>) {
@@ -1589,8 +1615,9 @@ export class RecordEngine {
         throw new Error('Record has changed since it was loaded');
       // Recheck required relationship rules under the record write lock to close
       // the interval between UI/API validation and transactional persistence.
-      if((await this.fields(tenantId,objectApi,transactionClient)).some(f=>f.data_type==='reference'))
-        await this.enforceRequiredLookupFilters(tenantId,objectApi,writeValues,transactionClient,id);
+      const recordFields=await this.fields(tenantId,objectApi,transactionClient);
+      if(recordFields.some(f=>f.data_type==='reference'))
+        await this.enforceRequiredLookupFilters(tenantId,objectApi,writeValues,transactionClient,id,recordFields);
       const affectedParents=await rollupParents(transactionClient,tenantId,objectApi,id);
       if(writeValues.has('__OwnerId__')){
         const queue=writeValues.get('__OwnerQueue__')?.value_text==='true',owner=writeValues.get('__OwnerId__')?.value_text;
@@ -1982,16 +2009,28 @@ export class RecordEngine {
         await this.rbac.require(tenantId,userId,item.object_api,'delete');
         await this.rbac.requireRecord(tenantId,userId,item.object_api,item.id,'delete');
       }
-      // A previously deleted master outside this group must not be resurrected implicitly.
-      const external=await client.query(`
-        SELECT 1 FROM md_record_values v
-        JOIN md_field_definitions f ON f.tenant_id=v.tenant_id
-          AND f.object_api=v.object_api AND f.api_name=v.field_api
-          AND f.relationship_type='Master-Detail' AND f.deleted_at IS NULL
-        JOIN md_records parent ON parent.tenant_id=v.tenant_id AND parent.id=v.reference_record_id
-        WHERE v.tenant_id=$1 AND v.record_id=ANY($2::uuid[])
-          AND parent.is_deleted=true AND parent.deletion_group_id IS DISTINCT FROM $3::uuid
-        LIMIT 1`,[tenantId,rows.map(row=>row.id),record.deletion_group_id]);
+      // A deleted master outside this group must not be resurrected. Resolve
+      // each affected Object through its validated native metadata, then check
+      // all Objects in one SQL query (not one query per record or field).
+      const groupObjects=[...new Set(rows.map(row=>row.object_api))];
+      const externalParts=await Promise.all(groupObjects.map(async (name,index)=>{
+        const meta=await this.nativeMeta(tenantId,name,client);
+        return `SELECT 1 FROM md_records r
+          ${readNativeValueRows(meta,'r')}
+          JOIN md_field_definitions f ON f.tenant_id=r.tenant_id
+            AND f.object_api=r.object_api AND f.api_name=v.field_api
+            AND f.relationship_type='Master-Detail' AND f.deleted_at IS NULL
+          JOIN md_records parent ON parent.tenant_id=r.tenant_id
+            AND parent.id=v.reference_record_id
+          WHERE r.tenant_id=$1 AND r.object_api=$${index+4}
+            AND r.id=ANY($2::uuid[])
+            AND parent.is_deleted=true
+            AND parent.deletion_group_id IS DISTINCT FROM $3::uuid`;
+      }));
+      const external=externalParts.length?await client.query(`
+        SELECT 1 FROM (${externalParts.join(' UNION ALL ')}) blocked_masters LIMIT 1`,
+        [tenantId,rows.map(row=>row.id),record.deletion_group_id,...groupObjects]
+      ):{rowCount:0};
       if(external.rowCount)throw new Error('Restore the master record first');
       // md_records is authoritative for deletion state; its native-row trigger
       // restores is_deleted at the same time, without touching EAV flags.

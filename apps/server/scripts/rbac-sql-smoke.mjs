@@ -230,6 +230,32 @@ try{
  assert.ok((await get('/records/User')).records.every(u=>u.Email===undefined));
  const adminTokens=await auth.signIn(t,'administrator@example.invalid',password);
  assert.equal((await http(adminTokens.accessToken,{...await rbac.describe(t,supervisor),revision:0})).status,409);
+ // User is a native md_users record; both Enabled (catalogue) and IsActive (older
+ // metadata) must round-trip, including extra form controls outside the layout.
+ const persistenceUser=await user('persistence@example.invalid');
+ const userUrl='http://127.0.0.1:'+listener.address().port+'/api/records/User/'+persistenceUser;
+ const adminHeaders={Authorization:'Bearer '+adminTokens.accessToken,'Content-Type':'application/json'};
+ const writeUser=async values=>fetch(userUrl,{method:'PUT',headers:adminHeaders,body:JSON.stringify(values)});
+ const loadUser=async()=>{
+  const response=await fetch(userUrl,{headers:adminHeaders});
+  assert.equal(response.status,200,await response.clone().text());
+  return (await response.json()).record;
+ };
+ assert.equal((await loadUser()).Enabled,true);
+ const firstSave=await writeUser({Enabled:false,LandingApp:'RbacTest',ReportsToId:supervisor});
+ assert.equal(firstSave.status,200,await firstSave.clone().text());
+ let savedUser=await loadUser();
+ assert.equal(savedUser.Enabled,false);
+ assert.equal(savedUser.IsActive,false);
+ assert.equal(savedUser.LandingApp,'RbacTest');
+ assert.equal(savedUser.ReportsToId,supervisor);
+ const secondSave=await writeUser({IsActive:true,LandingApp:'Setup',ReportsToId:null});
+ assert.equal(secondSave.status,200,await secondSave.clone().text());
+ savedUser=await loadUser();
+ assert.equal(savedUser.Enabled,true);
+ assert.equal(savedUser.IsActive,true);
+ assert.equal(savedUser.LandingApp,'Setup');
+ assert.equal(savedUser.ReportsToId,null);
 
  // Native user reporting hierarchy is independent of the role tree.
  await db.query('UPDATE md_users SET reports_to_user_id=$3 WHERE tenant_id=$1 AND id=$2',[t,supervisor,developer]);

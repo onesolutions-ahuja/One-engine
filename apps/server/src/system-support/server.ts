@@ -963,7 +963,7 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     res.json({profile:await platformTenants.saveSetting(actor.tenant_id,actor.user_id,'company-profile',req.body)});
   }));
-  /** Tenant name and logo for page formulas ($tenant.name / $tenant.logo).
+  /** Tenant name and logo for page formulas (@ThisTenant.Company.Name / .Logo).
    * Every signed-in user of the tenant (kiosk and app users) may read these two
    * public brand values; the full company profile still needs TenantSettings read. */
   app.get('/api/tenant/brand',route(async(req,res)=>{

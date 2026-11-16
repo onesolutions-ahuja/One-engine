@@ -9,8 +9,8 @@ import type {LightningPageMetadata,ObjectMetadata} from '../src/core/metadata/De
 const field=(apiName:string,dataType='Text')=>({apiName,label:apiName,dataType,required:false,unique:false});
 const objects=[{apiName:'Product',label:'Product',pluralLabel:'Products',kind:'Custom Object',description:'',
  fields:[field('Name'),field('Price','Currency')]}] as unknown as ObjectMetadata[];
-const total='SUMIFS(CartLine, LineTotal, session_key__c, $session, Status, "Open")';
-const qty='SUMIFS(CartLine, Quantity, session_key__c, $session, Status, "Open")';
+const total='SUMIFS(CartLine, LineTotal, session_key__c, @ThisPage.Session.Id, Status, "Open")';
+const qty='SUMIFS(CartLine, Quantity, session_key__c, @ThisPage.Session.Id, Status, "Open")';
 const label=(id:string,formula:string,extra:Record<string,unknown>={})=>({id,type:'Custom:smart_text',label:id,visible:true,
  properties:{textSource:formula,...extra}});
 const page={apiName:'p',label:'P',targetObject:'',pageType:'App Page',layoutMode:'free-canvas',status:'Draft',devices:['Desktop'],
@@ -19,7 +19,7 @@ const page={apiName:'p',label:'P',targetObject:'',pageType:'App Page',layoutMode
   ...Array.from({length:30},(_,i)=>label('b'+i,'=TEXT('+total+', "0.00") & " / " & '+qty+' & "'+i+'"')),
   {id:'grid',type:'Custom:smart_card_grid',label:'Grid',visible:true,properties:{objectApiName:'Product',
    actionFlows:{click:{actionType:'Formula',flowApiName:'SmartTillAddProduct',
-    formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, $state.activeCartId))'}}}}
+    formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, @ThisPage.Input.activeCartId))'}}}}
  ]} as unknown as LightningPageMetadata;
 
 test('a stale flowApiName does not replace an authored formula click',()=>{

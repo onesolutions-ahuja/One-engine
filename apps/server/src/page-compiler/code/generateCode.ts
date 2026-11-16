@@ -3,7 +3,7 @@
  *
  *  Display formula  "=LEFT(@Product.Name, 3)"
  *    -> (row, $) => F.LEFT($.f(row, "Name"), 3)
- *  Action formula   "=ACTIONS(GETRECORD(Cart, SessionKey, $session, AS(c)), UPDATERECORD(Cart, c.Id, Total, 0))"
+ *  Action formula   "=ACTIONS(GETRECORD(Cart, SessionKey, @ThisPage.Session.Id, AS(c)), UPDATERECORD(Cart, c.Id, Total, 0))"
  *    -> async ($) => { const v = {}; v.c = await $.getRecord("Cart", [["SessionKey", $.sessionId]]);
  *                      await $.update("Cart", $.f(v.c, "Id"), [["Total", 0]]); }
  *
@@ -18,7 +18,7 @@
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
 import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
-import {parseComponentStateReference} from '../../expression-engine/FormulaComponentState.js';
+import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,type PageReference} from '../../expression-engine/PageReferences.js';
 import {formulaEntry} from './formulaDictionary.js';
 import {parseActionFormulaAssignment} from '../pageCompilerSupport.js';
 
@@ -30,7 +30,7 @@ const reserved=new Set(['state','event','session','constructor','prototype','__p
 export class FormulaCodeError extends Error {}
 const fail=(message:string):never=>{throw new FormulaCodeError(message);};
 
-/** A criteria pair whose value the page can work out by itself ($session, $state, literals). */
+/** A criteria pair whose value the page can work out by itself (session, page values, literals). */
 export type RecordSetCriterion={field:string;js:string};
 /** Rows the page loads once so taps and totals need no server trip: every row
  * of `object` matching these page-known criteria, and (with `parent`) whose
@@ -67,32 +67,46 @@ function literalName(node:Expression|undefined,label:string,pattern=name):string
 /** True when a value needs nothing but the page itself (no row, no record lookups). */
 function pageKnown(node:Expression,scope:Scope):boolean{
  if(node.kind==='literal')return true;
- if(node.kind==='reference')return /^\$(?:session|state|tenant)(?:\.|$)/.test(node.value);
+ if(node.kind==='reference'){
+  const page=pageReference(node.value);
+  return Boolean(page)&&page!.kind!=='selected'&&!isBrowserOnlyReference(page);
+ }
  if(node.kind==='unary')return pageKnown(node.value,scope);
  if(node.kind==='binary')return pageKnown(node.left,scope)&&pageKnown(node.right,scope);
  const entry=formulaEntry(node.name);
  return Boolean(entry&&(entry.kind==='pure'||entry.kind==='inline'))&&node.args.every(arg=>pageKnown(arg,scope));
 }
+function pageReference(path:string):PageReference|null{
+ try{return parsePageReference(path);}
+ catch(error){return fail(error instanceof Error?error.message:'Invalid page value');}
+}
+/** @ThisPage… / @ThisTenant… -> the page code call that reads it. */
+function pageValueCode(page:PageReference):string{
+ const key=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+ switch(page.kind){
+  case 'session':return '$.sessionId';
+  case 'cart':return '$.session("cartId")';
+  case 'user':return '$.session('+q('user.'+USER_FIELDS[page.field])+')';
+  case 'company':return page.field==='Id'?'$.session("tenant.id")':'$.tenant('+q(page.field.toLowerCase())+')';
+  case 'selected':return '$.componentState('+q(page.name)+', '+q(page.field)+')';
+  case 'input':
+   if(!key.test(page.key))fail('Invalid page value @ThisPage.Input.'+page.key);
+   return '$.state('+q(page.key)+')';
+  case 'component':
+   // value / recordId / text: the component's live value (browser only).
+   if(isBrowserOnlyReference(page))return '$.component('+q(page.name)+', '+q(page.key)+')';
+   if(!key.test(page.key))fail('Invalid page value @ThisPage.'+page.name+'.'+page.key);
+   // A value the component's action saved (or one of its own properties).
+   return '$.pageValue('+q(page.name)+', '+q(page.key)+')';
+ }
+}
 function reference(path:string,scope:Scope):string{
  scope.references.add(path);
  if(/(?:^|\.)(?:__proto__|prototype|constructor)(?:\.|$)/.test(path))fail('Invalid reference');
- if(path==='$session'||path==='$session.id')return '$.sessionId';
- if(path.startsWith('$session.'))return '$.session('+q(path.slice(9))+')';
- if(path.startsWith('$state.')){
-  const key=path.slice(7);
-  if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key))fail('Invalid Page State reference');
-  return '$.state('+q(key)+')';
- }
- if(/^\$tenant\.(name|logo)$/i.test(path))return '$.tenant('+q(path.slice(8).toLowerCase())+')';
- if(path.startsWith('$component.')){
-  const parts=path.split('.');
-  if(parts.length!==3)fail('Invalid component reference');
-  return '$.component('+q(parts[1])+', '+q(parts[2])+')';
- }
- if(path.startsWith('$flow.'))return q(path);
- if(path.startsWith('$'))fail('Unsupported reference @'+path);
- const selected=parseComponentStateReference(path);
- if(selected)return '$.componentState('+q(selected.name)+', '+q(selected.field)+')';
+ const page=pageReference(path);
+ if(page)return pageValueCode(page);
+ if(isFlowMarker(path))return q(path);
+ if(path.startsWith('$'))fail('Old $ references are no longer used. Type @ and pick from ThisPage, ThisTenant or an Object.');
  // Event values of the action being run: the clicked row/card, the typed text.
  if(['recordId','value','index','label'].includes(path))return '$.event('+q(path)+')';
  const parts=path.split('.');

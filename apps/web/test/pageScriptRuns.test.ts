@@ -14,10 +14,10 @@ const button=(id:string,binding:Record<string,unknown>)=>({id,type:'Custom:smart
 const page={apiName:'till',label:'Till',targetObject:'',pageType:'App Page',layoutMode:'free-canvas',
  status:'Draft',devices:['Desktop'],draftRevision:7,components:[
   {id:'grid',type:'Custom:smart_card_grid',label:'Grid',visible:true,properties:{objectApiName:'Product',
-   actionFlows:{click:{actionType:'Formula',formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, $state.activeCartId))'}}}},
+   actionFlows:{click:{actionType:'Formula',formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, @ThisPage.Input.activeCartId))'}}}},
   button('pick',{actionType:'PageState',stateKey:'activeCartId',value:'$event.value'}),
-  button('calc',{actionType:'Formula',formula:'@state.total := ROUND($state.price * 2, 2) & " GBP"'}),
-  button('sum',{actionType:'Formula',formula:'@state.lines := COUNTIFS(CartLine, Cart, $state.activeCartId)'}),
+  button('calc',{actionType:'Formula',formula:'@ThisPage.Input.total := ROUND(@ThisPage.Input.price * 2, 2) & " GBP"'}),
+  button('sum',{actionType:'Formula',formula:'@ThisPage.Input.lines := COUNTIFS(CartLine, Cart, @ThisPage.Input.activeCartId)'}),
   button('go',{actionType:'Formula',formula:'@navigate.page := "Till/Checkout"'})
  ]} as unknown as LightningPageMetadata;
 const load=async(code:string)=>import('data:text/javascript,'+encodeURIComponent(code));
@@ -52,7 +52,7 @@ test('the generated file is a real module: actions run as JavaScript',async()=>{
   // Pure formula: worked out by the compiled JavaScript itself.
   ['setState','total','9 GBP'],
   // Database aggregate: the platform evaluates it (same rules as before).
-  ['platformValue','state','COUNTIFS(CartLine, Cart, $state.activeCartId)'],['setState','lines',3],
+  ['platformValue','state','COUNTIFS(CartLine, Cart, @ThisPage.Input.activeCartId)'],['setState','lines',3],
   ['navigateTo','page','Till/Checkout'],
   // Record save: only the action key goes to the server, which runs its own compiled copy.
   ['save','grid:click',1]]);
@@ -87,7 +87,7 @@ test('server builds once per saved revision and runs actions only from its own c
  const key={tenantId:'t1',apiName:'till',variant:'Desktop'};
  const first=scripts.build(key,page as never,objects as never);
  assert.equal(scripts.build(key,page as never,objects as never),first,'cached');
- assert.deepEqual(scripts.action(key,7,'grid:click'),{formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, $state.activeCartId))',
+ assert.deepEqual(scripts.action(key,7,'grid:click'),{formula:'ACTIONS(CREATERECORD(CartLine, Quantity, 1, Cart, @ThisPage.Input.activeCartId))',
   serverDataSteps:1,totalSteps:1});
  assert.equal(scripts.action(key,6,'grid:click'),null,'another revision is not trusted');
  assert.equal(scripts.action(key,7,'grid:delete'),null);
@@ -100,7 +100,7 @@ test('server builds once per saved revision and runs actions only from its own c
 test('Preview converts unsaved edits on the server; only that user can run its saves',()=>{
  const scripts=new PageScriptService();
  const edited={...page,draftRevision:7,components:[...page.components,button('extra',{actionType:'Formula',
-  formula:'ACTIONS(UPDATERECORD(Cart, $state.activeCartId, Name, "x"))'})]};
+  formula:'ACTIONS(UPDATERECORD(Cart, @ThisPage.Input.activeCartId, Name, "x"))'})]};
  const {previewId,built}=scripts.buildPreview('t1','u1','till','Desktop',edited as never,objects as never);
  assert.match(built.code,/"extra:click"/,'the unsaved button is in the converted file');
  assert.equal(scripts.buildPreview('t1','u1','till','Desktop',edited as never,objects as never).previewId,previewId,'same draft, same id');
@@ -116,12 +116,12 @@ test('Preview converts unsaved edits on the server; only that user can run its s
 test('page-level display formulas from the file equal the component result',async()=>{
  const {evaluateFieldExpression}=await import('../src/component-libraries/shared/FieldExpression.js');
  const labelled={...page,components:[{id:'t',type:'Custom:smart_text',label:'T',visible:true,
-  properties:{textSource:'=ROUND($state.price * 1.2, 2) & " GBP " & UPPER($session)'}}]};
+  properties:{textSource:'=ROUND(@ThisPage.Input.price * 1.2, 2) & " GBP " & UPPER(@ThisPage.Session.Id)'}}]};
  const module=await load(generatePageScript(compilePage(labelled as never,objects),'js'));
  const formulas=module.createFormulas(host);
  const state={price:4.25};
  assert.equal(formulas['t:textSource']({record:{},state,sessionId:'abc'}),
-  evaluateFieldExpression('=ROUND($state.price * 1.2, 2) & " GBP " & UPPER($session)',{},{pageState:state,sessionId:'abc'}));
+  evaluateFieldExpression('=ROUND(@ThisPage.Input.price * 1.2, 2) & " GBP " & UPPER(@ThisPage.Session.Id)',{},{pageState:state,sessionId:'abc'}));
 });
 
 test('one collection Object is loaded once for many components, and a save clears it',async()=>{

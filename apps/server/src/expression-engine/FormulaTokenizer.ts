@@ -1,4 +1,6 @@
+import {LEGACY_REFERENCE} from './PageReferences.js';
 export type Token={kind:'number'|'string'|'identifier'|'reference'|'operator'|'punctuation';value:string};
+const LEGACY_ERROR='Old $ references are no longer used. Type @ and pick from ThisPage, ThisTenant or an Object.';
 export function tokenize(source:string):Token[] {
   if(source.length>4000)throw new Error('Formula exceeds the 4000-character limit');
   const tokens:Token[]=[];
@@ -29,6 +31,7 @@ export function tokenize(source:string):Token[] {
       if(tokens.length>512)throw new Error('Formula exceeds the 512-token complexity limit');
       continue;}
     const shorthand=/^@([A-Za-z_$][A-Za-z0-9_$.]*)/.exec(source.slice(index));
+    if(shorthand&&LEGACY_REFERENCE.test('@'+shorthand[1]))throw new Error(LEGACY_ERROR);
     if(shorthand){tokens.push({kind:'reference',value:shorthand[1]});index+=shorthand[0].length;
       if(tokens.length>512)throw new Error('Formula exceeds the 512-token complexity limit');
       continue;}
@@ -39,6 +42,7 @@ export function tokenize(source:string):Token[] {
     const identifier=/^[A-Za-z_$][A-Za-z0-9_$.]*/.exec(source.slice(index));
     if(identifier){
       const value=identifier[0];
+      if(value.startsWith('$')&&LEGACY_REFERENCE.test(value))throw new Error(LEGACY_ERROR);
       const functionCall=/^(AND|OR|NOT)$/i.test(value)
         &&/^\s*\(/.test(source.slice(index+value.length));
       tokens.push({kind:/^(AND|OR|NOT)$/i.test(value)&&!functionCall?'operator':'identifier',value});

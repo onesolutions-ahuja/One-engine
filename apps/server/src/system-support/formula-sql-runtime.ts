@@ -3,6 +3,7 @@ import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
 import {Parser,type Expression} from '../expression-engine/FormulaParser.js';
 import {tokenize} from '../expression-engine/FormulaTokenizer.js';
+import {isPageReference,parsePageReference,savedValueKey} from '../expression-engine/PageReferences.js';
 import {validateFormulaFunctions} from '../expression-engine/FormulaFunctionRegistry.js';
 import {compileFormulaSql,SQL_SCALAR_FORMULAS,SQL_RECORD_AGGREGATES} from '../expression-engine/FormulaSqlCompiler.js';
 import {evaluateFlowFormula,evaluateFlowFormulaNode,type FormulaEvaluationContext} from '../system-files/flow-formula-runtime.js';
@@ -157,14 +158,14 @@ export async function evaluateFormulaSql(
  if(!user)throw Error('Authenticated Formula identity is unavailable');
 
  const session:Readonly<Record<string,string>>={
-  '$session.user.id':actor.user_id,
-  '$session.user.name':user.name,
-  '$session.user.email':user.email,
-  '$session.user.timeZone':user.time_zone,
-  '$session.user.locale':user.locale,
-  '$session.user.currencyIsoCode':user.currency_iso_code??'',
-  '$session.tenant.id':actor.tenant_id,
-  '$session.tenant.name':user.tenant_name
+  'user.Id':actor.user_id,
+  'user.Name':user.name,
+  'user.Email':user.email,
+  'user.TimeZone':user.time_zone,
+  'user.Locale':user.locale,
+  'user.CurrencyIsoCode':user.currency_iso_code??'',
+  'company.Id':actor.tenant_id,
+  'company.Name':user.tenant_name
  };
  const fields=new Map<string,Field>();
  const load=async(object:string,field:string):Promise<Field>=>{
@@ -259,7 +260,7 @@ export async function evaluateFormulaSql(
   visit(resolved,node=>{
    if(node.kind==='call'&&node.name==='SUM'&&node.args[0]?.kind==='reference')
     sums.add(node.args[0].value);
-   if(node.kind==='reference'&&!node.value.startsWith('$'))
+   if(node.kind==='reference'&&!isPageReference(node.value))
     references.add(node.value);
   });
   for(const source of sums)references.delete(source);
@@ -276,17 +277,19 @@ export async function evaluateFormulaSql(
    if(!numericTypes.has(kind))throw Error('SQL SUM requires a numeric metadata field');
   }
   const sqlReference=(reference:string):string=>{
-   if(Object.hasOwn(session,reference))return bind(session[reference])+'::text';
-   if(reference.startsWith('$state.')){
-    const key=reference.slice(7);
-    if(!api.test(key)||!Object.hasOwn(state,key))throw Error('Unknown Formula State reference');
+   const page=parsePageReference(reference);
+   const identity=page?.kind==='user'?'user.'+page.field:page?.kind==='company'?'company.'+page.field:'';
+   if(identity&&Object.hasOwn(session,identity))return bind(session[identity])+'::text';
+   const key=savedValueKey(page);
+   if(key!==null){
+    if(!api.test(key)||!Object.hasOwn(state,key))throw Error('Unknown page value '+reference);
     const value=state[key];
     if(value===null)return 'NULL';
     const parameter=bind(value);
     return parameter+(typeof value==='number'?'::numeric':
       typeof value==='boolean'?'::boolean':'::text');
    }
-   if(reference.startsWith('$'))throw Error('Unsupported trusted Formula reference');
+   if(page)throw Error('Unsupported trusted Formula reference');
    const {object,field}=parts(reference);
    if(!recordId&&!batch)throw Error('Formula reference requires a Record ID');
    if(field==='Id')return 'r.id::text';

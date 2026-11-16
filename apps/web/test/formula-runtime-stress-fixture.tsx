@@ -16,7 +16,7 @@ const textItems=Array.from({length:50},(_,i)=>({
   id:'text-'+i,type:'Custom:smart_text',
   properties:{navigatorName:'Text'+i,
     ...(i===0?{value:1}:{}),
-    textSource:i===0?'=$component.Text0.value':
+    textSource:i===0?'=@ThisPage.Text0.value':
       '=$component.Text'+(i-1)+'.text + 1'}
 }));
 const cartItems=Array.from({length:3},(_,i)=>({

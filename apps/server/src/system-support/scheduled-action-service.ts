@@ -1,3 +1,4 @@
+import {parsePageReference,savedValueKey} from '../expression-engine/PageReferences.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
@@ -48,9 +49,12 @@ function expressionSource(node:Expression):string{
  }
 }
 function lookup(source:Record<string,unknown>,reference:string):unknown{
- const normalized=reference.replace(/^\$state\./,'state.')
-  .replace(/^\$event\./,'event.')
-  .replace(/^\$session$/,'sessionId');
+ let page=null;
+ try{page=parsePageReference(reference);}catch{return null;}
+ const key=savedValueKey(page);
+ const normalized=page?.kind==='session'?'sessionId':key!==null?'state.'+key:page?'':
+  reference.replace(/^\$event\./,'event.');
+ if(!normalized)return null;
  const segments=normalized.replace(/^@/,'').split('.');
  let value:unknown=source;
  for(const key of segments){

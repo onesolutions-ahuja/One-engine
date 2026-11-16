@@ -22,7 +22,7 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
  if(typeof v!=="string")return {value:text(v)};
  // Keep literal text and asset URLs unchanged; only formulas can fail.
  if(/^(?:https:\/\/|asset:|data:image\/)/i.test(v.trim()))return {value:v};
- if(!/^\s*=/.test(v)&&!/@[A-Za-z]/.test(v)&&!/\$(?:component\.|state\.|session\b|tenant\.)/i.test(v)&&!/^\s*"/.test(v)&&
+ if(!/^\s*=/.test(v)&&!/@[A-Za-z]/.test(v)&&!/^\s*"/.test(v)&&
    !/^\s*-?(?:\d+(?:\.\d*)?|\.\d+)\s*[+\-*/&]/.test(v))return {value:v};
  // Static/SSR renders cannot execute effect-backed SQL requests. Preserve
  // permission-scoped collection evaluation until a browser SQL result exists.
@@ -108,7 +108,7 @@ const gridText=(p,key,record)=>p.kind==="smart_card_grid"
 const cardSelection=p=>{
  const action=p.actionFlows?.click;
  const formula=action?.actionType==="Formula"&&typeof action.formula==="string"
-  ?/^@state\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/.exec(action.formula.trim()):null;
+  ?/^@ThisPage\.[A-Za-z_][A-Za-z0-9_]{0,79}\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/i.exec(action.formula.trim()):null;
  const stateKey=action?.actionType==="PageState"&&typeof action.stateKey==="string"
   ?action.stateKey:formula?.[1];
  const rhs=formula?.[2]?.trim();
@@ -140,7 +140,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const image=boundImage(p,record);
  const imageError=image==='FORMULAERROR';
  // Distinguish an unset tenant brand from an unbound image in Builder previews.
- const tenantLogoReference=/^=?\s*(?:\$session\.tenant\.logo|\$tenant\.logo)$/i.test(String(p.imageSource??p.src??"").trim());
+ const tenantLogoReference=/^=?\s*@ThisTenant\.Company\.Logo$/i.test(String(p.imageSource??p.src??"").trim());
  const missingImageLabel=tenantLogoReference
   ?"Tenant logo unavailable — Company Settings › Branding":"Image Here";
  const preview=p.previewOnly===true||p.builderPreview===true||p.preview===true;
@@ -532,7 +532,7 @@ function SmartTabs({p,record,fire}){
  // parent selection must not leave a dependent child visibly selected.
  const changeAction=p.actionFlows?.change;
  const formulaStateKey=changeAction?.actionType==="Formula"&&typeof changeAction.formula==="string"
-  ?(/^@state\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/.exec(changeAction.formula.trim())
+  ?(/^@ThisPage\.[A-Za-z_][A-Za-z0-9_]{0,79}\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=/i.exec(changeAction.formula.trim())
    // =STATE(category, @record.Id): the tab shows the selection held in that Page State,
    // so another control (e.g. an "All" button doing =STATE(category, "*")) can change it.
    ??/^=?\s*STATE\s*\(\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*,/i.exec(changeAction.formula.trim()))?.[1]:null;
@@ -725,7 +725,7 @@ export default function SmartRuntime(p){
   return sqlLookup(v,record);
  }:sqlLookup;
  p={...p,__sqlLookup:lookup};
- // Re-render when the tenant brand arrives so $session.tenant.name / .logo show without a reload.
+ // Re-render when the tenant brand arrives so @ThisTenant.Company.Name / .Logo show without a reload.
  React.useSyncExternalStore(subscribeTenantBrand,getTenantBrand,getTenantBrand);
  const name=p.kind||"smart_text",record=recordOf(p),label=scopedExpression(p,"label",p.label||"",record);
  // Style = iOS is saved on newly inserted components. Older saved components have
@@ -869,7 +869,6 @@ export default function SmartRuntime(p){
   // the renderer never requires it for a formula and it is not a ribbon setting.
   const formulaValue=value=>typeof value==="string"&&(
    /^\s*=/.test(value)||/@[A-Za-z]/.test(value)||
-   /\$(?:component\.|state\.|session\b|tenant\.)/i.test(value)||
    /^\s*"/.test(value)||
    /^\s*-?(?:\d+(?:\.\d*)?|\.\d+)\s*[+\-*/&]/.test(value)||
    /^\s*[A-Za-z][A-Za-z0-9_]*\s*\(/.test(value));

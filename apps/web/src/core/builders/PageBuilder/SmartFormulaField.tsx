@@ -5,7 +5,8 @@ import {useState,useRef,useEffect,useLayoutEffect,useId,type KeyboardEvent} from
 import {createPortal} from 'react-dom';
 import type {FieldMetadata,ObjectMetadata} from '../../metadata/Definitions/metadata';
 import {relationshipFormulaFields} from './relationshipFormulaFields';
-import {formulaDollarSuggestions} from './formulaDollarSuggestions';
+import {pageValueRoots,pageValueSuggestions,type PageValueSuggestion} from './pageValueSuggestions';
+import {legacyReferenceError} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {formulaSignatureAt} from './formulaSignatureHelp';
 import {Parser} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
@@ -18,27 +19,27 @@ import type {MentionKind} from '../../../component-libraries/shared/primitives/S
  */
 export function splitSmartFormula(value:string){
  const parts:{value:string;kind:'field'|'string'|'operator'|'text'}[]=[];
- const token=/("(?:[^"]|"")*"|@[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*|\$component(?:\.[A-Za-z_][A-Za-z0-9_]*){1,2}|\$state\.[A-Za-z][A-Za-z0-9_]*|\$flow\.[A-Za-z][A-Za-z0-9_]*|\$session(?:\.[A-Za-z][A-Za-z0-9_]*){0,2}|[+*\/&-])/g;
+ const token=/("(?:[^"]|"")*"|@[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*|[+*\/&-])/g;
  let cursor=0;let match:RegExpExecArray|null;
  while((match=token.exec(value))){
   if(match.index>cursor)parts.push({value:value.slice(cursor,match.index),kind:'text'});
   parts.push({value:match[0],kind:match[0].startsWith('"')?'string':
-   (match[0].startsWith('@')||match[0].startsWith('$'))?'field':'operator'});
+   match[0].startsWith('@')?'field':'operator'});
   cursor=match.index+match[0].length;
  }
  if(cursor<value.length)parts.push({value:value.slice(cursor),kind:'text'});
  return parts;
 }
 function tokenEndsInComponentPrefix(source:string){
- return /\$component(?:\.[A-Za-z_][A-Za-z0-9_]*)?\.$/.test(source);
+ return /@This(?:Page|Tenant)(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.$/i.test(source);
 }
 export default function SmartFormulaField({value,onChange,fields,disabled,label,objects=[],rootObjectApiName='',singleFieldOnly=false,selectedSourceObjects,mentionKind='text',validate,stateOptions=[],flowReferences,actionPages=[],actionCredentials=[]}:{
  value:string;onChange:(next:string)=>void;fields:readonly FieldMetadata[];disabled:boolean;label:string;
  objects?:readonly ObjectMetadata[];rootObjectApiName?:string;singleFieldOnly?:boolean;selectedSourceObjects?:readonly ObjectMetadata[];mentionKind?:MentionKind;
  validate?:(formula:string)=>string|null;
- stateOptions?:readonly {source:'PageState'|'CollectionState';key:string;label:string}[];
- /** Action formula bar only: runnable Flows offered as $flow.ApiName. Omitted
-  * everywhere else, so normal formula bars never suggest or accept $flow. */
+ stateOptions?:readonly {source:'PageState'|'CollectionState';key:string;label:string;owner?:string}[];
+ /** Action formula bar only: runnable Flows offered as FLOW(ApiName). Omitted
+  * everywhere else, so normal formula bars never suggest FLOW(). */
  actionPages?:readonly {apiName:string;label:string;pageType:string;status:string}[];
  actionCredentials?:readonly {apiName:string;label:string}[];
  flowReferences?:readonly {apiName:string;label:string}[]
@@ -48,7 +49,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const [draft,setDraft]=useState(value);
  const [validationError,setValidationError]=useState<string|null>(null);
  useEffect(()=>{setDraft(value);setValidationError(null)},[value]);
- const [matches,setMatches]=useState<{start:number;end:number;query:string;prefix:'@'|'$'|''}|null>(null);
+ const [matches,setMatches]=useState<{start:number;end:number;query:string;prefix:'@'|''}|null>(null);
  const [popup,setPopup]=useState<{top:number;left:number;width:number;above:boolean}|null>(null);
  const [caret,setCaret]=useState(value.length);
  const [focused,setFocused]=useState(false);
@@ -91,21 +92,12 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const sourceRoots=selectedSourceObjects!==undefined
   ?selectedSourceObjects.map(source=>source.apiName)
   :rootObjectApiName?[rootObjectApiName]:[];
- // What other components publish: @CategoryTabs.state.Id / Value / Name / Text.
- const componentStateMentions=stateOptions.filter(entry=>entry.source==='CollectionState')
-  .map(entry=>({reference:'@'+entry.key,label:entry.label}));
- const dollarMentions=matches?.prefix==='$'
-  ?[...formulaDollarSuggestions(stateOptions,matches.query,flowReferences),...componentMentions()]:[];
- function componentMentions(){
-  const entries=scope?.entries??[];
-  if(!entries.length||!matches)return [];
-  const path=matches.query.split('.');
-  if(path.length===1)return [{reference:'$component.',label:'Components on this page'}];
-  if(path[0]!=='component')return [];
-  if(path.length===2)return entries.map(item=>({reference:'$component.'+item.token+'.',label:item.name}));
-  const entry=entries.find(item=>item.token===path[1]);
-  return (entry?.keys??[]).map(key=>({reference:'$component.'+path[1]+'.'+key,label:key}));
- }
+ // @ThisPage / @ThisTenant: picked step by step (components grouped by type).
+ const pageComponents=(scope?.entries??[]).map((entry:{token:string;typeLabel:string;keys:string[]})=>({name:entry.token,typeLabel:entry.typeLabel,keys:entry.keys}));
+ const pageMentions:PageValueSuggestion[]|null=matches?.prefix==='@'
+  ?pageValueSuggestions(matches.query,pageComponents,stateOptions):null;
+ const rootMentions:PageValueSuggestion[]=matches?.prefix==='@'&&!matches.query.includes('.')
+  ?pageValueRoots(matches.query):[];
  // Inside TABLE(@Object, ...), field choices follow that Object, not the
  // Page Builder's first object or another selected independent source.
  const tableOpen=/\bTABLE\s*\(\s*@([A-Za-z][A-Za-z0-9_]*)\s*,([^)]*)$/i.exec(draft.slice(0,caret));
@@ -115,29 +107,29 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const recordMentions:{reference:string;label:string}[]=tableSourcePrompt&&matches
   ?tableSources.map(object=>({reference:'@'+object.apiName,label:object.label+' Object source'}))
   :tableObject&&matches
-  ?tableObject.fields.map(field=>({reference:field.apiName,label:tableObject.label+' → '+field.label}))
+  ?tableObject.fields.map(field=>({reference:'@'+tableObject.apiName+'.'+field.apiName,label:tableObject.label+' → '+field.label}))
   :objects.length&&sourceRoots.length
   ?relationshipFormulaFields(objects,sourceRoots,matches?.query??'',mentionKind,singleFieldOnly)
     .map(({reference,label})=>({reference,label}))
   :fields.filter(field=>(!singleFieldOnly||/^(Checkbox|Boolean)$/i.test(field.dataType)))
     .map(field=>({reference:'@'+(rootObjectApiName||sourceRoots[0]||'Object')+'.'+field.apiName,label:field.label}));
- // TABLE's first argument is an @Object. Subsequent arguments are bare
- // field API names: TABLE(@Product,Name,Price). Do not show unrelated mentions.
+ // TABLE's first argument is an @Object; columns are that Object's fields,
+ // written like every other field: TABLE(@Product, @Product.Name, @Product.Price).
  const tableArg=Boolean(tableSourcePrompt||tableObject);
  const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials):null;
- const availableMentions=actionArgs&&matches?.prefix===''?actionArgs.choices.map(item=>({reference:item.apiName,label:item.label})):matches?.prefix==='$'
-  ?tableArg?[]:dollarMentions
-  :tableArg?recordMentions:[...recordMentions,...componentStateMentions];
- const filtered=matches?availableMentions
+ const availableMentions:PageValueSuggestion[]=actionArgs&&matches?.prefix===''?actionArgs.choices.map(item=>({reference:item.apiName,label:item.label}))
+  :tableArg?recordMentions:recordMentions;
+ const filtered:PageValueSuggestion[]=!matches?[]:pageMentions?pageMentions.slice(0,200):[...rootMentions,...availableMentions
     .filter(item=>item.reference.toLowerCase().includes(
-       (matches.prefix==='$'?'$':(tableArg||actionArgs)?'':'@')+matches.query.toLowerCase())||
-      item.label.toLowerCase().includes(matches.query.toLowerCase()))
-    .slice(0,200):[];
+       ((tableArg||actionArgs)?'':'@')+matches.query.toLowerCase())||
+      item.label.toLowerCase().includes(matches.query.toLowerCase()))]
+    .slice(0,200);
  const isFormulaDraft=(source:string)=>source.startsWith('=')||
-  /^\$(?:component\.|flow\.|state\.|session(?:\b|\.))/.test(source)||
+  /^@This(?:Page|Tenant)\./i.test(source)||
   /^@[A-Za-z][A-Za-z0-9_.]*\s*(?:==|=|<>|!=|>=|<=|>|<)/.test(source);
  const errorFor=(next:string):string|null=>{
-  if(!flowReferences&&/\$flow\b/i.test(next))return '$flow is only available in the Action formula bar';
+  const legacy=legacyReferenceError(next);
+  if(legacy)return legacy;
   const custom=validate?.(next);
   if(custom)return custom;
   if(flowReferences&&isScreenAction(next)){
@@ -161,7 +153,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   }
   const source=next.trim();
   if(!isFormulaDraft(source))return null;
-  if(tokenEndsInComponentPrefix(source))return 'Select a component and property';
+  if(tokenEndsInComponentPrefix(source))return 'Pick the next part from the list (e.g. @ThisPage.MyBox1.value)';
   if(!source.slice(source.startsWith('=')?1:0).trim())return 'Complete the formula after =';
   const functionPrefix=/^=\s*([A-Za-z][A-Za-z0-9_]*)$/.exec(source);
   if(functionPrefix&&functions.some(name=>name.startsWith(functionPrefix[1].toUpperCase())))
@@ -176,17 +168,14 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
    const before=next.slice(0,caret);
    const openString=(before.match(/"/g)||[]).length%2===1;
    const mention=!openString?/@([A-Za-z0-9_.]*)$/.exec(before):null;
-   const dollar=!openString&&!mention?/\$([A-Za-z0-9_.]*)$/.exec(before):null;
    const tablePart=!openString&&!mention
     ?/\bTABLE\s*\(\s*@[A-Za-z][A-Za-z0-9_]*\s*,([^)]*)$/i.exec(before):null;
    const last=tablePart?.[1].split(',').at(-1)?.trim()??'';
-   // Existing @Field spellings can still be edited, but selection inserts
-   // the canonical bare field name with no @.
+   // Picking a column inserts @Object.Field, the same spelling as everywhere else.
    const tableField=tablePart&&/^@?[A-Za-z0-9_]*$/.test(last)
     ?{start:caret-last.length,end:caret,query:last.replace(/^@/,'')}:null;
    const args=flowReferences?actionArgumentSuggestions(before,objects,flowReferences,actionPages,actionCredentials):null;
    setMatches(args?{start:caret-args.query.length,end:caret,query:args.query,prefix:''}:mention?{start:caret-mention[0].length,end:caret,query:mention[1],prefix:'@'}:
-    dollar?{start:caret-dollar[0].length,end:caret,query:dollar[1],prefix:'$'}:
     tableField?{...tableField,prefix:''}:null);
    const name=next.trimStart().startsWith('=')?formulaFunctionPrefix(before):null;
    setFunctionMatch(tablePart||args||!name?null:{start:caret-name.length,end:caret,query:name});
@@ -208,7 +197,8 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   setValidationError(null);
   if(!error)onChange(next);
   setCaret(end);setMatches(null);setFunctionMatch(null);
-  if(reference.startsWith('$component.')&&reference.endsWith('.'))suggest(next,end);
+  // Picking ThisPage / a component / Selected opens the next list straight away.
+  if(reference.endsWith('.'))suggest(next,end);
   requestAnimationFrame(()=>{input.current?.focus();input.current?.setSelectionRange(end,end)});
  };
  const insertFunction=(name:string)=>{
@@ -308,12 +298,14 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
   {matches&&filtered.length>0&&popup&&createPortal(<div id={suggestionListId} className="smart-formula-list" role="listbox"
     style={{position:'fixed',left:popup.left,top:popup.top,minWidth:popup.width,maxHeight:200,zIndex:6000}}>
    {inlineSignature}
-   {filtered.map((item,index)=><button key={item.reference} id={suggestionListId+'-option-'+index}
+   {filtered.map((item,index)=><div key={item.reference} role="presentation" className="smart-formula-option-row">
+    {item.group&&item.group!==filtered[index-1]?.group&&<div className="smart-formula-group" role="presentation">{item.group}</div>}
+    <button id={suggestionListId+'-option-'+index}
      type="button" role="option" aria-selected={index===activeSuggestion}
-     className={index===activeSuggestion?'is-active':''}
+     className={[index===activeSuggestion?'is-active':'',item.highlight?'is-page-value':''].filter(Boolean).join(' ')}
      ref={index===activeSuggestion?node=>node?.scrollIntoView({block:'nearest'}):undefined}
      onMouseEnter={()=>setActiveSuggestion(index)}
-     onMouseDown={e=>{e.preventDefault();insert(item.reference)}}>{item.reference} · {item.label}</button>)}
+     onMouseDown={e=>{e.preventDefault();insert(item.reference)}}>{pageMentions?item.reference.split('.').filter(Boolean).at(-1)+(item.drill?' ›':''):item.reference} · {item.label}</button></div>)}
   </div>,document.body)}
  </div>;
 }

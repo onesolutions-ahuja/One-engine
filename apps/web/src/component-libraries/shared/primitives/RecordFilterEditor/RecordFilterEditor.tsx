@@ -259,11 +259,11 @@ export default function RecordFilterEditor({
           onKeyUpCapture={event=>setFormulaCaret((event.target as HTMLTextAreaElement).selectionStart)}>
           <SmartFieldInput multiline rows={3} kind="formula" formulaContext="ribbon_binding" objects={objects}
             primaryObjectApiName={rootObjectApiName} value={formula} onChange={onFormulaChange}
-            ariaLabel={title+' filter formula'} placeholder={'IF(ISBLANK($state.categoryId), TRUE, @MenuCategory = $state.categoryId)'}/>
+            ariaLabel={title+' filter formula'} placeholder={'IF(ISBLANK(@ThisPage.Tabs1.Selected.Id), TRUE, @Product.Category = @ThisPage.Tabs1.Selected.Id)'}/>
         </span>
       </label>
       <FormulaSignatureGuide value={formula} caret={formulaCaret}/>
-      <small>Use @Field, $state.key, IF, ISBLANK and AND/OR. The formula is applied to authorised records before pagination.</small>
+      <small>Use @Object.Field, @ThisPage values, IF, ISBLANK and AND/OR. The formula is applied to authorised records before pagination.</small>
       {formulaError && <p role="alert" className="metadata-filter-error">{formulaError}</p>}
     </section>}
     {effectiveMode === 'Field' && <>
@@ -378,12 +378,12 @@ export default function RecordFilterEditor({
                     }}>
                     <option value="">Choose state…</option>
                     {stateOptions.filter(option=>option.source==='CollectionState').length>0&&
-                      <optgroup label="Component values (@Name.state.…)">
+                      <optgroup label="Component selections (@ThisPage.Name.Selected.…)">
                         {stateOptions.filter(option=>option.source==='CollectionState').map(option=>
                           <option key={option.source+option.key} value={option.source+':'+option.key}>{option.label}</option>)}
                       </optgroup>}
                     {stateOptions.filter(option=>option.source==='PageState').length>0&&
-                      <optgroup label="Page / Flow State">
+                      <optgroup label="Saved page values">
                         {stateOptions.filter(option=>option.source==='PageState').map(option=>
                           <option key={option.source+option.key} value={option.source+':'+option.key}>{option.label}</option>)}
                       </optgroup>}

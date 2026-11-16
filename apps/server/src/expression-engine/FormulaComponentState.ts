@@ -3,7 +3,7 @@
  * Every component on a page has a name (Navigator name, e.g. CategoryTabs, or the
  * automatic one, e.g. smarttabs1). When it fires change/select/click, the page
  * remembers its current value under that name, and any formula, filter or action
- * reads it as  @CategoryTabs.state.Id / .Value / .Name / .Text / .Field / .Criteria.
+ * reads it as  @ThisPage.CategoryTabs.Selected.Id / .Value / .Name / .Text / .Field / .Criteria.
  * A named COLLECTION() selection uses the same channel under the collection name,
  * so older pages keep working. Generic: nothing here knows any component type. */
 export const COMPONENT_STATE_FIELDS=['Id','Name','Value','Text','Field','Criteria'] as const;

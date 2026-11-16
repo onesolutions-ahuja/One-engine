@@ -1,4 +1,5 @@
-import {parseComponentStateReference,readComponentState,componentStateMentionPattern} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
+import {readComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
+import {parsePageReference,pageReferencesIn,savedValueKey,isPageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 /** Metadata-owned record filtering formulas compiled into permission-scoped
  * server filters before pagination. This intentionally accepts only expressions
  * that can be represented exactly by the existing Record API; there is NO
@@ -17,36 +18,37 @@ export type CompiledFilterFormula={
 };
 type Plan={truth?:boolean;filters:CompiledFilterFormula['filters'];logic:string};
 const blank=(value:unknown)=>value===null||value===undefined||value==='';
-const stateName=(node:Expression):string|null=>
- node.kind==='reference'&&/^\$state\.[A-Za-z][A-Za-z0-9_]{0,63}$/.test(node.value)
-  ?node.value.slice(7):null;
 const valueFunctions=new Set(['TODAY','NOW','TIMENOW','ADDDAYS','ADDMONTHS','DATE','DATEVALUE',
  'WEEKDAY','DAY','MONTH','YEAR','HOUR','MINUTE','VALUE','TEXT','LEFT','RIGHT','UPPER','LOWER',
  'LEN','ROUND','ROUNDUP','ROUNDDOWN','MIN','MAX','BLANKVALUE']);
 const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=''):unknown=>{
  if(node.kind==='literal')return node.value;
- if(node.kind==='reference'&&node.value.startsWith('$session.')){
-  const result=evaluateFieldExpressionDetailed(node.value,{},{sessionId});
+ const page=node.kind==='reference'?parsePageReference(node.value):null;
+ if(page?.kind==='session'||page?.kind==='user'||page?.kind==='company'||page?.kind==='cart'){
+  const result=evaluateFieldExpressionDetailed('@'+(node as {value:string}).value,{},{sessionId,pageState:state});
   if(result.error)throw Error(result.error);
   return result.value;
  }
- if(node.kind==='reference'&&node.value.startsWith('$component.')){
-  const parts=node.value.split('.');
-  const reader=(state as {[componentReaderKey]?:FormulaBindingContext['readComponent']})[componentReaderKey];
-  if(parts.length!==3||!reader)throw Error('Select a component and property on this page');
-  return reader(parts[1],parts[2]);
+ // @ThisPage.Tabs1.Selected.Id: what that component published (blank until picked).
+ if(page?.kind==='selected')return readComponentState(state.collectionSelections,page.name,page.field);
+ if(page?.kind==='component'){
+  // A saved value first; otherwise the component's own live value.
+  if(!Object.prototype.hasOwnProperty.call(state,page.key)){
+   const reader=(state as {[componentReaderKey]?:FormulaBindingContext['readComponent']})[componentReaderKey];
+   if(reader){
+    try{return reader(page.name,page.key);}
+    catch(error){if(!/^Unknown component property/.test(error instanceof Error?error.message:''))throw error;}
+   }
+  }
  }
- // @CategoryTabs.state.Id: what that component published (blank until picked).
- const published=node.kind==='reference'?parseComponentStateReference(node.value):null;
- if(published)return readComponentState(state.collectionSelections,published.name,published.field);
- const key=stateName(node);
+ const key=savedValueKey(page);
  if(key!==null){const value=state[key];
   if(value===undefined||value===null||['string','number','boolean'].includes(typeof value))return value;
-  throw Error('Page State formula value must be a scalar');
+  throw Error('Page value must be a scalar');
  }
  if(node.kind==='call'&&node.name==='ISBLANK'&&node.args.length===1)
   return blank(asState(node.args[0],state,sessionId));
- // Value-side IF, e.g. @Product.Category = IF(ISBLANK($state.category),"*",$state.category).
+ // Value-side IF, e.g. @Product.Category = IF(ISBLANK(@ThisPage.Tabs1.Selected.Id),"*",@ThisPage.Tabs1.Selected.Id).
  if(node.kind==='call'&&node.name==='IF'&&node.args.length===3){
   const condition=asState(node.args[0],state,sessionId);
   return asState(Boolean(condition)?node.args[1]:node.args[2],state,sessionId);
@@ -93,10 +95,10 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
    timeZone:()=>Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'};
   return O.out(entry.clock?run(clock,...values):run(...values));
  }
- throw Error('IF condition must use constants or $state values (e.g. ISBLANK($state.categoryId))');
+ throw Error('IF condition must use constants or @ThisPage values (e.g. ISBLANK(@ThisPage.Tabs1.Selected.Id))');
 };
 const simpleField=(node:Expression,fields:ReadonlyArray<FieldMetadata>):FieldMetadata|null=>{
- if(node.kind!=='reference')return null;
+ if(node.kind!=='reference'||isPageReference(node.value))return null;
  // @Field or @Object.Field (the component's own Object): both name one field.
  // @Object.Lookup.Field: one hop through a lookup on this Object. The Record API
  // filters it server-side against the related record, with that record's access rules.
@@ -156,12 +158,12 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    op=flip[node.operator];
    valueNode=node.left;
   }
-  // Neither side is a field: a pure state test such as @Tabs.state.Id = "*".
+  // Neither side is a field: a pure page test such as @ThisPage.Tabs1.Selected.Id = "*".
   if(!field&&!simpleField(node.left,fields)){
    const truth=asState(node,state,sessionId);
    if(typeof truth==='boolean')return {truth,filters:[],logic:''};
   }
-  if(!field||!op)throw Error('Formula comparisons require a direct readable @Field and $state or literal');
+  if(!field||!op)throw Error('Formula comparisons require a direct readable @Field (e.g. @Product.Category) and an @ThisPage value or literal');
   // Numeric formula fields (e.g. stock = opening + purchased - sold) are compiled to SQL by the
   // server; other formula types still cannot be filtered there.
   const numericFormula=/^Formula\s*\(\s*(Number|Currency|Percent)\s*\)/i.test(field.dataType);
@@ -203,9 +205,10 @@ export function compileRecordFilterFormula(formula:unknown,fields:ReadonlyArray<
 /** Check both selected and unselected Page State paths before allowing a save. */
 export function validateRecordFilterFormula(formula:string,fields:ReadonlyArray<FieldMetadata>):string|null{
  if(!formula.trim())return null;
- const keys=Array.from(new Set([...formula.matchAll(/\$state\.([A-Za-z][A-Za-z0-9_]{0,63})/g)].map(m=>m[1])));
- const published=Array.from(new Set([...formula.matchAll(componentStateMentionPattern)].map(m=>m[1])));
- if(keys.length+published.length>12)return 'Too many Page State references';
+ const references=pageReferencesIn(formula);
+ const keys=Array.from(new Set(references.map(savedValueKey).filter((key):key is string=>Boolean(key))));
+ const published=Array.from(new Set(references.flatMap(item=>item.kind==='selected'?[item.name]:[])));
+ if(keys.length+published.length>12)return 'Too many page value references';
  for(const selected of [false,true]){
   const picked=Object.fromEntries(published.map(name=>[name,{Id:'test-id',Name:'test',Value:'test-id',Text:'test',Field:'',Criteria:''}]));
   const state:Record<string,unknown>=selected?{...Object.fromEntries(keys.map(key=>[key,'test-id'])),collectionSelections:picked}:{};

@@ -123,7 +123,14 @@ export function activePageRecordFilters(properties:Readonly<Record<string,unknow
 }
 
 export function parseActionFormulaAssignment(formula:string):ActionFormulaAssignment|null{
- const parts=/^@(state|filter|navigate)\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/.exec(formula.trim());
+ // @ThisPage.PayButton.CartTotal := …  saves CartTotal (owned by PayButton).
+ const saved=/^@ThisPage\.([A-Za-z_][A-Za-z0-9_]{0,79})\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/i.exec(formula.trim());
+ if(saved){
+  if(formula.length>300||!saved[3].trim())throw Error('Invalid action assignment formula.');
+  if(/^Session$/i.test(saved[1]))throw Error('The page session cannot be changed.');
+  return {kind:'state',key:saved[2],value:saved[3].trim()};
+ }
+ const parts=/^@(filter|navigate)\.([A-Za-z][A-Za-z0-9_]{0,63})\s*:=\s*([\s\S]+)$/.exec(formula.trim());
  if(!parts)return null;
  if(formula.length>300||!parts[3].trim())throw Error('Invalid action assignment formula.');
  if(parts[1]==='navigate'&&!['page','list','home'].includes(parts[2]))

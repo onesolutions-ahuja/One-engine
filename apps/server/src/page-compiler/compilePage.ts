@@ -1,3 +1,4 @@
+import {pageReferencesIn,savedValueKey} from '../expression-engine/PageReferences.js';
 import {Parser,type Expression} from '../expression-engine/FormulaParser.js';
 import {tokenize} from '../expression-engine/FormulaTokenizer.js';
 import {compileActionPlan,isActionPlan,splitServerDataActionPlan,type ActionStep} from '../expression-engine/ActionFormulas.js';
@@ -39,7 +40,7 @@ export type CompiledAction={
  event:string;kind:CompiledActionKind;formula?:string;stateKey?:string;flowApiName?:string;
  /** The authored action settings, as saved (the compiled file passes them to the runtime). */
  binding:Record<string,unknown>;
- /** `@state.x := …`, `@navigate.page := …`, `@filter.x := …`: value formula parsed once. */
+ /** `@ThisPage.Button1.x := …`, `@navigate.page := …`, `@filter.x := …`: value formula parsed once. */
  assignment?:{kind:'state'|'filter'|'navigate';key:string;value:string;ast:Expression|null;functions:string[];references:string[]};
  steps:Array<{name:string;object:string}>;
  /** Leading steps that run on the server in ONE request and ONE SQL transaction. */
@@ -266,10 +267,11 @@ function filterStateInputs(filters:unknown,formula:unknown):string[]{
   if(named)keys.add(named[1]);
  }
  if(typeof formula==='string')
-  for(const match of formula.matchAll(/(?:\$state\.|@state\.)([A-Za-z][A-Za-z0-9_]{0,63})\b/g))keys.add(match[1]);
- // @CategoryTabs.state.Id: the component's published value, under its name.
- if(typeof formula==='string')
-  for(const match of formula.matchAll(/@([A-Za-z][A-Za-z0-9_]{0,79})\.state\.(?:Id|Name|Value|Text|Field|Criteria)\b/gi))keys.add(match[1]);
+  for(const reference of pageReferencesIn(formula)){
+   // Saved values by key; @ThisPage.Tabs1.Selected.Id under the component's name.
+   const key=reference.kind==='selected'?reference.name:savedValueKey(reference);
+   if(key&&identifier.test(key))keys.add(key);
+  }
  return unique(keys);
 }
 function stableHash(text:string):string{

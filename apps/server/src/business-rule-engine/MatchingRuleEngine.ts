@@ -48,7 +48,7 @@ export class RecordMatching {
     }
     await this.rbac.require(tenantId,userId,objectApi+'.'+field.field_api,'read');
     const matchedField=crossObject?field.target_field_api:field.field_api;
-    if(crossObject&&(!matchedField||!/^[A-Za-z][A-Za-z0-9_]*$/.test(matchedField)))
+    if(!matchedField||!/^[A-Za-z][A-Za-z0-9_]*$/.test(matchedField))
       throw new Error('Invalid cross-object matching field');
     if(crossObject)await this.rbac.require(tenantId,userId,targetObject+'.'+matchedField,'read');
     const column=nativeValueSql(native,matchedField,'nr',true);

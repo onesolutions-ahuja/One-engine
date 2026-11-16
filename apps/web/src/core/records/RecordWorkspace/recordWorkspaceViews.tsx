@@ -1346,7 +1346,8 @@ function RecordWorkspace({
           && object.fields.some((field) => field.apiName === apiName
             && field.dataType === 'Text (Encrypted)')
           && formValues[apiName] === '********') && (object.apiName === 'User'
-          ? ['Name', 'Email', 'Username', 'IsActive', 'Password', 'Tenant', 'LandingApp', 'ReportsToId'].includes(apiName)
+          ? ['Name', 'Email', 'Username', 'Enabled', 'IsActive', 'Password', 'Tenant', 'LandingApp', 'ReportsToId'].includes(apiName)
+            && (!['LandingApp', 'ReportsToId'].includes(apiName) || canManageUserIdentities)
             && (fieldAccess[`${object.apiName}.${apiName}`]?.edit !== false)
           : (apiName === 'RecordTypeId' || fieldAccess[`${object.apiName}.${apiName}`]?.edit))
       ));
@@ -1356,7 +1357,9 @@ function RecordWorkspace({
       Object.assign(writableValues,effectiveValues);
       const layoutWritable=filterLayoutWritableValues(writableValues,selectedLayout,
         new Set(object.fields.filter(field=>field.required).map(field=>field.apiName)),
-        authoredDynamicFields);
+        authoredDynamicFields,
+        object.apiName==='User'&&canManageUserIdentities
+          ? new Set(['LandingApp','ReportsToId']) : undefined);
       Object.keys(writableValues).forEach(name=>{if(!(name in layoutWritable))delete writableValues[name];});
       const missingLayoutFields=missingLayoutRequiredFields(writableValues,selectedLayout,
         new Set(object.fields.filter(field=>
@@ -1374,8 +1377,14 @@ function RecordWorkspace({
           if (typeof formValues.Password !== 'string' || formValues.Password.length < 12) throw new Error('Set an initial password of at least 12 characters.');
           writableValues.Password = formValues.Password;
         }
+        // Legacy User metadata uses Enabled; other layouts use IsActive. Both
+        // represent md_users.enabled, so never send a stale second value.
+        const userFields = new Set(object.fields.map(field=>field.apiName));
+        if (userFields.has('Enabled') && !userFields.has('IsActive')) delete writableValues.IsActive;
+        else if (userFields.has('IsActive') && !userFields.has('Enabled')) delete writableValues.Enabled;
+        else if ('IsActive' in writableValues && 'Enabled' in writableValues) delete writableValues.Enabled;
         // The identity API accepts only these explicit fields. No arbitrary metadata fields or password edits.
-        const allowed = new Set(['Name', 'Email', 'Username', 'IsActive', 'Password', 'Tenant', 'LandingApp', 'ReportsToId']);
+        const allowed = new Set(['Name', 'Email', 'Username', 'Enabled', 'IsActive', 'Password', 'Tenant', 'LandingApp', 'ReportsToId']);
         Object.keys(writableValues).forEach((name) => { if (!allowed.has(name)) delete writableValues[name]; });
       }
       const relatedCreation=route.kind==='record-list'&&!editingId?route.relatedCreation:undefined;

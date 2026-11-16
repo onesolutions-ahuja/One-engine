@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import type {RbacEngine} from './rbac-engine.js';
 import type {SqlPersistence} from './sql-persistence.js';
 import {validateTenantImage} from './record-file-service.js';
+import {loadNativeFields,readNativeValueRows} from './native-object-query.js';
 
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const limit=512*1024*1024;
@@ -89,10 +90,19 @@ export class TenantMediaService {
         UNION ALL SELECT value_text FROM md_component_properties WHERE tenant_id=$1
         UNION ALL SELECT value_text FROM md_page_properties WHERE tenant_id=$1
         UNION ALL SELECT value_text FROM md_flow_editor_values WHERE tenant_id=$1
-        UNION ALL SELECT value_text FROM md_record_values WHERE tenant_id=$1
        ) SELECT 1 FROM asset_refs WHERE position($2 IN value_text)>0 LIMIT 1`,
       [tenantId,assetRef]);
     if(references.rows.length)throw new Error('Media asset is referenced by a page component');
+    const {rows:objects}=await this.db.query<{object_api:string}>(
+      'SELECT object_api FROM md_native_objects WHERE tenant_id=$1',[tenantId]);
+    for(const {object_api:objectApi} of objects){
+      const native=await loadNativeFields(this.db,tenantId,objectApi);
+      const references=await this.db.query(`SELECT 1 FROM md_records r
+        ${readNativeValueRows(native,'r')}
+        WHERE r.tenant_id=$1 AND r.object_api=$2
+          AND position($3 IN v.value_text)>0 LIMIT 1`,[tenantId,objectApi,assetRef]);
+      if(references.rowCount)throw new Error('Media asset is referenced by a page component');
+    }
     const deleted=await this.db.query(
       'DELETE FROM md_tenant_media_assets WHERE tenant_id=$1 AND id=$2 RETURNING id',[tenantId,id]);
     if(!deleted.rowCount)throw new Error('Media asset not found');

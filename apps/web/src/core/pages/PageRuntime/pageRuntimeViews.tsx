@@ -122,7 +122,7 @@ const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));
 const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
 import { inspectPageDependencies } from './pageDependencies';
-import {CompiledPageProvider,MemoizedCompiledComponentNode} from '../PageCompiler/CompiledPageRuntime';
+import {CompiledPageProvider,MemoizedCompiledComponentNode,PageCodeFormulas} from '../PageCompiler/CompiledPageRuntime';
 import type {CompiledPage} from '../PageCompiler/compilePage';
 import {issuedAppPageScript,type LoadedPageScript} from '../PageCompiler/serverPageScript';
 import {preloadAppPageScript,primeAppPageScript,useAppPageScript} from '../PageCompiler/useAppPageScript';
@@ -1420,8 +1420,9 @@ function LightningAppRuntime({
             sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}
             children={nestedChildren}
             onNavigate={onNavigate} onLaunchFlow={onLaunchFlow} />
-        : <RegisteredComponent definition={definition} layoutTransparent props={{
+        : <PageCodeFormulas key={component.id} componentId={component.id}>{formulaCode=><RegisteredComponent definition={definition} layoutTransparent props={{
             ...component.properties, pageState:layoutState,
+            ...(formulaCode?{__formulaCode:formulaCode}:{}),
             ...componentLayoutProps(component.properties, layoutDevice),
             ...(definition.apiName.startsWith('smart_') && component.position
               ? {canvasFrameSized:true}:{}),
@@ -1438,7 +1439,7 @@ function LightningAppRuntime({
             properties: component.properties,
             pageSessionKey: runtimeSessionKey, componentId: component.id,
             device: layoutDevice, children: nestedChildren
-          }} />;
+          }} />}</PageCodeFormulas>;
       const rendered = nestedChildren?.length && definition.trustedBundled !== true
         ? <div className="metadata-nested-host" data-nested-host={component.id}>{content}{nestedChildren}</div>
         : content;

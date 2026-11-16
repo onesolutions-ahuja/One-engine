@@ -820,6 +820,21 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
 }
 export const MemoizedCompiledComponentNode=React.memo(CompiledComponentNode);
 
+/** Display-only components (labels, headers, logos) are drawn without the data node, but
+ * their formulas still run as the page's converted code, never on the previous engine. */
+export function PageCodeFormulas({componentId,children}:{componentId:string;
+ children:(formulaCode:{functions:Map<string,(row:Record<string,unknown>)=>unknown>;version:number}|null)=>ReactNode}){
+ const runtime=useCompiledPageRuntime();
+ const code=runtime?.code??null;
+ const version=useSyncExternalStore(listener=>code?code.subscribe(listener):()=>{},
+  ()=>code?.version()??0,()=>code?.version()??0);
+ const formulaCode=useMemo(()=>{
+  const map=code?.formulasFor(componentId);
+  return map&&map.size?{functions:map,version}:null;
+ },[code,componentId,version]);
+ return <>{children(formulaCode)}</>;
+}
+
 /** Builder canvas slot: in Preview the compiled node runs; while editing the
  * design canvas keeps its read-only design rendering. */
 export function CompiledPreviewSlot({componentId,enabled,compiled,fallback}:{

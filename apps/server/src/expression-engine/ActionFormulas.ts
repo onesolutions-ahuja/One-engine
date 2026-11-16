@@ -107,7 +107,7 @@ export type ActionStep={
  /** FOREACH: the loop body, and a TABLE()/COLLECTION() source instead of record criteria. */
  body?:ActionStep[];source?:Expression
 };
-const reservedAliases=['state','event','session','constructor','prototype'];
+const reservedAliases=['state','event','session','constructor','prototype','repeat'];
 
 export function compileActionPlan(source:string):ActionStep[] {
  const aliases=new Set<string>();
@@ -196,6 +196,51 @@ export function compileActionPlan(source:string):ActionStep[] {
    steps.push(step);
    return;
   }
+  if(node.name==='LOOP'){
+   // LOOP(Times, AS(i), Action): run the action Times times; i.Index is 1, 2, 3...
+   if(loop)throw Error('LOOP cannot be nested inside FOREACH, LOOP or REPEAT');
+   if(args.length!==3)throw Error('LOOP requires Times, AS(item) and an action');
+   validateFormulaFunctions(args[0],'ribbon_binding');
+   const alias=takeAlias(args[1],'LOOP requires AS(item) after Times');
+   const bodySteps:ActionStep[]=[];
+   add(bodySteps,args[2],[],true);
+   if(!bodySteps.length)throw Error('LOOP requires an action');
+   steps.push({name:'LOOP',object:'',source:args[0],fields:new Map(),alias,guards,body:bodySteps});
+   return;
+  }
+  if(node.name==='REPEAT'){
+   // REPEAT(Action, UntilCondition, EverySeconds, MaxTimes): run the action, stop when the
+   // condition is TRUE, otherwise wait and run again (at most MaxTimes). For status checks.
+   if(loop)throw Error('REPEAT cannot be nested inside FOREACH, LOOP or REPEAT');
+   if(args.length!==4)throw Error('REPEAT requires Action, Until condition, Every seconds and Max times');
+   args.slice(1).forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
+   const bodySteps:ActionStep[]=[];
+   add(bodySteps,args[0],[],true);
+   if(!bodySteps.length)throw Error('REPEAT requires an action');
+   steps.push({name:'REPEAT',object:'',values:args.slice(1),fields:new Map(),guards,body:bodySteps});
+   return;
+  }
+  if(node.name==='CALLOUT'){
+   // CALLOUT('Connector.Operation', 'Field', Value, ..., AS(result)): the connector app holds
+   // the URL, keys, method, path and body template; the formula only fills named blanks.
+   const target=args.shift();
+   const operation=target?.kind==='literal'||target?.kind==='reference'?String(target.value):'';
+   if(!/^[A-Za-z][A-Za-z0-9_]{0,79}\.[A-Za-z][A-Za-z0-9_]{0,79}$/.test(operation))
+    throw Error("CALLOUT needs 'Connector.Operation', for example 'SumUp.StartPayment'");
+   let alias:string|undefined;
+   const last=args.at(-1);
+   if(last?.kind==='call'&&last.name==='AS'){alias=takeAlias(last,'AS requires one variable');args.pop();}
+   if(args.length%2||args.length>80)throw Error('CALLOUT expects field and value pairs');
+   const fields=new Map<string,Expression>();
+   for(let i=0;i<args.length;i+=2){
+    const field=nameOf(args[i],'CALLOUT field name');
+    if(fields.has(field))throw Error('Duplicate field '+field);
+    validateFormulaFunctions(args[i+1],'ribbon_binding');
+    fields.set(field,args[i+1]);
+   }
+   steps.push({name:'CALLOUT',object:operation,fields,alias,guards});
+   return;
+  }
   const object=nameOf(args.shift(),'object API name');
   if(node.name==='GETRECORD'){
    const alias=takeAlias(args.at(-1),'GETRECORD requires AS(variable) for the found record');
@@ -278,7 +323,8 @@ export function splitServerDataActionPlan(formula:string):ActionPlanDataSplit|nu
  if(count===0)return null;
  // Conditional browser suffixes can re-decide IF guards after the server
  // transaction; never split them or plans with intervening data actions.
- if(steps.slice(count).some(step=>serverDataNames.has(step.name)||(step.guards?.length??0)>0))
+ const writesData=(step:ActionStep):boolean=>serverDataNames.has(step.name)||(step.body??[]).some(writesData);
+ if(steps.slice(count).some(step=>writesData(step)||(step.guards?.length??0)>0))
   return null;
  return {dataSteps:count,totalSteps:steps.length};
 }
@@ -702,6 +748,46 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
        const inner:Record<string,unknown>=Object.assign(Object.create(null),variables,{[step.alias!]:item});
        await run(step.body!,inner,false);
       }
+      completed++;
+      continue;
+     }
+     if(step.name==='LOOP'){
+      const times=evaluate(step.source!);
+      if(typeof times!=='number'||!Number.isInteger(times)||times<0||times>maxLoopIterations)
+       throw Error('LOOP Times must be a whole number from 0 to '+maxLoopIterations);
+      for(let index=1;index<=times;index++){
+       if(++iterations>maxLoopIterations)throw Error('LOOP is limited to '+maxLoopIterations+' iterations');
+       const inner:Record<string,unknown>=Object.assign(Object.create(null),variables,
+        {[step.alias!]:{Index:index,Id:index,Value:index,IsFirst:index===1,IsLast:index===times}});
+       await run(step.body!,inner,false);
+      }
+      completed++;
+      continue;
+     }
+     if(step.name==='REPEAT'){
+      const [every,max]=step.values!.slice(1).map(evaluate);
+      if(typeof every!=='number'||!Number.isFinite(every)||every<1||every>60)
+       throw Error('REPEAT Every seconds must be from 1 to 60');
+      if(typeof max!=='number'||!Number.isInteger(max)||max<1||max>600)
+       throw Error('REPEAT Max times must be a whole number from 1 to 600');
+      for(let attempt=1;attempt<=max;attempt++){
+       // The action's AS(...) results stay visible to the condition and to later steps.
+       variables.repeat={Attempt:attempt,IsLast:attempt===max};
+       await run(step.body!,variables,false);
+       const until=evaluateValue(step.values![0],{...record,...variables},Object.keys(variables),stateChanges);
+       if(formulaTruth(until))break;
+       if(attempt<max)await new Promise(resolve=>setTimeout(resolve,every*1000));
+      }
+      completed++;
+      continue;
+     }
+     if(step.name==='CALLOUT'){
+      const values=Object.fromEntries([...step.fields].map(([field,node])=>[field,evaluate(node)]));
+      // One provider idempotency key per executed step, so a network retry never pays twice.
+      const key='co'+(globalThis.crypto?.randomUUID?.().replace(/-/g,'')??(Date.now().toString(36)+Math.random().toString(36).slice(2)));
+      const result=await tracedRequest<Record<string,unknown>>('/action-formulas/callout',{method:'POST',
+       body:JSON.stringify({operation:step.object,values,key})});
+      if(step.alias)variables[step.alias]=result;
       completed++;
       continue;
      }

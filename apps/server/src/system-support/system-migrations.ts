@@ -10,6 +10,7 @@ import {applySmartIosKeyboardDock} from './smart-ios-keyboard-dock.js';
 import {TILL_DEVICE_DDL} from './till-device-service.js';
 import {applySmartChart} from './smart-chart.js';
 import {applySmartSearch} from './smart-search.js';
+import {applySmartQr} from './smart-qr.js';
 
 /** Recover original migration files from the immutable SQL baseline.
  * The old runner accepted any subset of known versions and ran missing files
@@ -765,6 +766,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await applySmartIosKeyboardDock(client);
   await applySmartChart(client);
   await applySmartSearch(client);
+  await applySmartQr(client);
   // Retire the duplicate Key Gap control. Existing page JSON keeps numpadGap
   // until authored again; all three renderers and the ribbon read that legacy
   // value only when the new shared gap property has not been set.

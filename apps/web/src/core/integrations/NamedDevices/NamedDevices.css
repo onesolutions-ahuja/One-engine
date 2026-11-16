@@ -1,0 +1,19 @@
+.md-named-devices{display:flex;flex-direction:column;gap:10px}
+.md-named-devices-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.md-named-devices-head h1{margin:0;font-size:18px}
+.md-named-devices-head p{margin:2px 0 0;font-size:12px;color:var(--md-muted,#6b7280);max-width:720px}
+.md-named-devices-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px 12px;
+ padding:10px;border:1px solid var(--md-border,#e5e7eb);border-radius:8px}
+.md-named-devices-form label{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.md-named-devices-form input,.md-named-devices-form select{height:28px;font-size:13px}
+.md-named-devices-form .md-named-devices-check{flex-direction:row;align-items:center;gap:6px;padding-top:18px}
+.md-named-devices-check input{height:auto}
+.md-named-devices-actions{grid-column:1/-1;display:flex;gap:6px}
+.md-named-devices-table td,.md-named-devices-table th{font-size:12px;padding:4px 8px}
+.md-named-devices-row-actions{display:flex;gap:4px;justify-content:flex-end}
+.md-named-devices-error{color:#b91c1c;font-size:12px;margin:0}
+.md-named-devices-status{color:#047857;font-size:12px;margin:0}
+.md-payment-defaults{display:flex;flex-direction:column;gap:8px}
+.md-payment-defaults label{display:flex;flex-direction:column;gap:3px;font-size:12px;max-width:360px}
+.md-payment-defaults select{height:28px}
+.md-payment-defaults p{margin:0;font-size:12px}

@@ -9,6 +9,7 @@ import {LOCATION_SRN_FIELDS,seedLocationSrnMetadata} from './core-location-srn.j
 import {APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,seedAppointmentObjects} from './core-appointment-objects.js';
 import {CART_OBJECTS,seedCartObjects} from './cart-objects.js';
 import {CORE_CASH_LEDGER_FIELDS,seedCoreCashLedger} from './core-cash-ledger.js';
+import {NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,seedNamedDeviceObjects} from './core-named-devices.js';
 import {PRODUCT_IMAGE_FIELD,seedFreshProductImageField} from './product-image-field.js';
 import {SMART_COMPONENTS,seedFreshSmartComponents} from './smart-components.js';
 import {deactivateUnavailableBundledComponents} from './bundled-components.js';
@@ -29,6 +30,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  await seedAppointmentObjects(client,tenantId);
  await seedCartObjects(client,tenantId);
  await seedCoreCashLedger(client,tenantId);
+ await seedNamedDeviceObjects(client,tenantId);
  await seedFreshProductImageField(client,tenantId);
  await seedFreshSmartComponents(client,tenantId);
 }
@@ -36,12 +38,13 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // Bump this whenever any catalog below changes (for example a new Smart
 // component in SMART_COMPONENTS). A changed catalog under an old version stops
 // API startup on purpose. v3: smart_keyboard, smart_dock, smart_chart. v4: smart_search.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v4';
+// v5: smart_qr, NamedDevice and IncomingWebhook objects.
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v5';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
  LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,
- CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS
+ CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS
 ];
 
 /** One upgrade-safe reconciliation for all shared Core metadata. Existing

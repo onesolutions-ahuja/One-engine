@@ -3,6 +3,7 @@ import WorkspaceFormulaScreen from '../../pages/PageRuntime/WorkspaceFormulaScre
 import SetupLoadingState from './SetupLoadingState';
 import { UneBrandLogo } from '../../branding/UneBrandLogo';
 import CompanySettingsWorkspace from '../../settings/CompanySettingsWorkspace/CompanySettingsWorkspace';
+import NamedDevices from '../../integrations/NamedDevices/NamedDevices';
 import SettingsNavigationIcon from '../../settings/SettingsNavigationIcon';
 import NotificationBell from '../../automation/Notifications/NotificationBell';
 // Shared shell presentation, composed from registered metadata-driven runtime and tools.
@@ -466,12 +467,7 @@ export function renderSetupShell(ctx: any) {
             onOpenWorkspace={(destination) => navigateRoute({kind:'setup', workspace:destination})} /></PlatformWorkspaceSurface>}
           {route.kind === 'setup' && workspace === 'named-credentials' && (
             route.resourceApiName==='NamedDevices'
-              ? <section className="setup-card md-access-locked" role="alert" aria-label="Named Devices access required">
-                  <h1>Named Devices</h1>
-                  <p>This workspace requires Read access to the Named Device object through your Profile or Permission Set.</p>
-                  <p>Contact your administrator to request access, then open Named Devices again.</p>
-                  <button type="button" className="btn" onClick={()=>navigateRoute({kind:'setup',workspace:'home'})}>Back to Setup</button>
-                </section> :
+              ? <NamedDevices request={apiRequest} canManage={canManageNamedCredentials} /> :
             !namedCredentialsLoaded ? <section className="setup-card" role="status">Loading live named credentials…</section> :
             namedCredentialsError && namedCredentials.length===0
               ? <section className="setup-card" role="alert">Named Credentials could not be verified: {namedCredentialsError}</section> :

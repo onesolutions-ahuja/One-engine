@@ -5,7 +5,8 @@ type Source=Choice&{fields:readonly Choice[]};
 
 /** Inspect complete tokens before the caret, including nested call frames. */
 export function actionArgumentSuggestions(before:string,objects:readonly Source[],flows:readonly Choice[],
- pages:readonly (Choice&{pageType:string;status:string})[]=[],credentials:readonly Choice[]=[]){
+ pages:readonly (Choice&{pageType:string;status:string})[]=[],credentials:readonly Choice[]=[],
+ callouts:readonly (Choice&{fields?:readonly string[];outputs?:readonly string[]})[]=[]){
  const suffix=/[A-Za-z0-9_.]*$/.exec(before)?.[0]??'';
  const prefix=before.slice(0,before.length-suffix.length);
  let tokens;
@@ -19,7 +20,9 @@ export function actionArgumentSuggestions(before:string,objects:readonly Source[
   }else if(token.kind==='punctuation'&&token.value===')'){
    stack.pop();
    const parent=stack.at(-1);
-   if(frame?.name==='AS'&&parent&&['CREATERECORD','UPDATERECORD','CREATEPDF'].includes(parent.name))
+   if(frame?.name==='AS'&&parent?.name==='CALLOUT')
+    aliases.set(frame.args[0].join(''),'__CALLOUT__'+parent.args[0].join('').replace(/['"]/g,''));
+   else if(frame?.name==='AS'&&parent&&['CREATERECORD','UPDATERECORD','CREATEPDF'].includes(parent.name))
     aliases.set(frame.args[0].join(''),parent.name==='CREATEPDF'?'__PDF__':parent.args[0].join(''));
   }else if(token.kind==='punctuation'&&token.value===',')frame?.args.push([]);
   else frame?.args.at(-1)?.push(token.value);
@@ -29,6 +32,11 @@ export function actionArgumentSuggestions(before:string,objects:readonly Source[
  const index=frame.args.length-1;
  const [alias,field]=suffix.split('.');
  if(field!==undefined){
+  const calloutAlias=aliases.get(alias);
+  if(calloutAlias?.startsWith('__CALLOUT__')){
+   const operation=callouts.find(item=>item.apiName===calloutAlias.slice(11));
+   return {query:suffix,choices:['HttpStatus',...(operation?.outputs??[])].map(name=>({apiName:alias+'.'+name,label:name}))};
+  }
   if(aliases.get(alias)==='__PDF__')return {query:suffix,choices:[{apiName:alias+'.FileId',label:'Generated PDF file ID'}]};
   const source=objects.find(object=>object.apiName===aliases.get(alias));
   return source?{query:suffix,choices:source.fields.map(item=>({...item,apiName:alias+'.'+item.apiName}))}:null;

@@ -1,4 +1,5 @@
 import {excelWildcardSqlLike} from '../expression-engine/FormulaWildcard.js';
+import {nativeTableSql,nativeValueSql,type NativeFieldsMetadata} from '../system-files/native-object-query.js';
 
 export type RecordFilterOperator =
   | 'eq' | 'ne' | 'lt' | 'lte' | 'gt' | 'gte'
@@ -15,6 +16,9 @@ export type QueryField = {
   /** Trusted server-generated SQL for an activated typed object table. Never request input. */
   nativeValue?: string;
   nativeText?: string;
+  native_table?: string|null;
+  native_column?: string|null;
+  native_type?: string|null;
   data_type: string;
   rollup_source_data_type?: string | null;
   /** Formula fields: simple numeric formulas can be filtered in SQL (see numericFormulaSql). */
@@ -78,8 +82,7 @@ export function numericFormulaSql(expression:string,fields:ReadonlyMap<string,Qu
     const type=field?.data_type==='rollup'?field.rollup_source_data_type??'number':field?.data_type;
     if(!field||field.via||!numericTypes.has(type??''))throw 0;
     if(field.nativeValue)return field.nativeValue;
-    return `(SELECT fx.value_number FROM md_record_values fx WHERE fx.tenant_id=r.tenant_id AND fx.record_id=r.id
-      AND fx.object_api=r.object_api AND fx.field_api=${bind(api)})`;
+    throw 0;
   };
   const args=()=>{take('(');const out=[expr()];while(peek()===','){take(',');out.push(expr());}take(')');return out;};
   const primary=():string=>{
@@ -247,7 +250,7 @@ export function compileRecordFilters(
   const parameters: unknown[] = [];
   const predicates = filters.map((filter, index) => {
     if (!filterFieldPath.test(filter.field)) throw new Error('Invalid list field');
-    // Id is a system column, not a value in md_record_values. Keep it inside
+    // Id is a system column, not a stored field value. Keep it inside
     // the normal tenant/record-access-scoped query so extra filters still apply.
     if (filter.field === 'Id') {
       if (filter.operator === 'isBlank' || filter.operator === 'isNotBlank') {

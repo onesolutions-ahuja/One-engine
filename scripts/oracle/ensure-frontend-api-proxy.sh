@@ -92,4 +92,30 @@ for attempt in 1 2 3 4 5 6 7 8 9 10; do
   sleep 1
 done
 [[ "$code" == "204" ]] || { echo "Unexpected main-domain federation status: $code" >&2; false; }
+# Cloudflare in front of the site: restore the visitor's own IP from CF-Connecting-IP,
+# only for requests that really come from Cloudflare's published ranges (cloudflare.com/ips).
+# Login limits, audit and session checks then keep seeing the real visitor.
+real_ip=/etc/nginx/conf.d/metadrive-cloudflare-real-ip.conf
+real_ip_new="$(mktemp)"
+{
+  echo '# Managed by ensure-frontend-api-proxy.sh'
+  for range in 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 \
+    108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 \
+    104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 \
+    2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32; do
+    echo "set_real_ip_from $range;"
+  done
+  echo 'real_ip_header CF-Connecting-IP;'
+} > "$real_ip_new"
+if ! cmp -s "$real_ip_new" "$real_ip"; then
+  had_old=0; [[ -f "$real_ip" ]] && { cp -p "$real_ip" "$real_ip_new.old"; had_old=1; }
+  install -o root -g root -m 0644 "$real_ip_new" "$real_ip"
+  if nginx -t >/dev/null 2>&1; then nginx -s reload; echo "Cloudflare visitor IP restore configured."
+  else
+    if [[ $had_old == 1 ]]; then cp -p "$real_ip_new.old" "$real_ip"; else rm -f "$real_ip"; fi
+    echo "Cloudflare visitor IP config rejected by nginx; left unchanged" >&2
+  fi
+  rm -f "$real_ip_new.old"
+fi
+rm -f "$real_ip_new"
 echo "Frontend API reverse proxy verified."

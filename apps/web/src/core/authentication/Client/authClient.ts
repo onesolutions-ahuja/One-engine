@@ -1,3 +1,4 @@
+import { currentFormFactor } from '../../workspace/Responsive/useFormFactor';
 import {createRecordPageCoalescer} from './recordPageCoalescer';
 import {invalidatePageMediaAssets} from '../../pages/PageRuntime/pageMediaAssetCoalescer';
 import {setAuthenticatedFormulaBindingContext} from '../../components/RegisteredComponent/fieldExpressionRuntime';
@@ -5,6 +6,8 @@ import {setSqlFormulaRequest} from '../../../component-libraries/shared/SqlFormu
 import {setLocalRecordSetProvider} from '../../../component-libraries/shared/localRecordSets.js';
 import {rememberCompleteRecordSet,recordSetGeneration,rowsForFilters,applyRecordSetMutation,heldRowById,
   type SetFilter} from './recordSetStore';
+/** Page brought by the sign-in refresh (see rememberBootPage). */
+let bootPage: { endpoint: string; body: unknown } | undefined;
 // Same-origin API for deployed builds and development's Vite /api proxy.
 export const apiBase = import.meta.env.VITE_API_BASE_URL ?? `${window.location.origin}/api`;
 let accessToken: string | undefined;
@@ -112,6 +115,11 @@ function invalidateAfterWrite(path:string,init?:RequestInit):void {
 }
 
 export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  if (init === undefined && bootPage && bootPage.endpoint === path) {
+    const body = bootPage.body;
+    bootPage = undefined;
+    return Promise.resolve(body as T);
+  }
   // Only default GETs are coalesced. Any explicit RequestInit may carry caller
   // semantics (cache mode, credentials, abort signal, headers, etc.) and must
   // remain an independent request.
@@ -336,12 +344,30 @@ export async function loadFlowScreenRecords(
 
 export function getAccessToken() { return accessToken; }
 export function setAccessToken(value: string | undefined) {
-  if(value!==accessToken){setAuthenticatedFormulaBindingContext(null);earlyEditorDrafts.clear();}
+  if(value!==accessToken){setAuthenticatedFormulaBindingContext(null);earlyEditorDrafts.clear();bootPage=undefined;}
   accessToken=value;
 }
 
 // Published components use the existing authenticated Core API.
 setSqlFormulaRequest(apiRequest);
+
+// Page open: the sign-in refresh also brings the page the browser is opening, so the
+// page does not wait for a second round trip. Used once, only for the exact same request.
+export function rememberBootPage(value: unknown) {
+  const page = value as { endpoint?: unknown; body?: unknown } | undefined;
+  bootPage = page && typeof page.endpoint === 'string' && page.body ? { endpoint: page.endpoint, body: page.body } : undefined;
+}
+/** The page request the app runtime will make for this address (same text as appPageEndpoint). */
+export function bootPageEndpoint(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const match = /^\/une\/apps\/([A-Za-z][A-Za-z0-9_]*)(?:\/pages\/([A-Za-z][A-Za-z0-9_]*)|\/home)?\/?$/.exec(window.location.pathname);
+  if (!match) return undefined;
+  const custom = new URLSearchParams(window.location.search).get('pageLayout') === 'Custom';
+  const device = currentFormFactor();
+  const layout = custom ? 'Custom' : device === 'Tablet' ? 'Tablet' : device === 'Phone' ? 'Mobile' : 'Desktop';
+  const query = `?formFactor=${layout}&viewportWidth=${window.innerWidth}&script=1`;
+  return match[2] ? `/apps/${match[1]}/pages/${match[2]}${query}` : `/apps/${match[1]}/home-page${query}`;
+}
 
 // Page open: the landing bootstrap (objects, pages, apps, session) is requested as soon
 // as the session is restored, in parallel with loading the workspace code, instead of

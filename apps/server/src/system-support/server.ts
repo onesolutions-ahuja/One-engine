@@ -510,7 +510,14 @@ export function createSystemServer(db:SqlPersistence) {
       const session=await auth.refresh(token,{ip:req.ip});
       res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
       if(req.query.landing==='1')res.setHeader('Cache-Control','no-store');
-      res.json({access_token:session.accessToken,expires_in:session.expiresIn,userId:session.user_id,landingAppApi:await landingPreference(session.tenant_id,session.user_id),...(req.query.landing==='1'?await landingBootstrap(session.tenant_id,session.user_id):{})});
+      const actor={tenant_id:session.tenant_id,user_id:session.user_id};
+      const [landingAppApi,bootPage,landing]=await Promise.all([
+        landingPreference(session.tenant_id,session.user_id),
+        req.query.page?bootPageAnswer(actor,req.query.page):undefined,
+        req.query.landing==='1'?landingBootstrap(session.tenant_id,session.user_id):undefined]);
+      if(bootPage||landing)res.setHeader('Cache-Control','no-store');
+      res.json({access_token:session.accessToken,expires_in:session.expiresIn,userId:session.user_id,landingAppApi,
+        ...(bootPage?{page:bootPage}:{}),...(landing??{})});
     } catch {res.status(401).json({error:'Invalid refresh session'});}
   }));
   app.get('/api/auth/password-reset/options',route(async(req,res)=>{
@@ -1460,8 +1467,10 @@ export function createSystemServer(db:SqlPersistence) {
         (page as {layoutVariant?:unknown}).layoutVariant??'Desktop');
     }catch{return undefined;}
   };
-  app.get('/api/apps/:appId/home-page',route(async(req,res)=>{
-    const actor=req.actor!;
+  type PageQuery=Request['query'];
+  type PageActor={tenant_id:string;user_id:string};
+  const homePageAnswer=async(actor:PageActor,appId:string,query:PageQuery)=>{
+    const req={params:{appId},query,actor};
     const viewportWidth=Number(req.query.viewportWidth??0);
     const factor=String(req.query.formFactor??'Desktop');
     if(!['Desktop','Phone','Mobile','Tablet','Custom'].includes(factor))throw new Error('Invalid form factor');
@@ -1504,9 +1513,35 @@ export function createSystemServer(db:SqlPersistence) {
     if(!targeted&&assignedResult.error)throw assignedResult.error;
     const page=targeted??assignedResult.page;
     const script=await withPageScript(req,req.params.appId,page);
+    return script?{page,script}:{page};
+  };
+  const appPageAnswer=async(actor:PageActor,appId:string,pageApiName:string,query:PageQuery)=>{
+    await rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
+    const factor=String(query.formFactor??'Desktop');
+    const viewportWidth=Number(query.viewportWidth??0);
+    const page=await pages.resolveAppPage(actor.tenant_id,appId,pageApiName,factor,viewportWidth);
+    if(!page)throw new Error('Page not found');
+    const script=await withPageScript({query,actor},appId,page.page);
+    return script?{page:page.page,script}:{page:page.page};
+  };
+  // Page open: the sign-in refresh can carry the page the browser is opening, so the
+  // page does not wait for a second round trip. Same checks as the GET routes below.
+  const bootPageAnswer=async(actor:PageActor,endpoint:unknown)=>{
+    if(typeof endpoint!=='string'||endpoint.length>300)return undefined;
+    const match=/^\/apps\/([A-Za-z][A-Za-z0-9_]*)\/(?:pages\/([A-Za-z][A-Za-z0-9_]*)|home-page)\?([A-Za-z0-9=&._-]*)$/.exec(endpoint);
+    if(!match)return undefined;
+    const query=Object.fromEntries(new URLSearchParams(match[3])) as PageQuery;
+    try{
+      const body=match[2]?await appPageAnswer(actor,match[1],match[2],query)
+        :await homePageAnswer(actor,match[1],query);
+      return {endpoint,body};
+    }catch{return undefined;}
+  };
+  app.get('/api/apps/:appId/home-page',route(async(req,res)=>{
+    const body=await homePageAnswer(req.actor!,req.params.appId,req.query);
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Vary','Authorization, Cookie');
-    res.json(script?{page,script}:{page});
+    res.json(body);
   }));
   app.get(['/api/apps/:appId/in-screen-pages/:pageApiName','/api/apps/:appId/print-templates/:pageApiName'],route(async(req,res)=>{
     const actor=req.actor!;
@@ -1522,17 +1557,10 @@ export function createSystemServer(db:SqlPersistence) {
     res.json(script?{page:page.page,script}:{page:page.page});
   }));
   app.get('/api/apps/:appId/pages/:pageApiName',route(async(req,res)=>{
-    const actor=req.actor!;
-    await rbac.require(actor.tenant_id,actor.user_id,'App:'+req.params.appId,'read');
-    const factor=String(req.query.formFactor??'Desktop');
-    const viewportWidth=Number(req.query.viewportWidth??0);
-    const page=await pages.resolveAppPage(actor.tenant_id,req.params.appId,
-      req.params.pageApiName,factor,viewportWidth);
-    if(!page)throw new Error('Page not found');
-    const script=await withPageScript(req,req.params.appId,page.page);
+    const body=await appPageAnswer(req.actor!,req.params.appId,req.params.pageApiName,req.query);
     res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Vary','Authorization, Cookie');
-    res.json(script?{page:page.page,script}:{page:page.page});
+    res.json(body);
   }));
   app.get('/api/metadata/relationships',route(async(req,res)=>{
     const actor=req.actor!;

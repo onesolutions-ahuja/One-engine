@@ -379,6 +379,17 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   }
   return Object.keys(fromFile).length?{...withRows,...fromFile}:withRows;
  },[properties,mentionContext,runtime.objects,mentionRoot,state,runtime.script,compiled,definition]);
+ // Components receive formula text with page state already filled in; the converted
+ // function for that property answers the filled-in text too (it reads state itself).
+ const boundFormulaCode=useMemo(()=>{
+  if(!formulaCode)return null;
+  const functions=new Map(formulaCode.functions);
+  for(const [property,run] of runtime.code?.formulasByProperty(component.id)??[]){
+   const value=(resolved as Record<string,unknown>)[property];
+   if(typeof value==='string'&&value.trim()&&!functions.has(value.trim()))functions.set(value.trim(),run);
+  }
+  return {functions,version:formulaCode.version};
+ },[formulaCode,resolved,runtime.code,component.id]);
  // COLLECTION()/TABLE(): users author collections; the shared rows feed them.
  const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,runtime.objects,objectApiName,
   source.records,source.total,source.version,state,sessionId,runtime.pageSessionKey,component.id);
@@ -771,7 +782,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    ...(definition.apiName.startsWith('smart_')&&component.position?{canvasFrameSized:true}:{}),
    label:runtimeComponentLabel(component,resolved.label),
    properties:resolved,objects:runtime.objects,reports:reports??[],flows:availableFlows,pageState:state,children,
-   ...(formulaCode?{__formulaCode:formulaCode}:{}),
+   ...(boundFormulaCode?{__formulaCode:boundFormulaCode}:{}),
    dataCollection,formulaCollectionSources:namedSource.formulaSources,namedCollections:namedSource.namedCollections,
    fieldAllowed:(key:string,row:Record<string,unknown>)=>scopedFieldAllows(properties.dataFieldFilters,key,row,fields,
     {pageState:state,recordId:runtime.recordId,sessionId}),

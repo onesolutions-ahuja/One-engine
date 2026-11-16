@@ -9,7 +9,7 @@ import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {tenantServerFormulaEnabled,executeServerDataAction} from '../system-support/formula-data-action-runtime.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
-import {executePageCodeAction,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
+import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 
 /**
  * Compiled page scripts (Page Builder Preview).
@@ -140,6 +140,14 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    const result=await executePageCodeAction(deps,actor,build.serverCode,key,parsePageCodeRequest(body.request),source);
    res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1));
    res.json(result);
+  }));
+  app.post(prefix+'/page-code/aggregates',wrap(async(req,res)=>{
+   const actor=authenticated(req);
+   res.setHeader('Cache-Control','private, no-store');
+   const body=(req.body??{}) as Record<string,unknown>;
+   const build=await codeBuild(actor,appParam?String(req.params.appId):'',body);
+   if(!build){res.json({ok:false,stale:true,values:[]});return;}
+   res.json({ok:true,values:await pageCodeAggregates(deps,actor,parsePageCodeRequest(body.request),body.items)});
   }));
   app.post(prefix+'/page-code/sets',wrap(async(req,res)=>{
    const actor=authenticated(req);

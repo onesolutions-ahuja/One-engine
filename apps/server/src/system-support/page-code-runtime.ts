@@ -391,6 +391,30 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
    changes:[],state:{},effects:[],sets:{}};
  }
 }
+const AGGREGATE_KINDS=new Set(['SUMIFS','COUNTIFS','AVERAGEIFS','MAXIFS','MINIFS']);
+/** Totals for display formulas over rows the page does not hold: same `$.agg` as actions
+ * (Record API, permissions), one read-only transaction for the whole batch. */
+export async function pageCodeAggregates(deps:Deps,actor:Actor,request:PageCodeRequest,items:unknown):Promise<unknown[]>{
+ if(!Array.isArray(items)||items.length>100)throw Error('Invalid aggregate request');
+ const scope=await scopeFor(deps,actor,request,{identity:false,connections:false});
+ return deps.db.transaction(()=>withRecordReadScope(async()=>{
+  const values:unknown[]=[];
+  for(const raw of items){
+   const item=(raw&&typeof raw==='object'?raw:{}) as {kind?:unknown;object?:unknown;field?:unknown;criteria?:unknown};
+   try{
+    if(typeof item.kind!=='string'||!AGGREGATE_KINDS.has(item.kind)||typeof item.object!=='string'||!key.test(item.object)
+     ||typeof item.field!=='string'||(item.field!==''&&!key.test(item.field))||!Array.isArray(item.criteria)||item.criteria.length>20)
+     throw Error('Invalid aggregate');
+    const criteria=item.criteria.map(pair=>{
+     if(!Array.isArray(pair)||pair.length!==2||typeof pair[0]!=='string'||!key.test(pair[0]))throw Error('Invalid criteria');
+     return [pair[0],pair[1]] as [string,unknown];
+    });
+    values.push(await scope.agg(item.kind,item.object,item.field,criteria));
+   }catch{values.push('');}
+  }
+  return values;
+ }));
+}
 /** All record sets of a page, for page open (with the page's first state). */
 export async function loadPageRecordSets(deps:Deps,actor:Actor,code:ServerPageCode,request:PageCodeRequest){
  if(!code.recordSets.length)return {};

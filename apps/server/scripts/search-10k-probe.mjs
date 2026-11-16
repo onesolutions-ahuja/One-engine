@@ -67,6 +67,24 @@ try{
  assert.equal(results[1][2],COUNT/10);
  assert.equal(results[3][2],1);
  assert.equal(results[4][2],0);
+ // The once-per-query access decision must give exactly what md_record_access gives per row.
+ const exact=async(u)=>Number((await db.query(`SELECT count(*) AS n FROM md_records r WHERE r.tenant_id=$1
+  AND r.object_api=$2 AND r.is_deleted=false AND md_record_access($1,$3,r.id,'read')`,[tenant,object,u])).rows[0].n);
+ assert.equal(results[0][2],await exact(user),'fast access = per-row access (owner with all rights)');
+ const reader=(await db.query("INSERT INTO md_users(tenant_id,email,password_hash) VALUES($1,'reader@example.invalid','fixture') RETURNING id",[tenant])).rows[0].id;
+ const limited=(await db.query("INSERT INTO md_permission_sets(tenant_id,api_name) VALUES($1,'Reader') RETURNING id",[tenant])).rows[0].id;
+ await db.query('INSERT INTO md_permission_assignments(tenant_id,user_id,permission_set_id) VALUES($1,$2,$3)',[tenant,reader,limited]);
+ for(const resource of [object,object+'.*'])await db.query("INSERT INTO md_permission_rules(tenant_id,permission_set_id,resource,action,effect) VALUES($1,$2,$3,'read','allow')",[tenant,limited,resource]);
+ await db.query("INSERT INTO md_sharing_settings(tenant_id,object_api,default_access) VALUES($1,$2,'Private') ON CONFLICT(tenant_id,object_api) DO UPDATE SET default_access='Private'",[tenant,object]);
+ assert.equal((await records.list(tenant,reader,object,50,0,{})).total,0,'private records stay hidden');
+ assert.equal(await exact(reader),0);
+ await db.query("UPDATE md_sharing_settings SET default_access='Public Read Only' WHERE tenant_id=$1 AND object_api=$2",[tenant,object]);
+ assert.equal((await records.list(tenant,reader,object,50,0,{})).total,COUNT,'public read shows all');
+ // A per-record deny turns the shortcut off; the denied record disappears.
+ const denied=(await db.query('SELECT id FROM md_records WHERE tenant_id=$1 AND object_api=$2 LIMIT 1',[tenant,object])).rows[0].id;
+ await db.query("INSERT INTO md_permission_rules(tenant_id,permission_set_id,resource,action,effect) VALUES($1,$2,$3,'read','deny')",[tenant,limited,'Record:'+denied]);
+ assert.equal((await records.list(tenant,reader,object,50,0,{})).total,COUNT-1,'record deny applies');
+ assert.equal(await exact(reader),COUNT-1);
  const budget=Number(process.env.SEARCH_BUDGET_MS??100000);
  for(const [name,ms] of results)assert(ms<=budget,name+' took '+ms+' ms (budget '+budget+')');
 }finally{await db.close();}

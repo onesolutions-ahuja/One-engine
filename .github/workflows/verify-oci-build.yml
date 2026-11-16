@@ -44,6 +44,7 @@ jobs:
       - name: Product grid on 10k products (PostgreSQL)
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
+          SEARCH_BUDGET_MS: '150'
         run: node --import tsx apps/server/scripts/search-10k-probe.mjs
   build:
     runs-on: ubuntu-latest

@@ -1,8 +1,10 @@
 import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {recordReadScope,forgetScopedRecords} from '../system-support/record-read-scope.js';
 export {withRecordReadScope} from '../system-support/record-read-scope.js';
-import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
-import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
+import type {RecordStoredValue} from './record-value-write.js';
+import {writeNativeValues} from './native-values.js';
+import {activateNativeObject} from '../system-support/native-object-storage.js';
+import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -870,6 +872,12 @@ export class RecordEngine {
     const save=async(client:PoolClient)=>{
       await this.lockObjectForWrite(client,tenantId,objectApi);
       const defaults=await this.fields(tenantId,objectApi,client);
+      // A newly defined Object may not have been activated yet. Activate before
+      // inserting md_records so its trigger creates the native row for this save.
+      if(!defaults.some(field=>field.native_table)){
+        await activateNativeObject(this.db,tenantId,objectApi);
+        recordReadScope()?.fields.clear();
+      }
       const literals=Object.fromEntries(defaults.filter(field=>field.default_value!==null)
         .map(field=>[field.api_name,['number','currency','percent'].includes(field.data_type)
           ?Number(field.default_value):field.data_type==='boolean'
@@ -1006,7 +1014,7 @@ export class RecordEngine {
       prepared.set(field.api_name,{value_text:value,reference_record_id:null,
         is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive});
     }
-    await writeRecordValues(client,tenantId,objectApi,rows[0].id,prepared,false);
+    await writeNativeValues(client,tenantId,objectApi,rows[0].id,prepared);
     const parents=await rollupParents(client,tenantId,objectApi,rows[0].id);
     await refreshRollups(client,tenantId,objectApi,parents);
     return rows[0].id;
@@ -1538,6 +1546,12 @@ export class RecordEngine {
     const prepared=client||!this.db.inTransaction()
       ?await this.prepare(tenantId,userId,objectApi,values,false,client,id):new Map<string,Storable>();
     const write=async(transactionClient:PoolClient,writeValues:Map<string,Storable>)=>{
+      // Existing records can also predate native activation. Copy before taking
+      // the md_records row lock; the native writer remains the sole value writer.
+      if(!(await this.fields(tenantId,objectApi,transactionClient)).some(field=>field.native_table)){
+        await activateNativeObject(this.db,tenantId,objectApi);
+        recordReadScope()?.fields.clear();
+      }
       const found=await transactionClient.query<{updated_at:Date}>("SELECT updated_at FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false AND md_record_access($1,$4,id,'edit') FOR UPDATE",
         [tenantId,objectApi,id,userId]);
       if(!found.rowCount)throw new Error('Record not found');
@@ -1561,9 +1575,15 @@ export class RecordEngine {
       // Field history: previous values of all written fields in ONE read, changed ones in ONE insert.
       type Previous={field_api:string;value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null};
       const historyFields=[...writeValues.keys()].filter(field=>!field.startsWith('__'));
-      const previousRows=historyFields.length?(await transactionClient.query<Previous>(
-        'SELECT field_api,value_text,reference_record_id,geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=ANY($3::text[])',
-        [tenantId,id,historyFields])).rows:[];
+      const historyMeta=historyFields.length?await loadNativeFields(transactionClient,tenantId,objectApi):null;
+      const previousRows=historyMeta?(await transactionClient.query<Previous>(
+        `SELECT v.field_api,v.value_text,v.reference_record_id,
+          v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,
+          v.address_state,v.address_postal_code,v.address_country
+          FROM md_records r ${readNativeValueRows(historyMeta,'r')}
+          WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+            AND v.field_api=ANY($4::text[])`,
+        [tenantId,objectApi,id,historyFields])).rows:[];
       const previousByField=new Map<string,Previous>();
       for(const row of previousRows)if(!previousByField.has(row.field_api))previousByField.set(row.field_api,row);
       const history:Array<[string,string|null,string|null]>=[];
@@ -1593,7 +1613,7 @@ export class RecordEngine {
         'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL) '+
         'ORDER BY h.ordinal',
         [tenantId,id,objectApi,userId,history.map(h=>h[0]),history.map(h=>h[1]),history.map(h=>h[2])]);
-      await writeRecordValues(transactionClient,tenantId,objectApi,id,writeValues,true);
+      await writeNativeValues(transactionClient,tenantId,objectApi,id,writeValues);
       if(this.richTextFilePruner){
         const richTextFields=(await this.fields(tenantId,objectApi,transactionClient))
           .filter(field=>field.data_type==='richtext'&&writeValues.has(field.api_name));
@@ -1789,29 +1809,47 @@ export class RecordEngine {
       await this.removeRecordTree(client,tenantId,userId,reference.object_api,reference.record_id,
         false,visiting,deletionGroupId,rootId);
     }
+    // Clear lookup links per SOURCE record, not per field. The native row is the
+    // authoritative value, so do not clear a reference changed since it was listed.
+    const lookupClears=new Map<string,{objectApi:string;recordId:string;fields:Set<string>}>();
     for(const reference of references){
       if(reference.relationship_type!=='Hierarchical'
         &&!(reference.relationship_type==='Lookup'&&(reference.delete_behavior??'Clear')==='Clear'))continue;
       await client.query(`INSERT INTO md_deleted_lookup_links
         (tenant_id,deletion_group_id,source_record_id,source_object_api,field_api,target_record_id)
         VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
-      [tenantId,deletionGroupId,reference.record_id,reference.object_api,reference.field_api,id]);
-      const cleared=await client.query<{record_id:string;object_api:string;field_api:string}>(
-        `UPDATE md_record_values SET value_text=NULL,reference_record_id=NULL
-         WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3 AND reference_record_id=$4
-         RETURNING record_id,object_api,field_api`,
-        [tenantId,reference.record_id,reference.field_api,id]);
-      if(!cleared.rowCount)continue;
+        [tenantId,deletionGroupId,reference.record_id,reference.object_api,reference.field_api,id]);
+      const key=JSON.stringify([reference.object_api,reference.record_id]);
+      let entry=lookupClears.get(key);
+      if(!entry){
+        entry={objectApi:reference.object_api,recordId:reference.record_id,fields:new Set()};
+        lookupClears.set(key,entry);
+      }
+      entry.fields.add(reference.field_api);
+    }
+    for(const entry of lookupClears.values()){
+      const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+      const {rows:current}=await client.query<{field_api:string;reference_record_id:string|null}>(`
+        SELECT v.field_api,v.reference_record_id FROM md_records r
+        ${readNativeValueRows(meta,'r')}
+        WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+          AND v.field_api=ANY($4::text[])`,
+        [tenantId,entry.objectApi,entry.recordId,[...entry.fields]]);
+      const clearedFields=current.filter(row=>row.reference_record_id===id)
+        .map(row=>row.field_api);
+      if(!clearedFields.length)continue;
+      const changes=new Map<string,Storable>(clearedFields.map(field=>[field,{
+        value_text:null,reference_record_id:null,is_unique:false,case_sensitive:false
+      }] as [string,Storable]));
+      await writeNativeValues(client,tenantId,entry.objectApi,entry.recordId,changes);
       await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND id=$2',
-        [tenantId,reference.record_id]);
+        [tenantId,entry.recordId]);
       await client.query(`INSERT INTO md_record_history
         (tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value)
-        VALUES($1,$2,$3,$4,$5,$6,NULL)`,
-      [tenantId,reference.record_id,reference.object_api,reference.field_api,userId,id]);
+        SELECT $1,$2,$3,fields.field_api,$4,$5,NULL
+        FROM unnest($6::text[]) AS fields(field_api)`,
+        [tenantId,entry.recordId,entry.objectApi,userId,id,clearedFields]);
     }
-    await client.query(`UPDATE md_record_values SET record_is_deleted=true
-      WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3`,
-      [tenantId,objectApi,id]);
     await client.query(`UPDATE md_records SET is_deleted=true,deleted_at=now(),deleted_by=$4,
       deletion_group_id=$5,deletion_root_id=$6,updated_at=now()
       WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false`,
@@ -1919,11 +1957,8 @@ export class RecordEngine {
           AND parent.is_deleted=true AND parent.deletion_group_id IS DISTINCT FROM $3::uuid
         LIMIT 1`,[tenantId,rows.map(row=>row.id),record.deletion_group_id]);
       if(external.rowCount)throw new Error('Restore the master record first');
-      await client.query(`UPDATE md_record_values v SET record_is_deleted=false
-        FROM md_records r
-        WHERE v.tenant_id=r.tenant_id AND v.record_id=r.id AND
-          r.tenant_id=$1 AND r.deletion_group_id=$2 AND r.is_deleted=true`,
-        [tenantId,record.deletion_group_id]);
+      // md_records is authoritative for deletion state; its native-row trigger
+      // restores is_deleted at the same time, without touching EAV flags.
       await client.query(`UPDATE md_records SET is_deleted=false,deleted_at=NULL,deleted_by=NULL,
         deletion_group_id=NULL,deletion_root_id=NULL,updated_at=now()
         WHERE tenant_id=$1 AND deletion_group_id=$2 AND is_deleted=true`,
@@ -1933,6 +1968,9 @@ export class RecordEngine {
       }>(`SELECT source_record_id,source_object_api,field_api,target_record_id
         FROM md_deleted_lookup_links WHERE tenant_id=$1 AND deletion_group_id=$2`,
         [tenantId,record.deletion_group_id]);
+      const restoreBySource=new Map<string,{
+        objectApi:string;recordId:string;targets:Map<string,string>
+      }>();
       for(const link of links){
         const resource=link.source_object_api+'.'+link.field_api;
         if(!await this.rbac.allowed(tenantId,userId,link.source_object_api,'edit')
@@ -1940,31 +1978,59 @@ export class RecordEngine {
         try {
           await this.rbac.requireRecord(tenantId,userId,link.source_object_api,link.source_record_id,'edit');
         } catch {continue;}
-        const restored=await client.query(`UPDATE md_record_values v
-          SET value_text='',reference_record_id=$5::uuid
-          FROM md_records source,md_records target,md_field_definitions field
-          WHERE v.tenant_id=$1 AND v.record_id=$2 AND v.object_api=$3 AND v.field_api=$4
-            AND v.reference_record_id IS NULL AND v.value_text IS NULL
-            AND source.tenant_id=v.tenant_id AND source.id=v.record_id AND source.is_deleted=false
-            AND target.tenant_id=v.tenant_id AND target.id=$5::uuid AND target.is_deleted=false
-            AND field.tenant_id=v.tenant_id AND field.object_api=v.object_api
-            AND field.api_name=v.field_api AND field.related_object=target.object_api
-            AND field.deleted_at IS NULL RETURNING v.record_id`,
-          [tenantId,link.source_record_id,link.source_object_api,link.field_api,
-            link.target_record_id]);
-        if(restored.rowCount){
-          await client.query(`DELETE FROM md_deleted_lookup_links
-            WHERE tenant_id=$1 AND deletion_group_id=$2 AND source_record_id=$3 AND field_api=$4`,
-            [tenantId,record.deletion_group_id,link.source_record_id,link.field_api]);
-          await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
-            [tenantId,link.source_object_api,link.source_record_id]);
-          const sourceParents=await rollupParents(client,tenantId,link.source_object_api,link.source_record_id);
-          await refreshRollups(client,tenantId,link.source_object_api,sourceParents);
-          await client.query(`INSERT INTO md_record_history
-            (tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value)
-            VALUES($1,$2,$3,$4,$5,NULL,$6)`,
-            [tenantId,link.source_record_id,link.source_object_api,link.field_api,userId,link.target_record_id]);
+        // Only recover into a live source when the target and field still match.
+        const valid=await client.query(`SELECT 1 FROM md_records source
+          JOIN md_records target ON target.tenant_id=source.tenant_id
+            AND target.id=$5::uuid AND target.is_deleted=false
+          JOIN md_field_definitions field ON field.tenant_id=source.tenant_id
+            AND field.object_api=source.object_api AND field.api_name=$4
+            AND field.related_object=target.object_api AND field.deleted_at IS NULL
+          WHERE source.tenant_id=$1 AND source.id=$2 AND source.object_api=$3
+            AND source.is_deleted=false`,
+          [tenantId,link.source_record_id,link.source_object_api,link.field_api,link.target_record_id]);
+        if(!valid.rowCount)continue;
+        const key=JSON.stringify([link.source_object_api,link.source_record_id]);
+        let entry=restoreBySource.get(key);
+        if(!entry){
+          entry={objectApi:link.source_object_api,recordId:link.source_record_id,targets:new Map()};
+          restoreBySource.set(key,entry);
         }
+        if(!entry.targets.has(link.field_api))entry.targets.set(link.field_api,link.target_record_id);
+      }
+      for(const entry of restoreBySource.values()){
+        const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+        const {rows:current}=await client.query<{
+          field_api:string;value_text:string|null;reference_record_id:string|null
+        }>(`SELECT v.field_api,v.value_text,v.reference_record_id FROM md_records r
+          ${readNativeValueRows(meta,'r')}
+          WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3
+            AND v.field_api=ANY($4::text[])`,
+          [tenantId,entry.objectApi,entry.recordId,[...entry.targets.keys()]]);
+        const existing=new Map(current.map(row=>[row.field_api,row]));
+        const recovered=[...entry.targets].filter(([field])=>{
+          const value=existing.get(field);
+          return !value||(value.reference_record_id===null&&(value.value_text===null||value.value_text===''));
+        });
+        if(!recovered.length)continue;
+        // One UPDATE on the source's native row, even if multiple links recover.
+        const values=new Map<string,Storable>(recovered.map(([field,target])=>[field,{
+          value_text:'',reference_record_id:target,is_unique:false,case_sensitive:false
+        }] as [string,Storable]));
+        await writeNativeValues(client,tenantId,entry.objectApi,entry.recordId,values);
+        await client.query(`DELETE FROM md_deleted_lookup_links
+          WHERE tenant_id=$1 AND deletion_group_id=$2 AND source_record_id=$3
+            AND field_api=ANY($4::text[])`,
+          [tenantId,record.deletion_group_id,entry.recordId,recovered.map(([field])=>field)]);
+        await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
+          [tenantId,entry.objectApi,entry.recordId]);
+        const sourceParents=await rollupParents(client,tenantId,entry.objectApi,entry.recordId);
+        await refreshRollups(client,tenantId,entry.objectApi,sourceParents);
+        await client.query(`INSERT INTO md_record_history
+          (tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value)
+          SELECT $1,$2,$3,links.field_api,$4,NULL,links.target_id
+          FROM unnest($5::text[],$6::text[]) AS links(field_api,target_id)`,
+          [tenantId,entry.recordId,entry.objectApi,userId,
+            recovered.map(([field])=>field),recovered.map(([,target])=>target)]);
       }
       // Keep unresolved recovery links for privileged/manual reconciliation.
       // Never discard them when a source Field or the user's edit rights have changed.

@@ -16,6 +16,7 @@ import {F,O,aggregateRows,fieldValue,rowMatches} from '../../../../../server/src
 import {readComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {isConnected} from '../../../../../server/src/expression-engine/FormulaConnections.js';
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
+import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
 
 type Row=Record<string,unknown>;
@@ -38,6 +39,20 @@ const identityKey=Symbol.for('une.authenticatedFormulaIdentity');
 const identity=()=>(globalThis as Record<symbol,unknown>)[identityKey] as undefined|{
  user?:Record<string,unknown>;organization?:Record<string,unknown>;connections?:unknown};
 const sessionUser:Record<string,string>={id:'Id',name:'Name',email:'Email',timeZone:'TimeZone',locale:'Locale',currencyIsoCode:'CurrencyIsoCode'};
+/** @ThisPage.Session / user / cart and @ThisTenant values, as page code reads them
+ * (shared with list filters, which run before a page code scope exists). */
+export function signedInValue(page:PageReference,state:Readonly<Record<string,unknown>>,sessionId:string):unknown{
+ const who=identity();
+ if(page.kind==='session')return sessionId;
+ if(page.kind==='cart'){const id=state.activeCartId;return typeof id==='string'?id:'';}
+ if(page.kind==='user')return who?.user?.[sessionUser[USER_FIELDS[page.field]]]??'';
+ if(page.kind==='company'){
+  if(page.field==='Id')return who?.organization?.Id??'';
+  const brand=getTenantBrand();
+  return (page.field==='Name'?brand.name||who?.organization?.Name:brand.logo)??'';
+ }
+ return '';
+}
 const same=(a:unknown,b:unknown)=>String(a??'')===String(b??'');
 let batches=Math.floor(Math.random()*0x10000)*0x1000;
 
@@ -81,7 +96,12 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   try{
    const answer=await post<{values?:unknown[]}>('/page-code/aggregates',{...host.build,
     request:requestFor({},''),items:items.map(([,item])=>item)});
-   items.forEach(([key,item],index)=>{aggregates.set(key,answer.values?.[index]??emptyTotal(item.kind));asked.delete(key);});
+   items.forEach(([key,item],index)=>{
+    // No answer (e.g. a blank criterion such as no customer picked yet): same as no rows.
+    const value=answer.values?.[index];
+    aggregates.set(key,value===undefined||value===null||value===''?emptyTotal(item.kind):value);
+    asked.delete(key);
+   });
   }catch{items.forEach(([key,item])=>{aggregates.set(key,emptyTotal(item.kind));asked.delete(key);});}
   changed();
   if(asked.size)void askAggregates();

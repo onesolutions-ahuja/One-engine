@@ -4,7 +4,8 @@ import {parsePageReference,pageReferencesIn,savedValueKey,isPageReference} from 
  * server filters before pagination. This intentionally accepts only expressions
  * that can be represented exactly by the existing Record API; there is NO
  * client-side filtering of a partial page and NO eval or arbitrary scripts. */
-import {componentReaderKey,evaluateFieldExpressionDetailed,type FormulaBindingContext} from '../../../component-libraries/shared/FieldExpression.js';
+import {componentReaderKey,type FormulaBindingContext} from '../../../component-libraries/shared/FieldExpression.js';
+import {signedInValue} from '../PageCompiler/pageCodeRuntime';
 import {F,O} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
 import {formulaEntry} from '../../../../../server/src/page-compiler/code/formulaDictionary.js';
 import {Parser,type Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
@@ -25,9 +26,7 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  if(node.kind==='literal')return node.value;
  const page=node.kind==='reference'?parsePageReference(node.value):null;
  if(page?.kind==='session'||page?.kind==='user'||page?.kind==='company'||page?.kind==='cart'){
-  const result=evaluateFieldExpressionDetailed('@'+(node as {value:string}).value,{},{sessionId,pageState:state});
-  if(result.error)throw Error(result.error);
-  return result.value;
+  return signedInValue(page,state,sessionId);
  }
  // @ThisPage.Tabs1.Selected.Id: what that component published (blank until picked).
  if(page?.kind==='selected')return readComponentState(state.collectionSelections,page.name,page.field);

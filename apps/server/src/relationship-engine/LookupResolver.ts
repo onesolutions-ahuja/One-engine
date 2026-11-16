@@ -1,6 +1,7 @@
 import type {PoolClient} from 'pg';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
+import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 /** Resolve a reference only within the caller's tenant, without bypassing Record Engine RBAC. */
 export async function assertLookupTargetExists(db:SqlPersistence|PoolClient,tenantId:string,objectApi:string|null,recordId:string,fieldKey:string,actorUserId?:string){
  // When invoked by Record Engine, apply parent read access inside its current
@@ -38,15 +39,16 @@ export async function resolveImportLookupValue(
  // and requires explicit access to both the destination Object and Name field.
  await rbac.require(tenantId,userId,relatedObject,'read');
  await rbac.require(tenantId,userId,relatedObject+'.Name','read');
+ const native=await loadNativeFields(db,tenantId,relatedObject);
+ const name=nativeValueSql(native,'Name','nr',true);
  const {rows}=await db.query<{id:string}>(`
    SELECT r.id FROM md_records r
+   JOIN ${nativeTableSql(native)} nr ON nr.tenant_id=r.tenant_id AND nr.id=r.id
    JOIN md_field_definitions f ON f.tenant_id=r.tenant_id
      AND f.object_api=r.object_api AND f.api_name='Name'
      AND f.data_type IN ('text','textarea','longtext') AND f.deleted_at IS NULL
-   JOIN md_record_values v ON v.tenant_id=r.tenant_id
-     AND v.object_api=r.object_api AND v.record_id=r.id AND v.field_api=f.api_name
    WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
-     AND v.value_text=$3 AND md_record_access($1,$4,r.id,'read')
+     AND ${name}=$3 AND md_record_access($1,$4,r.id,'read')
    ORDER BY r.id LIMIT 2`,[tenantId,relatedObject,rawValue,userId]);
  if(!rows.length)throw new Error(fieldKey+': no readable '+relatedObject+
    ' record with Name "'+rawValue+'". Import the related records first, or enter their record UUID.');

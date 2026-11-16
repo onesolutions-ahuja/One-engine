@@ -13,6 +13,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {ComponentLibraryService} from './component-library-service.js';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import compression from 'compression';
+import {constants as zlibConstants} from 'node:zlib';
 import { SqlPersistence } from '../system-files/sql-persistence.js';
 import {applySystemMigrations} from './system-migrations.js';
 import {loadFlowCapabilityCatalog} from '../system-files/flow-capability-catalog.js';
@@ -235,10 +236,15 @@ export function createSystemServer(db:SqlPersistence) {
   app.disable('x-powered-by');
   // PERFORMANCE FIX: compress JSON/JS/CSS responses (they were sent uncompressed, ~85% larger).
   // Live event streams must never be compressed or they stop streaming.
-  app.use(compression({threshold:1024,filter:(req,res)=>{
-    if(String(res.getHeader('Content-Type')??'').includes('text/event-stream'))return false;
-    return compression.filter(req,res);
-  }}));
+  // Brotli defaults to quality 11 (the slowest setting): 0.3-0.6 s of CPU for a large
+  // metadata reply, and every other request waited behind it. Quality 4 is ~20x faster
+  // and only slightly larger. gzip stays at its normal level.
+  app.use(compression({threshold:1024,
+    brotli:{params:{[zlibConstants.BROTLI_PARAM_QUALITY]:4}},
+    filter:(req,res)=>{
+      if(String(res.getHeader('Content-Type')??'').includes('text/event-stream'))return false;
+      return compression.filter(req,res);
+    }} as compression.CompressionOptions));
   app.use((_req,res,next)=>withAuditContext({timing:{dbTrips:0,dbMs:0,started:performance.now()}},()=>{
     const context=auditContext()!;
     res.setHeader('X-Correlation-ID',context.correlationId);

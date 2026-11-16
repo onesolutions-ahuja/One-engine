@@ -111,6 +111,8 @@ BEGIN
     AND n.field_api=d.api_name
   WHERE d.tenant_id=NEW.tenant_id AND d.object_api=obj
     AND d.data_type='reference' AND d.deleted_at IS NULL
+    -- User links are validated by the record engine against md_users (not md_records).
+    AND d.related_object<>'User'
  LOOP
   IF NOT f.api_name=ANY(NEW.present_fields) THEN CONTINUE; END IF;
   target:=CASE WHEN f.column_name IS NULL THEN NEW.extras->>f.api_name

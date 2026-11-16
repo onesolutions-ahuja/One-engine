@@ -10,7 +10,7 @@ import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
 import {smartPartOffsetStyle,smartPartOrderStyle} from "./SmartPartPlacement.js";
 import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../shared/FieldExpression.js";
-import {useSqlFormulaDisplay,isSelectedSqlFormula} from "../../shared/useSqlFormulaDisplay";
+import {isSelectedSqlFormula} from "../../shared/formulaKinds.js";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
 import {getTenantBrand,subscribeTenantBrand} from "../../shared/TenantBrand.js";
 const number=(v,f,min=0,max=2000)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
@@ -18,7 +18,7 @@ const text=(v)=>v===null||v===undefined?"":String(v);
 const formulaSourceFields=objects=>Array.isArray(objects)?Object.fromEntries(objects
  .filter(object=>object&&typeof object.apiName==="string"&&Array.isArray(object.fields))
  .map(object=>[object.apiName,object.fields.map(field=>field.apiName).filter(name=>typeof name==="string")])):undefined;
-const expressionResult=(v,record,pageState,objectApiName,collectionSources,namedCollections,collectionRows,sessionId,readComponent,objects,sqlLookup)=>{
+const expressionResult=(v,record,pageState,objectApiName,collectionSources,namedCollections,collectionRows,sessionId,readComponent,objects,codeLookup)=>{
  if(typeof v!=="string")return {value:text(v)};
  // Keep literal text and asset URLs unchanged; only formulas can fail.
  if(/^(?:https:\/\/|asset:|data:image\/)/i.test(v.trim()))return {value:v};
@@ -26,12 +26,13 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
    !/^\s*-?(?:\d+(?:\.\d*)?|\.\d+)\s*[+\-*/&]/.test(v))return {value:v};
  // Static/SSR renders cannot execute effect-backed SQL requests. Preserve
  // permission-scoped collection evaluation until a browser SQL result exists.
- if(sqlLookup&&typeof window!=="undefined"){
-  const sqlResult=sqlLookup(v,record);
-  if(sqlResult)return sqlResult;
+ if(codeLookup&&typeof window!=="undefined"){
+  const codeResult=codeLookup(v,record);
+  if(codeResult)return codeResult;
  }
+ // Totals over Objects (COUNTIFS, SUMIFS) exist only as page code.
  if(typeof window!=="undefined"&&isSelectedSqlFormula(v))
-  return {value:'',error:'SQL Formula requires an authorised published component'};
+  return {value:'',error:'This formula is not converted: save the page again'};
  try{return evaluateFieldExpressionDetailed(v,record||{},{
   readComponent,namedCollectionSelections:pageState?.collectionSelections,
   rootObjectApiName:objectApiName,collectionSources,
@@ -66,7 +67,7 @@ const scopedExpression=(p,key,source,record)=>fieldAllows(p,key,record)
      ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??"")))
     ?text(p.kind==="smart_card_grid"&&record.__collectionManual===false
       ?record.Name??"":record.__collectionLabel??record.Name??"")
-    :expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup)):"";
+    :expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup)):"";
 const scopedDisplayExpression=(p,key,source,record)=>{
  if(!fieldAllows(p,key,record))return {value:""};
  // A selected collection row already provides its authorised caption.
@@ -75,7 +76,7 @@ const scopedDisplayExpression=(p,key,source,record)=>{
     ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??""))))
   return {value:scopedExpression(p,key,source,record)};
  const result=expressionResult(source,record,p.pageState,p.objectApiName,
-  p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup);
+  p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup);
  return result.error?{value:"FORMULAERROR",error:result.error}:{value:result.value};
 };
 const recordOf=p=>p.objectApiName&&Array.isArray(p.records)
@@ -99,7 +100,7 @@ const boundImage=(p,record)=>{
   const source=p.imageSource??p.src??'';
  const key=typeof source==='string'?source.replace(/^@/,''):'';
  if(key && record && Object.prototype.hasOwnProperty.call(record,key))return text(record[key]);
- return expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup);
+ return expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup);
 };
 const gridText=(p,key,record)=>p.kind==="smart_card_grid"
  ?scopedExpression(p,key,p[key]??"",record):"";
@@ -708,23 +709,19 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=
  </div>;
 }
 export default function SmartRuntime(p){
- const sqlLookup=useSqlFormulaDisplay(p,React);
- // Page code: the page converter turned this component's formulas into plain
- // functions. They run first; a formula without one keeps the shared library path.
+ // Page code: the page converter turned this component's formulas into plain functions.
+ // There is no other formula engine on a published page: rows still loading show blank.
  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
  const lookup=code?(v,record)=>{
   const run=convertedFormula(code,v);
-  if(run){
-   try{return {value:run(record||{})};}
-   catch(error){
-    // Rows still loading: the shared path answers until they arrive.
-    if(error&&error.notHeld===true)return sqlLookup(v,record);
-    return {value:"",error:error instanceof Error?error.message:"Formula failed"};
-   }
+  if(!run)return undefined;
+  try{return {value:run(record||{})};}
+  catch(error){
+   if(error&&error.notHeld===true)return {value:""};
+   return {value:"",error:error instanceof Error?error.message:"Formula failed"};
   }
-  return sqlLookup(v,record);
- }:sqlLookup;
- p={...p,__sqlLookup:lookup};
+ }:undefined;
+ p={...p,__codeLookup:lookup};
  // Re-render when the tenant brand arrives so @ThisTenant.Company.Name / .Logo show without a reload.
  React.useSyncExternalStore(subscribeTenantBrand,getTenantBrand,getTenantBrand);
  const name=p.kind||"smart_text",record=recordOf(p),label=scopedExpression(p,"label",p.label||"",record);
@@ -1023,7 +1020,7 @@ export default function SmartRuntime(p){
   const pagination=p.recordPagination;
   const complete=!pagination||(pagination.offset===0&&pagination.total<=rows.length);
   return expression(formula,row,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,
-   complete&&rows.length<=200?rows:undefined,p.sessionId,p.readComponent,p.objects,p.__sqlLookup);
+   complete&&rows.length<=200?rows:undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup);
  }}
     fieldAllowed={(key,row)=>fieldAllows(p,key,row)} fire={fire}/>;
  else if(name==="smart_calendar")content=<SmartScheduleCalendar p={p} fire={fire}

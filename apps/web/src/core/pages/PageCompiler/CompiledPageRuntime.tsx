@@ -8,16 +8,13 @@ import {resolveMetadataProperties} from '../../metadata/Definitions/metadataRefe
 import {bindPageStateProperties,resolvePageStatePath} from '../PageRuntime/pageComponentBindings';
 import {componentLayoutProps} from '../TemplatePageRuntime/pageComponentLayout';
 import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pageBehaviorRuntime';
-import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
+import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
-import {isActionPlan,isScreenAction} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../PageRuntime/screenFormula';
 import {lockTillScreen} from '../../authentication/TillDevice/tillDevice';
 import {runSequenceFlow} from '../PageRuntime/formulaFlowSequence';
-import {flowActionFormulaTarget} from '../PageRuntime/actionFlowFormula';
 import {runtimeComponentLabel} from '../PageRuntime/smartComponentLabel';
-import {evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
 import {requestPageMediaAsset} from '../PageRuntime/pageMediaAssetCoalescer';
 import type {PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {scopedFieldAllows} from '../PageRuntime/fieldScopedRecordFilters';
@@ -498,37 +495,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     :{actionType:'Navigate',navigationTargetType:'Record List',navigationAppId:'Records',navigationObjectApiName:first};
    return executeOpenPageActionNode({binding:next,context:navigationContext,onNavigate:onNavigate as never});
   };
-  // Record saves: one request, one SQL transaction. The saved rows are shown
-  // first (prediction) and replaced by the real save.
-  const runSave=async(settings:Record<string,unknown>,event:Record<string,unknown>,
-   compiledAction?:{pageApiName:string;variant:string;revision:number;key:string})=>{
-   let predicted=false;
-   let result:Awaited<ReturnType<typeof executePageFormulaAction>>;
-   try{
-    result=await executePageFormulaAction(runtime.request,settings,event,runtime.store.get(),runtime.objects,objectApiName,
-     session,(template,id)=>previewPrintTemplate(template,id,runtime.pageSessionKey,session,currentAppId),
-     // SCREEN/CLOSESCREEN/FLOW steps inside an action plan (same as the standard runtime).
-     async(name,target,mode,screenRecordId)=>{
-      if(name==='CLOSESCREEN')return closeFormulaScreen(runtime.pageSessionKey);
-      if(name==='LOCKSCREEN')return lockTillScreen();
-      if(name==='SCREEN')return openFormulaScreen('SCREEN('+target+(mode?','+mode:'')+')',navigationContext,
-       onNavigate as never,runtime.pageSessionKey,session,
-       screenRecordId??String(event.recordId??runtime.store.get().recordId??record?.Id??''));
-      return runSequenceFlow(target,availableFlows,runtime.request,onLaunchFlow);
-     },undefined,{},prediction=>{
-      predicted=true;
-      saved({objectApiNames:prediction.objectApiNames,recordChanges:prediction.recordChanges,optimistic:prediction.batch});
-     },compiledAction);
-   }catch(error){
-    if(predicted)saved({});
-    throw error;
-   }
-   if(result.changes.length)applyState(result.changes);
-   if(result.recordChanged)saved({objectApiNames:result.mutatedObjectApiNames?.length?result.mutatedObjectApiNames:undefined,
-    recordChanges:result.recordChanges,replacesOptimistic:result.predictionBatch});
-   else if(predicted)saved({});
-   return {updated:true};
-  };
+  // Formula saves run only as page code; a formula without it was not converted.
+  const runSave=async(_settings:Record<string,unknown>,_event:Record<string,unknown>,
+   _compiledAction?:{pageApiName:string;variant:string;revision:number;key:string}):Promise<unknown>=>notConvertedAction();
   const runBinding=async(settings:Record<string,unknown>,event:Record<string,unknown>=payload):Promise<unknown>=>{
    const pageState=runtime.store.get();
    if(settings.actionType==='SetFilter'){
@@ -550,35 +519,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     saved({objectApiNames:[objectApiName]});
     return {updated:true};
    }
-   if(settings.actionType==='Formula'){
-    const formula=String(settings.formula??'');
-    // SCREEN(Page[,mode[,record]]) opens a page or popup (was missing in compiled mode).
-    if(isScreenAction(formula))
-     return openFormulaScreen(formula,navigationContext,onNavigate as never,runtime.pageSessionKey,session,
-      String(event.recordId??pageState.recordId??record?.Id??''),
-      source=>{
-       // The clicked row (cart line, card) is the record: @CartLine.Id works too.
-       const row=event.record&&typeof event.record==='object'&&!Array.isArray(event.record)
-        ?{...event.record as Record<string,unknown>,recordId:event.recordId??(event.record as Record<string,unknown>).Id}:event;
-       const result=evaluateFieldExpressionDetailed('='+source,row,{sessionId:session,pageState,rootObjectApiName:objectApiName});
-       if(result.error)throw Error('SCREEN record Id: '+result.error);
-       return result.value;
-      });
-    // FLOW() formula: IF(..., FLOW(A), FLOW(B)) picks the Flow; blank = do nothing.
-    if(!isActionPlan(formula)){
-     const flow=flowActionFormulaTarget(settings,event,pageState,session,availableFlows);
-     if(flow==='')return {skipped:true};
-     if(flow)return runBinding({...settings,actionType:'Flow',flowApiName:flow},event);
-    }
-    const assignment=parseActionFormulaAssignment(formula);
-    if(assignment?.kind==='filter'){
-     const value=String(resolveActionFormulaValue(assignment.value,event,pageState,session)??'');
-     return selectFilter(assignment.key,value,value);
-    }
-    if(assignment?.kind==='navigate')
-     return navigateTo(assignment.key,resolveActionFormulaValue(assignment.value,event,pageState,session));
-    return runSave(settings,event);
-   }
+   // Formula actions run as page code (see onAction); there is no other engine.
+   if(settings.actionType==='Formula')return notConvertedAction();
    // Flow actions: Screen Flows open their screen; Autolaunched Flows run on the server.
    const flowApiName=String(settings.flowApiName??'');
    const selected=availableFlows.find(flow=>flow.apiName===flowApiName);
@@ -639,10 +581,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    input:(value:unknown,event:Record<string,unknown>)=>input(value,event),
    formulaScope:(event:Record<string,unknown>)=>({record:{state:runtime.store.get(),event,session:{id:session}},
     state:runtime.store.get(),sessionId:session}),
-   platformValue:async(kind:string,expression:string,event:Record<string,unknown>)=>kind==='state'
-    ?(await executePageFormulaAction(runtime.request,{actionType:'Formula',formula:'@ThisPage.Input.value := '+expression},
-      event,runtime.store.get(),runtime.objects,objectApiName,session)).changes[0]?.value
-    :resolveActionFormulaValue(expression,event,runtime.store.get(),session),
+   platformValue:async()=>notConvertedAction(),
    save:(key:string,plan:{formula:string},event:Record<string,unknown>)=>runSave(
     {...binding,actionType:'Formula',formula:plan.formula},event,
     script?{pageApiName:runtime.compiled.apiName,variant:script.variant,revision:script.revision,key,

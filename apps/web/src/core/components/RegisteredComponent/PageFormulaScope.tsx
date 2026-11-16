@@ -3,7 +3,8 @@ import {sameFormulaSnapshot} from './pageFormulaSnapshot';
 import {componentInstanceNames,type NamedComponent} from '../../../../../server/src/system-support/page-component-names';
 import type {LibraryComponentMetadata} from '../../metadata/Definitions/metadata';
 import {resolveFieldText,getAuthenticatedFormulaBindingContext} from './fieldExpressionRuntime';
-import {useSqlFormulaDisplay} from '../../../component-libraries/shared/useSqlFormulaDisplay';
+import {isSelectedSqlFormula} from '../../../component-libraries/shared/formulaKinds.js';
+import {convertedFormula} from '../../../component-libraries/shared/formulaCodeLookup.js';
 import {componentReaderKey} from '../../../component-libraries/shared/FieldExpression.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
 import {componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
@@ -200,7 +201,9 @@ export function PageFormulaScope({components,catalog,children}:{
 }
 export function PublishedFormulaProperties({id,values,rendered}:{id?:string;values:Record<string,unknown>;rendered:Readonly<Record<string,string>>}){
  const scope=usePageFormulaScope();
- const sqlLookup=useSqlFormulaDisplay(values,{useEffect,useMemo,useRef,useState});
+ // The page's converted formulas (page code) are the only formula engine on a page.
+ const codeFunctions=(values.__formulaCode as {functions?:unknown}|undefined)?.functions;
+ const code=codeFunctions instanceof Map?codeFunctions as Map<string,(row:Record<string,unknown>)=>unknown>:null;
  const entry=scope?.entries.find(item=>item.id===id);
  const publish=scope?.publish;
  const output:Record<string,Scalar>=Object.create(null);
@@ -220,11 +223,11 @@ export function PublishedFormulaProperties({id,values,rendered}:{id?:string;valu
   }
   if(typeof value==='string'&&(/^(?:=|@)/.test(value)||/^[A-Z]+\(/i.test(value))){
    if(rows.length>1&&!values.record&&/@[A-Za-z]/.test(withoutPageValues(value))&&!['smart_image','ui_image'].includes(String(values.kind??'')))continue;
-   const sql=sqlLookup(value,record as Record<string,unknown>|undefined);
-   if(sql){
-    if(sql.error||sql.loading)continue;
-    value=sql.value;
-   }else try{
+   const run=code?code.get(value.trim())??convertedFormula(code,value)??undefined:undefined;
+   if(run){
+    try{value=run((record??{}) as Record<string,unknown>);}catch{continue;}
+   }else if(isSelectedSqlFormula(value))continue;
+   else try{
     value=resolveFieldText(value,record,{...getAuthenticatedFormulaBindingContext(),
      rootObjectApiName:typeof values.objectApiName==='string'?values.objectApiName:undefined,
      pageState:values.pageState as Record<string,unknown>,readComponent:scope?.read});

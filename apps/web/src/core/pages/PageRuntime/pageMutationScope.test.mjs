@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pageComponentReadObjectNames,shouldInvalidatePageComponent} from './pageMutationScope.js';
-import {formulaAggregateObjects,mutationAffectsFormulas,isRowIndependentFormula}
- from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
+import {isRowIndependentFormula} from '../../../component-libraries/shared/formulaKinds.js';
 
 const objects=['Product','MenuCategory','Cart','CartLine'].map(apiName=>({apiName,fields:[{apiName:'Name'},{apiName:'Price'}]}));
 const clickFormula='=ACTIONS(IF(COUNTIFS(Cart, SessionKey, $session, Status, "Open") = 0, CREATERECORD(Cart, SessionKey, $session), ""), GETRECORD(Cart, Id, $session.cartId, AS(cart)), UPDATERECORD(Cart, cart.Id, Subtotal, SUMIFS(CartLine, LineTotal, Cart, cart.Id, Status, "Open")))';
@@ -28,16 +27,6 @@ test('unknown writes, session changes and unparseable formulas still refresh eve
 test('TABLE/COLLECTION sources count as reads even when not selected (never stale)',()=>{
  const reads=pageComponentReadObjectNames('Product',{objectApiName:'Product',collectionFormula:'=TABLE(CartLine,Name)'},objects);
  assert.ok(reads.includes('CartLine'));
-});
-test('formula refresh: only formulas that aggregate a written object are re-asked',()=>{
- assert.deepEqual(formulaAggregateObjects('SUMIFS(CartLine,LineTotal,Cart,Id)'),['CartLine']);
- assert.deepEqual(formulaAggregateObjects('UPPER(Name)'),[]);
- assert.deepEqual(formulaAggregateObjects('ROUND(SUMIFS(CartLine,LineTotal,S,$session)+COUNTIFS(Cart,S,$session),2)').sort(),['Cart','CartLine']);
- assert.equal(mutationAffectsFormulas(detail(['CartLine']),'p',['CartLine']),true);
- assert.equal(mutationAffectsFormulas(detail(['Product']),'p',['CartLine']),false);
- assert.equal(mutationAffectsFormulas(detail([]),'p',['CartLine']),true);
- assert.equal(mutationAffectsFormulas(detail(['CartLine'],{pageSessionKey:'other'}),'p',['CartLine']),false);
- assert.equal(mutationAffectsFormulas(detail(['CartLine']),'p',[]),false);
 });
 test('row-independent detection still holds',()=>{
  assert.equal(isRowIndependentFormula('SUMIFS(CartLine,LineTotal,S,$session)'),true);

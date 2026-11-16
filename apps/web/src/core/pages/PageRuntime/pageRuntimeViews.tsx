@@ -1,10 +1,10 @@
 import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {runtimeComponentLabel} from './smartComponentLabel';
-import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
+import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {nextAccessibleTabIndex} from '../PageRuntime/tabKeyboardNavigation';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
-import {isRowIndependentFormula} from '../../../component-libraries/shared/useSqlFormulaDisplay.js';
+import {isRowIndependentFormula} from '../../../component-libraries/shared/formulaKinds.js';
 import {pageStateDependencies,applyPageSelection,implicitPageStateKeys,changedPageStateNames,
   pageStateChangeIsRelevant} from './pageStateDependencies';
 import { useFormFactor } from '../../workspace/Responsive/useFormFactor';
@@ -217,7 +217,7 @@ import {
 // - 'none'  : renders at most its first record and reads no row field (e.g.
 //             till totals built from SUMIFS). Loading 100 rows into each of 50
 //             such boxes and redrawing them on every save cost ~0.5 s per tap.
-// Formulas still refresh on writes through useSqlFormulaDisplay.
+// Their formulas refresh on writes through the page code (record sets and totals).
 type RowNeed='none'|'first'|'list';
 function componentRowNeed(rows:string|undefined,properties:Readonly<Record<string,unknown>>):RowNeed{
   if(rows!=='first')return 'list';
@@ -760,73 +760,8 @@ function MetadataBoundPageComponent({
       }));
       return {updated:true};
     }
-    if (binding.actionType === 'Formula') {
-      const payload=action.value&&typeof action.value==='object'&&!Array.isArray(action.value)
-        ?action.value as Record<string,unknown>:{value:action.value};
-      const assignment=parseActionFormulaAssignment(String(binding.formula??''));
-      if(assignment?.kind==='filter'){
-        const value=String(resolveActionFormulaValue(assignment.value,payload,pageState,sessionId)??'');
-        window.dispatchEvent(new CustomEvent('metadrive:page-filter-selected',{detail:{
-          pageSessionKey,filterKey:assignment.key,value,label:value,
-          recordId:String(payload.recordId??''),
-          sourceObjectApiName:String(payload.sourceObjectApiName??'')
-        }}));
-        return {selected:value};
-      }
-      if(assignment?.kind==='navigate'){
-        const name=resolveActionFormulaValue(assignment.value,payload,pageState,sessionId);
-        if(typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_]*(?:\/[A-Za-z][A-Za-z0-9_]*)?$/.test(name))
-          throw Error('Formula navigation requires a declared destination name.');
-        const [first,second]=name.split('/');
-        const nextBinding=assignment.key==='page'
-          ?{actionType:'Navigate',navigationTargetType:'App Page',
-             navigationAppId:first,navigationPageApiName:second??''}
-          :assignment.key==='home'
-          ?{actionType:'Navigate',navigationTargetType:'App Home',
-             navigationAppId:first}
-          :{actionType:'Navigate',navigationTargetType:'Record List',
-             navigationAppId:'Records',navigationObjectApiName:first};
-        return executeOpenPageActionNode({binding:nextBinding,context:{
-          objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName
-        },onNavigate});
-      }
-      // Show-first: the predicted rows appear at once; the real save replaces them.
-      let predicted=false;
-      let result:Awaited<ReturnType<typeof executePageFormulaAction>>;
-      try{
-        result=await executePageFormulaAction(apiRequest,binding,payload,
-          pageState,objects,objectApiName,sessionId,undefined,undefined,undefined,{},
-          prediction=>{
-            predicted=true;
-            window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-              detail:{pageSessionKey,sessionId,objectApiNames:prediction.objectApiNames,
-                recordChanges:prediction.recordChanges,optimistic:prediction.batch}
-            }));
-          });
-      }catch(error){
-        // The save failed after a prediction was shown: drop it by reloading from SQL.
-        if(predicted)window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-          detail:{pageSessionKey,sessionId}
-        }));
-        throw error;
-      }
-      for(const change of result.changes)
-        window.dispatchEvent(new CustomEvent('metadrive:page-local-state',{
-          detail:{pageSessionKey,key:change.key,value:change.value}
-        }));
-      if(result.recordChanged){
-        // Name the written Objects so only components reading them refresh
-        // (a CartLine write must not reload Product or MenuCategory).
-        window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-          detail:{pageSessionKey,sessionId,
-            objectApiNames:result.mutatedObjectApiNames?.length?result.mutatedObjectApiNames:undefined,
-            recordChanges:result.recordChanges,replacesOptimistic:result.predictionBatch}
-        }));
-      }else if(predicted)window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-        detail:{pageSessionKey,sessionId}
-      }));
-      return {updated:true};
-    }
+    // Formula actions run only as page code; this path never evaluates formulas.
+    if (binding.actionType === 'Formula') return notConvertedAction();
     if (binding.actionType === 'AdjustNumber') {
       const payload=action.value&&typeof action.value==='object'&&!Array.isArray(action.value)
         ?action.value as Record<string,unknown>:{value:action.value};

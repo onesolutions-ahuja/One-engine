@@ -133,7 +133,7 @@ export function applyRecordSetMutation(detail:Mutation|undefined){
  loading.clear();
  if(detail?.replacesOptimistic){
   // The real save replaces this prediction's provisional rows.
-  // Same reserved range as predictActionPlan's provisional Ids.
+  // Same reserved range as optimisticIds.ts provisional Ids.
   const prefix='ffffffff-ffff-4fff-8fff-'+detail.replacesOptimistic;
   for(const set of sets.values())
    for(const id of [...set.rows.keys()])if(id.startsWith(prefix))set.rows.delete(id);

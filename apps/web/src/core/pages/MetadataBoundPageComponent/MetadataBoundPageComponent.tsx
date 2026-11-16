@@ -9,7 +9,7 @@ import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../Page
 import {lockTillScreen} from '../../authentication/TillDevice/tillDevice';
 import {useComponentFormulaState,publishComponentInput} from '../../components/RegisteredComponent/PageFormulaScope';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
-import {executePageFormulaAction,parseActionFormulaAssignment,resolveActionFormulaValue} from '../PageRuntime/formulaAction';
+import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {resolveMetadataProperties} from '../../metadata/Definitions/metadataReferences';
 import * as React from 'react';
 import {useState,useEffect,useRef,useMemo} from 'react';
@@ -492,60 +492,8 @@ export default function MetadataBoundPageComponent({
       window.dispatchEvent(new CustomEvent('metadrive:page-local-state',{detail:{pageSessionKey,key,value}}));
       return {updated:true};
     }
-    if(binding.actionType==='Formula'){
-      const payload=action.value&&typeof action.value==='object'&&!Array.isArray(action.value)
-        ?action.value as Record<string,unknown>:{value:action.value};
-      const assignment=parseActionFormulaAssignment(String(binding.formula??''));
-      if(assignment?.kind==='filter'){
-        const value=String(resolveActionFormulaValue(assignment.value,payload,pageState,sessionId)??'');
-        window.dispatchEvent(new CustomEvent('metadrive:page-filter-selected',{detail:{
-          pageSessionKey,filterKey:assignment.key,value,label:value,
-          recordId:String(payload.recordId??''),
-          sourceObjectApiName:String(payload.sourceObjectApiName??'')
-        }}));
-        return {selected:value};
-      }
-      if(assignment?.kind==='navigate'){
-        const result=resolveActionFormulaValue(assignment.value,payload,pageState,sessionId);
-        if(typeof result!=='string'||!/^[A-Za-z][A-Za-z0-9_]*(?:\/[A-Za-z][A-Za-z0-9_]*)?$/.test(result))
-          throw Error('Formula navigation requires a declared destination.');
-        const [first,second]=result.split('/');
-        const nextBinding=assignment.key==='page'
-          ?{actionType:'Navigate',navigationTargetType:'App Page',
-            navigationAppId:first,navigationPageApiName:second??''}
-          :assignment.key==='home'
-          ?{actionType:'Navigate',navigationTargetType:'App Home',navigationAppId:first}
-          :{actionType:'Navigate',navigationTargetType:'Record List',
-            navigationAppId:'Records',navigationObjectApiName:first};
-        onNavigate(resolvePageActionRoute(nextBinding,{
-          objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName
-        }));
-        return {navigated:true};
-      }
-      const result=await executePageFormulaAction(apiRequest,binding,payload,
-        pageState,objects,objectApiName,sessionId,(template,id)=>previewPrintTemplate(template,id,pageSessionKey,sessionId,currentAppId),
-        async(name,target,mode,screenRecordId)=>{
-          if(name==='CLOSESCREEN')return closeFormulaScreen(pageSessionKey);
-          if(name==='LOCKSCREEN')return lockTillScreen();
-          if(name==='SCREEN')return openFormulaScreen('SCREEN('+target+(mode?','+mode:'')+')',{
-            objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName
-          },onNavigate,pageSessionKey,sessionId,
-          screenRecordId??String(payload.recordId??pageState.recordId??recordId??''));
-          return runSequenceFlow(target,availableFlows,apiRequest,onLaunchFlow);
-        },undefined,{namedCollections:namedSource.namedCollections,collectionSources:namedSource.formulaSources as never,
-          timingName:'formula.'+component.id+'.'+action.event});
-      for(const change of result.changes)
-        window.dispatchEvent(new CustomEvent('metadrive:page-local-state',{
-          detail:{pageSessionKey,key:change.key,value:change.value}
-        }));
-      if(result.recordChanged){
-        window.dispatchEvent(new CustomEvent('metadrive:page-flow-mutated',{
-          detail:{pageSessionKey,sessionId,objectApiNames:result.mutatedObjectApiNames,
-            recordChanges:result.recordChanges}
-        }));
-      }
-      return {updated:true,recordChanged:result.recordChanged};
-    }
+    // Formula actions run only as page code; this path never evaluates formulas.
+      if (binding.actionType === 'Formula') return notConvertedAction();
     if (binding.actionType === 'AdjustNumber') {
       const payload=action.value&&typeof action.value==='object'&&!Array.isArray(action.value)
         ?action.value as Record<string,unknown>:{value:action.value};

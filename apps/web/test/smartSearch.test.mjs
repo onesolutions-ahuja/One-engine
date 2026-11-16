@@ -58,5 +58,6 @@ test('Cart Padding also insets the totals box left and right',()=>{
 test('Action event values @recordId and @value resolve (SCREEN(page, popup, @recordId) from a cart row)',()=>{
  const expression=read('../src/component-libraries/shared/FieldExpression.js');
  assert.match(expression,/\['recordId','value','index','label'\]\.includes\(reference\)/);
- assert.match(read('../src/core/pages/PageCompiler/CompiledPageRuntime.tsx'),/rootObjectApiName:objectApiName\}\);\s*if\(result\.error\)throw Error\('SCREEN record Id: '/);
+ // Page code passes the SCREEN record (third value) or falls back to the tapped row's Id.
+ assert.match(read('../src/core/pages/PageCompiler/CompiledPageRuntime.tsx'),/third\|\|String\(payload\.recordId/);
 });

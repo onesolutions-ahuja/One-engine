@@ -2,7 +2,6 @@ import { currentFormFactor } from '../../workspace/Responsive/useFormFactor';
 import {createRecordPageCoalescer} from './recordPageCoalescer';
 import {invalidatePageMediaAssets} from '../../pages/PageRuntime/pageMediaAssetCoalescer';
 import {setAuthenticatedFormulaBindingContext} from '../../components/RegisteredComponent/fieldExpressionRuntime';
-import {setSqlFormulaRequest} from '../../../component-libraries/shared/SqlFormulaRequest.js';
 import {setLocalRecordSetProvider} from '../../../component-libraries/shared/localRecordSets.js';
 import {rememberCompleteRecordSet,recordSetGeneration,rowsForFilters,applyRecordSetMutation,heldRowById,
   type SetFilter} from './recordSetStore';
@@ -349,7 +348,6 @@ export function setAccessToken(value: string | undefined) {
 }
 
 // Published components use the existing authenticated Core API.
-setSqlFormulaRequest(apiRequest);
 
 // Page open: the sign-in refresh also brings the page the browser is opening, so the
 // page does not wait for a second round trip. Used once, only for the exact same request.

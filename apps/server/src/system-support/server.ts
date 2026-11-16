@@ -92,9 +92,6 @@ import {runActionCallout,listActionCallouts} from './action-formula-callout-serv
 import {registerInboundWebhookRoutes} from './inbound-webhook-routes.js';
 import {registerCloudPrntPublicRoutes,queueDeviceJob} from './cloudprnt-routes.js';
 import {sendActionCommunication} from './action-formula-communication-service.js';
-import {tenantServerFormulaEnabled,executeServerDataAction} from './formula-data-action-runtime.js';
-import {evaluateFormulaSql,evaluateFormulaSqlMany} from './formula-sql-runtime.js';
-import {splitServerDataActionPlan} from '../expression-engine/ActionFormulas.js';
 import {registerPageScriptPublicRoute,registerPageScriptRoutes,issueAppPageScript} from '../api/PageScriptController.js';
 import {PageScriptService} from '../page-compiler/pageScriptService.js';
 import {registerSeederManagerRoutes} from './seeder-manager-routes.js';
@@ -2013,71 +2010,6 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     res.setHeader('Cache-Control','no-store');
     res.json(await oauth.start(actor.tenant_id,actor.user_id,req.params.id));
-  }));
-  // Read-only SQL Formula compiler: metadata is resolved server-side and session identity
-  // comes from the signed-in actor. SQL values are bound, never interpolated.
-  app.post('/api/formulas/evaluate',route(async(req,res)=>{
-    const actor=req.actor!;
-    const {formula,objectApi,recordId,state}=req.body??{};
-    if(typeof formula!=='string'||!formula.trim()||formula.length>4000||
-      (objectApi!==undefined&&typeof objectApi!=='string')||
-      (recordId!==undefined&&typeof recordId!=='string'))
-      throw Error('Invalid SQL Formula request');
-    res.setHeader('Cache-Control','private, no-store');
-    res.setHeader('Vary','Authorization, Cookie');
-    res.json({value:await evaluateFormulaSql(db,rbac,records,actor,
-      {formula,objectApi,recordId,state})});
-  }));
-  // Same SQL Formula, many records, ONE query: avoids one HTTP request and one
-  // permission lookup per record when a grid/list shows the same formula per row.
-  app.post('/api/formulas/evaluate-batch',route(async(req,res)=>{
-    const actor=req.actor!;
-    const {formula,objectApi,recordIds,state}=req.body??{};
-    if(typeof formula!=='string'||!formula.trim()||formula.length>4000||
-      typeof objectApi!=='string'||!Array.isArray(recordIds))
-      throw Error('Invalid SQL Formula request');
-    res.setHeader('Cache-Control','private, no-store');
-    res.setHeader('Vary','Authorization, Cookie');
-    res.json({values:await evaluateFormulaSql(db,rbac,records,actor,
-      {formula,objectApi,recordIds,state})});
-  }));
-  // Every formula a page needs, ONE request. Identity, field metadata, permissions and
-  // identical aggregates are resolved once; each item returns {value} or {error}.
-  app.post('/api/formulas/evaluate-many',route(async(req,res)=>{
-    const actor=req.actor!;
-    res.setHeader('Cache-Control','private, no-store');
-    res.setHeader('Vary','Authorization, Cookie');
-    res.json({results:await evaluateFormulaSqlMany(db,rbac,records,actor,req.body?.items)});
-  }));
-  // One authenticated HTTP request for only a validated contiguous data prefix.
-  // Browser-only actions always execute after the server transaction returns.
-  app.post('/api/action-formulas/execute-data',route(async(req,res)=>{
-    const actor=req.actor!;
-    res.setHeader('Cache-Control','private, no-store');
-    if(!await tenantServerFormulaEnabled(db,actor.tenant_id)){
-      res.json({supported:false});return;
-    }
-    const formula=req.body?.formula,scope=req.body?.scope,steps=req.body?.dataSteps;
-    if(typeof formula!=='string'||formula.length>4000||!formula.trim()||
-      !scope||typeof scope!=='object'||Array.isArray(scope)||
-      !Number.isSafeInteger(steps)||steps<1||
-      Object.keys(scope).length>80||
-      Object.keys(scope).some(key=>!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key)||
-        ['constructor','prototype','__proto__'].includes(key))){
-      res.json({supported:false});return;
-    }
-    const split=splitServerDataActionPlan(formula);
-    if(!split||split.dataSteps!==steps){
-      res.json({supported:false});return;
-    }
-    const started=performance.now();
-    const stats={operations:0,reusedReads:0,steps:[] as string[]};
-    const result=await executeServerDataAction(db,records,actor,formula,scope,steps,rbac,stats);
-    // Server time and work for this save, visible in the browser's network timing.
-    res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1)
-      +',ops;desc="'+stats.operations+' operations, '+stats.reusedReads+' reused reads"'
-      +',steps;desc="'+stats.steps.join(' | ').replace(/["\\]/g,'')+'"');
-    res.json(result);
   }));
   app.get('/api/action-formulas/credentials',route(async(req,res)=>{
     const actor=req.actor!;

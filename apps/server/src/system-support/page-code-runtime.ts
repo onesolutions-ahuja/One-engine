@@ -17,6 +17,7 @@ import {isConnected,type ConnectionSnapshot} from '../expression-engine/FormulaC
 import type {ServerPageCode} from '../page-compiler/code/pageCode.js';
 import {trustedFormulaSession,type TrustedFormulaSession} from './formula-data-action-runtime.js';
 import {loadConnectionSnapshot} from './tenant-connections.js';
+import {withRecordReadScope} from './record-read-scope.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Row=Record<string,unknown>;
@@ -293,13 +294,13 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
  const scope=await scopeFor(deps,actor,request,{identity:/\$session\.(?:user|tenant)\.|\$tenant\./.test(source),
   connections:/\bCONNECTED\s*\(/i.test(source)});
  try{
-  return await deps.db.transaction(async()=>{
+  return await deps.db.transaction(()=>withRecordReadScope(async()=>{
    await scope.loadEventRecord();
    await action.run(scope);
    // All held sets: roll-ups and triggers can change Objects the action did not write.
    const sets=scope.written.size?await loadSets(scope,code):{};
    return {ok:true,changes:scope.changes,state:{...scope.stateChanges},effects:scope.effects,sets};
-  });
+  }));
  }catch(error){
   return {ok:false,error:error instanceof Error?error.message:'The action failed; nothing was saved',
    changes:[],state:{},effects:[],sets:{}};
@@ -309,5 +310,5 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
 export async function loadPageRecordSets(deps:Deps,actor:Actor,code:ServerPageCode,request:PageCodeRequest){
  if(!code.recordSets.length)return {};
  const scope=await scopeFor(deps,actor,request,{identity:false,connections:false});
- return deps.db.transaction(()=>loadSets(scope,code));
+ return deps.db.transaction(()=>withRecordReadScope(()=>loadSets(scope,code)));
 }

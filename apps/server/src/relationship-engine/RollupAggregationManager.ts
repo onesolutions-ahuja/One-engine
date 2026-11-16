@@ -1,12 +1,13 @@
 import type {PoolClient} from 'pg';
+import {scopedMetadata} from '../system-support/record-read-scope.js';
 /** The existing SQL rollup implementation, extracted verbatim from RecordEngine. */
 export async function rollupParents(client:PoolClient,tenantId:string,childObject:string,recordId:string) {
-    const {rows}=await client.query<{
+    const {rows}=await scopedMetadata('rollup-parents\u0000'+tenantId+'\u0000'+childObject,()=>client.query<{
       parent_object:string;relationship_field:string;
     }>(`SELECT object_api AS parent_object,rollup_relationship_field AS relationship_field
       FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
         AND rollup_child_object=$2 AND deleted_at IS NULL`,
-    [tenantId,childObject]);
+    [tenantId,childObject]));
     const parents=new Map<string,Set<string>>();
     const configs=rows.filter(config=>typeof config.parent_object==='string'
       &&typeof config.relationship_field==='string');
@@ -29,7 +30,7 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
     parentIds:Map<string,Set<string>>,visited=new Set<string>(),depth=0) {
     if(!parentIds.size)return;
     if(depth>50)throw new Error('Roll-Up Summary nesting limit exceeded');
-    const {rows}=await client.query<{
+    const {rows}=await scopedMetadata('rollups\u0000'+tenantId+'\u0000'+childObject,()=>client.query<{
       parent_object:string;field_api:string;relationship_field:string;operation:string;source_field:string|null;
       source_data_type:string|null;filter_logic:string;
     }>(`SELECT object_api AS parent_object,api_name AS field_api,
@@ -42,7 +43,7 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
           AS source_data_type
       FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
         AND rollup_child_object=$2 AND deleted_at IS NULL`,
-    [tenantId,childObject]);
+    [tenantId,childObject]));
     const rollups=rows.filter(rollup=>typeof rollup.parent_object==='string'
       &&typeof rollup.field_api==='string'&&typeof rollup.relationship_field==='string'
       &&typeof rollup.operation==='string');

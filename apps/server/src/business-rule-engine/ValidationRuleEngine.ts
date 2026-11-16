@@ -1,3 +1,4 @@
+import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {resolveDefaultValues} from './DefaultValueResolver.js';
 import type {PoolClient} from 'pg';
 import {evaluateResolvedFormulaSql} from '../system-support/formula-sql-runtime.js';
@@ -143,10 +144,10 @@ export class DeclarativeRules {
   async validate(client:PoolClient,tenantId:string,userId:string,objectApi:string,
     current:Values|(()=>Promise<Values>),prior:Values|null|(()=>Promise<Values|null>),
     lifecycle:RecordLifecycleContext={stage:'update'}) {
-    const {rows}=await client.query<Rule>(
+    const {rows}=await scopedMetadata('validation-rules\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<Rule>(
       `SELECT api_name,expression,error_message,error_field_api FROM md_validation_rules
        WHERE tenant_id=$1 AND object_api=$2 AND active=true ORDER BY sort_order,api_name`,
-      [tenantId,objectApi]);
+      [tenantId,objectApi]));
     if(!rows.length)return;
     const currentValues=typeof current==='function'?await current():current;
     const priorValues=typeof prior==='function'?await prior():prior;

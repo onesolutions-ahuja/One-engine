@@ -11,6 +11,7 @@ import {auditSystemFlowContext,flowExecutionMode,resolveFlowExecutionActor,
   type FlowExecutionActor} from '../../system-files/flow-execution-context.js';
 import {resolveFlowScheduledPathAt} from '../../system-files/flow-wait-runtime.js';
 import {orderTriggeredFlows,validateTriggerDependencies} from '../record-trigger-dependencies.js';
+import {recordReadScope,resetRecordReadScope} from '../../system-support/record-read-scope.js';
 
 type TriggerOperation='created'|'updated'|'deleted';
 type TriggerPhase='before-save'|'after-save';
@@ -245,24 +246,13 @@ export class FlowRecordTriggers {
    operation:TriggerOperation,record:Snapshot|null,prior:Snapshot|null,
    phase:TriggerPhase='after-save',isClone=false):Promise<Snapshot|void> {
   if(this.flowExecution.getStore())return;
-  const {rows}=await client.query<Candidate>(`
-  SELECT f.id,f.api_name,f.version,f.system_context_approved_by,s.app_api_name FROM md_flow_definitions f
-  JOIN md_flow_trigger_subscriptions s ON s.tenant_id=f.tenant_id AND s.flow_id=f.id
-  WHERE f.tenant_id=$1 AND f.active=true AND f.archived=false
-   AND f.flow_type='Record-Triggered Flow' AND s.flow_type=f.flow_type AND s.active=true
-  ORDER BY f.api_name
-  `,[tenantId]);
+  const loaded=await this.activeRecordFlows(client,tenantId);
   const ready:Array<{flow:Candidate;graph:TriggerDocument;
    start:NonNullable<TriggerDocument['elements']>[number];order:number;
    apiName:string;runAfterFlows:string[];execution:FlowExecutionActor}>=[];
   let current=record?{...record}:null;
   let scheduledPathCount=0;
-  for(const flow of rows){
-   const {rows:values}=await client.query<MetadataValueRow>(`
-    SELECT property_path,value_kind,value_text FROM md_flow_editor_values
-    WHERE tenant_id=$1 AND flow_id=$2
-   `,[tenantId,flow.id]);
-   const graph=decodeMetadataValues(values).builder as TriggerDocument|undefined;
+  for(const {flow,graph} of loaded){
    if(!graph||!Array.isArray(graph.elements))throw new Error('Invalid active Record-Triggered Flow graph');
    const start=graph.elements.find(element=>element.type==='Start');
    if(!start)throw new Error('Record-Triggered Flow has no Start element');
@@ -308,6 +298,8 @@ export class FlowRecordTriggers {
     runAfterFlows:validateTriggerDependencies(config.runAfterFlows,flow.api_name),execution});
   }
   const ordered=orderTriggeredFlows(ready);
+  // A Flow may change records, metadata or permissions: forget what the page action remembered.
+  if(ordered.length)resetRecordReadScope();
   if(ready.length>maxTriggerExecutions)
    throw new Error('Record-triggered Flow execution limit exceeded');
   for(const item of ordered){
@@ -353,6 +345,36 @@ export class FlowRecordTriggers {
   }
   return phase==='before-save'?current??undefined:undefined;
  }
+
+  /** Active Record-Triggered Flows of the tenant with their graphs. Read once per page
+   * action (record read scope); otherwise on every save as before. */
+  private activeRecordFlows(client:PoolClient,tenantId:string):Promise<Array<{flow:Candidate;graph:TriggerDocument|undefined}>>{
+   const load=async()=>{
+    const {rows}=await client.query<Candidate>(`
+    SELECT f.id,f.api_name,f.version,f.system_context_approved_by,s.app_api_name FROM md_flow_definitions f
+    JOIN md_flow_trigger_subscriptions s ON s.tenant_id=f.tenant_id AND s.flow_id=f.id
+    WHERE f.tenant_id=$1 AND f.active=true AND f.archived=false
+     AND f.flow_type='Record-Triggered Flow' AND s.flow_type=f.flow_type AND s.active=true
+    ORDER BY f.api_name
+    `,[tenantId]);
+    if(!rows.length)return [];
+    const {rows:values}=await client.query<MetadataValueRow&{flow_id:string}>(`
+     SELECT flow_id,property_path,value_kind,value_text FROM md_flow_editor_values
+     WHERE tenant_id=$1 AND flow_id::text=ANY($2::text[])
+    `,[tenantId,rows.map(flow=>flow.id)]);
+    return rows.map(flow=>({flow,graph:decodeMetadataValues(values.filter(value=>value.flow_id===flow.id))
+     .builder as TriggerDocument|undefined}));
+   };
+   const scope=recordReadScope();
+   if(!scope)return load();
+   const cacheKey='record-flows\u0000'+tenantId;
+   let hit=scope.fields.get(cacheKey) as ReturnType<typeof load>|undefined;
+   if(!hit){
+    hit=load();scope.fields.set(cacheKey,hit);
+    hit.catch(()=>{if(scope.fields.get(cacheKey)===hit)scope.fields.delete(cacheKey);});
+   }
+   return hit;
+  }
 
   private async readableRecord(tenantId:string,userId:string,objectApi:string,
    record:Snapshot|null):Promise<Snapshot|null>{

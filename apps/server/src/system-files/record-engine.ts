@@ -1,3 +1,6 @@
+import {scopedMetadata} from '../system-support/record-read-scope.js';
+import {recordReadScope,forgetScopedRecords} from '../system-support/record-read-scope.js';
+export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
 import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
@@ -73,6 +76,13 @@ export class RecordEngine {
   constructor(private readonly db:SqlPersistence,private readonly rbac:RbacEngine,
     private readonly encryptedValueVault?:EncryptedValueVault) {}
   private async lockObjectForWrite(client:PoolClient,tenantId:string,objectApi:string) {
+    // In one page action (one transaction) the Object lock taken first is held to the end.
+    const scope=recordReadScope(),lockKey=tenantId+':'+objectApi;
+    if(scope?.locked.has(lockKey)&&this.db.inTransaction())return;
+    await this.lockObjectForWriteOnce(client,tenantId,objectApi);
+    if(scope&&this.db.inTransaction())scope.locked.add(lockKey);
+  }
+  private async lockObjectForWriteOnce(client:PoolClient,tenantId:string,objectApi:string) {
     const active=await client.query(`SELECT 1 FROM md_matching_rules
       WHERE tenant_id=$1 AND object_api=$2 AND active=true LIMIT 1`,[tenantId,objectApi]);
     // Rules that prevent duplicates need serial writes. Other objects retain shared
@@ -96,6 +106,18 @@ export class RecordEngine {
     this.richTextFilePruner=handler;
   }
   private async fields(tenantId:string,objectApi:string,client?:PoolClient):Promise<FieldDefinition[]> {
+    const scope=recordReadScope();
+    if(!scope)return this.loadFields(tenantId,objectApi,client);
+    const cacheKey=tenantId+'\u0000'+objectApi;
+    let hit=scope.fields.get(cacheKey) as Promise<FieldDefinition[]>|undefined;
+    if(!hit){
+      hit=this.loadFields(tenantId,objectApi,client);
+      scope.fields.set(cacheKey,hit);
+      hit.catch(()=>{if(scope.fields.get(cacheKey)===hit)scope.fields.delete(cacheKey);});
+    }
+    return hit;
+  }
+  private async loadFields(tenantId:string,objectApi:string,client?:PoolClient):Promise<FieldDefinition[]> {
     const executor=client??this.db;
     const {rows}=await executor.query<FieldDefinition&{package_object_retained?:boolean}>(
       `SELECT md_field_definitions.api_name,md_field_definitions.data_type,related_object,relationship_type,allow_reparenting,required,max_length,precision,scale,is_unique,external_id,
@@ -534,7 +556,7 @@ export class RecordEngine {
     client?:PoolClient,recordId?:string
   ):Promise<void>{
     const executor=client??this.db;
-    const {rows}=await executor.query<{
+    const {rows}=await scopedMetadata('lookup-filters\u0000'+tenantId+'\u0000'+objectApi,()=>executor.query<{
       field_api:string;related_object:string;related_field_api:string;
       operator:LookupFilterMetadata['operator'];value_text:string;
       value_field_api:string|null
@@ -543,7 +565,7 @@ export class RecordEngine {
         ON f.tenant_id=l.tenant_id AND f.object_api=l.object_api AND f.api_name=l.field_api
       WHERE l.tenant_id=$1 AND l.object_api=$2 AND l.required=true
         AND f.data_type='reference' AND f.deleted_at IS NULL
-      ORDER BY l.field_api,l.sort_order`,[tenantId,objectApi]);
+      ORDER BY l.field_api,l.sort_order`,[tenantId,objectApi]));
     if(!rows.length)return;
     const targets=[...new Set(rows.map(row=>row.field_api))];
     const previous=recordId?await executor.query<{field_api:string;reference_record_id:string|null}>(
@@ -610,6 +632,11 @@ export class RecordEngine {
         &&field.api_name!=='OwnerId'&&(inputValues[field.api_name]===undefined||inputValues[field.api_name]===null))
         throw new Error('Required field missing: '+field.api_name);
     const prepared=new Map<string,Storable>();
+    // Field write permissions for every written field in ONE decision query.
+    const writable=Object.keys(inputValues).filter(key=>key!=='OwnerId'&&key!=='RecordTypeId'&&fields.has(key));
+    const writeAllowed=new Map(writable.map((key,index)=>[key,index]));
+    const writeDecisions=await this.rbac.allowedMany(tenantId,userId,
+      writable.map(key=>({resource:objectApi+'.'+key,action:creating?'create':'edit'})));
     for(const [key,value] of Object.entries(inputValues)) {
       if(key==='OwnerId'){
         if(typeof value!=='string'||!uuid.test(value))throw Error('Invalid record owner');
@@ -636,7 +663,7 @@ export class RecordEngine {
       if(!field) throw new Error('Unknown field: '+key);
       if(field.data_type==='formula'||field.data_type==='autonumber'||field.data_type==='rollup')
         throw new Error('Field is read-only: '+key);
-      await this.rbac.require(tenantId,userId,objectApi+'.'+key,creating?'create':'edit');
+      if(!writeDecisions[writeAllowed.get(key)!])throw Error('Permission denied');
       const metadata={is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive};
       if(value===null) {
         if(field.required&&!deferRequired)throw new Error('Required field cannot be null: '+key);
@@ -781,9 +808,9 @@ export class RecordEngine {
       if(!allowed.rowCount)throw new Error('Invalid dependent picklist value: '+field.api_name);
     }
     if(creating&&!prepared.has('__RecordTypeId__')){
-      const defaults=await (client??this.db).query<{record_type_id:string}>(
+      const defaults=await scopedMetadata('default-record-type\u0000'+tenantId+'\u0000'+objectApi,()=>(client??this.db).query<{record_type_id:string}>(
         'SELECT record_type_id FROM md_object_record_types WHERE tenant_id=$1 AND object_api=$2 AND active=true AND is_default=true ORDER BY sort_order LIMIT 1',
-        [tenantId,objectApi]);
+        [tenantId,objectApi]));
       if(defaults.rows[0]){
         const selected=defaults.rows[0].record_type_id;
         await this.rbac.require(tenantId,userId,'RecordType:'+objectApi+'.'+selected,'read');
@@ -834,6 +861,7 @@ export class RecordEngine {
   }
   private async createRecord(tenantId:string,userId:string,objectApi:string,
     values:Record<string,unknown>,isClone:boolean,existingClient?:PoolClient) {
+    forgetScopedRecords();
     await this.rbac.require(tenantId,userId,objectApi,'create');
     // External-ID upserts reuse the same before/after Flow contract inside their lock.
     const initialPrepared=await this.prepare(
@@ -895,6 +923,7 @@ export class RecordEngine {
   }
   /** Shared, atomic CSV/Data Loader import: new records or explicitly selected existing IDs. */
   async importRecords(tenantId:string,userId:string,objectApi:string,records:unknown) {
+    forgetScopedRecords();
     if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(objectApi) || objectApi==='User')
       throw new Error('Invalid import object');
     if(!Array.isArray(records)||records.length===0||records.length>200)
@@ -943,17 +972,17 @@ export class RecordEngine {
     const {rows}=await client.query<{id:string}>(
       'INSERT INTO md_records (tenant_id,object_api,record_type_id,owner_id,owner_queue_id,is_clone) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
       [tenantId,objectApi,selectedType,queue?null:selectedOwner,queue?selectedOwner:null,isClone]);
-    const autoFields=await client.query<{api_name:string;auto_number_format:string|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean}>(
+    const autoFields=await scopedMetadata('auto-number-fields\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{api_name:string;auto_number_format:string|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean}>(
       `SELECT api_name,auto_number_format,is_unique,external_id,case_sensitive FROM md_field_definitions
-       WHERE tenant_id=$1 AND object_api=$2 AND data_type='autonumber' AND deleted_at IS NULL`,[tenantId,objectApi]);
-    const rollupFields=await client.query<{api_name:string;operation:string;source_data_type:string|null}>(
+       WHERE tenant_id=$1 AND object_api=$2 AND data_type='autonumber' AND deleted_at IS NULL`,[tenantId,objectApi]));
+    const rollupFields=await scopedMetadata('rollup-fields\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{api_name:string;operation:string;source_data_type:string|null}>(
       `SELECT f.api_name,f.rollup_operation AS operation,
         (SELECT s.data_type FROM md_field_definitions s
          WHERE s.tenant_id=f.tenant_id AND s.object_api=f.rollup_child_object
            AND s.api_name=f.rollup_source_field AND s.deleted_at IS NULL) AS source_data_type
        FROM md_field_definitions f
        WHERE f.tenant_id=$1 AND f.object_api=$2 AND f.data_type='rollup' AND f.deleted_at IS NULL`,
-      [tenantId,objectApi]);
+      [tenantId,objectApi]));
     for(const field of rollupFields.rows)if(typeof field.api_name==='string'){
       const zero=field.operation==='COUNT'||field.operation==='SUM';
       prepared.set(field.api_name,{value_text:zero?'0':null,reference_record_id:null,
@@ -1142,9 +1171,9 @@ export class RecordEngine {
       // One tenant-scoped preference lookup; published list views and ad hoc
       // filters reuse the same QueryBuilder and OneEngine Field readability.
       const indexed=equalityFields.length
-       ?await this.db.query<{field_api:string}>(`SELECT field_api FROM md_field_exact_indexes
+       ?await scopedMetadata('exact-indexes\u0000'+tenantId+'\u0000'+objectApi+'\u0000'+equalityFields.join(','),()=>this.db.query<{field_api:string}>(`SELECT field_api FROM md_field_exact_indexes
           WHERE tenant_id=$1 AND object_api=$2 AND enabled
-           AND field_api=ANY($3::text[])`,[tenantId,objectApi,equalityFields])
+           AND field_api=ANY($3::text[])`,[tenantId,objectApi,equalityFields]))
        :{rows:[] as Array<{field_api:string}>};
       const compiled=compileRecordFilters(options.filters,options.filterLogic,filterFields,
         4+conditionParams.length,new Set(indexed.rows.map(row=>row.field_api)));
@@ -1410,7 +1439,20 @@ export class RecordEngine {
   }
 
   /** Single-record read uses the same tenant and field-level grants as list, without pagination. */
-  async get(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient) {
+  async get(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient):Promise<Record<string,unknown>> {
+    // In a page action a record read between two writes is read once (any write forgets all).
+    const scope=recordReadScope();
+    if(!scope)return this.loadRecord(tenantId,userId,objectApi,id,client);
+    const cacheKey=[tenantId,userId,objectApi,id].join('\u0000');
+    let hit=scope.records.get(cacheKey) as Promise<Record<string,unknown>>|undefined;
+    if(!hit){
+      const promise=this.loadRecord(tenantId,userId,objectApi,id,client);hit=promise;
+      scope.records.set(cacheKey,promise);
+      promise.catch(()=>{if(scope.records.get(cacheKey)===promise)scope.records.delete(cacheKey);});
+    }
+    return {...await hit};
+  }
+  private async loadRecord(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient) {
     if(!uuid.test(id))throw new Error('Invalid record ID');
     const [,definitions]=await Promise.all([this.rbac.require(tenantId,userId,objectApi,'read'),this.fields(tenantId,objectApi,client)]);
     const query=client??this.db;
@@ -1477,13 +1519,17 @@ export class RecordEngine {
   }
   async update(tenantId:string,userId:string,objectApi:string,id:string,values:Record<string,unknown>,
     ifUnmodifiedSince?:string,client?:PoolClient,runTriggers=false) {
+    forgetScopedRecords();
     if(!uuid.test(id))throw new Error('Invalid record ID');
     if(objectApi==='CashLedger')throw new Error('CashLedger entries are immutable; post a reversal');
     const checkDate=ifUnmodifiedSince?new Date(ifUnmodifiedSince):null;
     if(checkDate&&!Number.isFinite(checkDate.getTime()))throw new Error('Invalid record modification precondition');
     await this.rbac.require(tenantId,userId,objectApi,'edit');
     if(client)await this.lockObjectForWrite(client,tenantId,objectApi);
-    const prepared=await this.prepare(tenantId,userId,objectApi,values,false,client,id);
+    // Inside an outer transaction the values are prepared again under the record lock
+    // below, so the early (lock-free) validation pass would only repeat the same reads.
+    const prepared=client||!this.db.inTransaction()
+      ?await this.prepare(tenantId,userId,objectApi,values,false,client,id):new Map<string,Storable>();
     const write=async(transactionClient:PoolClient,writeValues:Map<string,Storable>)=>{
       const found=await transactionClient.query<{updated_at:Date}>("SELECT updated_at FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false AND md_record_access($1,$4,id,'edit') FOR UPDATE",
         [tenantId,objectApi,id,userId]);
@@ -1505,31 +1551,41 @@ export class RecordEngine {
         [tenantId,objectApi,id,writeValues.get('__RecordTypeId__')?.value_text]);
       else await transactionClient.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND object_api=$2 AND id=$3',
         [tenantId,objectApi,id]);
-      for(const [field,value] of writeValues){
-        if(field.startsWith('__'))continue;
-        const previous=await transactionClient.query<{value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null}>(
-          'SELECT value_text,reference_record_id,geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-          [tenantId,id,field]);
-        const before=previous.rows[0]?.reference_record_id??previous.rows[0]?.value_text
-          ??(previous.rows[0]?.geo_latitude!==null&&previous.rows[0]?.geo_latitude!==undefined
-            ?`${previous.rows[0].geo_latitude},${previous.rows[0].geo_longitude??''}`:null);
+      // Field history: previous values of all written fields in ONE read, changed ones in ONE insert.
+      type Previous={field_api:string;value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null};
+      const historyFields=[...writeValues.keys()].filter(field=>!field.startsWith('__'));
+      const previousRows=historyFields.length?(await transactionClient.query<Previous>(
+        'SELECT field_api,value_text,reference_record_id,geo_latitude,geo_longitude,address_street,address_city,address_state,address_postal_code,address_country FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=ANY($3::text[])',
+        [tenantId,id,historyFields])).rows:[];
+      const previousByField=new Map<string,Previous>();
+      for(const row of previousRows)if(!previousByField.has(row.field_api))previousByField.set(row.field_api,row);
+      const history:Array<[string,string|null,string|null]>=[];
+      for(const field of historyFields){
+        const value=writeValues.get(field)!;
+        const prior=previousByField.get(field);
+        const before=prior?.reference_record_id??prior?.value_text
+          ??(prior?.geo_latitude!==null&&prior?.geo_latitude!==undefined
+            ?`${prior.geo_latitude},${prior.geo_longitude??''}`:null);
         const after=value.reference_record_id??value.value_text
           ??(value.geo_latitude!==undefined?`${value.geo_latitude??''},${value.geo_longitude??''}`:null);
-        const oldAddress=value.address_street!==undefined&&previous.rows[0]
-          ?[previous.rows[0].address_street,previous.rows[0].address_city,
-            previous.rows[0].address_state,previous.rows[0].address_postal_code,previous.rows[0].address_country].join('|')
+        const oldAddress=value.address_street!==undefined&&prior
+          ?[prior.address_street,prior.address_city,
+            prior.address_state,prior.address_postal_code,prior.address_country].join('|')
           :undefined;
         const newAddress=value.address_street!==undefined?[value.address_street,value.address_city,
           value.address_state,value.address_postal_code,value.address_country].join('|'):undefined;
-        if(before!==after||oldAddress!==newAddress)await transactionClient.query(
-          'INSERT INTO md_record_history(tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value) '+
-          'SELECT $1,$2,$3,$4,$5,$6,$7 WHERE EXISTS ('+
-          'SELECT 1 FROM md_field_definitions f JOIN md_object_manager_settings settings '+
-          'ON settings.tenant_id=f.tenant_id AND settings.object_api=f.object_api '+
-          'WHERE f.tenant_id=$1 AND f.object_api=$3 AND f.api_name=$4 AND f.track_history=true '+
-          'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL)',
-          [tenantId,id,objectApi,field,userId,oldAddress??before,newAddress??after]);
+        if(before!==after||oldAddress!==newAddress)history.push([field,oldAddress??before??null,newAddress??after??null]);
       }
+      if(history.length)await transactionClient.query(
+        'INSERT INTO md_record_history(tenant_id,record_id,object_api,field_api,changed_by,old_value,new_value) '+
+        'SELECT $1,$2,$3,h.field_api,$4,h.old_value,h.new_value '+
+        'FROM unnest($5::text[],$6::text[],$7::text[]) WITH ORDINALITY AS h(field_api,old_value,new_value,ordinal) '+
+        'WHERE EXISTS (SELECT 1 FROM md_field_definitions f JOIN md_object_manager_settings settings '+
+        'ON settings.tenant_id=f.tenant_id AND settings.object_api=f.object_api '+
+        'WHERE f.tenant_id=$1 AND f.object_api=$3 AND f.api_name=h.field_api AND f.track_history=true '+
+        'AND settings.track_field_history=true AND f.data_type<>\'encryptedtext\' AND f.deleted_at IS NULL) '+
+        'ORDER BY h.ordinal',
+        [tenantId,id,objectApi,userId,history.map(h=>h[0]),history.map(h=>h[1]),history.map(h=>h[2])]);
       await writeRecordValues(transactionClient,tenantId,objectApi,id,writeValues,true);
       if(this.richTextFilePruner){
         const richTextFields=(await this.fields(tenantId,objectApi,transactionClient))
@@ -1597,8 +1653,7 @@ export class RecordEngine {
         [tenantId,objectApi,id,userId]);
       if(!locked.rowCount)throw new Error('Record not found');
       const prior=await this.get(tenantId,userId,objectApi,id,transactionClient);
-      let finalPrepared=prepared;
-      finalPrepared=await this.prepare(tenantId,userId,objectApi,values,false,transactionClient,id);
+      let finalPrepared=await this.prepare(tenantId,userId,objectApi,values,false,transactionClient,id);
       if(this.recordTrigger){
         const proposed=await this.recordTrigger(transactionClient,tenantId,userId,objectApi,'updated',
           {...prior,...values},prior,'before-save');
@@ -1662,6 +1717,7 @@ export class RecordEngine {
   }
   /** Transfer record ownership without bypassing Object/Record permissions or tenant boundaries. */
   async transferOwner(tenantId:string,userId:string,objectApi:string,id:string,ownerId:string,ifUnmodifiedSince?:string){
+    forgetScopedRecords();
     if(!uuid.test(id)||!uuid.test(ownerId)||!/^[A-Za-z][A-Za-z0-9_]*$/.test(objectApi))
       throw new Error('Invalid record ownership');
     await this.rbac.require(tenantId,userId,objectApi,'edit');
@@ -1755,6 +1811,7 @@ export class RecordEngine {
 
   /** Object-level delete permission and record access are checked for the root. */
   async remove(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient,ifUnmodifiedSince?:string) {
+    forgetScopedRecords();
     if(objectApi==='CashLedger')throw Error('CashLedger entries cannot be deleted; post a reversal');
     if(!uuid.test(id)||!/^[A-Za-z][A-Za-z0-9_]*$/.test(objectApi))
       throw new Error('Invalid record reference');
@@ -1814,6 +1871,7 @@ export class RecordEngine {
 
   /** Recover the exact deletion group; never overwrite a subsequently edited lookup. */
   async restore(tenantId:string,userId:string,objectApi:string,id:string){
+    forgetScopedRecords();
     if(!uuid.test(id)||!/^[A-Za-z][A-Za-z0-9_]*$/.test(objectApi))
       throw new Error('Invalid record reference');
     await this.rbac.require(tenantId,userId,objectApi,'create');

@@ -1,6 +1,7 @@
 import {SqlPersistence} from './sql-persistence.js';
 import {auditContext} from '../system-support/audit-context.js';
 import {readRbac} from '../system-support/rbac-description.js';
+import {recordReadScope} from '../system-support/record-read-scope.js';
 export type PermissionCheck={resource:string;action:string};
 /** One central SQL RBAC evaluator. OneEngine is an ordinary configurable permission set. */
 export class RbacEngine{
@@ -11,8 +12,9 @@ export class RbacEngine{
   // field, again by nested services). Remember it for this request only; any
   // database write in the request clears it. Not used inside a transaction.
   const context=auditContext();
+  // Inside one page action (record read scope) decisions are kept until a Flow runs.
   const memo=this.db instanceof SqlPersistence&&!this.db.inTransaction()&&context
-   ?(context.rbacMemo??=new Map<string,boolean>()):undefined;
+   ?(context.rbacMemo??=new Map<string,boolean>()):recordReadScope()?.rbac;
   const keyOf=(check:PermissionCheck)=>tenantId+'\u0000'+userId+'\u0000'+check.resource+'\u0000'+check.action;
   if(memo){
    const missing=checks.filter(check=>!memo.has(keyOf(check)));

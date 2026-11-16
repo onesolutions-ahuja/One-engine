@@ -20,12 +20,109 @@ CREATE TABLE IF NOT EXISTS md_native_fields(
  PRIMARY KEY(tenant_id,object_api,field_api),
  FOREIGN KEY(tenant_id,object_api) REFERENCES md_native_objects(tenant_id,object_api));
 
+-- Keep the search index in sync with the native row, including direct native writes.
+CREATE OR REPLACE FUNCTION md_native_search_values_sync() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE obj text; field record; raw_value text; stored jsonb;
+BEGIN
+ SELECT object_api INTO obj FROM md_native_objects
+  WHERE tenant_id=NEW.tenant_id AND table_name=TG_TABLE_NAME;
+ IF obj IS NULL THEN RETURN NEW; END IF;
+ DELETE FROM md_record_search_values
+  WHERE tenant_id=NEW.tenant_id AND record_id=NEW.id AND object_api=obj;
+ IF NEW.is_deleted THEN RETURN NEW; END IF;
+ stored:=to_jsonb(NEW);
+ FOR field IN
+  SELECT n.field_api,n.column_name FROM md_native_fields n
+   JOIN md_search_layout_fields s ON s.tenant_id=n.tenant_id
+    AND s.object_api=n.object_api AND s.field_api=n.field_api
+   WHERE n.tenant_id=NEW.tenant_id AND n.object_api=obj
+ LOOP
+  IF field.field_api=ANY(NEW.present_fields) THEN
+   raw_value:=CASE WHEN field.column_name IS NULL THEN NEW.extras->>field.field_api
+    ELSE stored->>field.column_name END;
+   PERFORM md_refresh_record_search_value(NEW.tenant_id,NEW.id,obj,field.field_api,raw_value);
+  END IF;
+ END LOOP;
+ RETURN NEW;
+END $$;
+
+-- Give serial duplicate writes the same public error while the unique index
+-- remains the final, concurrency-safe enforcement for simultaneous writers.
+CREATE OR REPLACE FUNCTION md_native_unique_check() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE obj text; field record; val jsonb; old_val jsonb; value_expr text; duplicate boolean;
+BEGIN
+ IF NEW.is_deleted THEN RETURN NEW; END IF;
+ SELECT object_api INTO obj FROM md_native_objects
+  WHERE tenant_id=NEW.tenant_id AND table_name=TG_TABLE_NAME;
+ IF obj IS NULL THEN RETURN NEW; END IF;
+ FOR field IN
+  SELECT n.field_api,n.column_name,n.sql_type,d.case_sensitive
+  FROM md_native_fields n JOIN md_field_definitions d
+   ON d.tenant_id=n.tenant_id AND d.object_api=n.object_api AND d.api_name=n.field_api
+  WHERE n.tenant_id=NEW.tenant_id AND n.object_api=obj AND d.is_unique
+ LOOP
+  IF NOT field.field_api=ANY(NEW.present_fields) THEN CONTINUE; END IF;
+  old_val:=NULL;
+  IF field.column_name IS NULL THEN
+   val:=NEW.extras->field.field_api;
+   value_expr:=CASE WHEN field.sql_type='text' THEN format('(extras->>%L)',field.field_api)
+    ELSE format('(extras->%L)',field.field_api) END;
+   IF TG_OP='UPDATE' THEN old_val:=OLD.extras->field.field_api; END IF;
+  ELSE
+   val:=to_jsonb(NEW)->field.column_name;
+   value_expr:=format('%I',field.column_name);
+   IF TG_OP='UPDATE' THEN old_val:=to_jsonb(OLD)->field.column_name; END IF;
+  END IF;
+  IF val IS NULL OR val='null'::jsonb THEN CONTINUE; END IF;
+  IF TG_OP='UPDATE' AND NOT OLD.is_deleted AND NEW.tenant_id=OLD.tenant_id
+    AND val IS NOT DISTINCT FROM old_val THEN CONTINUE; END IF;
+  IF field.sql_type='text' AND NOT field.case_sensitive THEN
+   EXECUTE format('SELECT EXISTS(SELECT 1 FROM %I WHERE tenant_id=$1 AND id<>$2
+    AND NOT is_deleted AND lower(%s)=lower($3))',TG_TABLE_NAME,value_expr)
+    INTO duplicate USING NEW.tenant_id,NEW.id,val#>>'{}';
+  ELSE
+   EXECUTE format('SELECT EXISTS(SELECT 1 FROM %I WHERE tenant_id=$1 AND id<>$2
+    AND NOT is_deleted AND to_jsonb(%s)=$3)',TG_TABLE_NAME,value_expr)
+    INTO duplicate USING NEW.tenant_id,NEW.id,val;
+  END IF;
+  IF duplicate THEN RAISE EXCEPTION 'Value must be unique' USING ERRCODE='23505'; END IF;
+ END LOOP;
+ RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION md_native_install_value_triggers(tab text) RETURNS void
+ LANGUAGE plpgsql AS $$
+BEGIN
+ IF tab !~ '^md_object_[a-f0-9]{32}$' THEN
+  RAISE EXCEPTION 'Invalid native table name';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_trigger
+  WHERE tgrelid=to_regclass(format('%I',tab)) AND tgname='md_native_unique_check_trigger') THEN
+  EXECUTE format('CREATE TRIGGER md_native_unique_check_trigger BEFORE INSERT OR UPDATE
+   ON %I FOR EACH ROW EXECUTE FUNCTION md_native_unique_check()',tab);
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_trigger
+  WHERE tgrelid=to_regclass(format('%I',tab)) AND tgname='md_native_search_values_sync_trigger') THEN
+  EXECUTE format('CREATE TRIGGER md_native_search_values_sync_trigger AFTER INSERT OR UPDATE
+   ON %I FOR EACH ROW EXECUTE FUNCTION md_native_search_values_sync()',tab);
+ END IF;
+END $$;
+
+-- Also attach on tables activated before this DDL upgrade.
+DO $$ DECLARE tab text; BEGIN
+ FOR tab IN SELECT DISTINCT table_name FROM md_native_objects LOOP
+  PERFORM md_native_install_value_triggers(tab);
+ END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION md_native_configure_field(t uuid,o text,k text) RETURNS void
  LANGUAGE plpgsql AS $$
-DECLARE f md_field_definitions; tab text; typ text; col text; standard boolean; expression text; idx text;
+DECLARE f md_field_definitions; tab text; typ text; col text; standard boolean;
+ expression text; unique_expr text; idx text; unique_ci text; unique_cs text;
 BEGIN
  SELECT table_name INTO tab FROM md_native_objects WHERE tenant_id=t AND object_api=o;
  IF tab IS NULL THEN RETURN; END IF;
+ PERFORM md_native_install_value_triggers(tab);
  SELECT * INTO f FROM md_field_definitions WHERE tenant_id=t AND object_api=o AND api_name=k;
  IF NOT FOUND OR f.data_type='formula' THEN
   DELETE FROM md_native_fields WHERE tenant_id=t AND object_api=o AND field_api=k; RETURN;
@@ -58,6 +155,24 @@ BEGIN
   DO UPDATE SET column_name=EXCLUDED.column_name,sql_type=EXCLUDED.sql_type,data_type=EXCLUDED.data_type;
  expression:=CASE WHEN col IS NOT NULL THEN format('%I',col)
   ELSE format('(extras->>%L)',k) END;
+ unique_expr:=CASE WHEN col IS NULL AND typ<>'text' THEN format('(extras->%L)',k)
+  ELSE expression END;
+ unique_ci:='md_native_u_ci_'||md5(tab||':'||k);
+ unique_cs:='md_native_u_cs_'||md5(tab||':'||k);
+ IF f.is_unique AND typ='text' AND NOT f.case_sensitive THEN
+  EXECUTE format('DROP INDEX IF EXISTS %I',unique_cs);
+  EXECUTE format('CREATE UNIQUE INDEX IF NOT EXISTS %I ON %I
+   (tenant_id,lower(%s)) WHERE NOT is_deleted AND %s IS NOT NULL',
+   unique_ci,tab,expression,expression);
+ ELSIF f.is_unique THEN
+  EXECUTE format('DROP INDEX IF EXISTS %I',unique_ci);
+  EXECUTE format('CREATE UNIQUE INDEX IF NOT EXISTS %I ON %I
+   (tenant_id,%s) WHERE NOT is_deleted AND %s IS NOT NULL',
+   unique_cs,tab,unique_expr,unique_expr);
+ ELSE
+  EXECUTE format('DROP INDEX IF EXISTS %I',unique_ci);
+  EXECUTE format('DROP INDEX IF EXISTS %I',unique_cs);
+ END IF;
  idx:='md_native_'||md5(tab||k||COALESCE(col,'extras')||typ);
  IF typ='text' AND f.data_type<>'encryptedtext' THEN
   EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON %I USING gin ((%s) gin_trgm_ops) WHERE NOT is_deleted',idx,tab,expression);
@@ -154,7 +269,7 @@ BEGIN
  RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS md_native_field_changed ON md_field_definitions;
-CREATE TRIGGER md_native_field_changed AFTER INSERT OR UPDATE OF data_type,rollup_operation,rollup_source_field,rollup_child_object
+CREATE TRIGGER md_native_field_changed AFTER INSERT OR UPDATE OF data_type,rollup_operation,rollup_source_field,rollup_child_object,is_unique,case_sensitive
  ON md_field_definitions FOR EACH ROW EXECUTE FUNCTION md_native_field_changed();
 `;
 

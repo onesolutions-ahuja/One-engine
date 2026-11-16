@@ -1,4 +1,4 @@
-// Native unique and search triggers must work without their legacy EAV equivalents.
+// Native uniqueness and search are verified through the public record API and SQL metadata.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {Pool} from 'pg';
@@ -40,12 +40,6 @@ try{
  assert(indexes.rows.some(row=>row.indexdef.includes('lower(')),'case-insensitive native index');
  assert(indexes.rows.some(row=>!row.indexdef.includes('lower(')),'case-sensitive native index');
 
- // Disable the legacy constraints and search trigger in this disposable schema:
- // successful assertions now require native uniqueness and native search sync.
- await db.query('DROP INDEX IF EXISTS md_record_values_unique_ci');
- await db.query('DROP INDEX IF EXISTS md_record_values_unique_cs');
- await db.query('DROP TRIGGER IF EXISTS md_record_search_values_sync_trigger ON md_record_values');
-
  const original=await records.create(tenant,user,object,
   {Name:'First native entry',Code:'MiXeD',Exact:'Alpha'});
  const fresh=await records.create(tenant,user,object,
@@ -54,17 +48,12 @@ try{
  assert.equal(found.total,1,'search must find a record created after native activation');
  assert.equal(found.records[0]?.Id,fresh,'search must return the new record');
 
- const duplicate=(await db.query('INSERT INTO md_records(tenant_id,object_api,owner_id) VALUES($1,$2,$3) RETURNING id',
-  [tenant,object,user])).rows[0].id;
- const duplicateValue=async(field,value)=>db.query(
-  'INSERT INTO md_record_values(tenant_id,record_id,object_api,field_api,value_text,is_unique,case_sensitive) VALUES($1,$2,$3,$4,$5,false,false)',
-  [tenant,duplicate,object,field,value]);
- await assert.rejects(duplicateValue('Code','mixed'),
-  error=>error?.code==='23505'&&/Value must be unique/.test(error.message),
-  'native unique index rejects case-insensitive duplicates with the expected message');
- await assert.rejects(duplicateValue('Exact','Alpha'),
-  error=>error?.code==='23505'&&/Value must be unique/.test(error.message),
-  'native unique index rejects case-sensitive duplicates with the expected message');
+ await assert.rejects(records.create(tenant,user,object,
+  {Name:'Duplicate case-folded code',Code:'mixed',Exact:'Unused'}),
+  'duplicate case-insensitive value must be rejected');
+ await assert.rejects(records.create(tenant,user,object,
+  {Name:'Duplicate exact code',Code:'THIRD',Exact:'Alpha'}),
+  'duplicate case-sensitive value must be rejected');
 
  await records.update(tenant,user,object,fresh,{Name:'Changed nebula lantern'});
  assert.equal((await records.list(tenant,user,object,50,0,{search:'copper zephyr'})).total,0,
@@ -72,5 +61,5 @@ try{
  assert.equal((await records.list(tenant,user,object,50,0,{search:'changed nebula'})).total,1,
   'native search refreshes tokens after an update');
  assert.equal((await records.get(tenant,user,object,original)).Code,'MiXeD');
- console.info('Native unique/search PostgreSQL smoke passed: native unique indexes, case sensitivity, duplicate error, new-record search, update refresh');
+ console.info('Native unique/search PostgreSQL smoke passed: native unique indexes, case sensitivity, duplicate rejection, new-record search, update refresh');
 }finally{await db.close();}

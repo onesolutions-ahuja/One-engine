@@ -20,6 +20,7 @@ import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
 import {parseComponentStateReference} from '../../expression-engine/FormulaComponentState.js';
 import {formulaEntry} from './formulaDictionary.js';
+import {parseActionFormulaAssignment} from '../pageCompilerSupport.js';
 
 const q=(value:unknown)=>JSON.stringify(value);
 const name=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
@@ -304,7 +305,18 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   case 'FLOW':scope.ui.add('FLOW');return ['await $.ui("FLOW", '+q(literalName(args[0],'Flow name'))+');'];
   // Device steps (GPS, PDF drawn in the browser) and WAIT (resumes later) stay with the
   // action engine: the page keeps working, this action is listed in codeIssues.
-  case 'CREATEPDF':case 'WAIT':case 'LOCATION':return fail(node.name+' runs in the action engine');
+  // WAIT resumes later: it stays with the action engine (no page uses it today).
+  case 'WAIT':return fail(node.name+' runs in the action engine');
+  // Device steps: the server asks the browser (GPS, PDF drawn from the print template)
+  // and runs the action again with the answer; nothing is saved until every step is done.
+  case 'LOCATION':case 'CREATEPDF':{
+   const last=args.at(-1);
+   const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
+   if(node.name==='LOCATION'&&!alias)return fail('LOCATION needs AS(name)');
+   scope.data=true;scope.ui.add(node.name);
+   const list=node.name==='CREATEPDF'?[q(literalName(args[0],'print template')),...args.slice(1).map(value)]:[];
+   return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
+  }
   case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'RECORDPAYMENT':{
    const last=args.at(-1);
    const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
@@ -320,6 +332,13 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
  return fail('Unsupported action step '+node.name);
 }
 
+function assignmentCode(assignment:{kind:'state'|'filter'|'navigate';key:string},scope:ActionScope):string[]{
+ const value=(source:string)=>expression(parseFormula('='+source),scope);
+ const node=(assignment as {value?:string}).value??'';
+ if(assignment.kind==='state')return ['$.setState('+q(assignment.key)+', '+value(node)+');'];
+ scope.ui.add(assignment.kind==='filter'?'FILTER':'NAVIGATE');
+ return ['await $.ui('+q(assignment.kind==='filter'?'FILTER':'NAVIGATE')+', '+q(assignment.key)+', '+value(node)+');'];
+}
 export type CompiledActionCode={
  /** `async ($) => { ... }`: run in the browser (instant, on held rows) and on the server (SQL, one transaction). */
  js:string;
@@ -337,14 +356,16 @@ export function compileActionFormula(source:string,rowObject=''):CompiledActionC
  const scope:ActionScope={rowObject,row:'$.row',aliases,aliasesMutable:aliases,async:true,functions:new Set(),
   references:new Set(),sets:[],reads:new Set(),writes:new Set(),ui:new Set(),data:false,loop:false,aliasSets:new Map()};
  // Aliases are visible to later steps: collect them first (AS names are unique per action).
- const root=parseFormula(source);
+ // `@state.x := value`, `@filter.x := value`, `@navigate.page|list|home := value`.
+ const assignment=parseActionFormulaAssignment(source);
+ const root=assignment?parseFormula('='+assignment.value):parseFormula(source);
  const collect=(node:Expression)=>{
   if(node.kind!=='call')return;
   if(node.name==='AS'&&node.args[0])aliases.add(literalName(node.args[0],'result variable'));
   node.args.forEach(collect);
  };
  collect(root);
- const lines=stepCode(root,scope);
+ const lines=assignment?assignmentCode(assignment,scope):stepCode(root,scope);
  return {js:'async ($) => {\n  const v = Object.create(null);\n'+indent(lines).join('\n')+(lines.length?'\n':'')+'}',
   reads:[...scope.reads],writes:[...scope.writes],ui:[...scope.ui],data:scope.data,sets:scope.sets,
   functions:[...scope.functions],references:[...scope.references]};

@@ -40,10 +40,19 @@ export type PageCodeRequest={
  /** Object of the clicked row (the component's Object). */
  rowObject:string;
  timeZone?:string;
+ /** Answers of device steps (LOCATION, CREATEPDF) the browser ran when asked. */
+ device?:Record<string,unknown>;
 };
+/** The action needs a device step from the browser; nothing was saved. */
+export class DeviceStepNeeded extends Error{
+ constructor(readonly step:{name:string;args:unknown[];key:string}){super(step.name+' needs the device');}
+}
+export const deviceStepKey=(name:string,args:readonly unknown[])=>name+':'+JSON.stringify(args);
 export type RecordChange={objectApiName:string;operation:'create'|'update'|'delete';record:Row};
 export type PageCodeResult={
  ok:boolean;error?:string;
+ /** A device step to run in the browser, then send the action again with its answer. */
+ needs?:{name:string;args:unknown[];key:string};
  /** Every record the action created, updated or deleted, as saved. */
  changes:RecordChange[];
  /** Page state the action set (STATE steps). */
@@ -255,6 +264,12 @@ class ServerScope{
    for(const object of ['Invoice','CashLedger']){this.written.add(object);this.forget(object);}
    return result;
   }
+  if(name==='LOCATION'||name==='CREATEPDF'){
+   const key=deviceStepKey(name,args);
+   const answers=this.request.device;
+   if(answers&&Object.prototype.hasOwnProperty.call(answers,key))return answers[key];
+   throw new DeviceStepNeeded({name,args,key});
+  }
   throw Error(name+' runs in the action engine');
  }
  /** Rows of one record set (with its parent set's ids for child sets). */
@@ -303,6 +318,17 @@ async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{ide
   deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null,
   {db:deps.db as SqlPersistence,rbac:deps.rbac});
 }
+/** At most 10 small answers (a position, a file id): data only, used like any user input. */
+function deviceAnswers(value:unknown):Record<string,unknown>|undefined{
+ if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
+ const out:Record<string,unknown>=Object.create(null);
+ for(const [k,v] of Object.entries(value).slice(0,10)){
+  if(!/^(LOCATION|CREATEPDF):/.test(k)||k.length>500)continue;
+  if(JSON.stringify(v??null).length>2000)continue;
+  out[k]=v;
+ }
+ return out;
+}
 export function parsePageCodeRequest(body:unknown):PageCodeRequest{
  const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
  const event=(raw.event&&typeof raw.event==='object'&&!Array.isArray(raw.event)?raw.event:{}) as Record<string,unknown>;
@@ -312,7 +338,8 @@ export function parsePageCodeRequest(body:unknown):PageCodeRequest{
   event:{recordId:typeof event.recordId==='string'?event.recordId:undefined,value:pick(event.value),
    index:pick(event.index),label:pick(event.label)},
   rowObject:typeof raw.rowObject==='string'&&key.test(raw.rowObject)?raw.rowObject:'',
-  timeZone:typeof raw.timeZone==='string'&&/^[A-Za-z0-9_+\-/]{1,64}$/.test(raw.timeZone)?raw.timeZone:undefined};
+  timeZone:typeof raw.timeZone==='string'&&/^[A-Za-z0-9_+\-/]{1,64}$/.test(raw.timeZone)?raw.timeZone:undefined,
+  device:deviceAnswers(raw.device)};
 }
 
 /** Run one page action: ONE transaction; all steps or none. */
@@ -342,6 +369,7 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
   }
   return failed.length?{...result as PageCodeResult,error:'Saved, but not sent - '+failed.join('; ')}:result as PageCodeResult;
  }catch(error){
+  if(error instanceof DeviceStepNeeded)return {ok:false,needs:error.step,changes:[],state:{},effects:[],sets:{}};
   return {ok:false,error:error instanceof Error?error.message:'The action failed; nothing was saved',
    changes:[],state:{},effects:[],sets:{}};
  }

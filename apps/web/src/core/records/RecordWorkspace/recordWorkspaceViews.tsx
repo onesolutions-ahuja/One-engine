@@ -1328,7 +1328,12 @@ function RecordWorkspace({
     // A successful form layout lookup carries the current OneEngine object
     // grant. Do not submit with a stale grant or after the operation was revoked.
     const permission:'Edit'|'Create'=editingId?'Edit':'Create';
-    if(recordGrants?.objectApi!==object.apiName||recordGrants[permission]!==true){
+    if(recordGrants?.objectApi!==object.apiName){
+      setFormError(editPageLoading?'Still loading your permissions. Try Save again in a moment.'
+        :'Could not load your permissions for this record. Close the form and open it again.');
+      return;
+    }
+    if(recordGrants[permission]!==true){
       setFormError('You do not have permission to save this record.');
       return;
     }

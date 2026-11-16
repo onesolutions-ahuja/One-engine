@@ -161,7 +161,7 @@
 }
 @media (prefers-color-scheme: dark) and (max-width: 599px),
        (prefers-color-scheme: dark) and (max-height: 500px) and (pointer: coarse) {
-    .lightning {
+    :root:not([data-theme="light"]) .lightning {
       --md-ios-bg: #000;
       --md-ios-surface: #1c1c1e;
       --md-ios-group: #2c2c2e;

@@ -63,10 +63,10 @@ export function renderSetupShell(ctx: any) {
     }));
   };
   return (
-    <div className={(standalonePageMode || isStandaloneMetadataPage ? 'lightning standalone-page-mode' : route.kind === 'setup' && route.workspace === 'page-builder' && Boolean(route.resourceApiName) ? 'lightning page-builder-editing' : 'lightning') + (route.kind === 'setup' && !standalonePageMode && !isStandaloneMetadataPage ? ' md-setup-light' : '')
+    <div className={(standalonePageMode || isStandaloneMetadataPage ? 'lightning standalone-page-mode' : route.kind === 'setup' && route.workspace === 'page-builder' && Boolean(route.resourceApiName) ? 'lightning page-builder-editing' : 'lightning') + (!standalonePageMode && !isStandaloneMetadataPage ? ' md-setup-light' : '')
       // Running an app: no platform header, and the app renders in its authored (light) colours
       // whatever the device's dark-mode setting is.
-      + ((route.kind === 'app-page' || route.kind === 'app-home') && !standalonePageMode && !isStandaloneMetadataPage ? ' md-app-runtime md-setup-light' : '')}>
+      + ((route.kind === 'app-page' || route.kind === 'app-home') && !standalonePageMode && !isStandaloneMetadataPage ? ' md-app-runtime' : '')}>
       <header className="salesforce-header">
         {(route.kind === 'setup' || (isRecordsRoute && readableRecordObjects.length > 1)) && <button type="button" className="md-sidebar-trigger"
           aria-label={setupSidebarCollapsed ? 'Open navigation' : 'Close navigation'}

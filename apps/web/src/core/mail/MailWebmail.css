@@ -292,7 +292,7 @@
 .md-mail-search:focus-within{outline:3px solid color-mix(in srgb,var(--mail-blue) 40%,transparent);outline-offset:0;box-shadow:none;background:var(--mail-surface);border-color:var(--mail-blue)}
 .md-mail :focus-visible{outline:3px solid color-mix(in srgb,var(--mail-blue) 45%,transparent);outline-offset:1px}
 @media(prefers-color-scheme:dark){
- .md-mail:not([data-theme="light"]){
+ :root:not([data-theme="light"]) .md-mail:not([data-theme="light"]){
   color-scheme:dark;--mail-bg:#1c1c1e;--mail-surface:#2c2c2e;
   --mail-text:#f5f5f7;--mail-muted:#c2c2c8;
   --mail-line:rgb(84 84 88 / 55%);--mail-blue:#0a84ff;
@@ -322,7 +322,7 @@
 .md-mail-message-row.is-unread .md-mail-row-date{color:var(--mail-text)}
 .md-mail[data-theme="dark"]{--mail-action-ink:#9acaff}
 @media(prefers-color-scheme:dark){
- .md-mail:not([data-theme="light"]){--mail-action-ink:#9acaff}
+ :root:not([data-theme="light"]) .md-mail:not([data-theme="light"]){--mail-action-ink:#9acaff}
 }
 
 /* Keep mail screens self-contained: workspace/browser dark-mode tokens must not
@@ -350,7 +350,7 @@
   color: var(--mail-text);
 }
 @media (prefers-color-scheme: dark) {
-  .md-mail:not([data-theme="light"]) {
+  :root:not([data-theme="light"]) .md-mail:not([data-theme="light"]) {
     --mail-bg: #181d26;
     --mail-surface: #252d39;
     --mail-text: #f2f6fc;

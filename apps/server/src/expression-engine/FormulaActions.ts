@@ -19,6 +19,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'FOREACH',parameters:['Object','Field1','Value1','AS(item)','Action']},
  {name:'LOOP',parameters:['Times','AS(item)','Action']},
  {name:'REPEAT',parameters:['Action','UntilCondition','EverySeconds','MaxTimes']},
+ {name:'DEVICE',parameters:['DeviceType','Command','Text']},
  {name:'CALLOUT',parameters:['Connector.Operation','Field1','Value1','AS(variable)']},
  {name:'CLOSESCREEN',parameters:[]},
  {name:'LOCKSCREEN',parameters:[]},

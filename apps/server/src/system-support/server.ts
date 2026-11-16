@@ -90,6 +90,7 @@ import {registerDurableJobAdminRoutes} from './durable-job-admin-routes.js';
 import {registerScheduledActionRoutes} from './scheduled-action-routes.js';
 import {runActionCallout,listActionCallouts} from './action-formula-callout-service.js';
 import {registerInboundWebhookRoutes} from './inbound-webhook-routes.js';
+import {registerCloudPrntPublicRoutes,queueDeviceJob} from './cloudprnt-routes.js';
 import {sendActionCommunication} from './action-formula-communication-service.js';
 import {tenantServerFormulaEnabled,executeServerDataAction} from './formula-data-action-runtime.js';
 import {evaluateFormulaSql,evaluateFormulaSqlMany} from './formula-sql-runtime.js';
@@ -616,6 +617,8 @@ export function createSystemServer(db:SqlPersistence) {
   registerConnectedPublicRoutes(app,connected);
   // Provider webhooks are public: each becomes an IncomingWebhook record for Flows and formulas.
   registerInboundWebhookRoutes(app,db,records);
+  // Star CloudPRNT network printers poll here for receipts queued by DEVICE(...).
+  registerCloudPrntPublicRoutes(app,db);
   // Compiled page scripts: the script fetch carries a one-time ticket instead of a bearer token.
   const pageScriptDeps={db,rbac,records,pages,definitions,namedCredentials,scripts:new PageScriptService(),
     verifyPin:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>tillPins.verify(actor.tenant_id,
@@ -2105,6 +2108,10 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     res.setHeader('Cache-Control','private, no-store');
     res.json(await listActionCallouts(db,rbac,actor.tenant_id,actor.user_id));
+  }));
+  app.post('/api/action-formulas/device-job',route(async(req,res)=>{
+    const actor=req.actor!;
+    res.json(await queueDeviceJob(db,new FlowRecordQuery(db,rbac),actor.tenant_id,actor.user_id,req.body));
   }));
   app.post('/api/action-formulas/callout',route(async(req,res)=>{
     const actor=req.actor!;

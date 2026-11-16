@@ -2,6 +2,7 @@ import {Parser,formulaTruth,type Expression} from './FormulaParser.js';
 import {tokenize} from './FormulaTokenizer.js';
 import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey} from './PageReferences.js';
 import {validateFormulaFunctions} from './FormulaFunctionRegistry.js';
+import {runDeviceCommand} from './ActionDevices.js';
 import {actionFormulaFunctions} from './FormulaCategories.js';
 import {SQL_SCALAR_FORMULAS,serializeFormulaSqlExpression} from './FormulaCategories.js';
 
@@ -218,6 +219,13 @@ export function compileActionPlan(source:string):ActionStep[] {
    add(bodySteps,args[0],[],true);
    if(!bodySteps.length)throw Error('REPEAT requires an action');
    steps.push({name:'REPEAT',object:'',values:args.slice(1),fields:new Map(),guards,body:bodySteps});
+   return;
+  }
+  if(node.name==='DEVICE'){
+   // DEVICE("Receipt Printer", "Print", text) / DEVICE("Cash Drawer", "Open"): default Named Device.
+   if(args.length<2||args.length>3)throw Error('DEVICE requires a device type, a command and optional text');
+   args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
+   steps.push({name:'DEVICE',object:'',values:args,fields:new Map(),guards});
    return;
   }
   if(node.name==='CALLOUT'){
@@ -778,6 +786,12 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
        if(formulaTruth(until))break;
        if(attempt<max)await new Promise(resolve=>setTimeout(resolve,every*1000));
       }
+      completed++;
+      continue;
+     }
+     if(step.name==='DEVICE'){
+      const [type,command,text]=(step.values??[]).map(evaluate);
+      await runDeviceCommand(tracedRequest,type,command,text);
       completed++;
       continue;
      }

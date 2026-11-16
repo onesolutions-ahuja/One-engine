@@ -268,5 +268,6 @@ function literalCollection(source:string):PageNamedCollection|null{
  let node:Expression;
  try{node=new Parser(tokenize(source)).parse();}catch{return null;}
  if(node.kind!=='call'||node.name!=='COLLECTION'||node.args.length<2||node.args.some(arg=>arg.kind!=='literal'))return null;
- return F.COLLECTION(...node.args.map(arg=>(arg as {value:unknown}).value)) as unknown as PageNamedCollection;
+ const [name,...values]=node.args.map(arg=>(arg as {value:unknown}).value);
+ return F.COLLECTION(name,...values) as unknown as PageNamedCollection;
 }

@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react';
+import {F} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
 import {visiblePageCollectionResult} from './pageCollectionVisibility';
 import {Parser,type Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
@@ -180,6 +181,9 @@ export function usePageCollectionFormula(
   return {collection:{name:'__filtered_list__',
     items:filteredCollectionItems(criteria,rows)},error:null,loading:false};
  }
+ // A fixed option list, COLLECTION("Name", "a", "b"): the converted formula's own function.
+ const literal=fullObject?null:literalCollection(source);
+ if(literal)return {collection:{...literal,key:formulaCollectionReferenceKey(literal.name)},error:null,loading:false};
  const resolved=evaluateCollectionFormula(fullObject?'TABLE(@'+fullObject+')':source,sources,{state:pageState,session:{id:sessionId},
    primaryObject,record:primaryRecords.length===1?primaryRecords[0]:{},
    collectionSourceFields:Object.fromEntries(objects.map(object=>[
@@ -256,4 +260,14 @@ export function namedCollectionRows(collection:PageNamedCollection):Row[]{
    __collectionLabel:item===null||item===undefined?'':String(item),
    __collectionValue:item,__collectionManual:true,__collectionIndex:index};
  });
+}
+
+/** COLLECTION("Name", "a", "b", ...) with only fixed values -> the collection (no engine). */
+function literalCollection(source:string):PageNamedCollection|null{
+ if(!/^COLLECTION\s*\(/i.test(source.trim()))return null;
+ let node:Expression;
+ try{node=new Parser(tokenize(source)).parse();}catch{return null;}
+ if(node.kind!=='call'||node.name!=='COLLECTION'||node.args.length<2||node.args.some(arg=>arg.kind!=='literal'))return null;
+ const [name,...values]=node.args.map(arg=>(arg as {value:unknown}).value);
+ return F.COLLECTION(name,...values) as unknown as PageNamedCollection;
 }

@@ -3,6 +3,7 @@ import {recordReadScope,forgetScopedRecords} from '../system-support/record-read
 export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
+import {activateNativeObject} from '../system-support/native-object-storage.js';
 import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
@@ -871,6 +872,12 @@ export class RecordEngine {
     const save=async(client:PoolClient)=>{
       await this.lockObjectForWrite(client,tenantId,objectApi);
       const defaults=await this.fields(tenantId,objectApi,client);
+      // A newly defined Object may not have been activated yet. Activate before
+      // inserting md_records so its trigger creates the native row for this save.
+      if(!defaults.some(field=>field.native_table)){
+        await activateNativeObject(this.db,tenantId,objectApi);
+        recordReadScope()?.fields.clear();
+      }
       const literals=Object.fromEntries(defaults.filter(field=>field.default_value!==null)
         .map(field=>[field.api_name,['number','currency','percent'].includes(field.data_type)
           ?Number(field.default_value):field.data_type==='boolean'
@@ -1539,6 +1546,12 @@ export class RecordEngine {
     const prepared=client||!this.db.inTransaction()
       ?await this.prepare(tenantId,userId,objectApi,values,false,client,id):new Map<string,Storable>();
     const write=async(transactionClient:PoolClient,writeValues:Map<string,Storable>)=>{
+      // Existing records can also predate native activation. Copy before taking
+      // the md_records row lock; the native writer remains the sole value writer.
+      if(!(await this.fields(tenantId,objectApi,transactionClient)).some(field=>field.native_table)){
+        await activateNativeObject(this.db,tenantId,objectApi);
+        recordReadScope()?.fields.clear();
+      }
       const found=await transactionClient.query<{updated_at:Date}>("SELECT updated_at FROM md_records WHERE tenant_id=$1 AND object_api=$2 AND id=$3 AND is_deleted=false AND md_record_access($1,$4,id,'edit') FOR UPDATE",
         [tenantId,objectApi,id,userId]);
       if(!found.rowCount)throw new Error('Record not found');
@@ -1827,7 +1840,7 @@ export class RecordEngine {
       if(!clearedFields.length)continue;
       const changes=new Map<string,Storable>(clearedFields.map(field=>[field,{
         value_text:null,reference_record_id:null,is_unique:false,case_sensitive:false
-      }]));
+      }] as [string,Storable]));
       await writeNativeValues(client,tenantId,entry.objectApi,entry.recordId,changes);
       await client.query('UPDATE md_records SET updated_at=now() WHERE tenant_id=$1 AND id=$2',
         [tenantId,entry.recordId]);
@@ -2002,7 +2015,7 @@ export class RecordEngine {
         // One UPDATE on the source's native row, even if multiple links recover.
         const values=new Map<string,Storable>(recovered.map(([field,target])=>[field,{
           value_text:'',reference_record_id:target,is_unique:false,case_sensitive:false
-        }]));
+        }] as [string,Storable]));
         await writeNativeValues(client,tenantId,entry.objectApi,entry.recordId,values);
         await client.query(`DELETE FROM md_deleted_lookup_links
           WHERE tenant_id=$1 AND deletion_group_id=$2 AND source_record_id=$3

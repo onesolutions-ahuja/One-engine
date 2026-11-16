@@ -57,6 +57,37 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  let version=0;
  const changed=()=>{version++;listeners.forEach(listener=>listener());};
  const byKey=new Map(code.recordSets.map(set=>[set.key,set]));
+ /** Server totals for display formulas over rows not held: key -> value. */
+ const aggregates=new Map<string,unknown>();
+ const asked=new Map<string,{kind:string;object:string;field:string;criteria:Criteria}>();
+ let askTimer:ReturnType<typeof setTimeout>|undefined;
+ const serverAggregate=(kind:string,object:string,field:string,criteria:Criteria):unknown=>{
+  const key=JSON.stringify([kind,object,field,criteria]);
+  if(aggregates.has(key))return aggregates.get(key);
+  if(!asked.has(key)){
+   asked.set(key,{kind,object,field,criteria});
+   askTimer??=setTimeout(()=>{askTimer=undefined;void askAggregates();},5);
+  }
+  return '';
+ };
+ const askAggregates=async()=>{
+  const items=[...asked.entries()].slice(0,100);
+  if(!items.length)return;
+  try{
+   const answer=await post<{values?:unknown[]}>('/page-code/aggregates',{...host.build,
+    request:requestFor({},''),items:items.map(([,item])=>item)});
+   items.forEach(([key],index)=>{aggregates.set(key,answer.values?.[index]??'');asked.delete(key);});
+  }catch{items.forEach(([key])=>{aggregates.set(key,'');asked.delete(key);});}
+  changed();
+  if(asked.size)void askAggregates();
+ };
+ /** A save of these Objects: their server totals are read again. */
+ const forgetAggregates=(objects:Iterable<string>)=>{
+  const names=new Set(objects);
+  let any=false;
+  for(const key of [...aggregates.keys()])if(names.has(JSON.parse(key)[1])){aggregates.delete(key);any=true;}
+  if(any)changed();
+ };
 
  /** One `$` for display formulas and taps. `overlay`: simulated writes of a tap. */
  class Scope{
@@ -136,7 +167,13 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    return notHeld('Rows of '+object+' are not on this page');
   }
   agg(kind:string,object:string,field:string,criteria:Criteria){
-   return aggregateRows(kind,this.rows(object,criteria),field);
+   try{return aggregateRows(kind,this.rows(object,criteria),field);}
+   catch(error){
+    // Display: totals over rows this page does not hold come from the server (one
+    // batched request, same code and permissions); blank until they arrive.
+    if(this.mode!=='display'||!(error instanceof NotHeld))throw error;
+    return serverAggregate(kind,object,field,criteria);
+   }
   }
   async getRecord(object:string,criteria:Criteria){return this.rows(object,criteria)[0]??{};}
   async list(object:string,criteria:Criteria){return this.rows(object,criteria);}
@@ -298,6 +335,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     throw Error(result.error||'The save failed; nothing was saved');
    }
    for(const [setKey,value] of Object.entries(result.sets))sets.set(setKey,value);
+   forgetAggregates(result.changes.map(change=>change.objectApiName));
    changed();
    io.show({changes:result.changes,state:result.state,replaces:predicted?batch:undefined});
    // Skip the popups already opened from the prediction (same screen, same arguments).

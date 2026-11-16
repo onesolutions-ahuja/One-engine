@@ -182,3 +182,13 @@ test('browser: a tap shows at once from held rows, then the server confirms', as
  assert.equal(shown[1].replaces,shown[0].optimistic);
  assert.deepEqual(posts.filter(path=>path.endsWith('/execute')).length,1);
 });
+
+test('messages and payments run on the server; device steps stay with the action engine', ()=>{
+ const email=compileActionFormula('=EMAIL(Mailer, "a@b.co", "Receipt", "Thanks")','Cart');
+ assert.equal(email.data,true);
+ assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", "a@b\.co", "Receipt", "Thanks"\]\)/);
+ const pay=compileActionFormula('=RECORDPAYMENT(@recordId, 10, "Cash", AS(p))','Invoice');
+ assert.deepEqual(pay.writes.sort(),['CashLedger','Invoice']);
+ for(const step of ['WAIT(1, 0)','LOCATION(AS(here))','CREATEPDF(receipt, @recordId)'])
+  assert.throws(()=>compileActionFormula('='+step,'Cart'),/action engine/);
+});

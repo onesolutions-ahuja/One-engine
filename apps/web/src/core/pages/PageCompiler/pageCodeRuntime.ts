@@ -265,23 +265,35 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     await io.effects(tap.effects);
     return;
    }
+   // A popup (SCREEN) the prediction opens is opened at once, not after the save;
+   // other UI steps (PRINT, ...) still wait for the saved rows.
+   const early=predicted?tap.effects.filter(effect=>effect.name==='SCREEN'):[];
+   const saving=post<ServerResult>('/page-code/execute',{...host.build,key,request:requestFor(event,rowObject)});
    if(predicted){
     applyOverlay(tap);changed();
     io.show({changes:tap.changes,state:{...tap.stateChanges},optimistic:batch});
+    if(early.length)void io.effects(early).catch(()=>undefined);
    }
    let result:ServerResult;
-   try{result=await post<ServerResult>('/page-code/execute',{...host.build,key,request:requestFor(event,rowObject)});}
+   try{result=await saving;}
    catch(error){result={ok:false,error:error instanceof Error?error.message:'The save failed',changes:[],state:{},effects:[],sets:{}};}
    if(!result.ok){
     // Undo the screen change: the held rows and lists go back to what SQL has.
     if(predicted){sets.clear();for(const [k,v] of before)sets.set(k,v);changed();}
     io.show({changes:[],state:{},failed:true,replaces:predicted?batch:undefined});
+    if(early.length)await io.effects([{name:'CLOSESCREEN',args:[]}]).catch(()=>undefined);
     throw Error(result.error||'The save failed; nothing was saved');
    }
    for(const [setKey,value] of Object.entries(result.sets))sets.set(setKey,value);
    changed();
    io.show({changes:result.changes,state:result.state,replaces:predicted?batch:undefined});
-   await io.effects(result.effects);
+   // Skip the popups already opened from the prediction (same screen, same arguments).
+   const opened=early.map(effect=>JSON.stringify(effect));
+   await io.effects(result.effects.filter(effect=>{
+    const index=opened.indexOf(JSON.stringify(effect));
+    if(index<0)return true;
+    opened.splice(index,1);return false;
+   }));
   }
  };
  // Debug handle for the speed test script (window.__unePageCode).

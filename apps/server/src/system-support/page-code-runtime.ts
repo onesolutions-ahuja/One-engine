@@ -18,6 +18,12 @@ import type {ServerPageCode} from '../page-compiler/code/pageCode.js';
 import {trustedFormulaSession,type TrustedFormulaSession} from './formula-data-action-runtime.js';
 import {loadConnectionSnapshot} from './tenant-connections.js';
 import {withRecordReadScope} from './record-read-scope.js';
+import {randomUUID} from 'node:crypto';
+import {recordInvoicePayment} from './record-payment-service.js';
+import {sendActionCommunication,type CommunicationChannel} from './action-formula-communication-service.js';
+import {FlowRecordQuery} from '../system-files/flow-record-query.js';
+import type {RbacEngine} from '../system-files/rbac-engine.js';
+import type {NamedCredentialService} from './named-credential-service.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Row=Record<string,unknown>;
@@ -89,7 +95,10 @@ class ServerScope{
  private eventRecord:Row={};
  constructor(private readonly records:Records,private readonly actor:Actor,private readonly request:PageCodeRequest,
   private readonly identity:TrustedFormulaSession|null,private readonly connections:ConnectionSnapshot|null,
-  private readonly verify:((pin:unknown,userId?:unknown)=>Promise<boolean>)|null){}
+  private readonly verify:((pin:unknown,userId?:unknown)=>Promise<boolean>)|null,
+  private readonly services:{db?:SqlPersistence;rbac?:RbacEngine}={}){}
+ /** Messages are sent after the transaction commits (never for a rolled-back save). */
+ readonly messages:Array<{channel:CommunicationChannel;credential:string;values:unknown[]}>=[];
  get sessionId(){return this.request.sessionId;}
  /** The clicked row is re-read from SQL: prices and ids never come from the browser. */
  async loadEventRecord(){
@@ -229,7 +238,25 @@ class ServerScope{
   this.stateChanges[name]=value;
  }
  async ui(name:string,...args:unknown[]){this.effects.push({name,args});}
- async service(name:string){throw Error(name+' is not available in page code yet');}
+ async service(name:string,args:unknown[]=[]){
+  if(name==='EMAIL'||name==='WHATSAPP'||name==='SMS'){
+   const [credential,...values]=args;
+   if(typeof credential!=='string'||!credential)throw Error(name+' needs a Named Credential');
+   this.messages.push({channel:name,credential,values:values.map(value=>value===null||value===undefined?'':String(value))});
+   return {queued:true};
+  }
+  if(name==='RECORDPAYMENT'){
+   const {db,rbac}=this.services;
+   if(!db||!rbac)throw Error('RECORDPAYMENT is unavailable');
+   const [invoiceId,amount,method,note]=args;
+   // Same service as before (Invoice edit + CashLedger create permissions), inside this transaction.
+   const result=await recordInvoicePayment({db,records:this.records as RecordEngine,query:new FlowRecordQuery(db,rbac)},
+    this.actor.tenant_id,this.actor.user_id,{invoiceId,amount,method,note:note??'',reference:'pay-'+randomUUID()});
+   for(const object of ['Invoice','CashLedger']){this.written.add(object);this.forget(object);}
+   return result;
+  }
+  throw Error(name+' runs in the action engine');
+ }
  /** Rows of one record set (with its parent set's ids for child sets). */
  async loadSet(object:string,criteria:Array<[string,unknown]>,parent?:{field:string;ids:string[]}){
   if(parent){
@@ -266,13 +293,15 @@ async function loadSets(scope:ServerScope,code:ServerPageCode,only?:ReadonlySet<
  return out;
 }
 
-type Deps={db:Sql;records:Records;verifyPin?:(actor:Actor,pin:unknown,userId?:unknown)=>Promise<boolean>};
+type Deps={db:Sql;records:Records;verifyPin?:(actor:Actor,pin:unknown,userId?:unknown)=>Promise<boolean>;
+ rbac?:RbacEngine;namedCredentials?:NamedCredentialService};
 async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{identity:boolean;connections:boolean}){
  const [identity,connections]=await Promise.all([
   needs.identity?trustedFormulaSession(deps.db,actor):Promise.resolve(null),
   needs.connections?loadConnectionSnapshot(deps.db,actor.tenant_id):Promise.resolve(null)]);
  return new ServerScope(deps.records,actor,request,identity,connections as ConnectionSnapshot|null,
-  deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null);
+  deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null,
+  {db:deps.db as SqlPersistence,rbac:deps.rbac});
 }
 export function parsePageCodeRequest(body:unknown):PageCodeRequest{
  const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
@@ -294,13 +323,24 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
  const scope=await scopeFor(deps,actor,request,{identity:/\$session\.(?:user|tenant)\.|\$tenant\./.test(source),
   connections:/\bCONNECTED\s*\(/i.test(source)});
  try{
-  return await deps.db.transaction(()=>withRecordReadScope(async()=>{
+  const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{
    await scope.loadEventRecord();
    await action.run(scope);
    // All held sets: roll-ups and triggers can change Objects the action did not write.
    const sets=scope.written.size?await loadSets(scope,code):{};
    return {ok:true,changes:scope.changes,state:{...scope.stateChanges},effects:scope.effects,sets};
   }));
+  // EMAIL/SMS/WHATSAPP after the save committed, in order (same delivery service as before).
+  // A failed message does not undo the committed save; it is reported with the result.
+  const failed:string[]=[];
+  for(const message of scope.messages){
+   try{
+    if(!deps.namedCredentials||!deps.rbac)throw Error('delivery service unavailable');
+    await sendActionCommunication(deps.db as SqlPersistence,deps.rbac,deps.namedCredentials,actor.tenant_id,actor.user_id,
+     message.channel,message.credential,message.values,randomUUID());
+   }catch(error){failed.push(message.channel+': '+(error instanceof Error?error.message:'not sent'));}
+  }
+  return failed.length?{...result as PageCodeResult,error:'Saved, but not sent - '+failed.join('; ')}:result as PageCodeResult;
  }catch(error){
   return {ok:false,error:error instanceof Error?error.message:'The action failed; nothing was saved',
    changes:[],state:{},effects:[],sets:{}};

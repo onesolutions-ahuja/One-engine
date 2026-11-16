@@ -302,12 +302,17 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    return ['await $.ui("PRINT", '+q(literalName(args[0],'print template'))+', '+value(args[1])+');'];
   }
   case 'FLOW':scope.ui.add('FLOW');return ['await $.ui("FLOW", '+q(literalName(args[0],'Flow name'))+');'];
-  case 'CREATEPDF':case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'WAIT':case 'LOCATION':case 'RECORDPAYMENT':{
+  // Device steps (GPS, PDF drawn in the browser) and WAIT (resumes later) stay with the
+  // action engine: the page keeps working, this action is listed in codeIssues.
+  case 'CREATEPDF':case 'WAIT':case 'LOCATION':return fail(node.name+' runs in the action engine');
+  case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'RECORDPAYMENT':{
    const last=args.at(-1);
    const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
-   scope.ui.add(node.name);
-   if(node.name==='RECORDPAYMENT'){scope.data=true;scope.writes.add('Invoice');scope.writes.add('CashLedger');}
-   const list=node.name==='CREATEPDF'?[q(literalName(args[0],'template')),...args.slice(1).map(value)]:args.map(value);
+   // Runs on the server only: messages are sent after the save, payments in the same transaction.
+   scope.data=true;
+   if(node.name==='RECORDPAYMENT'){scope.writes.add('Invoice');scope.writes.add('CashLedger');}
+   const list=node.name==='RECORDPAYMENT'?args.map(value)
+    :[q(literalName(args[0],'Named Credential')),...args.slice(1).map(value)];
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
   }
   case 'AS':return fail('AS(name) belongs at the end of GETRECORD, CREATERECORD or FOREACH');

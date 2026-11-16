@@ -2022,7 +2022,7 @@ export class RecordEngine {
             AND f.relationship_type='Master-Detail' AND f.deleted_at IS NULL
           JOIN md_records parent ON parent.tenant_id=r.tenant_id
             AND parent.id=v.reference_record_id
-          WHERE r.tenant_id=$1 AND r.object_api=${index+4}
+          WHERE r.tenant_id=$1 AND r.object_api=$${index+4}
             AND r.id=ANY($2::uuid[])
             AND parent.is_deleted=true
             AND parent.deletion_group_id IS DISTINCT FROM $3::uuid`;

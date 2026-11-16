@@ -4,7 +4,7 @@ export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
 import {activateNativeObject} from '../system-support/native-object-storage.js';
-import {nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
+import {nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeFieldsMetadata,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -159,6 +159,26 @@ export class RecordEngine {
         throw Error('Metadata package component is uninstalled: '+objectApi);
     }
     return rows;
+  }
+  /** Reuse the native metadata already returned by fields() rather than issuing a
+   * separate md_native_objects/md_native_fields SELECT for each read or save.
+   * fields() is request-scoped by recordReadScope; only objects without any
+   * active Field definitions need the Task 0 metadata loader.
+   */
+  private async nativeMeta(tenantId:string,objectApi:string,client?:PoolClient,
+    definitions?:readonly FieldDefinition[]):Promise<NativeFieldsMetadata>{
+    const fields=definitions??await this.fields(tenantId,objectApi,client);
+    const table=fields.find(field=>field.native_table)?.native_table;
+    if(!table)return scopedMetadata('native-meta\\u0000'+tenantId+'\\u0000'+objectApi,
+      ()=>loadNativeFields(client??this.db,tenantId,objectApi));
+    const meta:NativeFieldsMetadata={table,fields:new Map()};
+    for(const field of fields){
+      if(!field.native_type)continue;
+      meta.fields.set(field.api_name,{column:field.native_column??null,
+        sqlType:field.native_type,dataType:field.data_type});
+    }
+    nativeTableSql(meta);
+    return meta;
   }
   private async formulaContext(tenantId:string,userId:string,objectApi:string,
     record:Record<string,unknown>,definitions:readonly FieldDefinition[],
@@ -323,7 +343,7 @@ export class RecordEngine {
         ||!await canRead(objectApi,relationship.api_name)||!await canRead(targetObject,fieldApi)){
         referenceCache.set(key,null);return;
       }
-      const meta=await loadNativeFields(client??this.db,tenantId,targetObject);
+      const meta=await this.nativeMeta(tenantId,targetObject,client);
       const result=await (client??this.db).query<{
         value_text:string|null;reference_record_id:string|null;data_type:string|null;
         value_date:string|null;value_datetime:Date|string|null;rollup_source_data_type:string|null;
@@ -600,7 +620,7 @@ export class RecordEngine {
       const matches:boolean[]=[];
       for(const filter of rows.filter(row=>row.field_api===fieldApi)){
         // Query values through the same tenant boundary without dynamic SQL.
-        const targetMeta=await loadNativeFields(executor,tenantId,filter.related_object);
+        const targetMeta=await this.nativeMeta(tenantId,filter.related_object,client);
         const target=await executor.query<{
           value_text:string|null;reference_record_id:string|null;id:string
         }>(`SELECT r.id,v.value_text,v.reference_record_id FROM md_records r
@@ -724,7 +744,7 @@ export class RecordEngine {
         case 'reference':
           validateLookupField(value,key,field.related_object);
           if(recordId&&field.relationship_type==='Master-Detail'&&!field.allow_reparenting){
-            const meta=await loadNativeFields(client??this.db,tenantId,objectApi);
+            const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
             const previous=await (client??this.db).query<{reference_record_id:string|null}>(
               `SELECT ${nativeValueSql(meta,key,'nr')} AS reference_record_id
                 FROM ${nativeTableSql(meta)} nr WHERE nr.tenant_id=$1 AND nr.id=$2`,
@@ -1030,7 +1050,7 @@ export class RecordEngine {
     const [,definitions]=await Promise.all([
       this.rbac.require(tenantId,userId,objectApi,'read'),
       this.fields(tenantId,objectApi)]);
-    const nativeMeta=await loadNativeFields(this.db,tenantId,objectApi);
+    const nativeMeta=await this.nativeMeta(tenantId,objectApi,undefined,definitions);
     const pageSize=Math.min(Math.max(limit,1),100),start=options.cursor?0:Math.max(offset,0);
     const byApi=new Map(definitions.map(field=>[field.api_name,field]));
     const fieldFor=(name:string|undefined)=>{
@@ -1461,7 +1481,7 @@ export class RecordEngine {
     if(!uuid.test(id))throw new Error('Invalid record ID');
     const [,definitions]=await Promise.all([this.rbac.require(tenantId,userId,objectApi,'read'),this.fields(tenantId,objectApi,client)]);
     const query=client??this.db;
-    const nativeMeta=await loadNativeFields(query,tenantId,objectApi);
+    const nativeMeta=await this.nativeMeta(tenantId,objectApi,client,definitions);
     const {rows}=await query.query<{
       id:string;created_at:Date;updated_at:Date;owner_id:string|null;record_type_id:string|null;is_clone:boolean;
       field_api:string|null;value_text:string|null;reference_record_id:string|null;data_type:string|null;
@@ -1563,7 +1583,7 @@ export class RecordEngine {
       // Field history: previous values of all written fields in ONE read, changed ones in ONE insert.
       type Previous={field_api:string;value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null};
       const historyFields=[...writeValues.keys()].filter(field=>!field.startsWith('__'));
-      const historyMeta=historyFields.length?await loadNativeFields(transactionClient,tenantId,objectApi):null;
+      const historyMeta=historyFields.length?await this.nativeMeta(tenantId,objectApi,transactionClient):null;
       const previousRows=historyMeta?(await transactionClient.query<Previous>(
         `SELECT v.field_api,v.value_text,v.reference_record_id,
           v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,

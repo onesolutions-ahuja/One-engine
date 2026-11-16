@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {LightningPageMetadata,PageComponentMetadata} from '../src/core/metadata/Definitions/metadata';
 import {
-  runtimeCanvasWidthScale,runtimeCanvasExtraWidth,
+  runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth,
   runtimeRightColumnStart,runtimeResponsiveComponentStyle
 } from '../src/core/pages/PageRuntime/runtimeCanvasSizing';
 import {resolvePageComponentStyle} from '../src/core/pages/TemplatePageRuntime/pageComponentLayout';
@@ -64,4 +64,19 @@ test('non-column pages preserve normal sized controls and nested layouts',()=>{
 test('standard layout component direct fill is visible in the design renderer',()=>{
   assert.equal(resolvePageComponentStyle({backgroundColor:'#ffdf70'},'Container').backgroundColor,'#ffdf70');
   assert.equal(resolvePageComponentStyle({visualStyle:{backgroundColor:'#e5e7eb'},backgroundColor:'#ffdf70'},'Container').backgroundColor,'#e5e7eb');
+});
+
+test('scrollbar on/off does not make the canvas width flip-flop',()=>{
+  let step:{from:number;at:number}|null=null;
+  const remember=(next:typeof step)=>{step=next;};
+  // 1400x936 canvas in a 1200px frame; a 15px scrollbar appears, then vanishes.
+  let width=settleCanvasWidth(1200,1185,step,0,remember);
+  assert.equal(width,1185);
+  width=settleCanvasWidth(width,1200,step,50,remember);
+  assert.equal(width,1185,'settles on the narrower width instead of looping');
+  width=settleCanvasWidth(width,1185,step,100,remember);
+  assert.equal(width,1185);
+  // A real window resize still passes through.
+  assert.equal(settleCanvasWidth(1185,900,step,150,remember),900);
+  assert.equal(settleCanvasWidth(900,1200,null,2000,remember),1200);
 });

@@ -15,6 +15,28 @@ export function runtimeCanvasExtraWidth(canvasWidth: number, availableWidth: num
   return Math.max(0, availableWidth - canvasWidth);
 }
 
+/** Widest change treated as a scrollbar appearing or disappearing. */
+const SCROLLBAR_STEP = 24;
+/**
+ * Next measured canvas width, without the scrollbar feedback loop. When a small
+ * step is immediately undone (width A -> B -> A within a second), the scaled
+ * height is toggling a scrollbar; settle on the narrower width, where the
+ * shorter canvas fits and the scrollbar stays away. Real resizes pass through.
+ */
+export function settleCanvasWidth(
+  previous: number, next: number, lastStep: { from: number; at: number } | null, now: number,
+  remember: (step: { from: number; at: number } | null) => void,
+): number {
+  if (Math.abs(previous - next) < .5) return previous;
+  const small = Math.abs(previous - next) <= SCROLLBAR_STEP;
+  if (small && lastStep && now - lastStep.at < 1000 && Math.abs(lastStep.from - next) < .5) {
+    remember({ from: lastStep.from, at: now });
+    return Math.min(previous, next);
+  }
+  remember(small ? { from: previous, at: now } : null);
+  return next;
+}
+
 type CanvasPage = Pick<LightningPageMetadata, 'canvasWidth' | 'canvasHeight' | 'components'>;
 
 /**

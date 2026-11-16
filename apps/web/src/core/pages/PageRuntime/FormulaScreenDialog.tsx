@@ -1,7 +1,7 @@
 import * as React from 'react';
 import type {PopupScreen} from './screenFormula';
 
-const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:12px;overflow:auto;
+const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:12px;overflow:auto;scrollbar-gutter:stable;
  max-width:94vw;max-height:94vh;box-shadow:0 24px 64px rgba(0,0,0,.35);background:#fff}
 dialog.formula-screen-modal::backdrop{background:rgba(15,23,42,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 dialog.formula-screen-modal>.formula-screen-close{position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;
@@ -13,11 +13,11 @@ dialog.formula-screen-modal.formula-screen-page::backdrop{background:#fff;backdr
  border-bottom:1px solid rgba(15,23,42,.1);background:#fff}
 .formula-screen-page>.formula-screen-bar>button{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 10px;
  border:0;border-radius:8px;background:transparent;color:#2563eb;font-family:inherit;font-size:16px;font-weight:600;line-height:1;cursor:pointer}
-.formula-screen-page>.formula-screen-body{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+.formula-screen-page>.formula-screen-body{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable;overscroll-behavior:contain}
 .formula-screen-frame{position:absolute;inset:0;z-index:1200}
 .formula-screen-frame-backdrop{position:absolute;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;
  background:rgba(15,23,42,.45)}
-.formula-screen-frame-backdrop>.formula-screen-card{position:relative;max-width:94%;max-height:94%;overflow:auto;
+.formula-screen-frame-backdrop>.formula-screen-card{position:relative;max-width:94%;max-height:94%;overflow:auto;scrollbar-gutter:stable;
  border-radius:12px;background:#fff;box-shadow:0 24px 64px rgba(0,0,0,.35)}
 .formula-screen-card>.formula-screen-close{position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;
  border:0;border-radius:50%;background:rgba(15,23,42,.08);font-size:20px;line-height:36px;cursor:pointer}`;
@@ -30,7 +30,9 @@ const phoneWidth=()=>typeof window!=='undefined'&&typeof window.matchMedia==='fu
 export function formulaScreenWidth(canvas?:{canvasWidth?:number;canvasHeight?:number}){
  const width=Number(canvas?.canvasWidth),height=Number(canvas?.canvasHeight);
  if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return '85vw';
- return `min(94vw, ${Math.round(width)}px, calc(94vh * ${(width/height).toFixed(4)}))`;
+ // 4px under the 94vh cap: the scaled canvas rounds its height up, and touching
+ // the cap made a scrollbar flicker on and off.
+ return `min(94vw, ${Math.round(width)}px, calc((94vh - 4px) * ${(width/height).toFixed(4)}))`;
 }
 
 /**

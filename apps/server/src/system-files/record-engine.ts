@@ -4,7 +4,7 @@ export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
 import {activateNativeObject} from '../system-support/native-object-storage.js';
-import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,loadNativeFields,readNativeValueRows,type NativeQueryField} from './native-object-query.js';
+import {nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeFieldsMetadata,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -160,6 +160,26 @@ export class RecordEngine {
     }
     return rows;
   }
+  /** Reuse the native metadata already returned by fields() rather than issuing a
+   * separate md_native_objects/md_native_fields SELECT for each read or save.
+   * fields() is request-scoped by recordReadScope; only objects without any
+   * active Field definitions need the Task 0 metadata loader.
+   */
+  private async nativeMeta(tenantId:string,objectApi:string,client?:PoolClient,
+    definitions?:readonly FieldDefinition[]):Promise<NativeFieldsMetadata>{
+    const fields=definitions??await this.fields(tenantId,objectApi,client);
+    const table=fields.find(field=>field.native_table)?.native_table;
+    if(!table)return scopedMetadata('native-meta\u0000'+tenantId+'\u0000'+objectApi,
+      ()=>loadNativeFields(client??this.db,tenantId,objectApi));
+    const meta:NativeFieldsMetadata={table,fields:new Map()};
+    for(const field of fields){
+      if(!field.native_type)continue;
+      meta.fields.set(field.api_name,{column:field.native_column??null,
+        sqlType:field.native_type,dataType:field.data_type});
+    }
+    nativeTableSql(meta);
+    return meta;
+  }
   private async formulaContext(tenantId:string,userId:string,objectApi:string,
     record:Record<string,unknown>,definitions:readonly FieldDefinition[],
     client?:PoolClient,now:Date|string=new Date(),batch?:FormulaBatch):Promise<FormulaEvaluationContext>{
@@ -306,6 +326,7 @@ export class RecordEngine {
     const calculated=new Map<string,unknown>();
     const calculating=new Set<string>();
     const referenceCache=new Map<string,unknown>();
+    const relatedMetaCache=new Map<string,Promise<NativeFieldsMetadata>>();
     const visible=batch?.visible??new Map<string,boolean>();
     const canRead=async(targetObject:string,fieldApi:string)=>{
       if(migrationMode)return true;
@@ -323,6 +344,12 @@ export class RecordEngine {
         ||!await canRead(objectApi,relationship.api_name)||!await canRead(targetObject,fieldApi)){
         referenceCache.set(key,null);return;
       }
+      let metaPromise=relatedMetaCache.get(targetObject);
+      if(!metaPromise){
+        metaPromise=this.nativeMeta(tenantId,targetObject,client);
+        relatedMetaCache.set(targetObject,metaPromise);
+      }
+      const meta=await metaPromise;
       const result=await (client??this.db).query<{
         value_text:string|null;reference_record_id:string|null;data_type:string|null;
         value_date:string|null;value_datetime:Date|string|null;rollup_source_data_type:string|null;
@@ -335,9 +362,8 @@ export class RecordEngine {
            WHERE summary.tenant_id=f.tenant_id AND summary.object_api=f.object_api
              AND summary.api_name=f.api_name AND summary.data_type='rollup') AS rollup_source_data_type
         FROM md_records r
-        LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id
-          AND v.object_api=r.object_api AND v.field_api=$4
-        LEFT JOIN md_field_definitions f ON f.tenant_id=v.tenant_id AND f.object_api=v.object_api
+        ${readNativeValueRows(meta,'r')} AND v.field_api=$4
+        LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id AND f.object_api=r.object_api
           AND f.api_name=v.field_api AND f.deleted_at IS NULL
         WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false
           AND ${migrationMode?'true':"md_record_access($1,$5,r.id,'read')"}`,
@@ -571,6 +597,7 @@ export class RecordEngine {
       ORDER BY l.field_api,l.sort_order`,[tenantId,objectApi]));
     if(!rows.length)return;
     const targets=[...new Set(rows.map(row=>row.field_api))];
+    const targetMetaCache=new Map<string,Promise<NativeFieldsMetadata>>();
     const previous=recordId?await executor.query<{field_api:string;reference_record_id:string|null}>(
       'SELECT field_api,reference_record_id FROM md_record_values WHERE tenant_id=$1 AND object_api=$2 AND record_id=$3 AND field_api=ANY($4::text[])',
       [tenantId,objectApi,recordId,targets]):{rows:[]};
@@ -600,11 +627,16 @@ export class RecordEngine {
       const matches:boolean[]=[];
       for(const filter of rows.filter(row=>row.field_api===fieldApi)){
         // Query values through the same tenant boundary without dynamic SQL.
+        let targetMetaPromise=targetMetaCache.get(filter.related_object);
+        if(!targetMetaPromise){
+          targetMetaPromise=this.nativeMeta(tenantId,filter.related_object,client);
+          targetMetaCache.set(filter.related_object,targetMetaPromise);
+        }
+        const targetMeta=await targetMetaPromise;
         const target=await executor.query<{
           value_text:string|null;reference_record_id:string|null;id:string
         }>(`SELECT r.id,v.value_text,v.reference_record_id FROM md_records r
-          LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id
-            AND v.field_api=$4
+          ${readNativeValueRows(targetMeta,'r')} AND v.field_api=$4
           WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false`,
           [tenantId,filter.related_object,lookup,filter.related_field_api]);
         if(!target.rows[0])throw Error('Invalid required lookup filter: '+fieldApi);
@@ -620,7 +652,7 @@ export class RecordEngine {
     }
   }
 
-  private async prepare(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>,creating:boolean,client?:PoolClient,recordId?:string,deferRequired=false) {
+  private async prepare(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>,creating:boolean,client?:PoolClient,recordId?:string,deferRequired=false,prior?:Record<string,unknown>) {
     if(Object.getPrototypeOf(values)!==Object.prototype && Object.getPrototypeOf(values)!==null) throw new Error('Invalid record');
     const definitions=await this.fields(tenantId,objectApi,client);
     const fields=new Map(definitions.map(f=>[f.api_name,f]));
@@ -724,10 +756,20 @@ export class RecordEngine {
         case 'reference':
           validateLookupField(value,key,field.related_object);
           if(recordId&&field.relationship_type==='Master-Detail'&&!field.allow_reparenting){
-            const previous=await (client??this.db).query<{reference_record_id:string|null}>(
-              'SELECT reference_record_id FROM md_record_values WHERE tenant_id=$1 AND record_id=$2 AND field_api=$3',
-              [tenantId,recordId,key]);
-            enforceMasterDetailReparenting(previous.rows[0]?.reference_record_id,value,key,field.allow_reparenting);
+            // The caller's access-checked record read already contains this lookup.
+            // Fall back to one native lookup only when field-level read permission
+            // omitted it from that record.
+            const loaded=prior&&Object.hasOwn(prior,key)?prior[key]:undefined;
+            let previousId=typeof loaded==='string'?loaded:loaded===null?null:undefined;
+            if(previousId===undefined){
+              const meta=await this.nativeMeta(tenantId,objectApi,client,definitions);
+              const previous=await (client??this.db).query<{reference_record_id:string|null}>(
+                `SELECT ${nativeValueSql(meta,key,'nr')} AS reference_record_id
+                  FROM ${nativeTableSql(meta)} nr WHERE nr.tenant_id=$1 AND nr.id=$2`,
+                [tenantId,recordId]);
+              previousId=previous.rows[0]?.reference_record_id??null;
+            }
+            enforceMasterDetailReparenting(previousId,value,key,field.allow_reparenting);
           }
           await assertLookupTargetExists(client??this.db,tenantId,field.related_object,value,key,userId);
           // md_record_values.reference_record_id has a foreign key to md_records; users live in
@@ -1028,6 +1070,7 @@ export class RecordEngine {
     const [,definitions]=await Promise.all([
       this.rbac.require(tenantId,userId,objectApi,'read'),
       this.fields(tenantId,objectApi)]);
+    const nativeMeta=await this.nativeMeta(tenantId,objectApi,undefined,definitions);
     const pageSize=Math.min(Math.max(limit,1),100),start=options.cursor?0:Math.max(offset,0);
     const byApi=new Map(definitions.map(field=>[field.api_name,field]));
     const fieldFor=(name:string|undefined)=>{
@@ -1112,46 +1155,37 @@ export class RecordEngine {
     const predicates:string[]=[];
     const conditionParams:unknown[]=[];
     if(filterField&&filterValue!==undefined){
-      conditionParams.push(filterField.api_name);
-      const fieldParam='$'+(3+conditionParams.length);
-      conditionParams.push(filterValue);
-      const valueParam='$'+(3+conditionParams.length);
       if(filterOperator!=='Equals'&&filterField.data_type==='multipicklist'){
-        conditionParams[conditionParams.length-1]=multiValues;
+        conditionParams.push(filterField.api_name);
+        const fieldParam='$'+(3+conditionParams.length);
+        conditionParams.push(multiValues);
+        const valueParam='$'+(3+conditionParams.length);
         const membership=`COALESCE((SELECT array_agg(mv.value ORDER BY mv.sort_order)
           FROM md_record_multi_values mv WHERE mv.tenant_id=r.tenant_id AND mv.record_id=r.id
             AND mv.object_api=r.object_api AND mv.field_api=${fieldParam}),ARRAY[]::text[]) @> ${valueParam}::text[]`;
-        predicates.push(filterOperator==='Includes'
-          ?membership
-          :`NOT (${membership})`);
-      }else if(['number','currency','percent'].includes(filterField.data_type)){
-        if(!/^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(filterValue))
-          throw new Error('Invalid numeric list filter');
-        predicates.push(`EXISTS(SELECT 1 FROM md_record_values fv
-          WHERE fv.tenant_id=r.tenant_id AND fv.record_id=r.id AND fv.object_api=r.object_api
-            AND fv.field_api=${fieldParam}
-            AND fv.value_text ~ '^-?[0-9]+(\\.[0-9]+)?$'
-            AND fv.value_text::numeric=${valueParam}::numeric)`);
-      }else predicates.push(`EXISTS(SELECT 1 FROM md_record_values fv
-        WHERE fv.tenant_id=r.tenant_id AND fv.record_id=r.id AND fv.object_api=r.object_api
-          AND fv.field_api=${fieldParam}
-          AND COALESCE(fv.value_text,fv.reference_record_id::text)=${valueParam})`);
+        predicates.push(filterOperator==='Includes'?membership:`NOT (${membership})`);
+      }else{
+        conditionParams.push(filterValue);
+        const valueParam='$'+(3+conditionParams.length);
+        if(['number','currency','percent'].includes(filterField.data_type)){
+          if(!/^-?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$/.test(filterValue))
+            throw new Error('Invalid numeric list filter');
+          predicates.push(`${nativeValueSql(nativeMeta,filterField.api_name,'nr')}=${valueParam}::numeric`);
+        }else{
+          predicates.push(`${nativeValueSql(nativeMeta,filterField.api_name,'nr',true)}=${valueParam}::text`);
+        }
+      }
     }
     if(relatedField){
-      conditionParams.push(relatedField.api_name);
-      const relationshipParam='$'+(3+conditionParams.length);
       conditionParams.push(options.relatedId!);
       const parentParam='$'+(3+conditionParams.length);
-      predicates.push(`EXISTS(SELECT 1 FROM md_record_values relation
-        WHERE relation.tenant_id=r.tenant_id AND relation.record_id=r.id
-          AND relation.object_api=r.object_api AND relation.field_api=${relationshipParam}
-          AND relation.reference_record_id=${parentParam}::uuid)`);
+      predicates.push(`${nativeValueSql(nativeMeta,relatedField.api_name,'nr')}=${parentParam}::uuid`);
     }
     if(options.filters?.length){
       // One-level lookup paths (e.g. Product.AgeRestricted) are checked against
       // the lookup field, the related Object and the related Field, and the SQL
       // predicate re-applies record access to the related record.
-      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeFieldExpression(f)??undefined,nativeText:nativeFieldExpression(f,'nr',true)??undefined}]));
+      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name):undefined,nativeText:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name,'nr',true):undefined}]));
       for(const filter of options.filters){
         const path=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(filter.field);
         if(!path){
@@ -1235,19 +1269,14 @@ export class RecordEngine {
       resultOrder='r.sort_value DESC,r.id ASC,v.field_api';
     }
     if(sortField){
-      params.push(sortField.api_name);
-      sortJoin=`LEFT JOIN md_record_values sv ON sv.tenant_id=r.tenant_id AND sv.record_id=r.id
-        AND sv.object_api=r.object_api AND sv.field_api=$${params.length}`;
       const direction=options.sortDirection==='desc'?'DESC':'ASC';
       const sortType=sortField.data_type==='rollup'
         ?sortField.rollup_source_data_type:sortField.data_type;
-      const sortValue=['number','currency','percent'].includes(String(sortType))
-        ?'sv.value_number'
-        :sortType==='date'?'sv.value_date'
-          :sortType==='datetime'?'sv.value_datetime'
-            :sortField.data_type==='reference'?'sv.reference_record_id::text'
-              :sortType==='boolean'?'sv.value_boolean'
-                :'lower(COALESCE(sv.value_text,sv.reference_record_id::text))';
+      const nativeExpr=nativeValueSql(nativeMeta,sortField.api_name,'nr');
+      const sortValue=['number','currency','percent','date','datetime','boolean'].includes(String(sortType))
+        ?nativeExpr
+        :sortField.data_type==='reference'?`${nativeExpr}::text`
+          :`lower(${nativeValueSql(nativeMeta,sortField.api_name,'nr',true)})`;
       sortSelection=`${sortValue} AS sort_value`;
       cursorExpression=sortValue;
       cursorValueType=['number','currency','percent'].includes(String(sortType))?'numeric'
@@ -1315,10 +1344,7 @@ export class RecordEngine {
         v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,v.address_postal_code,
         v.address_country,f.data_type
       FROM totals LEFT JOIN selected r ON true
-      ${nativeValuesJoin(definitions)??`LEFT JOIN md_record_values v ON v.tenant_id=$1 AND v.record_id=r.id AND v.object_api=$2
-        AND EXISTS(SELECT 1 FROM md_field_definitions active_field
-          WHERE active_field.tenant_id=v.tenant_id AND active_field.object_api=v.object_api
-            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)`}
+      ${readNativeValueRows(nativeMeta,'r')}
       LEFT JOIN md_field_definitions f ON f.tenant_id=$1 AND f.object_api=$2 AND f.api_name=v.field_api
         AND f.deleted_at IS NULL
       ORDER BY ${resultOrder}
@@ -1410,14 +1436,16 @@ export class RecordEngine {
       value_datetime:'timestamptz',value_boolean:'boolean'};
     if(column==='value_boolean' && operator!=='eq')throw new Error('Invalid boolean comparison');
     const ops={eq:'=',lt:'<',lte:'<=',gt:'>',gte:'>='} as const;
+    const meta=await this.nativeMeta(tenantId,objectApi);
+    const expression=nativeValueSql(meta,fieldApi,'nr');
     const {rows}=await this.db.query<{id:string}>(`
-      SELECT r.id FROM md_records r JOIN md_record_values v
-        ON v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
-      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false AND v.field_api=$3
-        AND v.${column} ${ops[operator]} $4::${casts[column]}
-        AND md_record_access($1,$5,r.id,'read')
-      ORDER BY v.${column} ${direction==='desc'?'DESC':'ASC'},r.id LIMIT $6
-    `,[tenantId,objectApi,fieldApi,raw,userId,limit]);
+      SELECT r.id FROM md_records r
+      JOIN ${nativeTableSql(meta)} nr ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
+        AND nr.is_deleted=false AND ${expression} ${ops[operator]} $3::${casts[column]}
+        AND md_record_access($1,$4,r.id,'read')
+      ORDER BY ${expression} ${direction==='desc'?'DESC':'ASC'},r.id LIMIT $5
+    `,[tenantId,objectApi,raw,userId,limit]);
     return rows.map(row=>row.id);
   }
 
@@ -1432,15 +1460,17 @@ export class RecordEngine {
       [tenantId,objectApi,fieldApi]);
     if(!['number','currency','percent'].includes(fields[0]?.data_type??''))
       throw new Error('Invalid numeric aggregate field');
+    const meta=await this.nativeMeta(tenantId,objectApi);
+    const expression=nativeValueSql(meta,fieldApi,'nr');
     const {rows}=await this.db.query<{count:string;sum:string|null;min:string|null;max:string|null;avg:string|null}>(`
-      SELECT count(v.value_number)::text AS count,sum(v.value_number)::text AS sum,
-        min(v.value_number)::text AS min,max(v.value_number)::text AS max,
-        avg(v.value_number)::text AS avg
-      FROM md_record_values v JOIN md_records r
-        ON r.tenant_id=v.tenant_id AND r.id=v.record_id AND r.object_api=v.object_api
-      WHERE v.tenant_id=$1 AND v.object_api=$2 AND v.field_api=$3 AND r.is_deleted=false
-        AND md_record_access($1,$4,r.id,'read')`,
-      [tenantId,objectApi,fieldApi,userId]);
+      SELECT count(${expression})::text AS count,sum(${expression})::text AS sum,
+        min(${expression})::text AS min,max(${expression})::text AS max,
+        avg(${expression})::text AS avg
+      FROM md_records r JOIN ${nativeTableSql(meta)} nr
+        ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
+        AND nr.is_deleted=false AND md_record_access($1,$3,r.id,'read')`,
+      [tenantId,objectApi,userId]);
     return rows[0]??{count:'0',sum:null,min:null,max:null,avg:null};
   }
 
@@ -1471,6 +1501,7 @@ export class RecordEngine {
     if(!uuid.test(id))throw new Error('Invalid record ID');
     const [,definitions]=await Promise.all([this.rbac.require(tenantId,userId,objectApi,'read'),this.fields(tenantId,objectApi,client)]);
     const query=client??this.db;
+    const nativeMeta=await this.nativeMeta(tenantId,objectApi,client,definitions);
     const {rows}=await query.query<{
       id:string;created_at:Date;updated_at:Date;owner_id:string|null;record_type_id:string|null;is_clone:boolean;
       field_api:string|null;value_text:string|null;reference_record_id:string|null;data_type:string|null;
@@ -1482,10 +1513,7 @@ export class RecordEngine {
       v.field_api,v.value_text,v.reference_record_id,f.data_type,v.value_number,v.value_date,v.value_datetime,v.value_boolean,
       v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,v.address_state,v.address_postal_code,v.address_country
       FROM md_records r ${nativeRecordJoin(definitions)}
-      ${nativeValuesJoin(definitions)??`LEFT JOIN md_record_values v ON v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
-        AND EXISTS(SELECT 1 FROM md_field_definitions active_field
-          WHERE active_field.tenant_id=v.tenant_id AND active_field.object_api=v.object_api
-            AND active_field.api_name=v.field_api AND active_field.deleted_at IS NULL)`}
+      ${readNativeValueRows(nativeMeta,'r')}
       LEFT JOIN md_field_definitions f ON f.tenant_id=r.tenant_id AND f.object_api=r.object_api
         AND f.api_name=v.field_api AND f.deleted_at IS NULL
       WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.id=$3 AND r.is_deleted=false AND md_record_access($1,$4,r.id,'read') ORDER BY v.field_api`,
@@ -1543,8 +1571,10 @@ export class RecordEngine {
     if(client)await this.lockObjectForWrite(client,tenantId,objectApi);
     // Inside an outer transaction the values are prepared again under the record lock
     // below, so the early (lock-free) validation pass would only repeat the same reads.
-    const prepared=client||!this.db.inTransaction()
-      ?await this.prepare(tenantId,userId,objectApi,values,false,client,id):new Map<string,Storable>();
+    // For explicit transactional callers the prior record is loaded below;
+    // validate against it rather than independently reading each lookup first.
+    if(!client&&!this.db.inTransaction())
+      await this.prepare(tenantId,userId,objectApi,values,false,client,id);
     const write=async(transactionClient:PoolClient,writeValues:Map<string,Storable>)=>{
       // Existing records can also predate native activation. Copy before taking
       // the md_records row lock; the native writer remains the sole value writer.
@@ -1575,7 +1605,7 @@ export class RecordEngine {
       // Field history: previous values of all written fields in ONE read, changed ones in ONE insert.
       type Previous={field_api:string;value_text:string|null;reference_record_id:string|null;geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;address_state:string|null;address_postal_code:string|null;address_country:string|null};
       const historyFields=[...writeValues.keys()].filter(field=>!field.startsWith('__'));
-      const historyMeta=historyFields.length?await loadNativeFields(transactionClient,tenantId,objectApi):null;
+      const historyMeta=historyFields.length?await this.nativeMeta(tenantId,objectApi,transactionClient):null;
       const previousRows=historyMeta?(await transactionClient.query<Previous>(
         `SELECT v.field_api,v.value_text,v.reference_record_id,
           v.geo_latitude,v.geo_longitude,v.address_street,v.address_city,
@@ -1633,7 +1663,7 @@ export class RecordEngine {
       let previous:Record<string,unknown>|undefined;
       const loadPrior=async()=>previous??(previous=await this.get(tenantId,userId,objectApi,id,client));
       const prior=await loadPrior();
-      let writeValues=prepared;
+      let writeValues=await this.prepare(tenantId,userId,objectApi,values,false,client,id,false,prior);
       if(runTriggers&&this.recordTrigger){
         const proposed=await this.recordTrigger(client,tenantId,userId,objectApi,'updated',
           {...prior,...values},prior,'before-save');
@@ -1642,7 +1672,7 @@ export class RecordEngine {
           for(const [field,value] of Object.entries(proposed))
             if(!['Id','CreatedAt','LastModifiedDate','OwnerId','RecordTypeId'].includes(field)
                &&!Object.is(value,prior?.[field]))changed[field]=value;
-          writeValues=await this.prepare(tenantId,userId,objectApi,changed,false,client,id);
+          writeValues=await this.prepare(tenantId,userId,objectApi,changed,false,client,id,false,prior);
         }
       }
       const proposedValues={...(prior??{}),...values};
@@ -1682,7 +1712,7 @@ export class RecordEngine {
         [tenantId,objectApi,id,userId]);
       if(!locked.rowCount)throw new Error('Record not found');
       const prior=await this.get(tenantId,userId,objectApi,id,transactionClient);
-      let finalPrepared=await this.prepare(tenantId,userId,objectApi,values,false,transactionClient,id);
+      let finalPrepared=await this.prepare(tenantId,userId,objectApi,values,false,transactionClient,id,false,prior);
       if(this.recordTrigger){
         const proposed=await this.recordTrigger(transactionClient,tenantId,userId,objectApi,'updated',
           {...prior,...values},prior,'before-save');
@@ -1691,7 +1721,7 @@ export class RecordEngine {
           for(const [field,value] of Object.entries(proposed))
             if(!['Id','CreatedAt','LastModifiedDate','OwnerId','RecordTypeId'].includes(field)
               &&!Object.is(value,prior[field]))changed[field]=value;
-          finalPrepared=await this.prepare(tenantId,userId,objectApi,changed,false,transactionClient,id);
+          finalPrepared=await this.prepare(tenantId,userId,objectApi,changed,false,transactionClient,id,false,prior);
         }
       }
       const proposedValues={...prior,...values};
@@ -1827,8 +1857,14 @@ export class RecordEngine {
       }
       entry.fields.add(reference.field_api);
     }
+    const clearingMeta=new Map<string,Promise<NativeFieldsMetadata>>();
     for(const entry of lookupClears.values()){
-      const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+      let metaPromise=clearingMeta.get(entry.objectApi);
+      if(!metaPromise){
+        metaPromise=this.nativeMeta(tenantId,entry.objectApi,client);
+        clearingMeta.set(entry.objectApi,metaPromise);
+      }
+      const meta=await metaPromise;
       const {rows:current}=await client.query<{field_api:string;reference_record_id:string|null}>(`
         SELECT v.field_api,v.reference_record_id FROM md_records r
         ${readNativeValueRows(meta,'r')}
@@ -1997,8 +2033,14 @@ export class RecordEngine {
         }
         if(!entry.targets.has(link.field_api))entry.targets.set(link.field_api,link.target_record_id);
       }
+      const restoringMeta=new Map<string,Promise<NativeFieldsMetadata>>();
       for(const entry of restoreBySource.values()){
-        const meta=await loadNativeFields(client,tenantId,entry.objectApi);
+        let metaPromise=restoringMeta.get(entry.objectApi);
+        if(!metaPromise){
+          metaPromise=this.nativeMeta(tenantId,entry.objectApi,client);
+          restoringMeta.set(entry.objectApi,metaPromise);
+        }
+        const meta=await metaPromise;
         const {rows:current}=await client.query<{
           field_api:string;value_text:string|null;reference_record_id:string|null
         }>(`SELECT v.field_api,v.value_text,v.reference_record_id FROM md_records r

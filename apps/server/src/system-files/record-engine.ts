@@ -1396,14 +1396,16 @@ export class RecordEngine {
       value_datetime:'timestamptz',value_boolean:'boolean'};
     if(column==='value_boolean' && operator!=='eq')throw new Error('Invalid boolean comparison');
     const ops={eq:'=',lt:'<',lte:'<=',gt:'>',gte:'>='} as const;
+    const meta=await loadNativeFields(this.db,tenantId,objectApi);
+    const expression=nativeValueSql(meta,fieldApi,'nr');
     const {rows}=await this.db.query<{id:string}>(`
-      SELECT r.id FROM md_records r JOIN md_record_values v
-        ON v.tenant_id=r.tenant_id AND v.record_id=r.id AND v.object_api=r.object_api
-      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false AND v.field_api=$3
-        AND v.${column} ${ops[operator]} $4::${casts[column]}
-        AND md_record_access($1,$5,r.id,'read')
-      ORDER BY v.${column} ${direction==='desc'?'DESC':'ASC'},r.id LIMIT $6
-    `,[tenantId,objectApi,fieldApi,raw,userId,limit]);
+      SELECT r.id FROM md_records r
+      JOIN ${nativeTableSql(meta)} nr ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
+        AND nr.is_deleted=false AND ${expression} ${ops[operator]} $3::${casts[column]}
+        AND md_record_access($1,$4,r.id,'read')
+      ORDER BY ${expression} ${direction==='desc'?'DESC':'ASC'},r.id LIMIT $5
+    `,[tenantId,objectApi,raw,userId,limit]);
     return rows.map(row=>row.id);
   }
 
@@ -1418,15 +1420,17 @@ export class RecordEngine {
       [tenantId,objectApi,fieldApi]);
     if(!['number','currency','percent'].includes(fields[0]?.data_type??''))
       throw new Error('Invalid numeric aggregate field');
+    const meta=await loadNativeFields(this.db,tenantId,objectApi);
+    const expression=nativeValueSql(meta,fieldApi,'nr');
     const {rows}=await this.db.query<{count:string;sum:string|null;min:string|null;max:string|null;avg:string|null}>(`
-      SELECT count(v.value_number)::text AS count,sum(v.value_number)::text AS sum,
-        min(v.value_number)::text AS min,max(v.value_number)::text AS max,
-        avg(v.value_number)::text AS avg
-      FROM md_record_values v JOIN md_records r
-        ON r.tenant_id=v.tenant_id AND r.id=v.record_id AND r.object_api=v.object_api
-      WHERE v.tenant_id=$1 AND v.object_api=$2 AND v.field_api=$3 AND r.is_deleted=false
-        AND md_record_access($1,$4,r.id,'read')`,
-      [tenantId,objectApi,fieldApi,userId]);
+      SELECT count(${expression})::text AS count,sum(${expression})::text AS sum,
+        min(${expression})::text AS min,max(${expression})::text AS max,
+        avg(${expression})::text AS avg
+      FROM md_records r JOIN ${nativeTableSql(meta)} nr
+        ON nr.tenant_id=r.tenant_id AND nr.id=r.id
+      WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
+        AND nr.is_deleted=false AND md_record_access($1,$3,r.id,'read')`,
+      [tenantId,objectApi,userId]);
     return rows[0]??{count:'0',sum:null,min:null,max:null,avg:null};
   }
 

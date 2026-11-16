@@ -49,7 +49,7 @@ export function nativeValuesJoin(fields:readonly NativeQueryField[],recordAlias=
   ${arrayItem('text[]',2)} AS address_state,${arrayItem('text[]',3)} AS address_postal_code,
   ${arrayItem('text[]',4)} AS address_country
   FROM ${quote(table)} n CROSS JOIN LATERAL jsonb_each(n.extras${typed.map(x=>' || '+x).join('')}) d
-  WHERE n.tenant_id=$1 AND n.id=${recordAlias}.id AND d.key=ANY(ARRAY[${native.map(f=>literal(f.api_name)).join(',')}]::text[])
+  WHERE n.tenant_id=$1 AND n.tenant_id=${recordAlias}.tenant_id AND n.id=${recordAlias}.id AND d.key=ANY(ARRAY[${native.map(f=>literal(f.api_name)).join(',')}]::text[])
  ) v ON true`;
 }
 
@@ -67,13 +67,14 @@ type NativeFieldMetadataRow={
 
 /** Load native Object and all its fields in one round trip (including an Object with zero fields). */
 export async function loadNativeFields(executor:{query:(
- sql:string,params:unknown[])=>Promise<{rows:NativeFieldMetadataRow[]}>},
+ sql:string,params:unknown[])=>Promise<{rows:unknown[]}>},
  tenantId:string,objectApi:string):Promise<NativeFieldsMetadata>{
- const {rows}=await executor.query(
+ const result=await executor.query(
   `SELECT o.table_name,f.field_api,f.column_name,f.sql_type,f.data_type
    FROM md_native_objects o LEFT JOIN md_native_fields f
     ON f.tenant_id=o.tenant_id AND f.object_api=o.object_api
    WHERE o.tenant_id=$1 AND o.object_api=$2 ORDER BY f.field_api`,[tenantId,objectApi]);
+ const rows=result.rows as NativeFieldMetadataRow[];
  if(!rows.length)throw Error('Object has no native table');
  const table=rows[0].table_name;
  nativeTableSql({table,fields:new Map()});

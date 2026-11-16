@@ -1067,6 +1067,13 @@ export default function SmartRuntime(p){
     border:p.borderColor?"1px solid "+p.borderColor:0,
     borderRadius:number(p.radius,12),...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12))
  }}>{p.children||(p.builderPreview?<span className="smart-editor-container-placeholder">Drop components here</span>:null)}</div>;
+ // Show when (Data): a formula such as COUNTIFS(Cart, ..., PaymentStatus, "Card") > 0.
+ // Blank always shows; FALSE, 0 or blank text hides at runtime. The builder always shows it.
+ if(typeof p.visibleFormula==="string"&&p.visibleFormula.trim()&&!p.builderPreview&&!p.designMode){
+  const shown=scopedExpression(p,"visibleFormula",p.visibleFormula,record);
+  if(shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
+   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0")return null;
+ }
  // Geometry-only technical host; the native Smart surface owns all visible styling.
  return <div className={"smart-runtime "+name+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}
   data-builder-preview={p.builderPreview?"true":undefined} style={{

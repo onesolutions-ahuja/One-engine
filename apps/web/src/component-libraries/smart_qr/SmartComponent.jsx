@@ -34,8 +34,10 @@ export default function SmartComponent(p){
  const matrix=matrixFor(text);
  const dark=p.labelColor||"#1d1d1f",light=p.backgroundColor||"#ffffff";
  const caption=typeof p.label==="string"?p.label:"";
+ // Nothing to encode: hidden at runtime (e.g. no payment link yet), a hint in the builder.
+ if(!matrix&&!(p.editing||p.designMode||p.builderPreview))return null;
  if(!matrix)return <div className="smart-qr smart-qr-empty" style={{background:light,borderRadius:p.radius}}>
-  <span>{p.editing||p.designMode?"QR: set Text Source":caption}</span></div>;
+  <span>QR: set Text Source</span></div>;
  const size=matrix.length,quiet=4,view=size+quiet*2;
  let path="";
  matrix.forEach((cells,y)=>cells.forEach((on,x)=>{if(on)path+="M"+(x+quiet)+" "+(y+quiet)+"h1v1h-1z";}));

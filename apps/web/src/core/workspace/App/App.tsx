@@ -3,7 +3,7 @@ import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
-import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLanding, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
+import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLanding, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, bootPageEndpoint, rememberBootPage, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
 
 
@@ -147,13 +147,14 @@ function App() {
     // that the second request could succeed; show the existing explicit Retry UI.
     // Fast transient network failures and retryable HTTP responses still get one retry.
     const retryDelaysMs = [1000];
+    const bootPage = bootPageEndpoint();
 
     for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 9000);
       try {
         const response = await withAuthRefreshLock(() =>
-          fetch(`${apiBase}/auth/refresh`, {
+          fetch(`${apiBase}/auth/refresh${bootPage ? '?page=' + encodeURIComponent(bootPage) : ''}`, {
             method: 'POST',
             credentials: 'include',
             signal: controller.signal
@@ -169,8 +170,9 @@ function App() {
         }
 
         if (response.ok) {
-          const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string; userId?: string };
+          const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string; userId?: string; page?: unknown };
           setAccessToken(session.access_token);
+          rememberBootPage(session.page);
           setSessionUserId(session.userId);
           if (!session.landing) prefetchLandingBootstrap();
           setAuthError('');

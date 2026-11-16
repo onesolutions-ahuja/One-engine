@@ -12,6 +12,13 @@ import {RecordEngine,withRecordReadScope} from '../src/system-files/record-engin
 import {RbacEngine} from '../src/system-files/rbac-engine.ts';
 import {withAuditContext,auditContext} from '../src/system-support/audit-context.ts';
 
+ // TRIPS_TRACE=1 prints each statement of the page-code-scope tap (first 110 characters).
+let trace=null;
+const originalQuery=pg.Client.prototype.query;
+pg.Client.prototype.query=function(...args){
+ if(trace&&typeof args[0]==='string')trace.push(args[0].replace(/\s+/g,' ').slice(0,110));
+ return originalQuery.apply(this,args);
+};
 const url=process.env.METADRIVE_SQL_TEST_DATABASE_URL;
 if(!url||new URL(url).pathname!=='/metadrive_native_copy_test')throw Error('Disposable SQL database required');
 const setup=new Pool({connectionString:url});
@@ -45,13 +52,7 @@ try{
  const cart=await records.create(tenant,user,'ProbeCart',{Name:'Cart 1',Status:'Open'});
  const line=await records.create(tenant,user,'ProbeLine',{Name:'Cola',CartId:cart,ProductId:product,Qty:1,Amount:1.5});
  const steps=[];
- // TRIPS_TRACE=1 prints each statement of the page-code-scope tap (first 110 characters).
- let trace=null;
- const originalQuery=pg.Client.prototype.query;
- pg.Client.prototype.query=function(...args){
-  if(trace&&typeof args[0]==='string')trace.push(args[0].replace(/\s+/g,' ').slice(0,110));
-  return originalQuery.apply(this,args);
- };
+
  const tap=()=>db.transaction(async()=>{
   const measure=async(name,run)=>{
    const timing=auditContext().timing,before=timing.dbTrips;

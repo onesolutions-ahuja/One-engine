@@ -10,7 +10,12 @@ import type {FlowRecordQuery} from '../system-files/flow-record-query.js';
  */
 type Callout=(tenantId:string,userId:string,config:Record<string,unknown>,
  variables:Record<string,string|number|boolean|null>,idempotencyKey:string)=>Promise<{status:number;body:string}>;
-type Operation={method:string;path:string;headers?:string;body?:string;outputs?:Record<string,string>};
+type Operation={method:string;path:string;headers?:string;body?:string;outputs?:Record<string,string>;
+ /** Run this operation of the same connector first and feed its outputs in (e.g. Dojo intent). */
+ before?:string;
+ /** Normalised Result output: Paid / Failed / Pending, so one till formula fits every provider. */
+ results?:Record<string,string[]>};
+type Provider={api_name:string;properties:{operations?:Record<string,Operation>;credentialName?:string;providerType?:string}};
 type Scalar=string|number|boolean|null;
 const name=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
 const reference=/^([A-Za-z][A-Za-z0-9_]{0,79})\.([A-Za-z][A-Za-z0-9_]{0,79})$/;
@@ -62,6 +67,32 @@ const needs=(operation:Operation)=>{
  return found;
 };
 
+async function findProvider(deps:{db:SqlPersistence;query:FlowRecordQuery},tenantId:string,userId:string,connector:string):Promise<Provider>{
+ const lower=connector.toLowerCase();
+ // 'Card' = the connector of the default (or only) active card reader in Named Devices;
+ // 'QR' = the installed QR payment connector. Till formulas then work with any provider.
+ if(lower==='card'){
+  const devices=await deps.query.find(tenantId,userId,'NamedDevice',[
+   {field:'DeviceType',operator:'Equals',value:'Card Reader'},
+   {field:'Active',operator:'Equals',value:true}],undefined,{limit:20}) as Record<string,unknown>[];
+  const chosen=devices.find(device=>device.IsDefault===true)??(devices.length===1?devices[0]:undefined);
+  if(!chosen||typeof chosen.Connector!=='string'||!chosen.Connector)
+   throw Error('Set a default card reader in Company Settings → Payments');
+  connector=chosen.Connector;
+ }
+ const {rows}=await deps.db.query<Provider>(lower==='qr'?`
+  SELECT api_name,properties FROM md_system_definitions
+  WHERE tenant_id=$1 AND kind='connector-providers' AND enabled=true
+    AND properties->>'providerType'='QR Payment' ORDER BY api_name LIMIT 1`:`
+  SELECT api_name,properties FROM md_system_definitions
+  WHERE tenant_id=$1 AND kind='connector-providers' AND enabled=true
+    AND lower(api_name)=ANY($2::text[])
+  ORDER BY length(api_name) LIMIT 1`,
+  lower==='qr'?[tenantId]:[tenantId,[connector.toLowerCase(),(connector+'Connector').toLowerCase()]]);
+ if(!rows[0])throw Error((lower==='qr'?'A QR payment connector':'Connector '+connector)+' is not installed. Install it from AppExchange.');
+ return rows[0];
+}
+
 export async function runActionCallout(
  deps:{db:SqlPersistence;rbac:RbacEngine;query:FlowRecordQuery;callout:Callout},
  tenantId:string,userId:string,operationRef:unknown,values:unknown,key:string
@@ -70,49 +101,55 @@ export async function runActionCallout(
   throw Error("CALLOUT needs 'Connector.Operation', for example 'SumUp.StartPayment'");
  const [,connector,operationName]=reference.exec(operationRef)!;
  await deps.rbac.require(tenantId,userId,'HTTPCallout','execute');
- const {rows}=await deps.db.query<{api_name:string;properties:{operations?:Record<string,Operation>;credentialName?:string}}>(`
-  SELECT api_name,properties FROM md_system_definitions
-  WHERE tenant_id=$1 AND kind='connector-providers' AND enabled=true
-    AND lower(api_name)=ANY($2::text[])
-  ORDER BY length(api_name) LIMIT 1`,
-  [tenantId,[connector.toLowerCase(),(connector+'Connector').toLowerCase()]]);
- const provider=rows[0];
- if(!provider)throw Error('Connector '+connector+' is not installed. Install it from AppExchange.');
- const operation=provider.properties?.operations?.[operationName];
+ const provider=await findProvider(deps,tenantId,userId,connector);
+ const label=provider.api_name.replace(/Connector$/,'');
+ const operations=provider.properties?.operations??{};
+ const operation=operations[operationName];
  if(!operation||typeof operation.path!=='string')
-  throw Error('Connector '+connector+' has no operation '+operationName);
- const credentialName=provider.properties.credentialName;
+  throw Error('Connector '+label+' has no operation '+operationName);
  const {rows:credentials}=await deps.db.query<{id:string}>(`
   SELECT id FROM md_named_credentials WHERE tenant_id=$1 AND name=$2 AND enabled=true`,
-  [tenantId,credentialName]);
- if(!credentials[0])throw Error('The '+connector+' Named Credential is missing or switched off');
+  [tenantId,provider.properties.credentialName]);
+ if(!credentials[0])throw Error('The '+label+' Named Credential is missing or switched off');
  const variables=calloutVariables(values,key);
- const required=needs(operation);
- // The card reader / terminal comes from Named Devices when the formula does not name one:
- // the default Active device for this connector, or the only Active one.
- if(required.has('DeviceId')&&(variables.DeviceId===undefined||variables.DeviceId===null||variables.DeviceId==='')){
-  const devices=await deps.query.find(tenantId,userId,'NamedDevice',[
-   {field:'Connector',operator:'Equals',value:provider.api_name},
-   {field:'Active',operator:'Equals',value:true}],undefined,{limit:20}) as Record<string,unknown>[];
-  const chosen=devices.find(device=>device.IsDefault===true)??(devices.length===1?devices[0]:undefined);
-  if(!chosen||typeof chosen.DeviceId!=='string'||!chosen.DeviceId)
-   throw Error('Set a default '+connector+' device in Setup → Named Devices');
-  variables.DeviceId=chosen.DeviceId;
- }
- for(const blankName of required){
-  if(blankName.startsWith('public_'))continue;
-  if(!Object.hasOwn(variables,blankName))throw Error('CALLOUT '+operationRef+' needs the field '+blankName);
- }
- const result=await deps.callout(tenantId,userId,{
-  namedCredentialId:credentials[0].id,method:operation.method,path:operation.path,
-  headers:operation.headers??'',
-  ...(operation.body?{body:operation.body}:{})
- },variables,key);
- let payload:unknown=null;
- try{payload=result.body?JSON.parse(result.body):null;}catch{payload=null;}
  const output:Record<string,Scalar>=Object.create(null);
- output.HttpStatus=result.status;
- for(const [label,path] of Object.entries(operation.outputs??{}))output[label]=readCalloutPath(payload,path);
+ const chain=operation.before&&operations[operation.before]?[operations[operation.before],operation]:[operation];
+ for(const [index,step] of chain.entries()){
+  const required=needs(step);
+  // The card reader / terminal comes from Named Devices when the formula does not name one:
+  // the default Active device for this connector, or the only Active one.
+  if(required.has('DeviceId')&&(variables.DeviceId===undefined||variables.DeviceId===null||variables.DeviceId==='')){
+   const devices=await deps.query.find(tenantId,userId,'NamedDevice',[
+    {field:'Connector',operator:'Equals',value:provider.api_name},
+    {field:'Active',operator:'Equals',value:true}],undefined,{limit:20}) as Record<string,unknown>[];
+   const chosen=devices.find(device=>device.IsDefault===true)??(devices.length===1?devices[0]:undefined);
+   if(!chosen||typeof chosen.DeviceId!=='string'||!chosen.DeviceId)
+    throw Error('Set a default '+label+' device in Setup → Named Devices');
+   variables.DeviceId=chosen.DeviceId;
+  }
+  for(const blankName of required){
+   if(blankName.startsWith('public_'))continue;
+   if(!Object.hasOwn(variables,blankName))throw Error('CALLOUT '+label+'.'+operationName+' needs the field '+blankName);
+  }
+  const result=await deps.callout(tenantId,userId,{
+   namedCredentialId:credentials[0].id,method:step.method,path:step.path,
+   headers:step.headers??'',...(step.body?{body:step.body}:{})
+  },variables,index===chain.length-1?key:key+'-'+index);
+  let payload:unknown=null;
+  try{payload=result.body?JSON.parse(result.body):null;}catch{payload=null;}
+  output.HttpStatus=result.status;
+  for(const [name,path] of Object.entries(step.outputs??{})){
+   const value=readCalloutPath(payload,path);
+   output[name]=value;
+   // Outputs of the first step (e.g. IntentId, OrderId) fill the blanks of the next.
+   if(index<chain.length-1&&!Object.hasOwn(variables,name))variables[name]=value;
+  }
+ }
+ if(operation.results){
+  const status=String(output.Status??'').toUpperCase();
+  output.Result=Object.entries(operation.results).find(([,list])=>list.some(item=>item.toUpperCase()===status))?.[0]??'Pending';
+ }
+ if(variables.DeviceId&&output.DeviceId===undefined)output.DeviceId=variables.DeviceId;
  return output;
 }
 
@@ -124,7 +161,7 @@ export async function listActionCallouts(db:SqlPersistence,rbac:RbacEngine,tenan
   SELECT api_name,label,properties FROM md_system_definitions
   WHERE tenant_id=$1 AND kind='connector-providers' AND enabled=true ORDER BY api_name`,[tenantId]);
  const helper=/^(.*)(Minor|Decimal)$/;
- return rows.flatMap(row=>{
+ const list=rows.flatMap(row=>{
   const connector=row.api_name.replace(/Connector$/,'');
   return Object.entries(row.properties?.operations??{}).map(([operation,definition])=>{
    const fields=new Set<string>();
@@ -133,8 +170,23 @@ export async function listActionCallouts(db:SqlPersistence,rbac:RbacEngine,tenan
     const base=helper.exec(blankName)?.[1];
     fields.add(base||blankName);
    }
+   const before=definition.before?row.properties?.operations?.[definition.before]:undefined;
+   if(before)for(const blankName of needs(before))
+    if(!blankName.startsWith('public_')&&blankName!=='CalloutKey')fields.add(helper.exec(blankName)?.[1]||blankName);
    return {apiName:connector+'.'+operation,label:row.label+': '+(definition.label??operation),
-    fields:[...fields],outputs:Object.keys(definition.outputs??{})};
+    fields:[...fields],outputs:[...Object.keys(definition.outputs??{}),...(definition.results?['Result']:[])]};
   });
  });
+ // Provider-neutral names for any app: Card.* uses the default card reader's connector,
+ // QR.* the installed QR payment connector.
+ const generic=[
+  ['Card.StartPayment','Card reader: start payment',['Amount','Reference'],['PaymentId','OrderId','Status']],
+  ['Card.CheckStatus','Card reader: check payment',['PaymentId','OrderId'],['Status','Result']],
+  ['Card.Cancel','Card reader: cancel payment',['PaymentId','OrderId'],['Status']],
+  ['QR.CreateOrder','QR payment: create order',['Amount','Reference'],['Id','Status','QrLink']],
+  ['QR.GetOrder','QR payment: check order',['OrderId'],['Status','Result']],
+  ['QR.CaptureOrder','QR payment: capture order',['OrderId'],['Status','Result','CaptureId']]
+ ].map(([apiName,label,fields,outputs])=>({apiName:apiName as string,label:label as string,
+  fields:fields as string[],outputs:outputs as string[]}));
+ return [...generic,...list];
 }

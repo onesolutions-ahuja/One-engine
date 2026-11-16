@@ -2142,7 +2142,11 @@ export function createSystemServer(db:SqlPersistence) {
     const headers=saved?.configuration?.public_testHeaders??'';
     // Read-only diagnostics accept only version selectors, never method
     // override or other custom X-headers that could alter GET semantics.
-    if(headers&&!/^(?:Revolut-Api-Version: \d{4}-\d{2}-\d{2}|X-Api-Version: [A-Za-z0-9._-]{1,48})$/.test(headers))
+    // Up to three lines: an API version selector and (Dojo) the partner IDs that
+    // terminal endpoints require. Values may come only from the credential's public settings.
+    const testHeader=/^(?:(?:Revolut-Api-Version|Square-Version|version): \d{4}-\d{2}-\d{2}|X-Api-Version: [A-Za-z0-9._-]{1,48}|(?:software-house-id|reseller-id): (?:[A-Za-z0-9._:-]{1,128}|\{!public_[A-Za-z][A-Za-z0-9_]*\}))$/;
+    if(headers&&(typeof headers!=='string'||headers.split(/\r?\n/).length>3
+      ||headers.split(/\r?\n/).some(line=>!testHeader.test(line))))
       throw new Error('Invalid connection test version header');
     const result=await namedCredentials.callout(
       actor.tenant_id,actor.user_id,

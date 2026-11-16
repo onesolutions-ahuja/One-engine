@@ -29,7 +29,8 @@ export default Object.freeze({
       "outputs":{"PaymentId":"checkout.id","Status":"checkout.status"}},
     "CheckStatus":{"label":"Check checkout status","method":"GET","path":"v2/terminals/checkouts/{!PaymentId}",
       "headers":"Square-Version: 2025-01-23",
-      "outputs":{"Status":"checkout.status","SquarePaymentId":"checkout.payment_ids[0]"}},
+      "outputs":{"Status":"checkout.status","SquarePaymentId":"checkout.payment_ids[0]"},
+      "results":{"Paid":["COMPLETED"],"Failed":["CANCELED","CANCEL_REQUESTED"]}},
     "Cancel":{"label":"Cancel checkout","method":"POST","path":"v2/terminals/checkouts/{!PaymentId}/cancel",
       "headers":"Square-Version: 2025-01-23","body":"{}","outputs":{"Status":"checkout.status"}}
   },

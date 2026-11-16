@@ -37,11 +37,11 @@ try{
  await activateNativeObject(db,tenant,object);
  const indexes=await db.query("SELECT indexname,indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname LIKE 'md_native_u_%'");
  assert.equal(indexes.rows.length,2,'native field unique indexes installed');
- const triggerCount=(await db.query(`SELECT count(*)::int AS total FROM pg_trigger trigger
-  JOIN pg_class table_info ON table_info.oid=trigger.tgrelid
+ const triggerCount=(await db.query(`SELECT count(*)::int AS total FROM pg_trigger trig
+  JOIN pg_class table_info ON table_info.oid=trig.tgrelid
   JOIN md_native_objects obj ON obj.table_name=table_info.relname
   WHERE obj.tenant_id=$1 AND obj.object_api=$2
-   AND trigger.tgname IN ('md_native_unique_check_trigger','md_native_search_values_sync_trigger')`,[tenant,object])).rows[0].total;
+   AND trig.tgname IN ('md_native_unique_check_trigger','md_native_search_values_sync_trigger')`,[tenant,object])).rows[0].total;
  assert.equal(triggerCount,2,'native table has uniqueness and search triggers');
 
  assert(indexes.rows.some(row=>row.indexdef.includes('lower(')),'case-insensitive native index');

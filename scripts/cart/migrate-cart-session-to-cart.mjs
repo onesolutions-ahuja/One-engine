@@ -18,6 +18,10 @@ const db=new SqlPersistence(connectionString);
 const apply=process.argv.includes('--apply');
 const eligible=['Name','SessionKey','Status','ServiceMode','ExpiresAt'];
 try{
+ const retiredCheck=await db.query("SELECT to_regclass('public.md_record_values') IS NULL AS retired");
+ if(retiredCheck.rows[0]?.retired){
+  console.log('md_record_values retired; cart session migration already complete - skipped');
+ }else{
  const tenants=await db.query(`
   SELECT DISTINCT tenant_id FROM md_records
   WHERE object_api IN ('CartSession','Cart') ORDER BY tenant_id`);
@@ -131,4 +135,5 @@ try{
   });
  }
  console.log(JSON.stringify({mode:apply?'migrated':'preflight',summary},null,2));
+ }
 }finally{await db.close();}

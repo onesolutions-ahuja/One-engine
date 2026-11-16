@@ -314,7 +314,10 @@ export function compileRecordFilters(
         const direct=condition.replace(/fv\.reference_record_id::text/g,field.nativeText)
           .replace(/fv\.value_text/g,field.nativeText)
           .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,field.nativeValue);
-        return `${negated?'NOT ':''}COALESCE((${fieldParameter}::text IS NOT NULL AND (${direct})),FALSE)`;
+        // Filter logic is AND/OR only, so in WHERE a NULL counts as false: the plain
+        // comparison keeps native column indexes (btree/trigram) usable.
+        return negated?`NOT COALESCE((${fieldParameter}::text IS NOT NULL AND (${direct})),FALSE)`
+          :`(${fieldParameter}::text IS NOT NULL AND (${direct}))`;
       }
       return `${negated?'NOT ':''}EXISTS(SELECT 1 FROM md_record_values fv WHERE fv.tenant_id=r.tenant_id
         AND fv.record_id=r.id AND fv.object_api=r.object_api AND fv.field_api=${fieldParameter}

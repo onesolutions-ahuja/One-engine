@@ -3,6 +3,7 @@ import {recordReadScope,forgetScopedRecords} from '../system-support/record-read
 export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import {writeRecordValues,type RecordStoredValue} from './record-value-write.js';
 import {nativeFieldExpression,nativeRecordJoin,nativeValuesJoin,type NativeQueryField} from './native-object-query.js';
+import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
 import {registeredRelationships} from '../relationship-engine/RelationshipRegistry.js';
@@ -1266,6 +1267,7 @@ export class RecordEngine {
     }
     params.push(pageSize,start);
     const limitParam=params.length-1,offsetParam=params.length;
+    const native=Boolean(nativeRecordJoin(definitions));
     const slowListStarted=performance.now();
     const {rows}=await this.db.query<{
       id:string|null;created_at:Date|null;updated_at:Date|null;owner_id:string|null;record_type_id:string|null;is_clone:boolean|null;
@@ -1276,11 +1278,14 @@ export class RecordEngine {
       geo_latitude:number|null;geo_longitude:number|null;address_street:string|null;address_city:string|null;
       address_state:string|null;address_postal_code:string|null;address_country:string|null
     }>(`
-      WITH authorized AS MATERIALIZED (
+      WITH access_fast AS MATERIALIZED (
+        SELECT md_object_access_fast($1,$3,$2,'read') AS fast
+      ), authorized AS MATERIALIZED (
         SELECT r.id
         FROM md_records r ${nativeRecordJoin(definitions)}
-        WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false
-          AND md_record_access($1,$3,r.id,'read')${where}
+        WHERE r.tenant_id=$1 AND r.object_api=$2 AND r.is_deleted=false${native?' AND nr.is_deleted=false':''}
+          ${where}
+          AND ${fastRecordAccess('$1','$3','read')}
       ), totals AS (
         SELECT count(*)::text AS total_count FROM authorized
       ), selected AS (

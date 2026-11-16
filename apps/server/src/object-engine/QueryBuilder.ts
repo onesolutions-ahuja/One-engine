@@ -81,8 +81,8 @@ export function numericFormulaSql(expression:string,fields:ReadonlyMap<string,Qu
     const field=fields.get(api);
     const type=field?.data_type==='rollup'?field.rollup_source_data_type??'number':field?.data_type;
     if(!field||field.via||!numericTypes.has(type??''))throw 0;
-    if(field.nativeValue)return field.nativeValue;
-    throw 0;
+    // Metadata-only validation callers have no executable native expressions.
+    return field.nativeValue??'NULL::numeric';
   };
   const args=()=>{take('(');const out=[expr()];while(peek()===','){take(',');out.push(expr());}take(')');return out;};
   const primary=():string=>{
@@ -318,11 +318,14 @@ export function compileRecordFilters(
     const typed = sourceType ? typedColumns[sourceType] : undefined;
     const fieldParameter = `$${firstParameter + parameters.length}`;
     parameters.push(filter.field);
-    if(!field.nativeValue||!field.nativeText)throw new Error('Object has no native table');
+    // List-view metadata validation invokes this compiler without SQL expressions.
+    // A typed NULL can validate operators without ever reading legacy record values.
+    const nativeValue=field.nativeValue??('NULL::'+(typed?.cast??'text'));
+    const nativeText=field.nativeText??'NULL::text';
     const exists=(condition:string,negated=false)=>{
-      const direct=condition.replace(/fv\.reference_record_id::text/g,field.nativeText!)
-        .replace(/fv\.value_text/g,field.nativeText!)
-        .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,field.nativeValue!);
+      const direct=condition.replace(/fv\.reference_record_id::text/g,nativeText)
+        .replace(/fv\.value_text/g,nativeText)
+        .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,nativeValue);
       return negated?`NOT COALESCE((${direct}),FALSE)`:`(${direct})`;
     };
     if(filter.operator==='isBlank'||filter.operator==='isNotBlank'){

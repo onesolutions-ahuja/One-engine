@@ -304,12 +304,19 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const fields=runtime.objects.find(item=>item.apiName===objectApiName)?.fields??[];
  // Resolve metadata-validated parent lookups for each Card/Table row, not only
  // for a single record page. Every read still goes through tenant/RBAC API.
- const rowMentionKey=JSON.stringify([source.version,objectApiName,source.records.map(row=>row.Id),
+ // Related values (e.g. a cart line's Product image) are read again only when the rows or
+ // the records they point to change, not on every save of the rows themselves (a quantity
+ // change keeps the same Product). While a read is running the previous values stay on
+ // screen, so images and names do not blink.
+ const mentionLookups=useMemo(()=>[...new Set(referencedMentionPaths(properties,runtime.objects,objectApiName)
+  .map(path=>path.steps[0]?.lookupField).filter((field):field is string=>Boolean(field)))],
+  [properties,runtime.objects,objectApiName]);
+ const rowMentionKey=JSON.stringify([objectApiName,source.records.map(row=>[row.Id,...mentionLookups.map(field=>row[field]??null)]),
   Object.entries(properties).filter(([,value])=>typeof value==='string'&&value.includes('@'))]);
  const [rowMentions,setRowMentions]=useState<{key:string;rows:Record<string,unknown>[]} |null>(null);
+ const lastMentionValues=useRef(new Map<string,unknown>());
  useEffect(()=>{
   let active=true;
-  setRowMentions(null);
   if(!objectApiName||!source.records.length||
     !referencedMentionPaths(properties,runtime.objects,objectApiName).some(path=>path.steps.length))
    return()=>{active=false};
@@ -323,11 +330,24 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   void Promise.all(Array.from({length:Math.ceil(source.records.length/100)},(_,i)=>
    resolveCollectionMentionRows(runtime.objects,objectApiName,source.records.slice(i*100,(i+1)*100),
     properties,getRecord,getRecords))).then(parts=>{
-    if(active)setRowMentions({key:rowMentionKey,rows:parts.flat()});
+    if(!active)return;
+    const rows=parts.flat();
+    lastMentionValues.current=new Map(rows.map(row=>[String(row.Id??''),(row as {__mentionValues?:unknown}).__mentionValues]));
+    setRowMentions({key:rowMentionKey,rows});
    }).catch(()=>{if(active)setRowMentions(null)});
   return()=>{active=false};
- },[rowMentionKey,runtime,properties,source.records,objectApiName]);
- const displayRows=rowMentions?.key===rowMentionKey?rowMentions.rows:source.records;
+  // source.records is read through the key: rows changing only their own fields reuse the values.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[rowMentionKey,runtime,properties,objectApiName]);
+ const displayRows=useMemo(()=>{
+  const known=lastMentionValues.current;
+  // Fresh row fields + the related values already read for that row.
+  return source.records.map(row=>{
+   const values=rowMentions?.key===rowMentionKey
+    ?rowMentions.rows.find(item=>item.Id===row.Id)?.__mentionValues:known.get(String(row.Id??''));
+   return values===undefined?row:{...row,__mentionValues:values};
+  });
+ },[source.records,rowMentions,rowMentionKey]);
  // @Object.Field mentions: same authorised loader; it reads only when a record id is bound.
  const mentionRoot=runtime.compiled.targetObject||objectApiName;
  const boundRecordId=runtime.recordId||explicitMentionRecordId(properties);

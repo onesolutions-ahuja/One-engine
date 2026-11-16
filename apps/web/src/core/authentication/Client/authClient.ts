@@ -342,3 +342,19 @@ export function setAccessToken(value: string | undefined) {
 
 // Published components use the existing authenticated Core API.
 setSqlFormulaRequest(apiRequest);
+
+// Page open: the landing bootstrap (objects, pages, apps, session) is requested as soon
+// as the session is restored, in parallel with loading the workspace code, instead of
+// after it. The workspace takes the answer once; later loads request it as before.
+let landingPrefetch: Promise<unknown> | undefined;
+export function prefetchLandingBootstrap() {
+  if (landingPrefetch || !accessToken) return;
+  landingPrefetch = apiRequest<{ landing?: unknown }>('/metadata/landing-bootstrap')
+    .then(response => response?.landing)
+    .catch(() => undefined);
+}
+export function takeLandingPrefetch<T>(): Promise<T | undefined> | undefined {
+  const prefetched = landingPrefetch as Promise<T | undefined> | undefined;
+  landingPrefetch = undefined;
+  return prefetched;
+}

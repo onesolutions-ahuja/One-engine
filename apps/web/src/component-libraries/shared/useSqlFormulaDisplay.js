@@ -4,6 +4,8 @@ import {getSqlFormulaRequest} from './SqlFormulaRequest.js';
 import {noteSharedMutation} from './PageFormulaShare.js';
 import {Parser} from '../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../server/src/expression-engine/FormulaTokenizer.js';
+import {parsePageReference,savedValueKey} from '../../../../server/src/expression-engine/PageReferences.js';
+const pageRef=name=>{try{return parsePageReference(name);}catch{return null;}};
 import {SQL_QUERY_FORMULAS,SQL_RECORD_AGGREGATES} from '../../../../server/src/expression-engine/FormulaCategories.js';
 
 // Only query formulas (aggregates, SUM) need the server. A display formula made
@@ -93,7 +95,7 @@ export function formulaAggregateObjects(value){
  aggregateCache.set(value,result);
  return result;
 }
-/** Page State keys a formula reads ($state.Key; $session.cartId reads activeCartId). */
+/** Saved page values a formula reads (@ThisPage.X.Key; the cart reads activeCartId). */
 const stateKeyCache=new Map();
 export function formulaStateKeys(value){
  if(typeof value!=='string'||value.length>4000)return [];
@@ -102,8 +104,10 @@ export function formulaStateKeys(value){
  try{
   for(const token of tokenize(value)){
    if(token.kind!=='reference'&&token.kind!=='identifier')continue;
-   if(token.value.startsWith('$state.'))keys.add(token.value.slice(7).split('.')[0]);
-   else if(token.value==='$session.cartId')keys.add('activeCartId');
+   const page=pageRef(token.value);
+   const key=savedValueKey(page);
+   if(key)keys.add(key);
+   else if(page?.kind==='cart')keys.add('activeCartId');
   }
  }catch{/* not a formula */}
  const result=[...keys];
@@ -179,7 +183,7 @@ export function useSqlFormulaDisplay(properties,hooks){
   };
   const state=properties.pageState??{};
   // Only the Page State keys these formulas actually read. Including the whole
-  // state made every $state change (a selected card, a typed search) re-query
+  // state made every saved page value change (a selected card, a typed search) re-query
   // every formula on every component of the page.
   const readStateKeys=new Set(jobs.flatMap(job=>formulaStateKeys(job.source)));
   const stateInputs=Object.fromEntries(Object.entries(state)
@@ -188,10 +192,10 @@ export function useSqlFormulaDisplay(properties,hooks){
   const dependencies={};
   for(const job of jobs){
    for(const token of tokenize(job.source).filter(token=>token.kind!=='string'
-      &&token.value.startsWith('$component.'))){
-    const parts=token.value.split('.');
-    if(parts.length!==3||typeof properties.readComponent!=='function')continue;
-    try{const value=properties.readComponent(parts[1],parts[2]);
+      &&pageRef(token.value)?.kind==='component')){
+    const page=pageRef(token.value);
+    if(typeof properties.readComponent!=='function')continue;
+    try{const value=properties.readComponent(page.name,page.key);
       if(scalar(value))dependencies[token.value]=value;}
     catch{dependencies[token.value]=null;}
    }

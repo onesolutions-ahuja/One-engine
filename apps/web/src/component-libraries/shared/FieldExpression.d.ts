@@ -8,9 +8,9 @@ export type FormulaBindingContext={
   now?:Date|string;
   /** Already-authorised page-local scalar state values. */
   pageState?:Readonly<Record<string,unknown>>;
-  /** Tenant brand for $session.tenant.name / $session.tenant.logo; defaults to the signed-in tenant. */
+  /** Tenant brand for @ThisTenant.Company.Name / .Logo; defaults to the signed-in tenant. */
   tenant?:{readonly name:string;readonly logo:string};
-  /** Active Page Runtime session identifier ($session.id). */
+  /** Active Page Runtime session identifier (@ThisPage.Session.Id). */
   sessionId?:string;
   locale?:string;
   currencyIsoCode?:string|null;

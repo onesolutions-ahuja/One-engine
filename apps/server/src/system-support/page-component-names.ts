@@ -1,3 +1,4 @@
+import {isReservedComponentName} from '../expression-engine/PageReferences.js';
 /** Shared, per-page component instance names; IDs remain immutable runtime keys. */
 export type NamedComponent={id:string;type:string;properties:Record<string,unknown>};
 // Simple newly authored names can include readable spaces and hyphens.
@@ -68,7 +69,10 @@ export function validateExplicitComponentNames(components:readonly NamedComponen
   if(typeof raw!=='string'||!raw.trim())continue;
   const name=raw.trim(),key=canonicalComponentName(name);
   if(!validSavedName(name))throw Error('Invalid component name: '+name);
-  if(seen.has(key))throw Error('Duplicate component name: '+name);
-  seen.add(key);
+  // Formulas read it as @ThisPage.<Name>: spaces/hyphens become _, so My Box = My_Box.
+  if(isReservedComponentName(name))throw Error(name+' is a reserved formula name; choose another component name');
+  const formulaKey=key.replace(/[ -]+/g,'_');
+  if(seen.has(key)||seen.has('formula:'+formulaKey))throw Error('Duplicate component name: '+name);
+  seen.add(key);seen.add('formula:'+formulaKey);
  }
 }

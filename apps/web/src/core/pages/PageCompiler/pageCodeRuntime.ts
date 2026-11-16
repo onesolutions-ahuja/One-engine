@@ -113,7 +113,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(path==='tenant.id')return org?.Id??'';
    if(path==='tenant.name')return getTenantBrand().name||org?.Name||'';
    if(path==='tenant.logo')return getTenantBrand().logo??'';
-   throw Error('Unsupported session reference: $session.'+path);
+   throw Error('Unsupported tenant value: '+path);
   }
   tenant(name:string){const brand=getTenantBrand();return (name==='name'?brand.name:brand.logo)??'';}
   component(id:string,property:string){
@@ -121,6 +121,14 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    return host.readComponent(id,property);
   }
   componentState(name:string,field:string){return readComponentState(host.state().collectionSelections,name,field as never);}
+  /** @ThisPage.Cart1.CartTotal: the component's own property, else the value its action saved. */
+  pageValue(name:string,key:string){
+   if(host.readComponent){
+    try{return host.readComponent(name,key);}
+    catch(error){if(!/^Unknown component property/.test(error instanceof Error?error.message:''))throw error;}
+   }
+   return this.state(key);
+  }
   event(name:string){
    if(name==='record')return this.ev.record??{};
    const value=this.ev[name];

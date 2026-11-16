@@ -13,13 +13,13 @@ const knownIcons=new Set(icons.map(icon=>icon.id));
  * its own event (Item 1 … Item 6), so each can Navigate or run a Flow without
  * a formula. Every tap also fires On Click with {item,label} for one shared action. */
 export default function SmartDock({p,fire,resolve}){
- // Active item may be a formula, e.g. IF($state.Screen = "Orders", 3, 1).
+ // Active item may be a formula, e.g. IF(@ThisPage.Menu1.Screen = "Orders", 3, 1).
  const activeSource=p.dockActiveItem;
  const settings=dockSettings({...p,__dockActiveItem:activeSource!==undefined&&activeSource!==""&&activeSource!==null
   ?resolve("dockActiveItem",activeSource):undefined});
  const items=dockItems(p,resolve);
  const [localActive,setLocalActive]=React.useState(null);
- // A formula-driven active item (e.g. from $state) wins over the last tap.
+ // A formula-driven active item (e.g. a saved page value) wins over the last tap.
  const active=settings.activeItem??localActive??(items[0]?.index??null);
  const tap=item=>{
   if(p.builderPreview||p.previewOnly)return;

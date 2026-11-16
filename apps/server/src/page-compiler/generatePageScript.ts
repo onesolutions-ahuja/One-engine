@@ -1,3 +1,4 @@
+import {isCompiledStateReference,declarativeSource} from '../expression-engine/PageReferences.js';
 import type {Expression} from '../expression-engine/FormulaParser.js';
 import type {CompiledPage,CompiledFormula,CompiledAction} from './compilePage.js';
 
@@ -61,9 +62,10 @@ export const PURE_ACTION_FUNCTIONS:ReadonlySet<string>=new Set(['IF','AND','OR',
  'BLANKVALUE','NULLVALUE','IFERROR','MOD','INT','FLOOR','CEILING','SUBSTITUTE','FIND','CONTAINS','BEGINS']);
 const pureActionValue=(assignment:NonNullable<CompiledAction['assignment']>)=>Boolean(assignment.ast
  &&assignment.functions.every(name=>PURE_ACTION_FUNCTIONS.has(name))
- &&assignment.references.every(ref=>/^\$(?:state|event)\.[A-Za-z][A-Za-z0-9_.]*$|^\$session$/.test(ref)));
+ &&assignment.references.every(isCompiledStateReference));
 /** Declarative action input ($event.x, $state.x, $session, $record.F, literal) as JavaScript. */
-export function actionInputToJs(source:unknown):string{
+export function actionInputToJs(raw:unknown):string{
+ const source=declarativeSource(raw);
  if(source===undefined)return 'undefined';
  if(source&&typeof source==='object')return 'ctx.input('+q(source)+', event)';
  if(source==='$session')return 'ctx.sessionId';

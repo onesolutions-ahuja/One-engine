@@ -1,5 +1,6 @@
 import {Parser,formulaTruth,type Expression} from './FormulaParser.js';
 import {tokenize} from './FormulaTokenizer.js';
+import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey} from './PageReferences.js';
 import {validateFormulaFunctions} from './FormulaFunctionRegistry.js';
 import {actionFormulaFunctions} from './FormulaCategories.js';
 import {SQL_SCALAR_FORMULAS,serializeFormulaSqlExpression} from './FormulaCategories.js';
@@ -78,7 +79,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
  if(node.kind==='call'){
   if(node.name==='FLOW'){
    if(node.args.length!==1)throw Error('FLOW requires one Flow API name');
-   return {kind:'reference',value:'$flow.'+nameOf(node.args[0],'Flow API name')};
+   return {kind:'reference',value:FLOW_MARKER+nameOf(node.args[0],'Flow API name')};
   }
   return {...node,args:node.args.map(normalizeFlowCalls)};
  }
@@ -254,8 +255,12 @@ const safeServerCalls=new Set(['IF','IFERROR','ISBLANK','ISNULL','ISNUMBER','NOT
 function safeServerNode(node:Expression|undefined):boolean{
  if(!node)return true;
  if(node.kind==='literal')return true;
- if(node.kind==='reference')return !node.value.startsWith('$component.')
-  &&!node.value.startsWith('$flow.')&&!/(?:^|\.)(?:__proto__|prototype|constructor)(?:\.|$)/.test(node.value);
+ if(node.kind==='reference'){
+  let browserOnly=true;
+  try{browserOnly=isBrowserOnlyReference(parsePageReference(node.value));}catch{browserOnly=true;}
+  return !browserOnly&&!isFlowMarker(node.value)
+   &&!/(?:^|\.)(?:__proto__|prototype|constructor)(?:\.|$)/.test(node.value);
+ }
  if(node.kind==='binary')return safeServerNode(node.left)&&safeServerNode(node.right);
  if(node.kind==='unary')return safeServerNode(node.value);
  return safeServerCalls.has(node.name)&&node.args.every(safeServerNode);
@@ -287,7 +292,7 @@ export function parseScreenAction(source:string){
  const mode=node.args[1]?nameOf(node.args[1],'window mode').toLowerCase():'current';
  if(!['current','popup','newwindow'].includes(mode))throw Error('Choose current, popup or newwindow');
  // Optional 3rd argument: the record the screen opens with, e.g.
- // SCREEN(Payment,popup,$component.Cart2.recordId). The caller evaluates it.
+ // SCREEN(Payment,popup,@ThisPage.Cart2.recordId). The caller evaluates it.
  if(node.args[2])validateFormulaFunctions(node.args[2],'ribbon_binding');
  const record=node.args[2]?serializeFormulaSqlExpression(node.args[2]):undefined;
  return {page,mode,record};
@@ -549,15 +554,17 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
          throw Error('SQL Formula Action requires a scalar input');
         const key='SqlArgument'+index++;
         state[key]=value===undefined?null:value as string|number|boolean|null;
-        return {kind:'reference',value:'$state.'+key};
+        return {kind:'reference',value:'ThisPage.Input.'+key};
        };
        const remap=(value:Expression,parent=''):Expression=>{
         if(value.kind==='reference'){
          const name=value.value;
-         if(name.startsWith('$session.user.')||name.startsWith('$session.tenant.'))
+         const page=parsePageReference(name);
+         if(page?.kind==='user'||page?.kind==='company')
           return value;
-         if(name.startsWith('$state.')){
-          const key=name.slice(7);
+         const savedKey=isBrowserOnlyReference(page)?null:savedValueKey(page);
+         if(savedKey!==null){
+          const key=savedKey;
           const current=Object.hasOwn(stateChanges,key)?stateChanges[key]:
             sqlContext!.state?.[key];
           if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key))
@@ -565,7 +572,7 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
           state[key]=current===undefined?null:current as string|number|boolean|null;
           if(current!==null&&current!==undefined&&!['string','number','boolean'].includes(typeof current))
            throw Error('SQL Formula requires a scalar state value');
-          return value;
+          return {kind:'reference',value:'ThisPage.Input.'+key};
          }
          const objectField=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(name);
          if(parent==='SUM'&&objectField)return value;
@@ -574,7 +581,7 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
             objectField&&objectField[1]===sqlContext!.objectApi&&
              sqlContext!.recordFields?.includes(objectField[2])))
           return value;
-         if(name.startsWith('$flow.'))throw Error('Flow calls do not execute in SQL');
+         if(isFlowMarker(name))throw Error('Flow calls do not execute in SQL');
          return insert(evaluateNow(value));
         }
         if(value.kind==='call')return {...value,args:value.args.map(arg=>remap(arg,value.name))};
@@ -740,7 +747,7 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
       if(!runPageAction)throw Error('Page runtime unavailable');
       const mode=step.values?.[0];
       // SCREEN(Page,popup,record): the record Id is evaluated here, so an alias
-      // from an earlier step (sale.Id) or $component.Cart2.recordId both work.
+      // from an earlier step (sale.Id) or @ThisPage.Cart2.recordId both work.
       const record=step.name==='SCREEN'&&step.values?.[1]?evaluate(step.values[1]):undefined;
       await runPageAction(step.name,step.object,mode?.kind==='reference'?mode.value:mode?.kind==='literal'?String(mode.value):undefined,
        record===undefined||record===null?undefined:String(record));

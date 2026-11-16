@@ -1,3 +1,4 @@
+import {declarativeSource,modernizeReferences} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {beginOptimisticNumberChange} from '../PageRuntime/optimisticPageNumbers';
 import {runSerializedPageAction,planReadWriteObjects} from '../PageRuntime/pageActionCoordinator';
 import {runSequenceFlow} from '../PageRuntime/formulaFlowSequence';
@@ -63,7 +64,7 @@ export default function MetadataBoundPageComponent({
   pageComponents?:readonly PageComponentMetadata[];
   sessionIdOverride?:string;
 }) {
-  // $tenant.name / $tenant.logo formulas: load the signed-in tenant's brand once.
+  // @ThisTenant.Company.Name / .Logo formulas: load the signed-in tenant's brand once.
   useEffect(()=>{void ensureTenantBrand();},[]);
   const properties = resolveMetadataProperties({...component.properties,objectApiName:component.properties.objectApiName||defaultObjectApiName},objects,availableFlows);
   const objectApiName = String(properties.objectApiName || defaultObjectApiName || '');
@@ -87,7 +88,7 @@ export default function MetadataBoundPageComponent({
   const pageState=useComponentFormulaState(storedPageState,properties);
   const stateDependencies=useMemo(()=>pageStateDependencies(pageComponents??[component]),[pageComponents,component]);
   // What the user picks/types/toggles here is published under this component's
-  // page name, so other components read @Name.state.Id / Value / Name / Text.
+  // page name, so other components read @ThisPage.Name.Selected.Id / Value / Name / Text.
   const componentStateKey=useMemo(()=>componentStateName(
     componentInstanceNames(pageComponents??[component]).get(component.id)),[pageComponents,component]);
   const typingTimer=useRef<number|undefined>(undefined);
@@ -385,13 +386,15 @@ export default function MetadataBoundPageComponent({
   const rawActions = properties.actionFlows;
   const actionFlows = rawActions && typeof rawActions === 'object' && !Array.isArray(rawActions)
     ? rawActions as Record<string, unknown> : {};
-  const resolveInput = (source: unknown, eventPayload: Record<string, unknown>): unknown => {
+  const resolveInput = (raw: unknown, eventPayload: Record<string, unknown>): unknown => {
+    const source=declarativeSource(raw);
     if(source&&typeof source==='object'&&!Array.isArray(source))
       return resolveStructuredFlowInput(source as Record<string,unknown>,
        candidate=>resolveInput(candidate,eventPayload));
     if (source === '$session'||source==='$session.id') return sessionId;
     if (typeof source==='string'&&source.startsWith('$session.')) {
-      const resolved=evaluateFieldExpressionDetailed(source,{}, {sessionId,pageState});
+      // Same value the formula spelling (@ThisTenant.User.Name …) reads.
+      const resolved=evaluateFieldExpressionDetailed(modernizeReferences(source),{}, {sessionId,pageState});
       if(resolved.error)throw Error(resolved.error);
       return resolved.value;
     }
@@ -446,7 +449,7 @@ export default function MetadataBoundPageComponent({
       if(hasInteraction||selectedCollection)return {updated:true};
       throw new Error('No metadata event action is configured for "' + action.event + '".');
     }
-    // $flow formula: IF(..., $flow.A, $flow.B) picks the Flow, then the normal Flow
+    // FLOW() formula: IF(..., FLOW(A), FLOW(B)) picks the Flow, then the normal Flow
     // path runs it (same inputs/outputs, server RBAC). Blank result = do nothing.
     const authoredBinding = config as Record<string, unknown>;
     if(authoredBinding.actionType==='Formula'&&isScreenAction(String(authoredBinding.formula))){

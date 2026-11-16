@@ -6,9 +6,9 @@ export type PopupScreen={page:string;sessionId:string;recordId:string;instance:s
  /** Page session that opened the popup: refreshed when the popup closes. */
  parentKey?:string;print?:boolean;ready?:()=>void;failed?:(reason:Error)=>void};
 /** SCREEN(Page[,mode[,record]]). The optional record (for example
- * $component.Cart2.recordId) is evaluated by the caller's resolveRecord with the
- * page's own formula context; the popup reads it as $state.recordId. The popup
- * shares the session ($session.*) and gets its own Page State. */
+ * @ThisPage.Cart2.recordId) is evaluated by the caller's resolveRecord with the
+ * page's own formula context; the popup reads it as @ThisPage.Input.recordId. The
+ * popup shares the session (@ThisPage.Session.Id) and gets its own page values. */
 export function openFormulaScreen(source:string,context:PageActionRoutingContext,
  onNavigate:(route:PageActionRoute)=>void,parentKey:string,sessionId:string,recordId:string,
  resolveRecord?:(formula:string)=>unknown){

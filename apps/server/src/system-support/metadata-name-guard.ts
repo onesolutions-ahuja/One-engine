@@ -1,3 +1,4 @@
+import {isReservedRootName} from '../expression-engine/PageReferences.js';
 import type {SqlExecutor} from '../system-files/sql-persistence.js';
 /** Shared tenant-scoped name guard for metadata creation and explicit update flows. */
 const IDENTIFIER=/^[A-Za-z][A-Za-z0-9_]*$/;
@@ -31,6 +32,8 @@ export async function requireAvailableMetadataName(
  if(kind==='globalAction'){
    if(!/^[A-Za-z][A-Za-z0-9_-]{0,99}$/.test(name))throw new Error('Invalid API name');
  } else validateMetadataName(name);
+ // @ThisPage / @ThisTenant start page and tenant values in formulas.
+ if(kind==='object'&&isReservedRootName(name))throw new Error(name+' is a reserved formula name; choose another Object name');
  const table=allowedTables[kind];
  if((kind==='matchingRule'||kind==='validationRule'||kind==='field')&&!options.objectApi)throw new Error('Object scope required');
  const args:unknown[]=[tenantId,name];

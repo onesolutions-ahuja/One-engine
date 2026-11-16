@@ -30,6 +30,7 @@ import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
+import {isCompiledStateReference,declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
 import type {LoadedPageScript} from './serverPageScript';
 import {createPageCodeRuntime,type PageCodeRuntime,type Effect} from './pageCodeRuntime';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
@@ -59,7 +60,7 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  code:PageCodeRuntime|null;
  searchRecords(sourceId:string,query:string):Promise<Record<string,unknown>[]>;
  /** Remember what the user picked/typed/toggled in a component, under its page
-  * name, so any formula, filter or action reads @Name.state.Id / Value / Text. */
+  * name, so any formula, filter or action reads @ThisPage.Name.Selected.Id / Value / Text. */
  publishState(componentId:string,value:unknown):void;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
@@ -205,8 +206,9 @@ const eventPayload=(value:unknown):Record<string,unknown>=>
 const identifier=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
 /** Declarative action inputs ($state, $event, $session, $record, structured). Never scripts. */
-function resolveInput(source:unknown,payload:Record<string,unknown>,state:Readonly<Record<string,unknown>>,
+function resolveInput(raw:unknown,payload:Record<string,unknown>,state:Readonly<Record<string,unknown>>,
  sessionId:string,record:Readonly<Record<string,unknown>>|undefined):unknown{
+ const source=declarativeSource(raw);
  const again=(candidate:unknown)=>resolveInput(candidate,payload,state,sessionId,record);
  if(source&&typeof source==='object'&&!Array.isArray(source)){
   const option=source as Record<string,unknown>;
@@ -372,7 +374,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    const run=script.formulas[component.id+':'+formula.property];
    if(!run||formula.error||formula.property.includes('.')||withRows[formula.property]!==formula.source)continue;
    if(!definition.propertyDefinitions?.some(item=>item.propertyKey===formula.property&&textKinds.includes(item.kind)))continue;
-   if(!formula.references.every(ref=>/^\$state\.[A-Za-z][A-Za-z0-9_.]*$|^\$session$/.test(ref)))continue;
+   if(!formula.references.every(isCompiledStateReference))continue;
    if(!formula.functions.every(name=>PURE_ACTION_FUNCTIONS.has(name)))continue;
    try{fromFile[formula.property]=run({record:{},state,sessionId:runtime.sessionId()});}
    catch{/* The component shows the formula's own error. */}
@@ -448,7 +450,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   const validation=behaviorValidation(properties,action.event,{formFactor});
   if(validation)throw Error(validation);
   // Tabs, Navigation, Toggle, Search Box, Lookup, grids… publish their value
-  // first, so an action and any reader of @Name.state.* see the new pick.
+  // first, so an action and any reader of @ThisPage.Name.Selected.* see the new pick.
   if(['change','select','click'].includes(action.event))runtime.publishState(component.id,action.value);
   window.dispatchEvent(new CustomEvent('metadrive:in-screen-action',{
    detail:{pageSessionKey:runtime.pageSessionKey,componentId:component.id,event:action.event,value:action.value}}));
@@ -562,7 +564,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
        if(result.error)throw Error('SCREEN record Id: '+result.error);
        return result.value;
       });
-    // $flow formula: IF(..., $flow.A, $flow.B) picks the Flow; blank = do nothing.
+    // FLOW() formula: IF(..., FLOW(A), FLOW(B)) picks the Flow; blank = do nothing.
     if(!isActionPlan(formula)){
      const flow=flowActionFormulaTarget(settings,event,pageState,session,availableFlows);
      if(flow==='')return {skipped:true};
@@ -638,7 +640,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    formulaScope:(event:Record<string,unknown>)=>({record:{state:runtime.store.get(),event,session:{id:session}},
     state:runtime.store.get(),sessionId:session}),
    platformValue:async(kind:string,expression:string,event:Record<string,unknown>)=>kind==='state'
-    ?(await executePageFormulaAction(runtime.request,{actionType:'Formula',formula:'@state.value := '+expression},
+    ?(await executePageFormulaAction(runtime.request,{actionType:'Formula',formula:'@ThisPage.Input.value := '+expression},
       event,runtime.store.get(),runtime.objects,objectApiName,session)).changes[0]?.value
     :resolveActionFormulaValue(expression,event,runtime.store.get(),session),
    save:(key:string,plan:{formula:string},event:Record<string,unknown>)=>runSave(

@@ -132,11 +132,13 @@ class ServerScope{
    'user.timeZone':user?.timeZone,'user.locale':user?.locale,'user.currencyIsoCode':user?.currencyIsoCode,
    'tenant.id':tenant?.id,'tenant.name':tenant?.name,'tenant.logo':tenant?.logo};
   if(path==='cartId'){const id=this.state('activeCartId');return typeof id==='string'&&uuid.test(id)?id:'';}
-  if(!Object.prototype.hasOwnProperty.call(map,path))throw Error('Unsupported session reference: $session.'+path);
+  if(!Object.prototype.hasOwnProperty.call(map,path))throw Error('Unsupported tenant value: '+path);
   return map[path]??'';
  }
  tenant(name:string){return name==='name'?this.identity?.tenant.name??'':this.identity?.tenant.logo??'';}
- component(){throw Error('$component values are only available in the browser');}
+ component(){throw Error('A component\'s live value is only available in the browser');}
+ /** @ThisPage.PayButton.CartTotal on the server: the value that action saved. */
+ pageValue(_name:string,key:string){return this.state(key);}
  componentState(name:string,field:string){
   return readComponentState(this.request.state.collectionSelections,name,field as never);
  }
@@ -364,7 +366,7 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
  request:PageCodeRequest,source:string):Promise<PageCodeResult>{
  const action=code.actions[actionKey];
  if(!action)return {ok:false,error:'This action is not part of the published page',changes:[],state:{},effects:[],sets:{}};
- const scope=await scopeFor(deps,actor,request,{identity:/\$session\.(?:user|tenant)\.|\$tenant\./.test(source),
+ const scope=await scopeFor(deps,actor,request,{identity:/@ThisTenant\.(?:User|Company)\./i.test(source),
   connections:/\bCONNECTED\s*\(/i.test(source)});
  try{
   const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{

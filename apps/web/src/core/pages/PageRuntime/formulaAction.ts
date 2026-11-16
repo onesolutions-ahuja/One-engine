@@ -69,7 +69,7 @@ export async function executePageFormulaAction(
  objectApiName:string,sessionId='',print?:(template:string,id:string)=>Promise<void>,
  runPageAction?:(name:string,target:string,mode?:string,recordId?:string)=>Promise<unknown>,
  createPdf?:(template:string,id:string)=>Promise<{FileId:string;AssetRef:string}>,
- /** Page data the action may read: TABLE()/COLLECTION() sources and $component values. */
+ /** Page data the action may read: TABLE()/COLLECTION() sources and @ThisPage component values. */
  formulaContext:Pick<FormulaBindingContext,'namedCollections'|'collectionSources'|'readComponent'> & {timingName?:string}={},
  /** Show-first: receives the predicted saved records before the server answers. */
  onPredicted?:(prediction:Prediction)=>void,

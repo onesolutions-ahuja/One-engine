@@ -36,8 +36,8 @@ export function hasExcelWildcardCriteria(value:unknown):value is string{
  return false;
 }
 /** Page State, events and session values are selectors, not data fields.
- * Thus @state.categoryId = "*" tests the literal selected All ID, while
- * @Category = @state.categoryId treats a selected "*" as a criterion. */
+ * Thus @ThisPage.Tabs1.categoryId = "*" tests the literal selected All ID, while
+ * @Product.Category = @ThisPage.Tabs1.categoryId treats a selected "*" as a criterion. */
 export function isExcelWildcardDataReference(name:string):boolean{
  return !/^(?:\$?state|\$?event|\$?session)(?:\.|$)/i.test(name);
 }

@@ -1,3 +1,4 @@
+import {modernizeFormula} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {isActionPlan} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {useState,useEffect} from 'react';
 import {Trash2, SlidersHorizontal, Eye, EyeOff} from 'lucide-react';
@@ -31,7 +32,7 @@ const legacyLabels:Record<string,string>={
 };
 /** Convert legacy settings only when a user explicitly changes that event to
  * Formula. No migration runs on load, so published metadata remains stable. */
-const legacyFormula=(binding:Binding,eventName:string,field:string):string=>{
+const legacyFormula=(binding:Binding,eventName:string,field:string,owner:string):string=>{
  const type=String(binding.actionType??'');
  const quoted=(value:string)=>JSON.stringify(value);
  if(type==='SetFilter'){
@@ -42,13 +43,13 @@ const legacyFormula=(binding:Binding,eventName:string,field:string):string=>{
  if(type==='PageState'){
    const key=String(binding.stateKey??'');
    const original=String(binding.value??'$event.value');
-   const expression=original==='$session'?'@session.id':
+   const expression=original==='$session'?'@ThisPage.Session.Id':
      original==='$event'?'@event.value':
      original.startsWith('$event.')?'@event.'+original.slice(7):
-     original.startsWith('$state.')?'@state.'+original.slice(7):
-     original.startsWith('$session.')?original:quoted(original);
-   return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)
-     ?'@state.'+key+' := '+expression:'';
+     original.startsWith('$')?modernizeFormula(original,()=>owner):quoted(original);
+   // The value is saved by (and read from) this component: @ThisPage.<Me>.<key>.
+   return /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)&&owner
+     ?'@ThisPage.'+owner+'.'+key+' := '+expression:'';
  }
  if(type==='Navigate'){
    const mode=String(binding.navigationTargetType??'Record List');
@@ -77,7 +78,7 @@ const legacyFormula=(binding:Binding,eventName:string,field:string):string=>{
 export default function PageBuilderActionRibbon({
  actions,eventDefinitions,flows,selectedEvent,onSelectEvent,onChange,
  api='',selectedApis,mixedEventIds=[],mixedButtonVisibilityKeys=[],objects=[],pages=[],request,dataFields=[],disabled=false,
- buttonVisibility,onButtonVisibilityChange,stateOptions=[]
+ buttonVisibility,onButtonVisibilityChange,stateOptions=[],ownerName=''
 }:{
  actions:Binding;eventDefinitions:EventOption[];flows:FlowDefinitionMetadata[];
  selectedEvent:string;onSelectEvent:(name:string)=>void;
@@ -88,6 +89,8 @@ export default function PageBuilderActionRibbon({
  objects?:readonly ObjectMetadata[];
  dataFields?:Array<{apiName:string;label:string;dataType:string}>;disabled?:boolean;
  stateOptions?:readonly PageStateChoice[];
+ /** This component's page name: the owner of values its actions save. */
+ ownerName?:string;
  buttonVisibility?:Partial<Record<CartButtonKey,boolean>>;
  onButtonVisibilityChange?:(key:CartButtonKey,visible:boolean)=>void;
  // Deprecated parameters remain optional for existing Page Builder integrations.
@@ -106,7 +109,7 @@ export default function PageBuilderActionRibbon({
   /^(Number|Currency|Percent|Integer|Decimal|Double|Float|Long|Short|Int)(\(|$)/i.test(field.dataType));
  const formulaFields=numericFields.map(field=>({...field,required:false,unique:false}));
  // The Flow dropdown and the formula bar are one action: a chosen Flow shows as
- // $flow.ApiName, and editing it (e.g. IF(..., $flow.A, $flow.B)) makes it a Formula.
+ // FLOW(ApiName), and editing it (e.g. IF(..., FLOW(A), FLOW(B))) makes it a Formula.
  const selectedFlow=active&&selected.actionType==='Flow'?metadataSelection(flows,selected.flowApiName):undefined;
  const selectedFlowName=String(selectedFlow?.apiName??(active&&selected.actionType==='Flow'?selected.flowApiName??'':''));
  // Show a blank editor for mixed values: selecting the primary's existing
@@ -149,7 +152,7 @@ export default function PageBuilderActionRibbon({
    if(option==='formula'){
      const preferred=numericFields.find(field=>/^(Quantity|Qty)$/i.test(field.apiName))??numericFields[0];
      const field=String(previous.fieldApiName??preferred?.apiName??'');
-     const previousFormula=legacyFormula(previous,key,field);
+     const previousFormula=legacyFormula(previous,key,field,ownerName);
      const formula=previousFormula||(
        (key==='qtyDecrease'||key==='qtyIncrease')&&field
         ?'@'+field+(key==='qtyDecrease'?' - 1':' + 1'):'');
@@ -232,7 +235,7 @@ export default function PageBuilderActionRibbon({
      <div className="page-action-formula-bar" role="group" aria-label="Actions formula bar">
        <span className="page-action-formula-menu" aria-hidden="true"><SlidersHorizontal size={15}/></span>
        <span className="page-action-formula-symbol" aria-hidden="true"
-         title={'Formula: @Quantity + 1; @state.key := @event.value; @filter.key := @event.value; @navigate.page := "App/Page"; IF($state.Total > 500, FLOW(ApplePay), FLOW(CardMachine))'}>ƒx</span>
+         title={'Formula: @CartLine.Quantity + 1; @ThisPage.'+(ownerName||'Button1')+'.key := @event.value; @filter.key := @event.value; @navigate.page := "App/Page"; IF(@ThisPage.Cart1.Total > 500, FLOW(ApplePay), FLOW(CardMachine))'}>ƒx</span>
        <SmartFormulaField label="Selected action formula" fields={formulaFields} objects={objects} actionPages={pages} actionCredentials={credentials}
          stateOptions={stateOptions}
          flowReferences={availableFlows.map(flow=>({apiName:flow.apiName,label:flow.label}))}

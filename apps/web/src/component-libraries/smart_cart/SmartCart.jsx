@@ -101,8 +101,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
  const summaryRecord=records[0]??{};
  const summarySource=(source,key)=>{
   if(!allows(key,summaryRecord))return null;
-  if(typeof source==='string'&&/^\$state\.[A-Za-z][A-Za-z0-9_]{0,63}$/.test(source)){
-   const key=source.slice(7);
+  const saved=typeof source==='string'
+   ?/^@ThisPage\.(?!Session\.)[A-Za-z_][A-Za-z0-9_]{0,79}\.([A-Za-z][A-Za-z0-9_]{0,63})$/i.exec(source):null;
+  if(saved&&!['value','recordId','text','textSource','imageSource','badgeText'].includes(saved[1])){
+   const key=saved[1];
    return p.pageState&&Object.prototype.hasOwnProperty.call(p.pageState,key)
     ?p.pageState[key]:null;
   }

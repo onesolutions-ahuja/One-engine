@@ -11,6 +11,7 @@
     "build:system": "tsc -p tsconfig.system-files.json && node scripts/copy-system-migrations.mjs",
     "test:system": "node --import tsx --test test/system/backend.test.mjs",
     "provision:tenant": "node dist-system/system-support/provision-cli.js",
+    "formula:modernize": "node dist-system/system-support/modernize-formula-cli.js",
     "preflight:sql": "tsx src/system-support/cutover-cli.ts",
     "start:worker": "node dist-system/system-support/job-worker-entrypoint.js",
     "dev:worker": "tsx src/system-support/job-worker-entrypoint.ts",

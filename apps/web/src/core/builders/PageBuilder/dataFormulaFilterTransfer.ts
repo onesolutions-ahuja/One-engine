@@ -9,7 +9,7 @@ export function displayComparisonFilter(
 ):{formula:string;displayField:string}|null {
  if(typeof expression!=='string')return null;
  const source=expression.trim().replace(/^=\s*/,'');
- const match=/^(@[A-Za-z][A-Za-z0-9_]*)\s*(?:==|=|<=|>=|<|>)\s*(?:"[^"]*"|'[^']*'|-?\d+(?:\.\d+)?|TRUE|FALSE|\$state\.[A-Za-z][A-Za-z0-9_]*)$/i.exec(source);
+ const match=/^(@[A-Za-z][A-Za-z0-9_]*)\s*(?:==|=|<=|>=|<|>)\s*(?:"[^"]*"|'[^']*'|-?\d+(?:\.\d+)?|TRUE|FALSE|@ThisPage(?:\.[A-Za-z_][A-Za-z0-9_]*){2,3})$/i.exec(source);
  if(!match||validateRecordFilterFormula(source,fields))return null;
  return {formula:source,displayField:match[1]};
 }

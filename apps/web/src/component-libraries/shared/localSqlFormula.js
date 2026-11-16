@@ -287,7 +287,7 @@ const exactSum=values=>values.reduce((total,v)=>D.add(total,decFromNumber(v)),de
 
 /**
  * Replace every record aggregate with the number the server would bind.
- * criterionValue(node) resolves criterion expressions ($session, $state.x, literals).
+ * criterionValue(node) resolves criterion expressions (@ThisPage.Session.Id, saved page values, literals).
  * rowsFor(object, filters) returns the complete matching rows or null.
  */
 export async function substituteLocalAggregates(node,criterionValue,rowsFor){

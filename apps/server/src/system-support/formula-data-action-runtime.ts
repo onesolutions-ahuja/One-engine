@@ -8,7 +8,8 @@ import {evaluateFlowFormulaNode} from '../system-files/flow-formula-runtime.js';
 import {resolveConnectedCalls,type ConnectionSnapshot} from '../expression-engine/FormulaConnections.js';
 import {loadConnectionSnapshot} from './tenant-connections.js';
 import type {Expression} from '../expression-engine/FormulaParser.js';
-import {parseComponentStateReference,readComponentState} from '../expression-engine/FormulaComponentState.js';
+import {readComponentState} from '../expression-engine/FormulaComponentState.js';
+import {parsePageReference,USER_FIELDS} from '../expression-engine/PageReferences.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Records=Pick<RecordEngine,'list'|'get'|'create'|'update'|'remove'|'aggregateFiltered'>;
@@ -55,30 +56,24 @@ function evaluateDataNode(node:Expression,scope:Record<string,unknown>,
  authenticated?:TrustedFormulaSession,connections?:ConnectionSnapshot):unknown{
  if(connections)node=resolveConnectedCalls(node,connections);
  const resolve=(path:string):unknown=>{
-  if(path==='$session')return scope.sessionId??'';
-  if(path==='$session.id')return scope.sessionId??'';
-  if(path==='$session.cartId'){
-   const id=state?.activeCartId??(scope.state as Record<string,unknown>|undefined)?.activeCartId;
-   return typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)?id:'';
+  const page=parsePageReference(path);
+  if(page){
+   if(page.kind==='session')return scope.sessionId??'';
+   if(page.kind==='cart'){
+    const id=state?.activeCartId??(scope.state as Record<string,unknown>|undefined)?.activeCartId;
+    return typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)?id:'';
+   }
+   if(page.kind==='user'||page.kind==='company'){
+    if(!authenticated)throw Error('Authenticated formula identity is unavailable');
+    return page.kind==='user'?own(authenticated.user,USER_FIELDS[page.field])??''
+     :own(authenticated.tenant,page.field.toLowerCase())??'';
+   }
+   // @ThisPage.Tabs1.Selected.Id: the value that component published in this page session.
+   if(page.kind==='selected')return readComponentState(own(state,'collectionSelections')
+    ??own(scope.state,'collectionSelections'),page.name,page.field);
+   // A saved page value (component live properties never reach the server).
+   return own(state,page.key)??own(scope.state,page.key);
   }
-  if(path.startsWith('$session.')){
-   const key=path.slice('$session.'.length);
-   if(!/^(?:user\.(?:id|name|email|timeZone|locale|currencyIsoCode)|tenant\.(?:id|name|logo))$/.test(key))
-    throw Error('Unsupported session reference: '+path);
-   if(!authenticated)throw Error('Authenticated formula identity is unavailable');
-   const [root,property]=key.split('.') as ['user'|'tenant',string];
-   return own(authenticated[root],property)??'';
-  }
-  if(path.startsWith('$state.')){
-   const key=path.slice(7);
-   return own(state,key)??own(scope.state,key);
-  }
-  // @CategoryTabs.state.Id: the value that component published in this page session.
-  const published=parseComponentStateReference(path);
-  if(published)return readComponentState(own(state,'collectionSelections')
-   ??own(scope.state,'collectionSelections'),published.name,published.field);
-  if(path.startsWith('$component.')||path.startsWith('$flow.'))
-   throw Error('Browser-only Formula reference');
   let current:unknown=scope;
   for(const part of path.split('.')){
    if(!name.test(part)||['constructor','prototype','__proto__'].includes(part))
@@ -208,7 +203,7 @@ export async function executeServerDataAction(
   }
   return operation as Promise<T>;
  };
- const authenticated=/\$session\.(?:user|tenant)\./.test(formula)
+ const authenticated=/@ThisTenant\.(?:User|Company)\./i.test(formula)
   ?await trustedFormulaSession(db,actor):undefined;
  // CONNECTED("x") is answered from the tenant's own credentials, never the browser.
  const connections=/\bCONNECTED\s*\(/i.test(formula)

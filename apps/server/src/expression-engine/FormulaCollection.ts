@@ -28,7 +28,7 @@ export function mergeFormulaCollectionValues(values:readonly unknown[],limit=200
 }
 
 /** Human-readable names may contain spaces. Formula references use their stable
- * underscore alias, e.g. "test collection" -> @test_collection.state.Id.
+ * underscore alias, e.g. "test collection" -> @ThisPage.test_collection.Selected.Id.
  * Both spellings occupy the same unique page-session namespace. */
 export const validFormulaCollectionName=(name:unknown):name is string=>
  typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_ ]{0,79}$/.test(name)&&name.trim()===name;

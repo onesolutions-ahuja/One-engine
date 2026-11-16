@@ -29,3 +29,9 @@
 .smart-formula-confirm p{margin:0 0 16px;color:#a23d30}
 .smart-formula-confirm button{border:1px solid #a7bddd;border-radius:5px;background:#fff;padding:8px 12px;color:#224976;cursor:pointer;margin-right:8px}
 .smart-formula-confirm button:first-of-type{background:#216ab3;color:#fff;border-color:#216ab3}
+
+/* @ list: ThisPage / ThisTenant and saved values first, in yellow; components grouped by type. */
+.smart-formula-list .smart-formula-option-row{display:contents}
+.smart-formula-list .smart-formula-group{padding:4px 8px 2px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;pointer-events:none}
+.smart-formula-list button.is-page-value{background:#fff8d6}
+.smart-formula-list button.is-page-value.is-active{background:#ffe98a}

@@ -16,6 +16,10 @@ const deferOrderLookup=process.argv.includes('--defer-order-cart-session-lookup'
 const db=new SqlPersistence(conn),runtime=new PageRuntime(db);
 const variants=['Desktop','Tablet','Mobile','Custom'];
 try{
+ const retiredCheck=await db.query("SELECT to_regclass('public.md_record_values') IS NULL AS retired");
+ if(retiredCheck.rows[0]?.retired){
+  console.log('md_record_values retired; cart session migration already complete - skipped');
+ }else{
  const tenants=await db.query(`
   SELECT tenant_id FROM md_object_definitions
   WHERE api_name='CartSession' AND deleted_at IS NULL ORDER BY tenant_id`);
@@ -151,4 +155,5 @@ try{
   });
  }
  console.log(JSON.stringify({mode:apply?(deferred?'deferred':'retired'):'preflight',reports},null,2));
+ }
 }finally{await db.close();}

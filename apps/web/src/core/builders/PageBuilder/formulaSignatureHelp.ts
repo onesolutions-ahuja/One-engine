@@ -20,7 +20,10 @@ export function formulaSignatureAt(source:string,caret:number,actions=false){
  }
  const active=frames.at(-1);
  if(!active)return null;
- if(actions){
+ // Record totals are display formulas too: the property formula bar shows the
+ // same Object / ValueField / Field, Value names as the Actions bar.
+ const recordAggregate=['COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS'].includes(active.name);
+ if(actions||recordAggregate){
   const signatures:Record<string,string[]>={
    EMAIL:['NamedCredential','To','Subject','Body','Attachment'],WHATSAPP:['NamedCredential','Recipient','Message','Attachment'],
    SMS:['NamedCredential','To','Message'],PRINT:['TemplateApiName','RecordId'],

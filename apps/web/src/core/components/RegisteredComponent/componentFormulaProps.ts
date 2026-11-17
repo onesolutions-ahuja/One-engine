@@ -41,7 +41,9 @@ export function isRowDisplayProperty(apiName:string,key:string,props:Readonly<Re
 export function resolveComponentFormulaProps(
  configuredProps:Record<string,unknown>,
  apiName:string,
- codeFunctions:Map<string,(row:Record<string,unknown>)=>unknown>|null
+ codeFunctions:Map<string,(row:Record<string,unknown>)=>unknown>|null,
+ /** Page Builder design canvas: it never holds compiled page code (Preview does). */
+ editorPreview=false
 ):Record<string,unknown>{
  const result:Record<string,unknown>={...configuredProps};
  const sqlRecord=configuredProps.record&&typeof configuredProps.record==='object'&&!Array.isArray(configuredProps.record)
@@ -64,7 +66,9 @@ export function resolveComponentFormulaProps(
    !(configuredProps.fieldAllowed as (key:string,row:Record<string,unknown>)=>boolean)(key,sqlRecord??{}))
    continue;
   // A total over Objects with no page code was not converted: never another engine.
-  result[key]='FORMULAERROR';
+  // The design canvas has no page code at all, so a total there is a placeholder
+  // (blank, shown as "—"), not an error; Preview and published pages stay strict.
+  result[key]=editorPreview&&!codeFunctions?'':'FORMULAERROR';
  }
  return result;
 }

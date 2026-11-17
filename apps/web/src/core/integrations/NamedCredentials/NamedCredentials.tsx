@@ -265,7 +265,7 @@ export default function NamedCredentials({
     : 'No '+listName.toLowerCase()+' are configured yet.';
   return <section className="surface object-setting-surface named-credentials-page" aria-label={listName}>
     <div className="section-toolbar">
-      <div><h1 className="audit-page-heading">{embedded ? 'Connection Settings' : webhookOnly ? 'Webhook Endpoints' : 'Named Credentials'}</h1><p>{embedded ? 'Tenant-specific HTTPS connection configuration. Secrets remain encrypted and masked.' : webhookOnly ? 'Manage inbound HTTPS endpoints and signing configuration.' : 'Manage tenant-wide HTTPS credentials used by HTTP Callouts and webhook integrations.'}</p></div>
+      <div><h1 id="credential-list-title" className="audit-page-heading">{embedded ? 'Connection Settings' : webhookOnly ? 'Webhook Endpoints' : 'Named Credentials'}</h1><p>{embedded ? 'Tenant-specific HTTPS connection configuration. Secrets remain encrypted and masked.' : webhookOnly ? 'Manage inbound HTTPS endpoints and signing configuration.' : 'Manage tenant-wide HTTPS credentials used by HTTP Callouts and webhook integrations.'}</p></div>
       <button className="btn btn-brand" disabled={!canManage || encryptionReady === false} title={!canManage ? 'Requires namedCredentials:manage permission' : encryptionReady === false ? 'Credential encryption is not configured on the server' : undefined} onClick={() => editCredential()}><Plus size={14} />{embedded ? 'Configure Connection' : webhookOnly ? 'New Webhook Endpoint' : 'New Named Credential'}</button>
     </div>
     {!embedded && <div className="named-credentials-search">
@@ -299,7 +299,7 @@ export default function NamedCredentials({
             onClick={()=>void performAction(credential,'delete')}>Delete</button>}
         </div>}
       ]}/>
-    <div className="table-scroll md-mobile-table-replaced" role="region" aria-label="Named Credential connections" tabIndex={0} {...(webhookOnly?{'aria-label':'Webhook endpoints table'}:{})}>
+    <div className="table-scroll md-mobile-table-replaced" role="region" aria-label="Named Credential connections" tabIndex={0} aria-labelledby={webhookOnly?'credential-list-title':undefined}>
       <table className="slds-table">
         <thead><tr><th scope="col">Connection</th><th scope="col">Authentication</th><th scope="col">Connection test</th>{!embedded && <th scope="col">Status</th>}<th scope="col">Actions</th></tr></thead>
         <tbody>{pagedCredentials.map((credential) => <tr key={credential.id}>

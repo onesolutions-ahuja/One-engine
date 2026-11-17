@@ -14,12 +14,21 @@ export default function TenantGovernance({request,canManage,initialTab='audit',f
  const tab=initialTab;
  const rootRef=useRef<HTMLElement>(null);
  useEffect(()=>{if(focusOnMount)rootRef.current?.scrollIntoView({block:'start',behavior:'auto'});},[focusOnMount,initialTab]);
- return <section ref={rootRef} className="surface permission-section md-security-governance"><h2>Security governance</h2><nav className="permission-tabs md-admin-tabstrip" aria-label="Security governance views">
- {governanceViews.map(item=><a key={item.id} id={'governance-tab-'+item.id.replace(' ','-')}
-  aria-current={tab===item.id?'page':undefined} className={tab===item.id?'active':''}
-  href={appRoutePath({kind:'setup',workspace:'company-settings',resourceApiName:'security',resourceId:item.route})}>{item.label}</a>)}
+ return <section ref={rootRef} className="surface permission-section md-security-governance"><h2>Security governance</h2><nav className="permission-tabs md-admin-tabstrip" role="tablist" aria-label="Security governance views">
+ {governanceViews.map(({id:t,route,label},index)=><a key={t} role="tab" id={'governance-tab-'+t.replace(' ','-')}
+  aria-selected={tab===t} aria-controls={'governance-panel-'+t.replace(' ','-')} tabIndex={tab===t?0:-1}
+  className={tab===t?'active':''}
+  onKeyDown={event=>{
+   const count=governanceViews.length;
+   const next=event.key==='ArrowRight'?(index+1)%count:event.key==='ArrowLeft'?(index+count-1)%count:
+    event.key==='Home'?0:event.key==='End'?count-1:-1;
+   if(next<0)return;
+   event.preventDefault();
+   event.currentTarget.parentElement?.querySelectorAll<HTMLAnchorElement>('[role="tab"]')[next]?.focus();
+  }}
+  href={appRoutePath({kind:'setup',workspace:'company-settings',resourceApiName:'security',resourceId:route})}>{label}</a>)}
  </nav>
- <div role="region" id={'governance-panel-'+tab.replace(' ','-')} aria-labelledby={'governance-tab-'+tab.replace(' ','-')} className="md-admin-tabpanel">{tab==='audit'&&<AuditTrail request={request}/>}{tab==='monitoring'&&<Monitoring request={request}/>}{tab==='licences'&&<TenantLicenses request={request} canManage={canManage}/>}{tab==='connected apps'&&<TenantConnectedApps request={request}/>}</div>
+ <div role="tabpanel" id={'governance-panel-'+tab.replace(' ','-')} aria-labelledby={'governance-tab-'+tab.replace(' ','-')} className="md-admin-tabpanel">{tab==='audit'&&<AuditTrail request={request}/>}{tab==='monitoring'&&<Monitoring request={request}/>}{tab==='licences'&&<TenantLicenses request={request} canManage={canManage}/>}{tab==='connected apps'&&<TenantConnectedApps request={request}/>}</div>
  </section>;
 }
 function AuditTrail({request}:{request:Request}){

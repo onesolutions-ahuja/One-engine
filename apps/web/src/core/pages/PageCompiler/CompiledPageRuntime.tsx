@@ -10,6 +10,7 @@ import {bindPageStateProperties,resolvePageStatePath} from '../PageRuntime/pageC
 import {componentLayoutProps} from '../TemplatePageRuntime/pageComponentLayout';
 import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pageBehaviorRuntime';
 import {notConvertedAction} from '../PageRuntime/formulaAction';
+import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen,closeSecondScreen} from '../PageRuntime/screenFormula';
@@ -91,11 +92,16 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
 }){
  // A server-built file carries its own plan: the page runs exactly that.
  const compiled=script?.plan??browserPlan;
+ // The runtime is built again when the page code arrives or metadata reloads:
+ // the same page session keeps its state (e.g. STATE(sk, ...) from the start action).
+ const carried=useRef<CarriedPageState|null>(null);
  const runtime=useMemo<Runtime>(()=>{
   let sessionId=pageSessionId(pageSessionKey,sessionIdOverride);
   const sessionListeners=new Set<()=>void>();
   // Which selections clear which (Category → Product): computed once for the page.
-  const store=createCompiledPageStore(compiled,initialState,pageStateDependencies(components));
+  const store=createCompiledPageStore(compiled,
+   carriedPageState(carried.current,pageSessionKey+'\n'+sessionId,initialState),pageStateDependencies(components));
+  carried.current={session:()=>pageSessionKey+'\n'+sessionId,state:store.get};
   const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
   const data=createCompiledDataLayer(compiled,sourceLoader,store.get,objects);
   // Published app pages and Builder Preview run their generated code.
@@ -673,12 +679,14 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const actionRef=useRef(onAction);
  actionRef.current=onAction;
  const started=useRef('');
+ // A Formula start runs as page code: it waits until that code has loaded.
+ const startKey=pageStartKey(sessionId,actionFlows.start,Boolean(runtime.code||runtime.script));
  useEffect(()=>{
-  if(started.current===sessionId||!actionFlows.start)return;
-  started.current=sessionId;
+  if(!startKey||started.current===startKey)return;
+  started.current=startKey;
   void actionRef.current({event:'start',value:{}}).catch(()=>{started.current='';});
  // The page's start action runs once per page session.
- },[sessionId]);
+ },[startKey]);
  // Live refresh: re-read this component's rows while the page is visible.
  useEffect(()=>{
   if(properties.liveRefreshEnabled!==true||!compiled.dataSourceId)return;

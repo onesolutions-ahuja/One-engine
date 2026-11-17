@@ -17,6 +17,8 @@ export type CompiledFilterFormula={
  blocked:boolean;filters:Array<{field:string;operator:string;value:string}>;
  filterLogic?:string;error?:string
 };
+/** A filter that reads a page value not set yet: no rows, not an error. */
+export const EMPTY_FILTER_VALUE='Selected formula state value is empty';
 type Plan={truth?:boolean;filters:CompiledFilterFormula['filters'];logic:string};
 const blank=(value:unknown)=>value===null||value===undefined||value==='';
 const valueFunctions=new Set(['TODAY','NOW','TIMENOW','ADDDAYS','ADDMONTHS','DATE','DATEVALUE',
@@ -170,7 +172,7 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    throw Error('This field cannot be filtered reliably by the server');
   if(field.apiName.startsWith('@'))throw Error('Related formula fields are not directly server-filterable');
   const value=asState(valueNode,state,sessionId);
-  if(value===undefined||value===null||value==='')throw Error('Selected formula state value is empty');
+  if(value===undefined||value===null||value==='')throw Error(EMPTY_FILTER_VALUE);
   if(!['string','boolean','number'].includes(typeof value)||typeof value==='number'&&!Number.isFinite(value))
    throw Error('Formula comparison requires a scalar');
   if((op==='='||op==='==')&&hasExcelWildcardCriteria(value)){
@@ -214,7 +216,7 @@ export function validateRecordFilterFormula(formula:string,fields:ReadonlyArray<
   const result=compileRecordFilterFormula(formula,fields,{...state,[componentReaderKey]:()=>selected?'test-id':''});
   // Nothing picked yet is a runtime state, not a formula error: the formula
   // must still save (the page shows no rows until a value is picked).
-  if(result.error&&!(!selected&&result.error==='Selected formula state value is empty'))return result.error;
+  if(result.error&&!(!selected&&result.error===EMPTY_FILTER_VALUE))return result.error;
  }
  return null;
 }

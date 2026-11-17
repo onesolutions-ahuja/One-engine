@@ -279,6 +279,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
   const mailboxLabel = { active: 'Ready', pending: 'Provisioning', error: 'Failed', missing: 'Not created' } as const;
   const closeTenant = () => { setSelected(null); setEditDetails(false); setError(''); setNotice(''); };
 
+  const tenantDetailTabs = [['details','Overview'],['users','Users'],['recovery','Recovery'],['seeders','Seeders']] as const;
   return <div className="tenant-console">
     {selected ? <header className="tenant-heading tenant-heading-detail">
       <div>
@@ -342,7 +343,22 @@ export default function TenantManagement({ request, permitted }: { request: Requ
         <Mail size={17} /><span>Developer mailbox <strong>{developer.email}</strong> was not created ({mailboxLabel[developer.mailboxStatus ?? 'missing'].toLowerCase()}).</span>
         <button type="button" className="tenant-button tenant-button-primary" onClick={() => void retryMailbox()} disabled={busy}>{busy ? 'Working…' : 'Retry developer mailbox'}</button>
       </div>}
-      <div className="tenant-detail-tabs" role="tablist" aria-label="Tenant details sections">{([["details","Overview"],["users","Users"],["recovery","Recovery"],["seeders","Seeders"]] as const).map(([id,label]) => <button type="button" key={id} role="tab" aria-selected={detailTab === id} className={detailTab === id ? "active" : ""} onClick={() => setDetailTab(id)}>{label}</button>)}</div>
+      <div className="tenant-detail-tabs" role="tablist" aria-label="Tenant details sections">
+        {tenantDetailTabs.map(([id,label],index)=><button type="button" key={id} role="tab"
+          id={'tenant-tab-'+id} aria-controls="tenant-detail-panel" aria-selected={detailTab===id}
+          tabIndex={detailTab===id?0:-1} className={detailTab===id?'active':''}
+          onClick={()=>setDetailTab(id)}
+          onKeyDown={event=>{
+            const count=tenantDetailTabs.length;
+            const next=event.key==='ArrowRight'?(index+1)%count:event.key==='ArrowLeft'?(index+count-1)%count:
+              event.key==='Home'?0:event.key==='End'?count-1:-1;
+            if(next<0)return;
+            event.preventDefault();
+            setDetailTab(tenantDetailTabs[next][0]);
+            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+          }}>{label}</button>)}
+      </div>
+      <div id="tenant-detail-panel" role="tabpanel" aria-labelledby={'tenant-tab-'+detailTab}>
       {detailTab === "details" && <div className="tenant-overview-grid">
         <form className="tenant-card" onSubmit={(event) => void saveTenant(event)}>
           <div className="tenant-card-heading"><h3>Organisation</h3>{!editDetails && <button type="button" className="tenant-button tenant-button-small" onClick={() => setEditDetails(true)}>Edit</button>}</div>
@@ -371,14 +387,15 @@ export default function TenantManagement({ request, permitted }: { request: Requ
         <section className="tenant-card tenant-card-wide" aria-label="Retention controls">
           <div className="tenant-card-heading"><h3>Retention and legal hold</h3></div>
           <div className="tenant-retention-row">
-            <label>Retain until (optional)<input type="date" value={retentionUntil} onChange={(event) => setRetentionUntil(event.target.value)} /></label>
+            <label>Retain until (optional)<input aria-describedby="tenant-retention-help" type="date" value={retentionUntil} onChange={(event) => setRetentionUntil(event.target.value)} /></label>
             <label className="tenant-checkbox"><input type="checkbox" checked={legalHold} onChange={(event) => setLegalHold(event.target.checked)} /> Legal hold</label>
             <button type="button" className="tenant-button" onClick={() => void saveRetention()} disabled={busy||!retentionChanged}>Save retention</button>
           </div>
-          <p className="tenant-help">Changes are audited. Nothing is ever deleted automatically.</p>
+          <p id="tenant-retention-help" className="tenant-help">Leave the date blank if no retention deadline applies. Changes are audited. Nothing is ever deleted automatically.</p>
         </section>
       </div>}
       {detailTab === "users" && <TenantUsersPanel request={request} tenantId={selected.tenantId} permitted={permitted} />}{detailTab === "seeders" && <SeederManager request={request} tenantId={selected.tenantId} />}{detailTab === "recovery" && <PlatformPageSlot slotKey="tenant-recovery"><TenantRecoveryPanel request={request} operator permitted={permitted} tenantId={selected.tenantId} /></PlatformPageSlot>}
+      </div>
     </section></PlatformPageSlot>}
     {showCreate&&<div className="tenant-create-backdrop" role="presentation">
       <section className="tenant-create-dialog" role="dialog" aria-modal="true" aria-labelledby="tenant-create-title"

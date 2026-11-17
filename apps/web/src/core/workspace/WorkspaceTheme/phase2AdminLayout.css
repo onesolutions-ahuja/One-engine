@@ -507,3 +507,14 @@
 .lightning .md-admin-tabstrip > a{display:inline-flex;align-items:center;text-decoration:none}
 
 .lightning .permissions-page .permission-tabs > a{display:inline-flex;align-items:center;text-decoration:none}
+
+@media (max-width:1023px) {
+  .lightning .md-sharing-defaults .md-sharing-matrix { min-width:0; width:100%; }
+  .lightning .md-sharing-matrix thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  .lightning .md-sharing-matrix :is(tbody,tr,td) { display:block; width:100%; }
+  .lightning .md-sharing-matrix tbody tr { padding:8px 12px; border-bottom:1px solid var(--md-border); }
+  .lightning .md-sharing-matrix tbody td { border:0; padding:6px 0; overflow-wrap:anywhere; }
+  .lightning .md-sharing-matrix tbody td[data-label] { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center; gap:8px; }
+  .lightning .md-sharing-matrix tbody td[data-label]::before { content:attr(data-label); color:var(--md-text-secondary); }
+  .lightning .md-sharing-matrix tbody select { width:100%; min-width:0; }
+}

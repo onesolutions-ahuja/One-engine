@@ -166,3 +166,5 @@
 
 .tenant-console .tenant-columns:has(> :only-child){grid-template-columns:minmax(0,1fr)}
 .tenant-console .tenant-name-link:focus-visible,.tenant-console .tenant-pagination button:focus-visible{outline:2px solid var(--md-focus-ring,#0054aa);outline-offset:2px}
+
+.tenant-facts dd{min-width:0;overflow-wrap:anywhere}

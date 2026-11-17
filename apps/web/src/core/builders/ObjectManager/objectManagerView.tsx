@@ -1719,15 +1719,15 @@ function ObjectManager({
   };
   const renderBrowseSetting = () => {
     if (selectedSetting === 'Details') return <section className="surface object-setting-surface">
-      <div className="section-toolbar"><div><h2>Details</h2><p>Object definition · Read only</p></div>
+      <div className="section-toolbar"><div><h2>Details</h2><p>Object definition</p></div>
         <button className="btn btn-brand" type="button" onClick={() => setSectionMode('edit')}><Pencil size={14}/>Edit</button></div>
-      {([['Label', draft.label], ['Plural label', draft.pluralLabel], ['Object name', draft.apiName],
-        ['Object type', draft.kind], ['Description', draft.description || '—'],
-        ['Help text', draft.helpText || '—'], ['Deployment status', draft.settings?.deploymentStatus || 'Deployed'],
+      <dl className="object-definition-facts">{([['Label', draft.label], ['Plural label', draft.pluralLabel], ['Object name', draft.apiName],
+        ['Object type', draft.kind], ['Description', draft.description || 'Not provided'],
+        ['Help text', draft.helpText || 'Not provided'], ['Deployment status', draft.settings?.deploymentStatus || 'Deployed'],
         ['Search enabled', draft.settings?.allowSearch ? 'Yes' : 'No'],
         ['Reports enabled', draft.settings?.allowReports ? 'Yes' : 'No']] as Array<[string,string]>)
         .map(([label, value]) => <div className="metadata-row" key={label}>
-          <span>{label}</span><strong>{value}</strong></div>)}
+          <dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       </section>;
     if (sectionMode === 'view' && selectedMetadata && selectedSetting !== 'Lightning Record Pages') return <section className="surface object-setting-surface">
       <div className="section-toolbar"><div><h2>{selectedMetadata.label}</h2><p>{selectedSetting} · Read only</p></div>

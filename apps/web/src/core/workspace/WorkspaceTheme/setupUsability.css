@@ -792,3 +792,9 @@ html, body, #root { min-width:0; max-width:100%; }
 @media (max-width: 599px) {
   .lightning .setup-layout .home-content { --text-h1: 20px; }
 }
+
+.lightning .object-definition-facts { margin:0; }
+.lightning .object-definition-facts dd { margin:0; min-width:0; overflow-wrap:anywhere; font-weight:600; }
+@media(max-width:599px) {
+  .lightning .object-definition-facts .metadata-row { grid-template-columns:1fr; gap:4px; }
+}

@@ -18,7 +18,7 @@ const text=(v)=>v===null||v===undefined?"":String(v);
 const formulaSourceFields=objects=>Array.isArray(objects)?Object.fromEntries(objects
  .filter(object=>object&&typeof object.apiName==="string"&&Array.isArray(object.fields))
  .map(object=>[object.apiName,object.fields.map(field=>field.apiName).filter(name=>typeof name==="string")])):undefined;
-const expressionResult=(v,record,pageState,objectApiName,collectionSources,namedCollections,collectionRows,sessionId,readComponent,objects,codeLookup)=>{
+const expressionResult=(v,record,pageState,objectApiName,collectionSources,namedCollections,collectionRows,sessionId,readComponent,objects,codeLookup,designCanvas=false)=>{
  if(typeof v!=="string")return {value:text(v)};
  // Keep literal text and asset URLs unchanged; only formulas can fail.
  if(/^(?:https:\/\/|asset:|data:image\/)/i.test(v.trim()))return {value:v};
@@ -33,8 +33,10 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
   if(codeResult)return codeResult;
  }
  // Totals over Objects (COUNTIFS, SUMIFS) exist only as page code.
+ // The Page Builder design canvas holds no page code (Preview does): a total
+ // there is a blank placeholder, never an error and never another engine.
  if(typeof window!=="undefined"&&isSelectedSqlFormula(v))
-  return {value:'',error:'This formula is not converted: save the page again'};
+  return designCanvas?{value:''}:{value:'',error:'This formula is not converted: save the page again'};
  try{return evaluateFieldExpressionDetailed(v,record||{},{
   readComponent,namedCollectionSelections:pageState?.collectionSelections,
   rootObjectApiName:objectApiName,collectionSources,
@@ -69,7 +71,7 @@ const scopedExpression=(p,key,source,record)=>fieldAllows(p,key,record)
      ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??"")))
     ?text(p.kind==="smart_card_grid"&&record.__collectionManual===false
       ?record.Name??"":record.__collectionLabel??record.Name??"")
-    :expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup)):"";
+    :expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true)):"";
 const scopedDisplayExpression=(p,key,source,record)=>{
  if(!fieldAllows(p,key,record))return {value:""};
  // A selected collection row already provides its authorised caption.
@@ -78,7 +80,7 @@ const scopedDisplayExpression=(p,key,source,record)=>{
     ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??""))))
   return {value:scopedExpression(p,key,source,record)};
  const result=expressionResult(source,record,p.pageState,p.objectApiName,
-  p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup);
+  p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
  return result.error?{value:"FORMULAERROR",error:result.error}:{value:result.value};
 };
 const recordOf=p=>p.objectApiName&&Array.isArray(p.records)
@@ -102,7 +104,7 @@ const boundImage=(p,record)=>{
   const source=p.imageSource??p.src??'';
  const key=typeof source==='string'?source.replace(/^@/,''):'';
  if(key && record && Object.prototype.hasOwnProperty.call(record,key))return text(record[key]);
- return expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup);
+ return expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
 };
 const gridText=(p,key,record)=>p.kind==="smart_card_grid"
  ?scopedExpression(p,key,p[key]??"",record):"";
@@ -1077,7 +1079,7 @@ export default function SmartRuntime(p){
   const pagination=p.recordPagination;
   const complete=!pagination||(pagination.offset===0&&pagination.total<=rows.length);
   return expression(formula,row,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,
-   complete&&rows.length<=200?rows:undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup);
+   complete&&rows.length<=200?rows:undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
  }}
     fieldAllowed={(key,row)=>fieldAllows(p,key,row)} fire={fire}/>;
  else if(name==="smart_calendar")content=<SmartScheduleCalendar p={p} fire={fire}

@@ -21,18 +21,18 @@
   background: var(--md-surface-2, #f6f8fb);
 }
 
-/* A narrow, non-frozen first column with four borderless icon actions. */
+/* A non-frozen first column with room to separate the Archive action. */
 .lightning .page-manager-table :is(th.page-manager-actions-heading, td.page-manager-actions) {
   box-sizing: border-box;
-  width: 200px;
-  min-width: 200px;
-  max-width: 200px;
+  width: 230px;
+  min-width: 230px;
+  max-width: 230px;
   padding: 8px;
 }
 .lightning .page-manager-table .page-manager-action-icons {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
 }
 .lightning .page-manager-table td.page-manager-actions .page-manager-icon-action {
   box-sizing: border-box;
@@ -67,6 +67,10 @@
 }
 .lightning .page-manager-table td.page-manager-actions .page-manager-toggle.is-active {
   color: var(--md-success, #15803d);
+}
+.lightning .page-manager-table td.page-manager-actions .page-manager-delete {
+  margin-inline-start: 6px;
+  color: var(--md-danger, #b42318);
 }
 .lightning .page-manager-table td.page-manager-actions .page-manager-delete:hover:not(:disabled) {
   color: var(--md-danger, #b42318);

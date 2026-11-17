@@ -31,17 +31,17 @@ export default function PageManagerDialogs({ props, editorState, management }: {
 {!editorMode && pendingArchivePageApiName && (() => {
         const toArchive = pages.find(candidate => candidate.apiName === pendingArchivePageApiName);
         return toArchive ? <div className="modal-backdrop" role="presentation">
-          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-lightning-page-title">
-            <div className="modal-header"><h2 id="delete-lightning-page-title">Delete page</h2></div>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="archive-lightning-page-title">
+            <div className="modal-header"><h2 id="archive-lightning-page-title">Archive page</h2></div>
             <p className="modal-copy">Archive <strong>{toArchive.label}</strong>?</p>
             <p className="modal-copy">The page will be removed from the live page list. Its SQL metadata,
               layouts and version history are preserved. App-owned and app-home pages may require reassignment or AppExchange management.</p>
             <div className="modal-actions">
               <button className="btn" type="button" disabled={Boolean(archivingPageApiName)}
                 onClick={()=>setPendingArchivePageApiName('')}>Cancel</button>
-              <button className="btn btn-brand" type="button" disabled={Boolean(archivingPageApiName)}
+              <button className="btn btn-danger" type="button" disabled={Boolean(archivingPageApiName)}
                 onClick={()=>void archiveSavedPage(toArchive)}>
-                {archivingPageApiName ? 'Deleting…' : 'Delete page'}
+                {archivingPageApiName ? 'Archiving…' : 'Archive page'}
               </button>
             </div>
           </section>

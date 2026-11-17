@@ -92,7 +92,7 @@ export default function PageManagerView({ props, editorState, management, layout
                 onOpenDefault={()=>void openPageDesign(item.apiName)}
                 onOpenLayout={variant=>void openPageDesignLayout(item.apiName,variant)}/>
               <button type="button" className="btn" aria-label={(item.status==="Active"?"Deactivate ":"Activate ")+item.label} disabled={saving} onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):activateListedPage(item))}>{item.status==='Active'?'Deactivate':'Activate'}</button>
-              <button type="button" className="btn" aria-label={"Delete "+item.label} disabled={saving||Boolean(archivingPageApiName)} onClick={()=>setPendingArchivePageApiName(item.apiName)}>Delete</button>
+              <button type="button" className="btn" aria-label={"Archive "+item.label} disabled={saving||Boolean(archivingPageApiName)} onClick={()=>setPendingArchivePageApiName(item.apiName)}>Archive</button>
             </div>}
           ]}/>
         <div className="page-manager-table-scroll md-mobile-table-replaced md-tablet-table-replaced"><table className="records-table page-manager-table"><thead><tr>
@@ -132,8 +132,8 @@ export default function PageManagerView({ props, editorState, management, layout
                 onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):activateListedPage(item))}><Power size={16}/></button>
               <button className="page-manager-icon-action page-manager-delete" type="button"
                 disabled={saving||Boolean(archivingPageApiName)}
-                aria-label={(archivingPageApiName===item.apiName?'Deleting ':'Delete ')+item.label}
-                title={archivingPageApiName===item.apiName?'Deleting page…':'Delete page'}
+                aria-label={(archivingPageApiName===item.apiName?'Archiving ':'Archive ')+item.label}
+                title={archivingPageApiName===item.apiName?'Archiving page…':'Archive page'}
                 onClick={()=>setPendingArchivePageApiName(item.apiName)}><Trash2 size={16}/></button>
             </div>
           </td>

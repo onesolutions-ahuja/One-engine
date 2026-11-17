@@ -344,6 +344,7 @@
   .lightning .md-permission-mobile-save>.btn {min-height:44px}
 }
 @media (min-width: 1024px) {.lightning .md-permission-mobile-save{display:none}}
+@media (width < 1024px) {.lightning .permissions-page .md-permission-desktop-save{display:none}}
 /* RBAC tabs keep their reading order on small phones. */
 @media (max-width: 599px) {
   .lightning .permissions-page .permission-tabs {

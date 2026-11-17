@@ -76,7 +76,12 @@ function SetupHome({ onNavigate, request, onShowShortcuts, onOpenAuditTrail }: {
                 <time dateTime={event.at} title={new Date(event.at).toLocaleString()}>{relativeSecurityTime(event.at,Date.now())}</time>
               </div>;
             })}
-          {onOpenAuditTrail && <button type="button" className="text-action" onClick={onOpenAuditTrail}>View full audit trail <ArrowRight size={14}/></button>}
+          {onOpenAuditTrail && <a className="text-action" href={appRoutePath({kind:'setup',workspace:'company-settings',resourceApiName:'security',resourceId:'audit-trail'})}
+            onClick={event=>{
+              if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+              event.preventDefault();
+              onOpenAuditTrail();
+            }}>View full audit trail <ArrowRight size={14}/></a>}
         </section>
         <section className="surface help-surface"><div className="section-heading"><h2>Resources</h2><ExternalLink size={15} /></div><button type="button" className="resource-row" aria-expanded={helpOpen} aria-controls="md-setup-help-details" onClick={()=>setHelpOpen(open=>!open)}><span><CircleHelp size={16} /></span><div><strong>Setup help</strong><small>Learn how to configure your org</small></div><ChevronRight size={15} /></button>
           {helpOpen && <div id="md-setup-help-details" className="resource-help-details"><p>Use Object Manager to configure records and fields, Page Builder to arrange screens, Flows to automate work, and Permission Sets to control access.</p></div>}

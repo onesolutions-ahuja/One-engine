@@ -130,7 +130,11 @@ function Monitoring({request}:{request:Request}){
   finally{setPruning(false);}
  };
  return <><h3>Event Monitoring and Transaction Security</h3><p>Rules count authenticated requests per user and time window. Blocking starts at the threshold. Flow responses run once per window through the durable Flow worker, using the selected service identity.</p>{message&&<p role="status">{message}</p>}
- {data&&<><p>Last 24 hours: {data.summary.requests} requests, {data.summary.errors} errors, average {data.summary.average_ms} ms</p>
+ {data&&<><dl className="md-monitoring-metrics" aria-label="Event totals for the last 24 hours">
+  <div><dt>Requests</dt><dd>{data.summary.requests.toLocaleString()}</dd></div>
+  <div><dt>Errors</dt><dd>{data.summary.errors.toLocaleString()}</dd></div>
+  <div><dt>Average response</dt><dd>{data.summary.average_ms.toLocaleString()} ms</dd></div>
+ </dl>
  <div className="md-admin-settings-block"><div className="md-admin-form-grid"><label className="checkbox-row md-admin-span-all"><input type="checkbox" checked={data.settings.enabled} onChange={e=>setData({...data,settings:{...data.settings,enabled:e.target.checked}})}/>Record request events (rules remain enforced)</label>
  <label className="form-label md-admin-field-short">Event retention days<input className="form-control" type="number" min="90" max="3650" value={data.settings.retention_days} onChange={e=>setData({...data,settings:{...data.settings,retention_days:Number(e.target.value)}})}/></label>
  </div><div className="md-admin-actions"><button type="button" className="btn btn-brand" disabled={!settingsValid||!settingsChanged||pruning} onClick={()=>save('/security/monitoring',data.settings)}>Save monitoring settings</button><button type="button" className="btn btn-danger" disabled={pruning} onClick={()=>{

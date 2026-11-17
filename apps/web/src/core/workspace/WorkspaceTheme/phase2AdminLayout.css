@@ -518,3 +518,18 @@
   .lightning .md-sharing-matrix tbody td[data-label]::before { content:attr(data-label); color:var(--md-text-secondary); }
   .lightning .md-sharing-matrix tbody select { width:100%; min-width:0; }
 }
+
+.lightning .md-monitoring-metrics {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));
+  gap:12px;
+  margin:12px 0;
+}
+.lightning .md-monitoring-metrics > div {
+  padding:12px;
+  border:1px solid var(--md-border);
+  border-radius:var(--md-radius-md,8px);
+  background:var(--md-surface-2);
+}
+.lightning .md-monitoring-metrics dt { color:var(--md-text-secondary); }
+.lightning .md-monitoring-metrics dd { margin:4px 0 0; font-size:1.25rem; font-weight:700; }

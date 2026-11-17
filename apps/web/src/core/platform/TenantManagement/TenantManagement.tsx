@@ -125,7 +125,10 @@ export default function TenantManagement({ request, permitted }: { request: Requ
     setLegalHold(tenant.legalHold ?? false);
     setEditing({ name: tenant.name, description: tenant.description });
   };
+  const [openingTenant,setOpeningTenant]=useState<string|null>(null);
   const selectTenant = async (id: string) => {
+    if(openingTenant)return;
+    setOpeningTenant(id);
     setError(''); setNotice('');
     try {
       const result = await request<{ tenant: TenantSummary }>('/platform/tenants/' + encodeURIComponent(id));
@@ -134,6 +137,8 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setDetailTab('details'); setEditDetails(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to open tenant');
+    } finally {
+      setOpeningTenant(null);
     }
   };
   const administratorEmailMatchesDeveloper = create.email.trim().length>0
@@ -303,6 +308,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
     </header>}
     {error && !showCreate && <div className="tenant-alert tenant-alert-error" role="alert"><CircleAlert size={17} /> {error}</div>}
     {notice && <div className="tenant-alert" role="status">{notice}</div>}
+    {openingTenant && <p role="status">Loading tenant details…</p>}
 
     {!selected && <>
     <section className="tenant-overview" aria-label="Tenant overview"><div><strong>{total}</strong><span>Matching tenants</span></div><div><strong>{activeOnPage}</strong><span>Active on this page</span></div><div><strong>{suspendedOnPage}</strong><span>Suspended on this page</span></div><div><strong>{archivedOnPage}</strong><span>Archived on this page</span></div></section>

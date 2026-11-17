@@ -177,8 +177,17 @@ export default function AppExchange(props: Props) {
       {error && <div className="records-message" role="alert">{error}</div>}
       {notice && <div className="records-message" role="status">{notice}</div>}
       <PlatformPageSlot slotKey="marketplace-filters"><div className="exchange-tabs" role="tablist" aria-label="Marketplace views">
-        <button type="button" role="tab" id="exchange-tab-discover" aria-controls="exchange-panel" aria-selected={view === 'discover'} className={view === 'discover' ? 'active' : ''} onClick={() => setView('discover')}>Discover apps</button>
-        <button type="button" role="tab" id="exchange-tab-installed" aria-controls="exchange-panel" aria-selected={view === 'installed'} className={view === 'installed' ? 'active' : ''} onClick={() => setView('installed')}>Installed apps <span aria-live="polite">{loading ? 'Loading…' : error ? 'Unavailable' : installed}</span></button>
+        {(['discover','installed'] as const).map(tab=><button key={tab} type="button" role="tab"
+          id={'exchange-tab-'+tab} aria-controls="exchange-panel" aria-selected={view===tab}
+          tabIndex={view===tab?0:-1} className={view===tab?'active':''} onClick={()=>setView(tab)}
+          onKeyDown={event=>{
+            const next=event.key==='Home'?'discover':event.key==='End'?'installed':
+              event.key==='ArrowLeft'||event.key==='ArrowRight'?(tab==='discover'?'installed':'discover'):null;
+            if(!next)return;
+            event.preventDefault();
+            setView(next);
+            document.getElementById('exchange-tab-'+next)?.focus();
+          }}>{tab==='discover'?'Discover apps':<>Installed apps <span aria-live="polite">{loading?'Loading…':error?'Unavailable':installed}</span></>}</button>)}
       </div>
       </PlatformPageSlot>
       <div id="exchange-panel" role="tabpanel" aria-labelledby={'exchange-tab-'+view}>

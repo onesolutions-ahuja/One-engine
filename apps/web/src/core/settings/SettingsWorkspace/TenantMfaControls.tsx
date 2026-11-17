@@ -14,6 +14,7 @@ export default function TenantMfaControls({request,canManage,onReauthenticate}:{
  const post=<T,>(path:string,body:unknown)=>request<T>(path,{method:'POST',body:JSON.stringify(body)});
  return <section className="surface permission-section"><h2>Multi-factor authentication</h2>
   <p>Policy: {status?.mode??'Loading…'} · {status?.enrolled?'A factor is enrolled':'No factor enrolled'}</p>
+  {status?.mode==='Off'&&<p className="info-callout"><strong>MFA is off.</strong> This organisation does not require a second factor at sign-in.</p>}
   {canManage&&<div className="md-admin-form-grid"><label className="form-label md-admin-field-medium">Tenant MFA policy<select className="form-control" value={mode} onChange={e=>setMode(e.target.value)}>
    {['Off','Optional','Required'].map(m=><option key={m}>{m}</option>)}</select></label>
    <div className="md-admin-actions"><button className="btn btn-brand" type="button" disabled={busy||!status} onClick={()=>void run(async()=>{await request('/auth/mfa/policy',{method:'PUT',body:JSON.stringify({mode})});if(mode==='Required'){onReauthenticate();return;}await load();setMessage('MFA policy saved.');})}>Save policy</button></div>
@@ -29,13 +30,14 @@ export default function TenantMfaControls({request,canManage,onReauthenticate}:{
   {codes.length>0&&<div><p>Save these codes privately. Each works once; generating another set revokes this set.</p><pre>{codes.join('\n')}</pre>
    <button className="btn" type="button" onClick={()=>setCodes([])}>I saved these codes</button></div>}
   <h3>Passkeys</h3>
+  <p>Use a name that helps you recognise the device or security key.</p>
   <label className="form-label">Passkey name<input className="form-control" value={label} onChange={e=>setLabel(e.target.value)} maxLength={100}/></label>
   <button className="btn" type="button" disabled={busy||!password||!label} onClick={()=>void run(async()=>{
    const {startRegistration}=await import('@simplewebauthn/browser');
    const r=await post<{options:Parameters<typeof startRegistration>[0]['optionsJSON'];token:string}>('/auth/passkeys/register/options',{password});
    const response=await startRegistration({optionsJSON:r.options});await post('/auth/passkeys/register',{token:r.token,response,label});setPassword('');await load();
   })}>Register passkey</button>
-  {keys.map(k=><div key={k.credential_id}>{k.label} <button type="button" className="btn" disabled={busy||!password} onClick={()=>void run(async()=>{
+  {keys.map(k=><div key={k.credential_id}>{k.label} <button type="button" className="btn btn-danger" disabled={busy||!password} onClick={()=>void run(async()=>{
    await post('/auth/passkeys/remove',{id:k.credential_id,password});onReauthenticate();
   })}>Remove and sign out</button></div>)}
   <p>Passkeys require HTTPS. Trusted IP addresses do not bypass MFA. Backup codes require an enrolled authenticator to generate.</p>

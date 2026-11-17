@@ -89,7 +89,7 @@ function ExcelWorkflow({apiRequest,category,options,filename,onSuccess}:{
   {file&&<p>Selected: <strong>{file.name}</strong></p>}
   <div className="toolbar-actions" style={{marginTop:10}}>
    <button type="button" className="btn btn-brand" disabled={busy||!file} aria-describedby={!file?'data-loader-validate-hint':undefined} onClick={()=>void validate()}>
-    <Upload size={15}/> Validate first
+    <Upload size={15}/> Validate workbook
    </button>
   </div>
   {!file&&<small id="data-loader-validate-hint">Choose an exported workbook to enable validation.</small>}
@@ -144,11 +144,11 @@ export default function UniversalDataLoaderWorkspace({apiRequest,objects,onMetad
    <div><h1>Universal Data Loader</h1>
     <p>Export, edit, validate and upsert Object Metadata, Records or Smart Ribbon Properties.</p></div>
   </div>
-  <nav role="tablist" aria-label="Data Loader categories" style={{display:'flex',gap:8,flexWrap:'nowrap',overflowX:'auto',width:'calc(100% - 48px)',maxWidth:1052,marginLeft:24,marginBottom:18,paddingBlock:4,scrollSnapType:'x mandatory'}}>
+  <nav role="tablist" aria-label="Data Loader categories" style={{display:'flex',gap:8,flexWrap:'wrap',width:'calc(100% - 48px)',maxWidth:1052,marginLeft:24,marginBottom:18,paddingBlock:4}}>
    {([
     ['objects','Objects & Fields',Database],
     ['records','Records',Table2],
-    ['ribbon','Smart Component Property Library',SlidersHorizontal]
+    ['ribbon','Smart Properties',SlidersHorizontal]
    ] as const).map(([key,label,Icon])=><button key={key} type="button"
     className={tab===key?'btn btn-brand':'btn'} role="tab" aria-selected={tab===key} aria-controls={'data-loader-panel-'+key} id={'data-loader-tab-'+key}
     tabIndex={tab===key?0:-1} style={{flexShrink:0,minHeight:44,scrollSnapAlign:'start'}}

@@ -244,8 +244,12 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setError(cause instanceof Error ? cause.message : 'Unable to change lifecycle');
     } finally { setBusy(false); }
   };
+  const retentionChanged = Boolean(selected && (
+    retentionUntil !== (selected.retentionUntil?.slice(0,10) ?? '') ||
+    legalHold !== Boolean(selected.legalHold)
+  ));
   const saveRetention = async () => {
-    if (!selected || busy || !permitted) return;
+    if (!selected || busy || !permitted || !retentionChanged) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await request<{ tenant: TenantSummary }>(
@@ -304,7 +308,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
     <div className="tenant-columns" aria-hidden={showCreate || undefined}>
       <PlatformPageSlot slotKey="directory"><section className="tenant-panel" aria-label="Tenants">
         <div className="tenant-toolbar">
-          <label className="tenant-search"><Search size={16} /><input type="search" aria-label="Search tenants" placeholder="Search name or tenant ID" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
+          <label className="tenant-search"><Search size={16} /><input type="search" aria-label="Search by name or tenant ID" placeholder="Search by name or tenant ID" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
           <label className="tenant-filter">Status <select aria-label="Filter tenant status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="ALL">All</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="ARCHIVED">Archived</option></select></label>
         </div>
         <ResponsiveDataList rows={tenants} getId={item=>item.tenantId} label="Tenant organisations"
@@ -317,12 +321,13 @@ export default function TenantManagement({ request, permitted }: { request: Requ
             {apiName:'users',label:'Users',phoneRole:'subtitle',render:item=>usersLabel(item)},
             {apiName:'created',label:'Created',phoneRole:'trailing',render:item=>shortDate(item.createdAt)}
           ]}/>
-        <div className="tenant-table-wrap md-mobile-table-replaced"><table className="tenant-table"><thead><tr><th>Organisation</th><th>Tenant ID</th><th>Status</th><th>Users</th><th>Created</th></tr></thead>
+        <div className="tenant-table-wrap md-mobile-table-replaced"><table className="tenant-table"><thead><tr><th scope="col">Organisation</th><th scope="col">Tenant ID</th><th scope="col">Status</th><th scope="col">Users</th><th scope="col">Created</th></tr></thead>
           <tbody>{tenants.map((item) => <tr key={item.tenantId} className="tenant-row-link" onClick={() => void selectTenant(item.tenantId)}>
-            <td><button className="tenant-name-link" onClick={(event) => { event.stopPropagation(); void selectTenant(item.tenantId); }}>{item.name}</button></td><td title={item.tenantId}><code>{item.tenantId}</code></td>
+            <td><button type="button" className="tenant-name-link" onClick={(event) => { event.stopPropagation(); void selectTenant(item.tenantId); }}>{item.name}</button></td><td title={item.tenantId}><code>{item.tenantId}</code></td>
             <td>{statusPill(item.status)}</td>
             <td>{usersLabel(item)}</td><td>{shortDate(item.createdAt)}</td></tr>)}
-            {!loading && tenants.length === 0 && <tr><td colSpan={5} className="tenant-empty">No tenants match this search.</td></tr>}
+            {!loading && tenants.length === 0 && <tr><td colSpan={5} className="tenant-empty">No tenants match these filters. {(query || status !== 'ALL') && <button type="button" className="tenant-button"
+              onClick={()=>{setQuery('');setStatus('ALL');setPage(1);}}>Clear filters</button>}</td></tr>}
             {loading && <tr><td colSpan={5} className="tenant-empty">Loading tenants…</td></tr>}
           </tbody></table></div>
         <footer className="tenant-pagination"><span>{total} tenant{total === 1 ? '' : 's'} · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span><div>
@@ -368,7 +373,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
           <div className="tenant-retention-row">
             <label>Retain until (optional)<input type="date" value={retentionUntil} onChange={(event) => setRetentionUntil(event.target.value)} /></label>
             <label className="tenant-checkbox"><input type="checkbox" checked={legalHold} onChange={(event) => setLegalHold(event.target.checked)} /> Legal hold</label>
-            <button type="button" className="tenant-button" onClick={() => void saveRetention()} disabled={busy}>Save retention</button>
+            <button type="button" className="tenant-button" onClick={() => void saveRetention()} disabled={busy||!retentionChanged}>Save retention</button>
           </div>
           <p className="tenant-help">Changes are audited. Nothing is ever deleted automatically.</p>
         </section>

@@ -1,3 +1,4 @@
+import {appRoutePath} from '../../workspace/Navigation/appRouting';
 import type { ObjectMetadata } from '../../metadata/Definitions/metadata';
 import { cloneElement, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Settings2 } from 'lucide-react';
@@ -31,9 +32,9 @@ recovery:ReactNode;mfa:ReactNode;emailRecovery:ReactNode;locks:ReactNode;session
  const [mobileSection,setMobileSection]=useState<Section|null>(mobile?(resolvedInitialSection??null):null);
  useEffect(()=>{setActive(resolvedInitialSection??'general');if(mobile)setMobileSection(resolvedInitialSection??null);},[resolvedInitialSection,mobile]);
  const currentSection=mobile ? mobileSection : active;
- const sectionTitle=active==='security'&&securitySubsection==='connected-apps'?'Connected Apps'
-  :active==='security'&&securitySubsection==='audit-trail'?'Audit Trail'
-  :resolvedInitialSection?sections.find(item=>item.id===active)?.label??'Company Settings':'Company Settings';
+ const governanceTitle=active==='security' ? ({'connected-apps':'Connected Apps','audit-trail':'Audit Trail',monitoring:'Monitoring',licences:'Licences'} as Record<string,string>)[securitySubsection??''] : undefined;
+ const sectionTitle=governanceTitle??(resolvedInitialSection?sections.find(item=>item.id===active)?.label??'Company Settings':'Company Settings');
+ const sectionHref=(section:Section)=>appRoutePath({kind:'setup',workspace:'company-settings',resourceApiName:section});
  const sectionPath=resolvedInitialSection?('Setup / Organisation / '+(active==='security'?'Security & Recovery':sectionTitle)):'Setup / Organisation';
  const rights=developerAccess;
  const destinations:DeveloperDestination[]=[
@@ -57,18 +58,18 @@ recovery:ReactNode;mfa:ReactNode;emailRecovery:ReactNode;locks:ReactNode;session
      {mobile && mobileSection && <button type="button" className="company-workspace-mobile-back"
        onClick={()=>{setMobileSection(null);onSelectSection?.(null);}}><ChevronLeft size={19} aria-hidden="true" /> Company Settings</button>}
      <div><p className="company-workspace-eyebrow">{sectionPath}</p>
-     <h1>{mobile&&mobileSection?securitySubsection==='connected-apps'?'Connected Apps':securitySubsection==='audit-trail'?'Audit Trail':visibleSections.find(item=>item.id===mobileSection)?.label:sectionTitle}</h1>
+     <h1>{governanceTitle??(mobile&&mobileSection?visibleSections.find(item=>item.id===mobileSection)?.label:sectionTitle)}</h1>
      {!mobileSection && <p>Manage your organisation, currency, branding and security settings.</p>}</div>
    </header>
    <nav className="company-workspace-tabs" aria-label="Company settings sections">
-     {visibleSections.map(section=><button key={section.id} type="button" className={active===section.id?'active':''}
-       aria-current={active===section.id?'page':undefined} onClick={()=>{setActive(section.id);if(mobile)setMobileSection(section.id);onSelectSection?.(section.id);}}>{section.label}</button>)}
+     {visibleSections.map(section=><a key={section.id} href={sectionHref(section.id)} className={active===section.id?'active':''}
+       aria-current={active===section.id?'page':undefined}>{section.label}</a>)}
    </nav>
    {mobile && mobileSection===null && <nav className="company-workspace-mobile-menu" aria-label="Company settings sections">
-     {visibleSections.map(section=><button key={section.id} type="button" onClick={()=>{setMobileSection(section.id);setActive(section.id);onSelectSection?.(section.id);}}>
+     {visibleSections.map(section=><a key={section.id} href={sectionHref(section.id)}>
        <span className="company-workspace-mobile-section-icon"><Settings2 size={17} aria-hidden="true" /></span>
        <span>{section.label}</span><ChevronRight size={18} aria-hidden="true" />
-     </button>)}
+     </a>)}
    </nav>}
    {currentSection && <div className={"company-workspace-body company-workspace-section-"+currentSection}>
      {/* CompanySettings currently contains both company details and currency sections.

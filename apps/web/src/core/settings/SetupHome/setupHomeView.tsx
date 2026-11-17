@@ -1,3 +1,4 @@
+import {appRoutePath} from '../../workspace/Navigation/appRouting';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { RefreshCw, ArrowRight, ChevronRight, ShieldCheck, AlertCircle, ExternalLink, CircleHelp, Command } from 'lucide-react';
 import { setupShortcuts, type WorkspaceId } from '../../metadata/Definitions/metadata';
@@ -49,20 +50,19 @@ function SetupHome({ onNavigate, request, onShowShortcuts, onOpenAuditTrail }: {
   return (
     <div className="home-content">
       <Heading title="Setup Home" description="Configure objects, pages, flows and access permissions for your organisation."
-        actions={<div className="setup-home-refresh"><button type="button" className="btn" onClick={reload} disabled={loading} aria-busy={loading}><RefreshCw size={14} className={loading?'setup-refresh-spinning':undefined} aria-hidden="true" />{loading?'Refreshing…':'Refresh'}</button>
-          {lastUpdated&&<small role="status">Updated {new Date(lastUpdated).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</small>}</div>} />
-      <div className="welcome-banner setup-home-summary">
-        <div className="welcome-copy">
-          <h2>Workspace overview</h2>
-          <p>Open a tool below to manage metadata, automation, access and your applications.</p>
-        </div>
-      </div>
-      <div className="home-section-title"><div><h2>Quick access</h2><p>Open setup tools for this organisation.</p></div></div>
+        actions={<div className="setup-home-refresh"><button type="button" className="btn" onClick={reload} disabled={loading} aria-busy={loading} aria-label="Refresh security activity"><RefreshCw size={14} className={loading?'setup-refresh-spinning':undefined} aria-hidden="true" />{loading?'Refreshing…':'Refresh'}</button>
+          {lastUpdated&&<small role="status">Security activity updated {new Date(lastUpdated).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</small>}</div>} />
+      <div className="home-section-title"><h2>Quick access</h2></div>
       <div className="shortcut-grid">
         {setupShortcuts.map(({ title, description, workspace, icon: Icon }) => (
-          <button key={title} className="shortcut-card" onClick={() => onNavigate(workspace)}>
+          <a key={title} className="shortcut-card" href={appRoutePath({kind:'setup',workspace})}
+            onClick={event=>{
+              if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+              event.preventDefault();
+              onNavigate(workspace);
+            }}>
             <span className="shortcut-icon"><Icon size={19} /></span><span className="shortcut-title">{title}</span><span className="shortcut-description">{description}</span><ArrowRight className="shortcut-arrow" size={15} />
-          </button>
+          </a>
         ))}
       </div>
       <div className="home-lower-grid">

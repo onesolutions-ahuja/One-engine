@@ -255,14 +255,22 @@ function Permissions({
     if (selectedItem && selectedId !== selectedItem.id) setSelectedId(selectedItem.id);
   }, [routeResourceApiName, routeResourceId, draft, selectedId]);
 
-  const changeTab = (nextTab: 'profiles' | 'sets' | 'groups' | 'users' | 'sharing' | 'roles' | 'publicGroups' | 'queues' | 'sharingRules') => {
+  const permissionSections = {
+    profiles: ['Profiles', 'Profiles'],
+    sets: ['PermissionSets', 'Permission Sets'],
+    groups: ['PermissionSetGroups', 'Permission Set Groups'],
+    users: ['Users', 'Users & Assignments'],
+    roles: ['Roles', 'Roles'],
+    sharing: ['SharingSettings', 'Sharing Settings'],
+    publicGroups: ['PublicGroups', 'Public Groups'],
+    queues: ['Queues', 'Queues'],
+    sharingRules: ['SharingRules', 'Sharing Rules']
+  } as const;
+  const changeTab = (nextTab: keyof typeof permissionSections) => {
     setTab(nextTab);
     setMobilePermissionDetail(false);
     setPermissionListPage(0);
-    const resourceApiName = nextTab === 'profiles' ? 'Profiles' : nextTab === 'sets' ? 'PermissionSets'
-      : nextTab === 'groups' ? 'PermissionSetGroups' : nextTab === 'sharing' ? 'SharingSettings'
-        : nextTab === 'roles' ? 'Roles' : nextTab === 'publicGroups' ? 'PublicGroups' : nextTab === 'queues' ? 'Queues'
-          : nextTab === 'sharingRules' ? 'SharingRules' : 'Users';
+    const [resourceApiName] = permissionSections[nextTab];
     const initialId = nextTab === 'profiles' ? draft.profiles[0]?.id
       : nextTab === 'sets'
       ? draft.permissionSets[0]?.apiName
@@ -520,17 +528,19 @@ function Permissions({
         <optgroup label="Sharing"><option value="sharing">Sharing Settings</option><option value="publicGroups">Public Groups</option><option value="queues">Queues</option><option value="sharingRules">Sharing Rules</option></optgroup>
       </select>
     </label>
-    <div className="permission-tabs">
-      <button className={tab === 'profiles' ? 'active' : ''} onClick={() => changeTab('profiles')}>Profiles</button>
-      <button className={tab === 'sets' ? 'active' : ''} onClick={() => changeTab('sets')}>Permission Sets</button>
-      <button className={tab === 'groups' ? 'active' : ''} onClick={() => changeTab('groups')}>Permission Set Groups</button>
-      <button className={tab === 'users' ? 'active' : ''} onClick={() => changeTab('users')}>Users & Assignments</button>
-      <button className={tab === 'roles' ? 'active' : ''} onClick={() => changeTab('roles')}>Roles</button>
-      <button className={tab === 'sharing' ? 'active' : ''} onClick={() => changeTab('sharing')}>Sharing Settings</button>
-      <button className={tab === 'publicGroups' ? 'active' : ''} onClick={() => changeTab('publicGroups')}>Public Groups</button>
-      <button className={tab === 'queues' ? 'active' : ''} onClick={() => changeTab('queues')}>Queues</button>
-      <button className={tab === 'sharingRules' ? 'active' : ''} onClick={() => changeTab('sharingRules')}>Sharing Rules</button>
-    </div></></PlatformPageSlot>
+    <nav className="permission-tabs" aria-label="Permission areas">
+      {(Object.keys(permissionSections) as Array<keyof typeof permissionSections>).map(section=>{
+        const [resourceApiName,label] = permissionSections[section];
+        return <a key={section} className={tab===section?'active':''}
+          aria-current={tab===section?'page':undefined}
+          href={appRoutePath({kind:'setup',workspace:'rbac',resourceApiName})}
+          onClick={event=>{
+            if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+            event.preventDefault();
+            changeTab(section);
+          }}>{label}</a>;
+      })}
+    </nav></></PlatformPageSlot>
     <section className={`surface permission-workspace${tab === 'sharing' ? ' sharing-full-width' : ''}${(tab === 'sets'||tab==='users') ? mobilePermissionDetail ? ' md-permission-sets-detail-mode' : ' md-permission-sets-list-mode' : ''}`} style={tab === 'sharing' ? {gridTemplateColumns: 'minmax(0, 1fr)'} : undefined}>
       {tab !== 'sharing' && tab !== 'users' && <PlatformPageSlot slotKey="rbac-list"><aside className="permission-list">
         <div className="mini-search"><Search size={13} /><input placeholder={`Search ${tabLabel.toLowerCase()}…`} aria-label={`Search ${tabLabel}`} value={query} onChange={(event) => {setQuery(event.target.value);setPermissionListPage(0);}} /></div>

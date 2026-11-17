@@ -6,12 +6,12 @@
  overflow-x:auto;scrollbar-width:thin;padding:6px;border:1px solid var(--md-border,#e0e5eb);
  border-radius:var(--md-radius-md,8px);background:var(--md-surface-2,var(--md-canvas,#f8fafc));
 }
-.lightning .md-admin-tabstrip>button {
+.lightning .md-admin-tabstrip>:is(button,a) {
  flex:0 0 auto;min-height:38px;white-space:nowrap;padding:7px 12px;
  font-size:var(--md-label-size,13px);font-weight:600;color:var(--md-text,#192230);
  background:transparent;border:1px solid transparent;border-radius:var(--md-radius-md,8px);
 }
-.lightning .md-admin-tabstrip>button[aria-selected="true"] {
+.lightning .md-admin-tabstrip>:is(button[aria-selected="true"],a[aria-current="page"]) {
  color:var(--md-action-ink,var(--md-primary,#1d4ed8));background:var(--md-surface,#fff);
  border-color:var(--md-border,#e0e5eb);box-shadow:var(--md-shadow-sm,0 1px 3px rgb(0 0 0 / 5%));
 }
@@ -113,7 +113,7 @@
  .lightning .md-admin-tabpanel {padding-top:10px}
 }
 @media(pointer:coarse) {
- .lightning .md-admin-tabstrip>button,.lightning .md-admin-entity-row>.btn {min-height:44px}
+ .lightning .md-admin-tabstrip>:is(button,a),.lightning .md-admin-entity-row>.btn {min-height:44px}
 }
 
 /* Content-size and mobile overflow fixes across remaining administrative views. */
@@ -299,7 +299,7 @@
     overflow: visible;
     gap: 5px;
   }
-  .lightning .company-workspace .md-admin-tabstrip > button {
+  .lightning .company-workspace .md-admin-tabstrip > :is(button,a) {
     flex: 1 1 auto;
     min-height: 44px;
     white-space: normal;
@@ -351,7 +351,7 @@
     display:flex;flex-wrap:wrap;justify-content:flex-start;gap:5px;
     max-width:100%;overflow:visible
   }
-  .lightning .permissions-page .permission-tabs>button {
+  .lightning .permissions-page .permission-tabs>:is(button,a) {
     flex:1 1 auto;max-width:100%;min-height:44px;white-space:normal;text-align:center
   }
 }
@@ -503,3 +503,7 @@
 .md-user-form fieldset:disabled input[type=checkbox]{opacity:.85}
 .md-user-access{border:0;padding:0;margin:8px 0 0}
 @media(max-width:700px){.md-user-details-grid,.md-user-access-grid{grid-template-columns:1fr}.md-user-directory-table td:nth-child(3),.md-user-directory-table td:nth-child(4),.md-user-directory-table th:nth-child(3),.md-user-directory-table th:nth-child(4){display:none}}
+
+.lightning .md-admin-tabstrip > a{display:inline-flex;align-items:center;text-decoration:none}
+
+.lightning .permissions-page .permission-tabs > a{display:inline-flex;align-items:center;text-decoration:none}

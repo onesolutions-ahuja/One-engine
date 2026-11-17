@@ -1070,6 +1070,8 @@ export type LightningAppMetadata = {
   navigationOrder: Array<{ type: 'Object' | 'App Page'; apiName: string }>;
   brandColor: string;
   utilityItems: Array<'Notes' | 'History'>;
+  /** The App Page users land on; blank means the first App Page in navigation. */
+  homePageApiName?: string;
 };
 
 export const objectMetadata: ObjectMetadata[] = [

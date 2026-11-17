@@ -22,11 +22,19 @@
   "eventDefinitions": [
     {
       "apiName": "customButton1",
-      "label": "Inline Custom Button 1 (Delete)"
+      "label": "Row Button 1"
     },
     {
       "apiName": "customButton2",
-      "label": "Inline Custom Button 2 (View)"
+      "label": "Row Button 2"
+    },
+    {
+      "apiName": "customButton3",
+      "label": "Row Button 3"
+    },
+    {
+      "apiName": "customButton4",
+      "label": "Row Button 4"
     },
     {
       "apiName": "rowSelect",

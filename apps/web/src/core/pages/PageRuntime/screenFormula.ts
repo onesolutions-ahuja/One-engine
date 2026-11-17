@@ -1,3 +1,4 @@
+import './messageScreen';
 import {parseScreenAction} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {resolvePageActionRoute,type PageActionRoutingContext,type PageActionRoute} from './pageActionRouting';
 import {appRoutePath} from '../../workspace/Navigation/appRouting';
@@ -36,9 +37,38 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   if(!handled&&window.dispatchEvent(new CustomEvent('metadrive:workspace-formula-screen',{cancelable:true,detail:{appId:context.currentAppId,screen}})))throw Error('This page has no popup host');
  }else if(route){
   if(mode==='current')onNavigate(route);
+  else if(mode==='second')void openSecondScreen(appRoutePath(route),sessionId);
   else window.open(appRoutePath(route),'_blank','noopener');
  }
  return {navigated:true};
+}
+
+/** SCREEN(Page,"second"): one window on the second monitor (full size where the browser
+ * allows), sharing this page's session so its formulas read the same cart. Calling it
+ * again reuses (refreshes) the same window. */
+let secondWindow:Window|null=null;
+export async function openSecondScreen(path:string,sessionId:string){
+ const url=new URL(path,window.location.origin);
+ if(/^[0-9a-f-]{36}$/i.test(sessionId))url.searchParams.set('screenSession',sessionId);
+ let features='popup=yes';
+ try{
+  // Chrome/Edge: asks once to "manage windows on all displays", then places it on monitor 2.
+  const details=await (window as unknown as {getScreenDetails?:()=>Promise<{
+   screens:Array<{availLeft:number;availTop:number;availWidth:number;availHeight:number}>;currentScreen:unknown}>})
+   .getScreenDetails?.();
+  const other=details?.screens.find(screen=>screen!==details.currentScreen);
+  if(other)features='popup=yes,left='+other.availLeft+',top='+other.availTop
+   +',width='+other.availWidth+',height='+other.availHeight;
+ }catch{/* permission declined: a normal window the user drags across */}
+ if(secondWindow&&!secondWindow.closed){secondWindow.location.href=url.href;secondWindow.focus();return;}
+ secondWindow=window.open(url.href,'une-second-screen',features);
+}
+/** CLOSESCREEN("second"). */
+export function closeSecondScreen(){
+ if(secondWindow&&!secondWindow.closed)secondWindow.close();
+ else{try{window.open('','une-second-screen')?.close();}catch{/* blocked */}}
+ secondWindow=null;
+ return {closed:true};
 }
 
 export function previewPrintTemplate(page:string,recordId:string,parentKey:string,sessionId:string,appId:string){

@@ -41,6 +41,41 @@ function reduceSets(sets:RecordSetNeed[]):RecordSetNeed[]{
  return kept.map(set=>set.parent&&replaced.has(set.parent.key)?{...set,parent:{...set.parent,key:replaced.get(set.parent.key)!}}:set);
 }
 
+/** Top-level arguments of NAME(...), split at commas outside quotes and brackets. */
+function topLevelArguments(source:string,name:string):string[]|null{
+ const match=new RegExp('^\\s*=?\\s*'+name+'\\s*\\(','i').exec(source);
+ if(!match)return null;
+ const args:string[]=[];let depth=0,quote='',start=match[0].length;
+ for(let i=start;i<source.length;i++){
+  const ch=source[i];
+  if(quote){if(ch==='\\'){i++;continue;}if(ch===quote)quote='';continue;}
+  if(ch==='"'||ch==="'"){quote=ch;continue;}
+  if(ch==='('||ch==='[')depth++;
+  else if(ch===')'||ch===']'){
+   if(depth===0){
+    args.push(source.slice(start,i));
+    return source.slice(i+1).trim()?null:args;
+   }
+   depth--;
+  }else if(ch===','&&depth===0){args.push(source.slice(start,i));start=i+1;}
+ }
+ return null;
+}
+/** CONFIRMSCREEN(message, yes, [no], [yesLabel], [noLabel]) / INFOSCREEN(message, [then]). */
+export function messageScreenParts(source:string){
+ const confirm=topLevelArguments(source,'CONFIRMSCREEN');
+ if(confirm){
+  if(confirm.length<2||confirm.length>5)throw new FormulaCodeError('CONFIRMSCREEN needs a message, actions on Yes, and optional actions on No and button labels');
+  return {kind:'CONFIRM',message:confirm[0],yes:confirm[1],no:confirm[2]??'',yesLabel:confirm[3]??'',noLabel:confirm[4]??''};
+ }
+ const info=topLevelArguments(source,'INFOSCREEN');
+ if(info){
+  if(info.length<1||info.length>2)throw new FormulaCodeError('INFOSCREEN needs a message and optional actions after OK');
+  return {kind:'INFO',message:info[0],yes:info[1]??'',no:'',yesLabel:'',noLabel:''};
+ }
+ return null;
+}
+
 export function buildPageCode(compiled:CompiledPage):PageCode{
  const formulas:PageCodeFormula[]=[],actions:PageCodeAction[]=[],issues:PageCodeIssue[]=[];
  const sets:RecordSetNeed[]=[];
@@ -64,8 +99,29 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
    if(action.kind!=='Formula'&&action.kind!=='ActionPlan'&&action.kind!=='PageState'&&action.kind!=='Navigate')continue;
    if(!source.trim())continue;
    try{
+    const key=component.id+':'+action.event;
+    const box=messageScreenParts(source);
+    if(box){
+     // CONFIRMSCREEN/INFOSCREEN: the box is a screen-only action; each answer is its own
+     // action (key__yes, key__no), run after the user taps, like any other button.
+     const branch=(suffix:string,branchSource:string)=>{
+      if(!branchSource.trim())return '';
+      const code=compileActionFormula(branchSource,object);
+      actions.push({key:key+suffix,componentId:component.id,event:action.event+suffix,objectApiName:object,
+       js:code.js,data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
+      addSets(code.sets);
+      return key+suffix;
+     };
+     const yes=branch('__yes',box.yes),no=branch('__no',box.no);
+     const text=(part:string)=>part.trim()?'('+compileDisplayFormula(part,object).js+')($.row, $)':'""';
+     actions.push({key,componentId:component.id,event:action.event,objectApiName:object,
+      js:'async ($) => {\n  await $.ui('+q(box.kind)+', '+text(box.message)+', '+q(yes)+', '+q(no)+', '
+       +text(box.yesLabel)+', '+text(box.noLabel)+');\n}',
+      data:false,reads:[],writes:[],ui:[box.kind]});
+     continue;
+    }
     const code=compileActionFormula(source,object);
-    actions.push({key:component.id+':'+action.event,componentId:component.id,event:action.event,objectApiName:object,
+    actions.push({key,componentId:component.id,event:action.event,objectApiName:object,
      js:code.js,data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
     addSets(code.sets);
    }catch(error){

@@ -23,7 +23,8 @@ const componentSlots=[
  {key:'qtyDecrease',label:'− Icon'},
  {key:'customButton1',label:'Custom Button 1'},
  {key:'customButton2',label:'Custom Button 2'},
- {key:'customButton3',label:'Custom Button 3'}
+ {key:'customButton3',label:'Custom Button 3'},
+ {key:'customButton4',label:'Custom Button 4'}
 ] as const;
 type CartButtonKey=(typeof componentSlots)[number]['key'];
 const legacyLabels:Record<string,string>={
@@ -128,7 +129,7 @@ export default function PageBuilderActionRibbon({
  const members=selectedApis?.length?selectedApis:[api];
  const isCartSelection=members.length>0&&members.every(member=>member==='smart_cart');
   const hasCustomButtons=members.length>0&&members.every(member=>
-   member==='smart_cart'||member==='smart_card_grid'||member==='smart_numpad');
+   member==='smart_cart'||member==='smart_card_grid'||member==='smart_numpad'||member==='smart_table');
  const supports=(key:string)=>members.every(member=>member.startsWith('smart_')
    ?supportsSmartActionEvent(member,key)
    :eventDefinitions.some(item=>item.apiName===key));

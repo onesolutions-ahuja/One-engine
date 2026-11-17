@@ -1,3 +1,4 @@
+import {showMessageScreen} from '../PageRuntime/messageScreen';
 import * as React from 'react';
 import {createContext,useContext,useEffect,useMemo,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
 import RegisteredComponent from '../../components/RegisteredComponent/RegisteredComponent';
@@ -11,7 +12,7 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
-import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../PageRuntime/screenFormula';
+import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen,closeSecondScreen} from '../PageRuntime/screenFormula';
 import {lockTillScreen} from '../../authentication/TillDevice/tillDevice';
 import {runSequenceFlow} from '../PageRuntime/formulaFlowSequence';
 import {runtimeComponentLabel} from '../PageRuntime/smartComponentLabel';
@@ -72,6 +73,11 @@ const sessionStorageKey=(pageSessionKey:string)=>'metadrive-page-session:'+pageS
 
 function pageSessionId(pageSessionKey:string,override?:string):string{
  if(override)return override;
+ // A second-monitor screen (SCREEN(Page,"second")) shares the opener's session.
+ try{
+  const shared=new URLSearchParams(window.location.search).get('screenSession');
+  if(shared&&/^[0-9a-f-]{36}$/i.test(shared))return shared;
+ }catch{/* no location */}
  try{
   let value=window.sessionStorage.getItem(sessionStorageKey(pageSessionKey));
   if(!value){value=crypto.randomUUID();window.sessionStorage.setItem(sessionStorageKey(pageSessionKey),value);}
@@ -602,12 +608,20 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      const [first,second,third]=effect.args.map(value=>value===null||value===undefined?'':String(value));
      if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+')',navigationContext,
       onNavigate as never,runtime.pageSessionKey,session,third||String(payload.recordId??runtime.store.get().recordId??record?.Id??''));
+     else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();
      else if(effect.name==='PRINT')await previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId);
      else if(effect.name==='FLOW')await runSequenceFlow(first,availableFlows,runtime.request,onLaunchFlow);
      else if(effect.name==='NAVIGATE')await navigateTo(first,effect.args[1]);
      else if(effect.name==='FILTER')await selectFilter(first,second,second);
+     else if(effect.name==='CONFIRM'||effect.name==='INFO'){
+      // CONFIRMSCREEN / INFOSCREEN: ask, then run the answer's own action (key__yes / key__no).
+      const [message,yesKey,noKey,yesLabel,noLabel]=effect.args.map(value=>value===null||value===undefined?'':String(value));
+      const yes=await showMessageScreen({kind:effect.name==='CONFIRM'?'confirm':'info',message,yesLabel,noLabel});
+      const next=yes?yesKey:noKey;
+      if(next&&runtime.code?.hasAction(next))await runtime.code.run(next,payload,objectApiName,codeIo);
+     }
     }
    };
    // Device steps the server asks for: GPS position, or a PDF drawn from a Print Template.
@@ -621,8 +635,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     }
     throw Error(step.name+' is not a device step');
    };
-   try{
-    await runtime.code.run(codeKey,payload,objectApiName,{
+   const codeIo:Parameters<NonNullable<typeof runtime.code>['run']>[3]={
      show:update=>{
       const stateChanges=Object.entries(update.state).map(([key,value])=>({key,value}));
       if(stateChanges.length)applyState(stateChanges);
@@ -641,7 +654,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      },
      effects:runEffects,
      device
-    });
+    };
+   try{
+    await runtime.code.run(codeKey,payload,objectApiName,codeIo);
     return {updated:true};
    }catch(error){
     setActionError(error instanceof Error?error.message:'Action failed');

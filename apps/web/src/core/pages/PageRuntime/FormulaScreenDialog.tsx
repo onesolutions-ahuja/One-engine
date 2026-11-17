@@ -3,7 +3,9 @@ import type {PopupScreen} from './screenFormula';
 
 const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:12px;overflow:auto;scrollbar-gutter:stable;
  max-width:94vw;max-height:94vh;box-shadow:0 24px 64px rgba(0,0,0,.35);background:#fff}
-dialog.formula-screen-modal::backdrop{background:rgba(15,23,42,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+dialog.formula-screen-modal::backdrop{background:rgba(15,23,42,.45)}
+dialog.formula-screen-modal.formula-screen-ready::backdrop{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+dialog.formula-screen-modal,.formula-screen-card{will-change:transform,opacity}
 dialog.formula-screen-modal>.formula-screen-close{position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;
  border:0;border-radius:50%;background:rgba(15,23,42,.08);font-size:20px;line-height:36px;cursor:pointer}
 dialog.formula-screen-modal.formula-screen-page{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border-radius:0;box-shadow:none}
@@ -35,24 +37,29 @@ export function formulaScreenWidth(canvas?:{canvasWidth?:number;canvasHeight?:nu
  return `min(94vw, ${Math.round(width)}px, calc((94vh - 4px) * ${(width/height).toFixed(4)}))`;
 }
 
-/** macOS-style genie: the popup pinches into the bottom centre (and grows back out). */
+/** macOS-style genie: the popup pinches into the bottom centre (and grows back out).
+ * Transform and opacity only, so the GPU composites it with no per-frame repaint. */
 const GENIE:Keyframe[]=[
- {transform:'translateY(0) scale(1,1)',clipPath:'polygon(0 0,100% 0,100% 100%,0 100%)',opacity:1},
- {transform:'translateY(12%) scale(.86,.9)',clipPath:'polygon(0 0,100% 0,64% 100%,36% 100%)',opacity:1,offset:.45},
- {transform:'translateY(60vh) scale(.06,.12)',clipPath:'polygon(32% 0,68% 0,52% 100%,48% 100%)',opacity:0}
+ {transform:'translateY(0) scale(1,1)',opacity:1},
+ {transform:'translateY(8%) scale(.82,.88)',opacity:1,offset:.4},
+ {transform:'translateY(55vh) scale(.08,.12)',opacity:0}
 ];
 const reducedMotion=()=>typeof window!=='undefined'&&typeof window.matchMedia==='function'
  &&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-function genie(el:HTMLElement|null|undefined,closing:boolean,done?:()=>void){
- if(!el||typeof el.animate!=='function'||reducedMotion()){done?.();return;}
+export function genie(el:HTMLElement|null|undefined,closing:boolean,done?:()=>void){
+ if(!el||typeof el.animate!=='function'||reducedMotion()){el?.classList.add('formula-screen-ready');done?.();return;}
  el.style.transformOrigin='50% 100%';
+ if(closing)el.classList.remove('formula-screen-ready');
  const animation=el.animate(closing?GENIE:[...GENIE].reverse().map(frame=>frame.offset===undefined?frame:{...frame,offset:1-Number(frame.offset)}),
-  {duration:closing?300:340,easing:closing?'cubic-bezier(.5,0,.75,.15)':'cubic-bezier(.2,.8,.3,1)',fill:closing?'forwards':'none'});
- if(!done)return;
+  {duration:closing?160:200,easing:closing?'cubic-bezier(.4,0,1,1)':'cubic-bezier(.2,.9,.3,1)',fill:closing?'forwards':'none'});
  let finished=false;
- const finish=()=>{if(!finished){finished=true;done();}};
+ const finish=()=>{if(finished)return;finished=true;
+  // The backdrop blur turns on only once the popup is open: blurring during the
+  // animation made every frame redraw the whole page behind it.
+  if(!closing)el.classList.add('formula-screen-ready');
+  done?.();};
  animation.onfinish=finish;animation.oncancel=finish;
- window.setTimeout(finish,450);
+ window.setTimeout(finish,closing?260:300);
 }
 
 /**

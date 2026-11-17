@@ -210,7 +210,7 @@ export default function AppManager({
         if (validation) throw new Error(validation);
       }
       if (!draft.navigationItems.length && !draft.navigationPageApiNames.length) throw new Error('Select at least one object or active App Page.');
-      await onSave({ ...draft, apiName, label, navigationOrder }, !creating);
+      await onSave({ ...draft, apiName, label, navigationOrder, homePageApiName: homePage }, !creating);
       setCreating(false);
       setSelectedApiName(apiName);
       if (!embedded) {setView('list');updateEditorRoute(null);}
@@ -311,11 +311,27 @@ export default function AppManager({
     onOpenWorkspace?.(destination);
   };
   const steps = [
-    {id:'app-basics',name:'Basic Info',subtitle:'Enter app details'},
-    {id:'app-navigation',name:'Navigation Items',subtitle:'Choose records'},
-    {id:'app-pages',name:'App Pages',subtitle:'Choose pages'},
-    {id:'app-review',name:'Review & Create',subtitle:'Check and save'}
+    {id:'app-basics',name:'Basics'},
+    {id:'app-navigation',name:'Navigation'},
+    {id:'app-home',name:'Home Page'},
+    {id:'app-review',name:'Review & Save'}
   ];
+  const stepIndex=Math.max(0,steps.findIndex(step=>step.id===activeStep));
+  // The Home Page choices are the app's own App Pages, in navigation order.
+  const homeChoices=navigationOrder.filter(item=>item.type==='App Page').map(item=>item.apiName);
+  const homePage=homeChoices.includes(draft.homePageApiName??'')?draft.homePageApiName??'':homeChoices[0]??'';
+  const homeLabel=pages.find(page=>page.apiName===homePage)?.label??homePage;
+  const stepError=(index:number)=>{
+    if(index>=1&&!draft.label.trim())return 'Enter an App Label.';
+    if(index>=2&&!draft.navigationItems.length&&!draft.navigationPageApiNames.length)
+      return 'Select at least one object or active App Page.';
+    return '';
+  };
+  const goToStep=(index:number)=>{
+    const problem=index>stepIndex?stepError(index):'';
+    if(problem){setError(problem);return;}
+    setError('');setActiveStep(steps[index].id);
+  };
 
   return <div className="home-content app-manager-workspace">
     {(confirmDelete||confirmDiscard) && <div className="app-manager-confirm-overlay" role="presentation">
@@ -354,188 +370,151 @@ export default function AppManager({
     </> : <>
     <ol className="app-manager-stepper" aria-label="Application setup steps">
       {steps.map((step,index)=><li key={step.id} className="app-manager-step-item">
-        <a href={'#'+step.id} className={'app-manager-step'+(index===0?' is-first':'')}
+        <button type="button" className={'app-manager-step'+(index<stepIndex?' is-done':'')}
           aria-current={activeStep===step.id?'step':undefined}
           aria-label={'Step '+(index+1)+' of '+steps.length+': '+step.name}
-          onClick={event=>{event.preventDefault();setActiveStep(step.id);document.getElementById(step.id)?.scrollIntoView({behavior:'smooth',block:'center'});}}>
+          onClick={()=>goToStep(index)}>
           <span className="app-manager-step-number">{index+1}</span>
-          <span><strong>{step.name}</strong><small>{step.subtitle}</small></span>
-        </a>
+          <strong>{step.name}</strong>
+        </button>
       </li>)}
     </ol>
 
-    <div className="app-manager-layout">
-      <section className="surface permission-section app-manager app-manager-form-card" aria-label="App configuration">
-        <div className="app-manager-card-intro">
-          <h2>{creating ? 'Create New App' : 'App Details'}</h2>
-          <p>{creating ? 'Enter the details and select what to include. All steps are on this page.' : 'Edit this app without changing its existing settings until you save.'}</p>
-        </div>
-        {!creating && embedded && <label className="form-label app-manager-switcher">App
-          <select className="form-control" aria-label="Select app to edit" value={selectedApiName}
-            onChange={event => {
-              const original = apps.find(app => app.apiName === selectedApiName);
-              if (original && JSON.stringify(appDraftFromMetadata(original)) !== JSON.stringify(draft)) {setConfirmDiscard(true);return;}
-              setSelectedApiName(event.target.value); setError(''); setNotice('');
-            }}>
-            {apps.map(app => <option key={app.apiName} value={app.apiName}>{app.label}</option>)}
-          </select>
-        </label>}
-        <form onSubmit={event => void save(event)}>
-          <div id="app-basics" className="app-manager-form-section">
-            <div className="app-manager-section-title"><span>1</span><div><h3>Basic Information</h3><p>Enter the details for your application.</p></div></div>
-            <PlatformPageSlot slotKey="identity">
-              <div className="app-manager-identity-grid">
-                {appManagerFieldDefinitions.map(definition => {
-                  const field = definition.propertyKey as AppManagerFieldKey;
-                  const disabled = field === 'apiName' && !creating;
-                  const change = (next: string) => {
-                    if (field === 'label') {
-                      setDraft(current => ({
-                        ...current, label: next,
-                        apiName: creating && (!current.apiName || current.apiName === suggestAppApiName(current.label, apps))
-                          ? suggestAppApiName(next, apps) : current.apiName
-                      }));
-                      setError(''); setNotice('');
-                    } else update(field,field==='apiName'&&creating?next.toLowerCase():next);
-                  };
-                  return <div className={'app-manager-identity-' + field} key={field}>
-                    <AdminPropertyControl definition={definition} value={draft[field]}
-                      disabled={disabled} onChange={change}/>
-                    {field === 'apiName' && <small className="permission-help">
-                      New developer names are automatically lowercase and use letters, digits and underscores.
-                      AppExchange installation keys have separate rules.
-                    </small>}
-                  </div>;
-                })}
-              </div>
+    <section className="surface permission-section app-manager app-manager-form-card" aria-label="App configuration">
+      {!creating && embedded && <label className="form-label app-manager-switcher">App
+        <select className="form-control" aria-label="Select app to edit" value={selectedApiName}
+          onChange={event => {
+            const original = apps.find(app => app.apiName === selectedApiName);
+            if (original && JSON.stringify(appDraftFromMetadata(original)) !== JSON.stringify(draft)) {setConfirmDiscard(true);return;}
+            setSelectedApiName(event.target.value); setError(''); setNotice('');
+          }}>
+          {apps.map(app => <option key={app.apiName} value={app.apiName}>{app.label}</option>)}
+        </select>
+      </label>}
+      <form onSubmit={event => {
+        if(stepIndex<steps.length-1){event.preventDefault();goToStep(stepIndex+1);return;}
+        void save(event);
+      }}>
+        {activeStep==='app-basics' && <div id="app-basics" className="app-manager-form-section">
+          <PlatformPageSlot slotKey="identity">
+            <div className="app-manager-identity-grid">
+              {appManagerFieldDefinitions.map(definition => {
+                const field = definition.propertyKey as AppManagerFieldKey;
+                const disabled = field === 'apiName' && !creating;
+                const change = (next: string) => {
+                  if (field === 'label') {
+                    setDraft(current => ({
+                      ...current, label: next,
+                      apiName: creating && (!current.apiName || current.apiName === suggestAppApiName(current.label, apps))
+                        ? suggestAppApiName(next, apps) : current.apiName
+                    }));
+                    setError(''); setNotice('');
+                  } else update(field,field==='apiName'&&creating?next.toLowerCase():next);
+                };
+                return <div className={'app-manager-identity-' + field} key={field}>
+                  <AdminPropertyControl definition={definition} value={draft[field]}
+                    disabled={disabled} onChange={change}/>
+                </div>;
+              })}
+            </div>
+          </PlatformPageSlot>
+        </div>}
+
+        {activeStep==='app-navigation' && <div id="app-navigation" className="app-manager-form-section">
+          <div className="app-manager-selectors">
+            <PlatformPageSlot slotKey="pages">
+              <ChecklistMultiSelect label="App Pages (tabs)" choices={pageChoices}
+                values={draft.navigationPageApiNames} onChange={values => setNavigationSelection('App Page',values)}
+                placeholder="Select App Pages…" searchPlaceholder="Search Pages…"
+                emptyText="No Pages found. Publish an App Page using Page Builder."/>
+            </PlatformPageSlot>
+            <PlatformPageSlot slotKey="navigation-items">
+              <ChecklistMultiSelect label="Objects (records)" choices={objectChoices}
+                values={draft.navigationItems} onChange={values => setNavigationSelection('Object',values)}
+                placeholder="Select objects…" searchPlaceholder="Search Objects…"/>
             </PlatformPageSlot>
           </div>
+          <PlatformPageSlot slotKey="navigation-order"><fieldset className="app-manager-fieldset">
+            <legend>Order</legend>
+            <ol className="app-manager-navigation-order">
+              {navigationOrder.map((item,index) => {
+                const label = item.type === 'Object'
+                  ? objects.find(object => object.apiName === item.apiName)?.pluralLabel ?? item.apiName
+                  : pages.find(page => page.apiName === item.apiName)?.label ?? item.apiName;
+                return <li key={item.type + ':' + item.apiName}>
+                  <span className="app-manager-navigation-label"><strong>{label}</strong><small>{item.type}</small></span>
+                  <div className="app-manager-order-controls">
+                    <button type="button" className="btn btn-small" aria-label={'Move ' + label + ' up'}
+                      disabled={index === 0 || busy} onClick={() => moveNavigation(index,index - 1)}><ArrowUp size={14}/></button>
+                    <button type="button" className="btn btn-small" aria-label={'Move ' + label + ' down'}
+                      disabled={index === navigationOrder.length - 1 || busy} onClick={() => moveNavigation(index,index + 1)}><ArrowDown size={14}/></button>
+                    <button type="button" className="btn btn-small" disabled={busy}
+                      aria-label={'Remove ' + label + ' from navigation'} onClick={() => toggleNavigation(item.type,item.apiName,false)}><Trash2 size={14}/></button>
+                  </div>
+                </li>;
+              })}
+            </ol>
+            {!navigationOrder.length && <span className="permission-help">Select at least one App Page or object.</span>}
+          </fieldset></PlatformPageSlot>
+        </div>}
 
-          <div className="app-manager-selectors">
-            <section id="app-navigation" className="app-manager-form-section">
-              <div className="app-manager-section-title"><span>2</span>
-                <div><h3>Navigation Items</h3><p>Choose Objects to show in this app's Records selector.</p></div>
-              </div>
-              <PlatformPageSlot slotKey="navigation-items">
-                <ChecklistMultiSelect label="Select navigation items" choices={objectChoices}
-                  values={draft.navigationItems} onChange={values => setNavigationSelection('Object',values)}
-                  placeholder="Select navigation items…" searchPlaceholder="Search Objects…"/>
-              </PlatformPageSlot>
-            </section>
-            <section id="app-pages" className="app-manager-form-section">
-              <div className="app-manager-section-title"><span>3</span>
-                <div><h3>App Pages</h3><p>Choose active Pages to show as app navigation tabs.</p></div>
-              </div>
-              <PlatformPageSlot slotKey="pages">
-                <ChecklistMultiSelect label="Select App Pages" choices={pageChoices}
-                  values={draft.navigationPageApiNames} onChange={values => setNavigationSelection('App Page',values)}
-                  placeholder="Select App Pages…" searchPlaceholder="Search Pages…"
-                  emptyText="No Pages found. Publish an App Page using Page Builder."/>
-              </PlatformPageSlot>
-            </section>
-          </div>
-          <p className="app-manager-selector-note">Select at least one Object or App Page. Draft Pages cannot be added until activated.</p>
+        {activeStep==='app-home' && <div id="app-home" className="app-manager-form-section">
+          <label className="form-label" htmlFor="app-home-page">Home Page
+            <select id="app-home-page" className="form-control" value={homePage} disabled={!homeChoices.length}
+              onChange={event=>update('homePageApiName',event.target.value)}>
+              {homeChoices.map(name=><option key={name} value={name}>{pages.find(page=>page.apiName===name)?.label??name}</option>)}
+            </select>
+          </label>
+          <p className="permission-help">{homeChoices.length
+            ?'Users land on this page when they open the app. It defaults to the first App Page.'
+            :'Add an App Page in Navigation to choose a Home Page.'}</p>
+          {assignedPages.some(page=>page.pageType==='Home Page') && <p className="permission-help">
+            A Home Page assigned in Page Builder ({assignedPages.filter(page=>page.pageType==='Home Page').map(page=>page.label).join(', ')}) still takes priority.</p>}
+        </div>}
 
-          <details className="app-manager-advanced">
-            <summary>Additional settings <small>Navigation order, assigned Pages and utility bar</small></summary>
-            <div className="app-manager-advanced-inner">
-              <PlatformPageSlot slotKey="assignments"><fieldset className="app-manager-fieldset">
-                <legend>Activated Pages for This App</legend>
-                <p>Active Home and Record Pages assigned to the selected app.</p>
-                <div className="app-manager-assigned-pages">
-                  {assignedPages.map(page => <div className="app-manager-assigned-page" key={page.apiName}>
-                    <span><strong>{page.label}</strong><small>{page.pageType} · {(page.activationAssignments ?? [])
-                      .filter(assignment => assignment.appId === selectedApiName)
-                      .map(assignment => assignment.scope).join(', ')}</small></span>
-                    {embedded && onOpenPage && <button className="text-action" type="button" onClick={() => onOpenPage(page.apiName)}>Edit in Builder</button>}
-                  </div>)}
-                  {!assignedPages.length && <span className="permission-help">No active Home or Record Pages are assigned to this app.</span>}
-                </div>
-              </fieldset></PlatformPageSlot>
-              <PlatformPageSlot slotKey="navigation-order"><fieldset className="app-manager-fieldset">
-                <legend>Navigation Order</legend>
-                <p>Set the order of selected Object tabs and App Pages.</p>
-                <ol className="app-manager-navigation-order">
-                  {navigationOrder.map((item,index) => {
-                    const label = item.type === 'Object'
-                      ? objects.find(object => object.apiName === item.apiName)?.pluralLabel ?? item.apiName
-                      : pages.find(page => page.apiName === item.apiName)?.label ?? item.apiName;
-                    return <li key={item.type + ':' + item.apiName}>
-                      <span className="app-manager-navigation-label"><small>{item.type}</small><strong>{label}</strong></span>
-                      <div className="app-manager-order-controls">
-                        <button type="button" className="btn btn-small" aria-label={'Move ' + label + ' up'}
-                          disabled={index === 0 || busy} onClick={() => moveNavigation(index,index - 1)}><ArrowUp size={15}/></button>
-                        <button type="button" className="btn btn-small" aria-label={'Move ' + label + ' down'}
-                          disabled={index === navigationOrder.length - 1 || busy} onClick={() => moveNavigation(index,index + 1)}><ArrowDown size={15}/></button>
-                        <button type="button" className="btn btn-small" disabled={busy}
-                          aria-label={'Remove ' + label + ' from navigation'} onClick={() => toggleNavigation(item.type,item.apiName,false)}>Remove</button>
-                      </div>
-                    </li>;
-                  })}
-                </ol>
-                {!navigationOrder.length && <span className="permission-help">Select at least one Object or App Page above.</span>}
-              </fieldset></PlatformPageSlot>
-              <PlatformPageSlot slotKey="utility"><fieldset className="app-manager-fieldset">
-                <legend>Utility Bar</legend>
-                <div className="app-manager-checks">
-                  {(['Notes','History'] as const).map(item => <label key={item} htmlFor={'app-utility-'+item.toLowerCase()}>
-                    <input id={'app-utility-'+item.toLowerCase()} name="app-utility-items" type="checkbox" checked={draft.utilityItems.includes(item)}
-                      onChange={event => update('utilityItems',event.target.checked
-                        ? [...draft.utilityItems,item]
-                        : draft.utilityItems.filter(utility => utility !== item))}/>{item}
-                  </label>)}
-                </div>
-              </fieldset></PlatformPageSlot>
+        {activeStep==='app-review' && <div id="app-review" className="app-manager-form-section">
+          <dl className="app-manager-review">
+            <div><dt>App</dt><dd>{draft.label||'—'} <small>{draft.apiName}</small></dd></div>
+            <div><dt>App Pages</dt><dd>{displayPageNames.join(', ')||'None'}</dd></div>
+            <div><dt>Objects</dt><dd>{displayObjectNames.join(', ')||'None'}</dd></div>
+            <div><dt>Home Page</dt><dd>{homeLabel||'None'}</dd></div>
+          </dl>
+          <PlatformPageSlot slotKey="utility"><fieldset className="app-manager-fieldset">
+            <legend>Utility Bar</legend>
+            <div className="app-manager-checks">
+              {(['Notes','History'] as const).map(item => <label key={item} htmlFor={'app-utility-'+item.toLowerCase()}>
+                <input id={'app-utility-'+item.toLowerCase()} name="app-utility-items" type="checkbox" checked={draft.utilityItems.includes(item)}
+                  onChange={event => update('utilityItems',event.target.checked
+                    ? [...draft.utilityItems,item]
+                    : draft.utilityItems.filter(utility => utility !== item))}/>{item}
+              </label>)}
             </div>
+          </fieldset></PlatformPageSlot>
+          <details className="app-manager-readiness">
+            <summary>Setup checks</summary>
+            <AppSetupGuide app={draft} apps={apps} objects={objects} pages={pages}
+              flows={flows} libraryComponents={libraryComponents} reports={reports} dashboards={dashboards}
+              creating={creating} request={request} onOpenWorkspace={openSetupWorkspace}/>
           </details>
+        </div>}
 
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {notice && <p className="form-success" role="status">{notice}</p>}
-          <div id="app-review" className="app-manager-review-line">
-            <strong>Ready to {creating ? 'create' : 'save'}?</strong>
-            <span>{draft.navigationItems.length} navigation items · {draft.navigationPageApiNames.length} App Pages</span>
-          </div>
-          <PlatformPageSlot slotKey="actions"><div className="app-manager-actions">
-            {!embedded && <button className="btn" type="button" disabled={busy} onClick={returnToList}>Cancel</button>}
-            {!creating && <button className="btn" type="button" disabled={busy || apps.length <= 1}
-              ref={deleteTrigger} onClick={() => setConfirmDelete(true)}><Trash2 size={14}/>Delete App</button>}
-            <button className="btn btn-brand" type="submit"
-              disabled={busy || (!draft.navigationItems.length && !draft.navigationPageApiNames.length)}>
-              {busy ? 'Saving…' : creating ? 'Create App' : 'Save Changes'}
-              {!busy && <Save size={14}/>}
-            </button>
-          </div></PlatformPageSlot>
-        </form>
-      </section>
-
-      <aside className="app-manager-help-column" aria-label="Application setup help">
-        <section className="app-manager-side-card">
-          <h2>What happens next?</h2>
-          <ol className="app-manager-help-steps">
-            <li><span>1</span><div><strong>Enter app details</strong><p>Choose a label, developer name, description and colour.</p></div></li>
-            <li><span>2</span><div><strong>Select navigation items</strong><p>Choose Objects for the app's Records selector.</p></div></li>
-            <li><span>3</span><div><strong>Select App Pages</strong><p>Add active Pages to your app navigation.</p></div></li>
-            <li><span>4</span><div><strong>Review and create</strong><p>Check your selections and save the app.</p></div></li>
-          </ol>
-          <p className="app-manager-help-tip">You can select several options inside each searchable dropdown.</p>
-        </section>
-
-        <section className="app-manager-side-card app-manager-selection-summary">
-          <h2>Your selection</h2>
-          <div><strong>{draft.navigationItems.length} navigation items</strong>
-            <p>{displayObjectNames.join(', ') || 'No Objects selected'}</p></div>
-          <div><strong>{draft.navigationPageApiNames.length} App Pages</strong>
-            <p>{displayPageNames.join(', ') || 'No App Pages selected'}</p></div>
-        </section>
-
-        <details className="app-manager-readiness">
-          <summary>Application setup review <span>Configuration and dependency checks</span></summary>
-          <AppSetupGuide app={draft} apps={apps} objects={objects} pages={pages}
-            flows={flows} libraryComponents={libraryComponents} reports={reports} dashboards={dashboards}
-            creating={creating} request={request} onOpenWorkspace={openSetupWorkspace}/>
-        </details>
-      </aside>
-    </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {notice && <p className="form-success" role="status">{notice}</p>}
+        <PlatformPageSlot slotKey="actions"><div className="app-manager-actions">
+          {!creating && <button className="btn app-manager-delete" type="button" disabled={busy || apps.length <= 1}
+            ref={deleteTrigger} onClick={() => setConfirmDelete(true)}><Trash2 size={14}/>Delete</button>}
+          {!embedded && <button className="btn" type="button" disabled={busy} onClick={returnToList}>Cancel</button>}
+          {stepIndex>0 && <button className="btn" type="button" disabled={busy} onClick={()=>goToStep(stepIndex-1)}>Back</button>}
+          {stepIndex<steps.length-1
+            ? <button className="btn btn-brand" type="submit" disabled={busy}>Next</button>
+            : <button className="btn btn-brand" type="submit"
+                disabled={busy || (!draft.navigationItems.length && !draft.navigationPageApiNames.length)}>
+                {busy ? 'Saving…' : creating ? 'Create App' : 'Save Changes'}
+                {!busy && <Save size={14}/>}
+              </button>}
+        </div></PlatformPageSlot>
+      </form>
+    </section>
     </>}
   </div>;
 }

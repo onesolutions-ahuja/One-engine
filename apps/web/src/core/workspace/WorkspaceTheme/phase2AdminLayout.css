@@ -479,3 +479,26 @@
   }
   .lightning .md-admin-table-wrap .md-audit-table{min-width:0;width:100%;table-layout:auto}
 }
+
+/* Users: one compact list with view/edit icons, then one user form. */
+.permission-workspace:has(.md-user-directory),.permission-workspace:has(.md-user-form){grid-template-columns:minmax(0,1fr)!important}
+.md-user-directory-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.md-user-directory-toolbar .mini-search{flex:0 1 320px}
+.md-user-directory-table{width:100%;font-size:13px}
+.md-user-directory-table th,.md-user-directory-table td{padding:6px 10px;white-space:nowrap}
+.md-user-directory-table td:nth-child(2){color:var(--md-muted,#64748b)}
+.md-user-directory-actions{text-align:right;width:1%}
+.md-user-directory-actions .icon-button{width:28px;height:28px}
+.md-user-status{display:inline-block;padding:1px 8px;border-radius:10px;background:#eef1f5;color:#5b6676;font-size:12px}
+.md-user-status.is-active{background:#e6f4ea;color:#1e6b34}
+.md-user-form{max-width:960px}
+.md-user-form-header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.md-user-form-header h2{margin:0;font-size:18px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.md-user-form-actions{display:flex;gap:6px}
+.md-user-details-grid,.md-user-access-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;border:0;padding:0;margin:0}
+.md-user-details-grid .form-label,.md-user-access-grid .form-label{margin:0}
+.md-user-active{align-self:end;padding-bottom:8px}
+.md-user-form fieldset:disabled .form-control{background:transparent;border-color:transparent;padding-left:0;color:inherit;appearance:none}
+.md-user-form fieldset:disabled input[type=checkbox]{opacity:.85}
+.md-user-access{border:0;padding:0;margin:8px 0 0}
+@media(max-width:700px){.md-user-details-grid,.md-user-access-grid{grid-template-columns:1fr}.md-user-directory-table td:nth-child(3),.md-user-directory-table td:nth-child(4),.md-user-directory-table th:nth-child(3),.md-user-directory-table th:nth-child(4){display:none}}

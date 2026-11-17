@@ -668,6 +668,12 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
     item.fields.some((field) => currentFieldAccess[`${item.apiName}.${field.apiName}`]?.read)
   ), [objects, currentFieldAccess]);
   useEffect(() => { setRecordSearch(''); }, [route.kind, route.kind === 'record-list' || route.kind === 'record-detail' ? route.objectApiName : '']);
+  // Users are managed in one place: Setup > Users (list, view, edit and access together).
+  useEffect(() => {
+    if ((route.kind === 'record-list' || route.kind === 'record-detail') && route.objectApiName === 'User')
+      navigateRoute({ kind: 'setup', workspace: 'rbac', resourceApiName: 'Users',
+        ...(route.kind === 'record-detail' && route.recordId ? { resourceId: route.recordId } : {}) });
+  }, [route]);
   const appUtilityRef = useRef<HTMLDivElement>(null);
   useDismissOnOutside(appUtilityRef, Boolean(activeUtility), () => setActiveUtility(null));
   const filteredSetupGroups = useMemo(() => {

@@ -404,6 +404,7 @@ function SmartSelector({p,fire}){
  const fingerprint=JSON.stringify(options.map(item=>[item.label,item.value]));
  const [active,setActive]=React.useState(0);
  React.useEffect(()=>setActive(0),[fingerprint]);
+ if(p.selectorMultiSelect===true)return <SmartMultiSelector p={p} fire={fire} options={options} fingerprint={fingerprint}/>;
  const selected=options.length?Math.max(0,Math.min(active,options.length-1)):-1;
  const placeholder=text(scopedExpression(p,"label",p.placeholder??p.label??"Select",recordOf(p)));
  return <div className="smart-selector"
@@ -430,6 +431,60 @@ function SmartSelector({p,fire}){
    {options.length?options.map(item=><option value={String(item.index)} key={item.index}>{item.label}</option>)
     :<option value="">No options</option>}
   </select>
+ </div>;
+}
+/** Multi-select: a compact button ("Categories (3)") opening a checkbox list with
+ * search, Select all and Clear. Its value is the ticked values joined by ";", so a
+ * filter reads it with INCLUDES(@ThisPage.Name.Selected.Value, @Object.Field).
+ * Nothing ticked = blank value (show everything). */
+function SmartMultiSelector({p,fire,options,fingerprint}){
+ const [picked,setPicked]=React.useState(()=>new Set());
+ const [open,setOpen]=React.useState(false);
+ const [query,setQuery]=React.useState("");
+ const root=React.useRef(null);
+ React.useEffect(()=>{setPicked(current=>new Set([...current].filter(value=>options.some(item=>String(item.value)===value))));},[fingerprint]);
+ React.useEffect(()=>{
+  if(!open)return;
+  const away=event=>{if(root.current&&!root.current.contains(event.target))setOpen(false);};
+  const key=event=>{if(event.key==="Escape")setOpen(false);};
+  document.addEventListener("pointerdown",away);document.addEventListener("keydown",key);
+  return ()=>{document.removeEventListener("pointerdown",away);document.removeEventListener("keydown",key);};
+ },[open]);
+ const publish=next=>{
+  setPicked(next);
+  const chosen=options.filter(item=>next.has(String(item.value)));
+  fire("change",{value:chosen.map(item=>String(item.value)).join(";"),
+   label:chosen.map(item=>item.label).join(", ")});
+ };
+ const toggle=value=>{const next=new Set(picked);if(next.has(value))next.delete(value);else next.add(value);publish(next);};
+ const term=query.trim().toLowerCase();
+ const visible=options.filter(item=>!term||item.label.toLowerCase().includes(term));
+ const caption=text(scopedExpression(p,"label",p.placeholder??p.label??"Select",recordOf(p)));
+ return <div className="smart-selector smart-multi-selector" ref={root}
+   style={{fontSize:number(p.textSize,16),color:p.labelColor||"#263b56",
+    "--smart-selector-bg":p.backgroundColor||"#fff","--smart-selector-fg":p.labelColor||"#263b56",
+    "--smart-selector-focus":p.defaultValueColor||"#2563eb"}}>
+  <button type="button" className="smart-selector-control smart-multi-selector-button" aria-haspopup="listbox"
+   aria-expanded={open} disabled={p.disabled===true||options.length===0}
+   style={{textAlign:p.labelAlignment||"left",
+    border:p.borderColor?"1px solid "+p.borderColor:"1px solid #b8c7d7",
+    ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}
+   onClick={()=>{if(!p.builderPreview)setOpen(value=>!value);}}>
+   <span>{caption}{picked.size?" ("+picked.size+")":""}</span><span aria-hidden="true">▾</span>
+  </button>
+  {open&&<div className="smart-multi-selector-panel" role="listbox" aria-multiselectable="true" aria-label={caption}>
+   <input className="smart-multi-selector-search" type="search" placeholder="Search…" aria-label={"Search "+caption}
+    value={query} onChange={event=>setQuery(event.target.value)} autoFocus/>
+   <div className="smart-multi-selector-tools">
+    <button type="button" onClick={()=>publish(new Set(options.map(item=>String(item.value))))}>Select all</button>
+    <button type="button" onClick={()=>publish(new Set())}>Clear</button>
+   </div>
+   <div className="smart-multi-selector-list">
+    {visible.map(item=>{const value=String(item.value);return <label key={item.index} className="smart-multi-selector-item">
+     <input type="checkbox" checked={picked.has(value)} onChange={()=>toggle(value)}/>{item.label}</label>;})}
+    {!visible.length&&<p className="smart-multi-selector-empty">No matches</p>}
+   </div>
+  </div>}
  </div>;
 }
 function SmartLookup({p,style,fire}){

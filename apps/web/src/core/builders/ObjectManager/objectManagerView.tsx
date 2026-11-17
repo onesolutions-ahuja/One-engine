@@ -1,3 +1,4 @@
+import {appRoutePath} from '../../workspace/Navigation/appRouting';
 import {generateMetadataApiName} from '../../metadata/Definitions/metadataApiNames';
 import { PicklistValueRows } from './PicklistValueRows';
 import {confirmDestructiveAction} from '../../components/ConfirmAction/confirmDestructiveAction';
@@ -1901,7 +1902,7 @@ function ObjectManager({
       {visibleObjects.length>0&&<div ref={objectListScrollRef} className="table-scroll object-manager-desktop-list"><table className="slds-table">
         <thead><tr>
           {([['label','Object label'],['apiName','API name'],['kind','Type']] as const).map(([key,label])=>
-            <th key={key} aria-sort={objectSortKey===key?(objectSortDescending?'descending':'ascending'):undefined}><button type="button" onClick={()=>changeObjectSort(key)}>{label} {objectSortKey===key&&<span className="md-sort-indicator" aria-hidden="true">{objectSortDescending?'↓':'↑'}</span>}</button></th>)}
+            <th scope="col" key={key} aria-sort={objectSortKey===key?(objectSortDescending?'descending':'ascending'):undefined}><button type="button" onClick={()=>changeObjectSort(key)}>{label} {objectSortKey===key&&<span className="md-sort-indicator" aria-hidden="true">{objectSortDescending?'↓':'↑'}</span>}</button></th>)}
           {showDescriptionColumn&&<th>Description</th>}{showDeploymentColumn&&<th>Deployment</th>}
           <th aria-sort={objectSortKey==='fields'?(objectSortDescending?'descending':'ascending'):undefined}><button type="button" onClick={()=>changeObjectSort('fields')}>Fields {objectSortKey==='fields'&&<span className="md-sort-indicator" aria-hidden="true">{objectSortDescending?'↓':'↑'}</span>}</button></th>
         </tr></thead>
@@ -1916,10 +1917,13 @@ function ObjectManager({
       <div className="object-manager-mobile-sort"><label htmlFor="object-mobile-sort">Sort objects</label><select id="object-mobile-sort" value={objectSortKey} onChange={event=>{const key=event.target.value as typeof objectSortKey;if(key!==objectSortKey)changeObjectSort(key);}}><option value="label">Label</option><option value="apiName">API name</option><option value="kind">Type</option><option value="fields">Field count</option></select><button type="button" className="btn object-manager-sort-direction" onClick={()=>{setObjectSortDescending(value=>!value);setObjectListPage(0);resetObjectListScroll();}} aria-label={'Sort '+(objectSortDescending?'ascending':'descending')} title={'Sort '+(objectSortDescending?'ascending':'descending')}>{objectSortDescending?'↓ Descending':'↑ Ascending'}</button></div>
       <div className="object-manager-mobile-list" role="list" aria-label="Objects">
         {paginatedObjects.map(item => <div role="listitem" key={item.apiName}>
-          <button type="button" className="object-manager-mobile-row" onClick={() => onObjectSelect(item)}>
-            <span className="object-manager-mobile-row-labels"><strong>{item.label}</strong><small>{item.apiName}</small></span>
+          <a className="object-manager-mobile-row"
+            href={appRoutePath({kind:'setup',workspace:'object-manager',objectApiName:item.apiName,setting:'Details'})}
+            onClick={event=>{if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();onObjectSelect(item);}}>
+            <span className="object-manager-mobile-row-labels"><strong>{item.label}</strong><small>{item.apiName}</small>
+              <small>{item.kind} · {item.fields.length} {item.fields.length===1?'field':'fields'}</small></span>
             <ChevronRight size={20} aria-hidden="true" />
-          </button>
+          </a>
         </div>)}
       </div>
       {!visibleObjects.length && <div className="empty-state" role="status">
@@ -1949,10 +1953,11 @@ function ObjectManager({
             <div className="object-title-actions"><button type="button" className="btn" onClick={() => void validateDraft()}>Validate Draft</button><button type="button" className="btn" onClick={onOpenRecords}><Database size={14} />View Records</button></div></div></PlatformPageSlot>
           <div className="md-object-editor-split md-builder-frame">
             <PlatformPageSlot slotKey="object-subnav"><nav className="object-subnav" aria-label="Object settings">
-              {objectSettings.map((setting) => <button type="button" key={setting}
+              {objectSettings.map((setting) => <a key={setting} href={appRoutePath(setting==='Objects'?{kind:'setup',workspace:'object-manager'}:
+                {kind:'setup',workspace:'object-manager',objectApiName:object.apiName,setting})}
                 className={selectedSetting === setting ? 'active' : ''}
                 aria-current={selectedSetting === setting ? 'page' : undefined}
-                onClick={() => onSettingSelect(setting)}>{setting}</button>)}
+                onClick={event=>{if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();onSettingSelect(setting);}}>{setting}</a>)}
             </nav>
             <label className="md-object-settings-picker">Object settings
               <select aria-label="Choose object setting" value={selectedSetting}

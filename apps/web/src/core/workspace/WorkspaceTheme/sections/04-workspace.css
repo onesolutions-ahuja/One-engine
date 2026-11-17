@@ -105,7 +105,7 @@ body, .workspace, .object-manager, .analytics-page, .home-content { background-c
 .btn-brand { color: #fff; border-color: var(--brand); background: var(--brand); }
 .btn-brand:hover { border-color: var(--brand-dark); background: var(--brand-dark); }
 .object-title-icon, .record-object-icon, .mini-record-icon { background: var(--brand); }
-.object-subnav button.active::after, .record-tabs button.active::after { background: var(--brand); }
+.object-subnav :is(button,a).active::after, .record-tabs button.active::after { background: var(--brand); }
 .record-tabs button.active { color: var(--brand); }
 .welcome-banner { border-color: var(--border); }
 .welcome-art { background: linear-gradient(135deg, #e9e5df, #d9d5ce 54%, #c8c4bb); }

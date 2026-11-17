@@ -549,25 +549,25 @@
 /* File-level UI audit: shared Core chrome, not tenant-authored page content. */
 .lightning .icon-button {min-width:var(--md-control-height,40px);min-height:var(--md-control-height,40px)}
 .lightning .user-menu {font-size:var(--md-fs-md,13px);min-height:var(--md-control-height,40px)}
-.lightning .object-toggle button,.lightning .object-subnav button {
+.lightning .object-toggle button,.lightning .object-subnav :is(button,a) {
  min-height:var(--md-control-height,40px);height:auto;font-size:var(--md-fs-md,13px)
 }
 .lightning .mini-search,.lightning .quick-find-input,.lightning .object-search,.lightning .component-search {min-height:var(--md-control-height,40px)}
 .lightning .mini-search input {font-size:var(--md-fs-sm,12px)}
 .lightning .welcome-quick button {min-height:var(--md-control-height,40px)}
 .lightning .notification-panel {right:max(0px,env(safe-area-inset-right,0px));max-width:calc(100vw - 16px)}
-.lightning :is(.icon-button,.user-menu,.object-toggle button,.object-subnav button,.primary-tab,.header-page-tab,.mini-search input,.welcome-quick button,.record-tabs button,.builder-icon-rail button):focus-visible {
+.lightning :is(.icon-button,.user-menu,.object-toggle button,.object-subnav :is(button,a),.primary-tab,.header-page-tab,.mini-search input,.welcome-quick button,.record-tabs button,.builder-icon-rail button):focus-visible {
  outline:2px solid var(--md-focus-ring,var(--md-primary,#1d4ed8));outline-offset:2px;
 }
 @media(pointer:coarse) {
- .lightning :is(.icon-button,.user-menu,.object-toggle button,.object-subnav button,.primary-tab,.header-page-tab,.welcome-quick button) {
+ .lightning :is(.icon-button,.user-menu,.object-toggle button,.object-subnav :is(button,a),.primary-tab,.header-page-tab,.welcome-quick button) {
   min-height:var(--md-control-touch,44px);
  }
  .lightning .icon-button {min-width:var(--md-control-touch,44px);width:var(--md-control-touch,44px)}
  .lightning .mini-search {min-height:var(--md-control-touch,44px)}
 }
 @media(prefers-reduced-motion:reduce) {
- .lightning :is(.icon-button,.user-menu,.object-toggle button,.object-subnav button,.primary-tab,.header-page-tab,.welcome-quick button,.notification-panel) {
+ .lightning :is(.icon-button,.user-menu,.object-toggle button,.object-subnav :is(button,a),.primary-tab,.header-page-tab,.welcome-quick button,.notification-panel) {
   animation:none;transition:none;scroll-behavior:auto;
  }
 }

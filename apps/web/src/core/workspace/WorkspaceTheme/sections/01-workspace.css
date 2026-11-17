@@ -210,9 +210,9 @@ h1, h2, h3, p { margin-top: 0; }
 .object-titlebar h1 { margin: 1px 0 0; font-size: 19px; }
 .object-title-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .object-subnav { display: flex; gap: 16px; overflow-x: auto; overflow-y: hidden; border-bottom: 1px solid var(--md-border,#e0e5eb); margin-bottom: 21px; background: #f3f3f3; scrollbar-width: thin; }
-.object-subnav button { position: relative; height: 38px; flex: 0 0 auto; border: 0; padding: 0 2px; background: transparent; color: var(--md-text,#192230); font-size: var(--md-fs-sm,12px); }
-.object-subnav button.active { color: #181818; font-weight: 700; }
-.object-subnav button.active::after { position: absolute; content: ''; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 2px 2px 0 0; background: var(--md-primary,#1d4ed8); }
+.object-subnav :is(button,a) { position: relative; height: 38px; flex: 0 0 auto; border: 0; padding: 0 2px; background: transparent; color: var(--md-text,#192230); font-size: var(--md-fs-sm,12px); }
+.object-subnav :is(button,a).active { color: #181818; font-weight: 700; }
+.object-subnav :is(button,a).active::after { position: absolute; content: ''; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 2px 2px 0 0; background: var(--md-primary,#1d4ed8); }
 .object-subnav::-webkit-scrollbar { height: 6px; }
 .object-subnav::-webkit-scrollbar-thumb { border-radius: 3px; background: #b7b7b7; }
 @media (min-width: 1121px) {

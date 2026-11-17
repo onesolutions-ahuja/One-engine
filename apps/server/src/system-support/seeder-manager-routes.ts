@@ -9,6 +9,7 @@ import {CART_OBJECTS} from '../app-seeders/cart-objects.js';
 import {APPOINTMENT_OBJECTS} from '../app-seeders/core-appointment-objects.js';
 import {COMMUNICATION_OBJECTS,COMMUNICATION_ACTIVITY_FIELDS} from '../app-seeders/core-communication-objects.js';
 import {LOCATION_SRN_FIELDS} from '../app-seeders/core-location-srn.js';
+import {TILL_NUMBERING_FIELDS} from '../app-seeders/core-till-numbering.js';
 import {CORE_CASH_LEDGER_FIELDS} from '../app-seeders/core-cash-ledger.js';
 import {PRODUCT_IMAGE_FIELD} from '../app-seeders/product-image-field.js';
 import {seedCoreObjects} from '../app-seeders/core-objects.js';
@@ -48,6 +49,9 @@ function coreCatalog():SeedObject[]{
    apiName:f.api,label:f.label,dataType:f.type,
    ...('related' in f?{relatedObject:f.related}: {})
   })));
+ // Order belongs to the app that installs it: not reported as missing from Core.
+ for(const o of TILL_NUMBERING_FIELDS)if(!o.appOwned)add(o.object,o.label??o.object,o.fields.map(f=>({
+  apiName:f.api,label:f.label,dataType:f.type,...(f.related?{relatedObject:f.related}:{})})));
  add('CashLedger','Cash Ledger',CORE_CASH_LEDGER_FIELDS.map(f=>({
   apiName:f.api,label:f.label,dataType:f.type,
   ...('related' in f?{relatedObject:f.related}: {})

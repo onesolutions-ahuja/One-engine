@@ -11,4 +11,7 @@ export async function seedInstalledAppMetadata(
  // AppExchange has already checked the tenant's licence and installation.
  const {isConnectorApp,installConnectorApp}=await import('./connector-apps.js');
  if(isConnectorApp(appApiName))await installConnectorApp(client,tenantId,appApiName);
+ // An app that brings Order gets its numbering fields now, not at the next server start.
+ const {seedTillNumberingMetadata}=await import('./core-till-numbering.js');
+ await seedTillNumberingMetadata(client,tenantId);
 }

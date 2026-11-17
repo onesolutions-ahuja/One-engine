@@ -86,6 +86,8 @@ function pageValueCode(page:PageReference):string{
  switch(page.kind){
   case 'session':return '$.sessionId';
   case 'cart':return '$.session("cartId")';
+  case 'till':return '$.till('+q(page.field)+')';
+  case 'device':return '$.device('+q(page.field)+')';
   case 'user':return '$.session('+q('user.'+USER_FIELDS[page.field])+')';
   case 'company':return page.field==='Id'?'$.session("tenant.id")':'$.tenant('+q(page.field.toLowerCase())+')';
   case 'selected':return '$.componentState('+q(page.name)+', '+q(page.field)+')';

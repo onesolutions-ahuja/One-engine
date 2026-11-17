@@ -44,6 +44,10 @@ export type PageCodeRequest={
  timeZone?:string;
  /** Answers of device steps (LOCATION, CREATEPDF) the browser ran when asked. */
  device?:Record<string,unknown>;
+ /** This device's key (made on the device; the server maps it to a Till). */
+ deviceKey?:string;
+ /** Seen by the server itself, never sent by the browser: for audit. */
+ deviceIp?:string;deviceAgent?:string;
 };
 /** The action needs a device step from the browser; nothing was saved. */
 export class DeviceStepNeeded extends Error{
@@ -136,6 +140,18 @@ class ServerScope{
   return map[path]??'';
  }
  tenant(name:string){return name==='name'?this.identity?.tenant.name??'':this.identity?.tenant.logo??'';}
+ private tillRow:Row|null=null;
+ /** Read once before the code runs (page values are plain, synchronous reads). */
+ async loadTill(){this.tillRow=await findDeviceTill(this.records,this.actor,this.request.deviceKey);}
+ /** @ThisPage.Till.*: the active Till whose DeviceKey is this device's key ('' when not set up). */
+ till(field:string){
+  const value=this.tillRow?.[field];
+  return value===undefined||value===null?'':value;
+ }
+ device(field:string){
+  const value=field==='Key'?this.request.deviceKey:field==='Ip'?this.request.deviceIp:field==='Agent'?this.request.deviceAgent:undefined;
+  return value??'';
+ }
  component(){throw Error('A component\'s live value is only available in the browser');}
  /** @ThisPage.PayButton.CartTotal on the server: the value that action saved. */
  pageValue(_name:string,key:string){return this.state(key);}
@@ -333,9 +349,12 @@ async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{ide
  const [identity,connections]=await Promise.all([
   needs.identity?trustedFormulaSession(deps.db,actor):Promise.resolve(null),
   needs.connections?loadConnectionSnapshot(deps.db,actor.tenant_id):Promise.resolve(null)]);
- return new ServerScope(deps.records,actor,request,identity,connections as ConnectionSnapshot|null,
+ const scope=new ServerScope(deps.records,actor,request,identity,connections as ConnectionSnapshot|null,
   deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null,
   {db:deps.db as SqlPersistence,rbac:deps.rbac});
+ // Only a request from a page that reads @ThisPage.Till/Device carries a device key.
+ if(request.deviceKey)await scope.loadTill();
+ return scope;
 }
 /** At most 10 small answers (a position, a file id): data only, used like any user input. */
 function deviceAnswers(value:unknown):Record<string,unknown>|undefined{
@@ -348,7 +367,24 @@ function deviceAnswers(value:unknown):Record<string,unknown>|undefined{
  }
  return out;
 }
-export function parsePageCodeRequest(body:unknown):PageCodeRequest{
+/** Device keys are made on the device: a random UUID (browser) or the OS vendor id (app). */
+export const deviceKeyPattern=/^[A-Za-z0-9_-]{16,128}$/;
+/** The active Till set up for this device, with its Location's Code (the number prefix). */
+export async function findDeviceTill(records:Pick<Records,'list'|'get'>,actor:Actor,deviceKey:unknown):Promise<Row|null>{
+ if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))return null;
+ const page=await records.list(actor.tenant_id,actor.user_id,'Till',2,0,{filters:[
+  {field:'DeviceKey',operator:'eq',value:deviceKey},{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
+ const till=page.records[0];
+ if(!till)return null;
+ let locationCode='';
+ if(typeof till.Location==='string'&&uuid.test(till.Location)){
+  try{locationCode=String((await records.get(actor.tenant_id,actor.user_id,'Location',till.Location) as Row).Code??'');}
+  catch{/* no read access to Location: the code stays blank */}
+ }
+ return {Id:till.Id,Name:till.Name??'',Code:till.Code??'',Location:till.Location??'',LocationCode:locationCode};
+}
+
+export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unknown}={}):PageCodeRequest{
  const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
  const event=(raw.event&&typeof raw.event==='object'&&!Array.isArray(raw.event)?raw.event:{}) as Record<string,unknown>;
  const sessionId=typeof raw.sessionId==='string'&&raw.sessionId.length<=80?raw.sessionId:'';
@@ -358,7 +394,10 @@ export function parsePageCodeRequest(body:unknown):PageCodeRequest{
    index:pick(event.index),label:pick(event.label)},
   rowObject:typeof raw.rowObject==='string'&&key.test(raw.rowObject)?raw.rowObject:'',
   timeZone:typeof raw.timeZone==='string'&&/^[A-Za-z0-9_+\-/]{1,64}$/.test(raw.timeZone)?raw.timeZone:undefined,
-  device:deviceAnswers(raw.device)};
+  device:deviceAnswers(raw.device),
+  ...(typeof raw.deviceKey==='string'&&deviceKeyPattern.test(raw.deviceKey)?{deviceKey:raw.deviceKey}:{}),
+  ...(typeof seen.ip==='string'&&seen.ip?{deviceIp:seen.ip.slice(0,64)}:{}),
+  ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{})};
 }
 
 /** Run one page action: ONE transaction; all steps or none. */

@@ -78,6 +78,8 @@ export async function recordInvoicePayment({db,records,query}:Engines,tenantId:s
    Name:'Payment '+String(invoice.InvoiceNumber||invoice.Name||p.invoiceId).slice(0,60),
    TransactionType:'Receipt',Direction:'IN',Amount:p.amount/100,Method:p.method,
    Invoice:p.invoiceId,Customer:invoice.Customer??null,CurrencyCode:invoice.CurrencyCode??null,
+   // Where the money was taken: the Invoice's own Location and Till (never the browser's).
+   ...(invoice.Location?{Location:invoice.Location}:{}),...(invoice.TillId?{TillId:invoice.TillId}:{}),
    User:userId,SourceApp:'ActionFormula',TransactionDate:new Date().toISOString(),
    Reference:p.reference,ExternalReference:p.note||null,Status:'Posted'
   });

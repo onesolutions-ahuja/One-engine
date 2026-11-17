@@ -11,6 +11,7 @@ import {componentLayoutProps} from '../TemplatePageRuntime/pageComponentLayout';
 import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pageBehaviorRuntime';
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
+import {askWhichTill} from '../PageRuntime/tillPickerScreen';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen,closeSecondScreen} from '../PageRuntime/screenFormula';
@@ -154,6 +155,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
  },[compiled,script,components,objects,request,pageSessionKey,sessionIdOverride,recordId]);
  useEffect(()=>{
   void runtime.data.start();
+  // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
+  if(runtime.code?.usesTill)void askWhichTill(runtime.request);
   // Rows for instant taps and totals: one request with the first data.
   void runtime.code?.loadSets().catch(error=>console.warn('[PageCode] record sets:',error instanceof Error?error.message:error));
   // A state value the held rows depend on ($state.x in their criteria) reloads them.

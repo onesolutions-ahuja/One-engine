@@ -63,6 +63,7 @@ function evaluateDataNode(node:Expression,scope:Record<string,unknown>,
     const id=state?.activeCartId??(scope.state as Record<string,unknown>|undefined)?.activeCartId;
     return typeof id==='string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)?id:'';
    }
+   if(page.kind==='till'||page.kind==='device')throw Error('@ThisPage.'+(page.kind==='till'?'Till':'Device')+' is read by page code actions');
    if(page.kind==='user'||page.kind==='company'){
     if(!authenticated)throw Error('Authenticated formula identity is unavailable');
     return page.kind==='user'?own(authenticated.user,USER_FIELDS[page.field])??''

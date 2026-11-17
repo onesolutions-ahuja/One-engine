@@ -58,7 +58,7 @@ export default function AppManagerList({apps, busy, onEdit, onClone, onPublish}:
          {onPublish&&<button type="button" className="btn" disabled={busy} aria-label={"Publish "+app.label+" to AppExchange"} onClick={()=>onPublish(app)}>Publish</button>}
         </div>}
       ]}/>
-    <div className="app-manager-list-scroll md-mobile-table-replaced md-tablet-table-replaced">
+    <div className="app-manager-list-scroll md-mobile-table-replaced md-tablet-table-replaced" role="region" aria-label="Applications table" tabIndex={0}>
       <table className="app-manager-list-table">
         <thead><tr>
           <th scope="col" aria-sort={sort==="label"?(descending?"descending":"ascending"):undefined}><button type="button" onClick={()=>changeSort("label")}>App {sort==='label'&&<span className="md-sort-indicator" aria-hidden="true">{descending?'↓':'↑'}</span>}</button></th>

@@ -163,3 +163,6 @@
 .tenant-alert-warning>span{flex:1;min-width:220px}
 .tenant-create-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
 .tenant-create-dialog{width:min(820px,100%)}
+
+.tenant-console .tenant-columns:has(> :only-child){grid-template-columns:minmax(0,1fr)}
+.tenant-console .tenant-name-link:focus-visible,.tenant-console .tenant-pagination button:focus-visible{outline:2px solid var(--md-focus-ring,#0054aa);outline-offset:2px}

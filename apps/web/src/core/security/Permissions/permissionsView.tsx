@@ -74,6 +74,14 @@ import {
 import { type ObjectMetadata, type AccessControlMetadata, type PermissionSetMetadata, type PermissionSetGroupMetadata, type PublicGroupMetadata, type QueueMetadata, type SharingRuleMetadata } from '../../metadata/Definitions/metadata';
 
 
+function PermissionFieldGroup({label,children}:{label:string;children:()=>ReactNode}) {
+  const [open,setOpen]=useState(false);
+  return <details className="permission-field-group" onToggle={event=>setOpen(event.currentTarget.open)}>
+    <summary>{label}</summary>
+    {open&&children()}
+  </details>;
+}
+
 export function createPermissions(apiRequest: <T>(path: string, init?: RequestInit) => Promise<T>, PageHeading: (props: {eyebrow?:string;title:string;description?:string;actions?:React.ReactNode}) => React.ReactNode) {
 function Permissions({
   accessControl,
@@ -790,11 +798,11 @@ function Permissions({
           <FieldSecurityWizard objects={objects} policyName={selectedProfile.label}
            fieldPermissions={selectedProfile.fieldPermissions}
            onApply={fieldPermissions=>patchProfile(selectedProfile.id,{fieldPermissions})}/>
-          {objects.map((object) => <details className="permission-field-group" key={object.apiName}><summary>{object.label} ({object.fields.length} fields)</summary><div className="permission-table-wrap" role="region" aria-label="Record and field access settings" tabIndex={0}><table className="slds-table permission-matrix"><thead><tr><th scope="col">Field</th><th scope="col">API Name</th><th scope="col">Create</th><th scope="col">Read</th><th scope="col">Edit</th><th scope="col">Delete</th></tr></thead><tbody>{object.fields.map((field) => {
+          {objects.map((object) => <PermissionFieldGroup key={object.apiName} label={object.label+" ("+object.fields.length+" fields)"}>{()=><div className="permission-table-wrap" role="region" aria-label="Record and field access settings" tabIndex={0}><table className="slds-table permission-matrix"><thead><tr><th scope="col">Field</th><th scope="col">API Name</th><th scope="col">Create</th><th scope="col">Read</th><th scope="col">Edit</th><th scope="col">Delete</th></tr></thead><tbody>{object.fields.map((field) => {
             const fieldName = `${object.apiName}.${field.apiName}`;
             const permissions = selectedProfile.fieldPermissions[fieldName] ?? { read: false, edit: false };
             return <tr key={fieldName}><td><strong>{field.label}</strong></td><td title={field.apiName}><code>{field.apiName}</code></td>{(['create', 'read', 'edit', 'delete'] as const).map((permission) => <td key={permission}><input type="checkbox" aria-label={`${selectedProfile.label} ${object.label}.${field.label} ${permission}`} checked={Boolean(permissions[permission])} onChange={() => patchProfile(selectedProfile.id, { fieldPermissions: { ...selectedProfile.fieldPermissions, [fieldName]: { ...permissions, [permission]: !permissions[permission] } } })} /></td>)}</tr>;
-          })}</tbody></table></div></details>)}
+          })}</tbody></table></div>}</PermissionFieldGroup>)}
           </details>
         </>}
         {tab === 'sets' && selectedSet && <>
@@ -870,11 +878,11 @@ function Permissions({
           <FieldSecurityWizard objects={objects} policyName={selectedSet.label}
            fieldPermissions={selectedSet.fieldPermissions}
            onApply={fieldPermissions=>patchSet(selectedSet.id,{fieldPermissions})}/>
-          {objects.map((object) => <details className="permission-field-group" key={object.apiName}><summary>{object.label} ({object.fields.length} fields)</summary><div className="permission-table-wrap" role="region" aria-label="Record and field access settings" tabIndex={0}><table className="slds-table permission-matrix"><thead><tr><th scope="col">Field</th><th scope="col">API Name</th><th scope="col">Create</th><th scope="col">Read</th><th scope="col">Edit</th><th scope="col">Delete</th></tr></thead><tbody>{object.fields.map((field) => {
+          {objects.map((object) => <PermissionFieldGroup key={object.apiName} label={object.label+" ("+object.fields.length+" fields)"}>{()=><div className="permission-table-wrap" role="region" aria-label="Record and field access settings" tabIndex={0}><table className="slds-table permission-matrix"><thead><tr><th scope="col">Field</th><th scope="col">API Name</th><th scope="col">Create</th><th scope="col">Read</th><th scope="col">Edit</th><th scope="col">Delete</th></tr></thead><tbody>{object.fields.map((field) => {
             const fieldName = `${object.apiName}.${field.apiName}`;
             const permissions = selectedSet.fieldPermissions[fieldName] ?? { read: false, edit: false };
             return <tr key={fieldName}><td><strong>{field.label}</strong></td><td title={field.apiName}><code>{field.apiName}</code></td>{(['create', 'read', 'edit', 'delete'] as const).map((permission) => <td key={permission}><input type="checkbox" aria-label={`${object.label}.${field.label} ${permission}`} checked={Boolean(permissions[permission])} onChange={() => toggleFieldPermission(selectedSet, fieldName, permission)} /></td>)}</tr>;
-          })}</tbody></table></div></details>)}
+          })}</tbody></table></div>}</PermissionFieldGroup>)}
         </>}
         {tab === 'groups' && selectedGroup && <>
           <div className="section-toolbar"><div><h2>{selectedGroup.label}</h2><p>Permission Set Group · {selectedGroup.apiName}</p></div><button className="btn" onClick={() => {
@@ -925,11 +933,11 @@ function Permissions({
           })}</tbody></table></div>)}
           </details>
           <details className="md-permission-collapsible md-permission-group-advanced"><summary>Muted Field Permissions</summary>
-          {objects.map((object) => <details className="permission-field-group" key={object.apiName}><summary>{object.label} ({object.fields.length} fields)</summary><div className="permission-table-wrap" role="region" aria-label="Record and field access settings" tabIndex={0}><table className="slds-table permission-matrix"><thead><tr><th scope="col">Field</th><th scope="col">API Name</th><th scope="col">Mute Create</th><th scope="col">Mute Read</th><th scope="col">Mute Edit</th><th scope="col">Mute Delete</th></tr></thead><tbody>{object.fields.map((field) => {
+          {objects.map((object) => <PermissionFieldGroup key={object.apiName} label={object.label+" ("+object.fields.length+" fields)"}>{()=><div className="permission-table-wrap" role="region" aria-label="Record and field access settings" tabIndex={0}><table className="slds-table permission-matrix"><thead><tr><th scope="col">Field</th><th scope="col">API Name</th><th scope="col">Mute Create</th><th scope="col">Mute Read</th><th scope="col">Mute Edit</th><th scope="col">Mute Delete</th></tr></thead><tbody>{object.fields.map((field) => {
             const fieldName = `${object.apiName}.${field.apiName}`;
             const permissions = selectedGroup.mutedFieldPermissions[fieldName] ?? {};
             return <tr key={fieldName}><td><strong>{field.label}</strong></td><td title={field.apiName}><code>{field.apiName}</code></td>{(['create', 'read', 'edit', 'delete'] as const).map((permission) => <td key={permission}><input type="checkbox" aria-label={`Mute ${object.label}.${field.label} ${permission}`} checked={Boolean(permissions[permission])} onChange={() => patchGroup(selectedGroup.id, { mutedFieldPermissions: { ...selectedGroup.mutedFieldPermissions, [fieldName]: { ...permissions, [permission]: !permissions[permission] } } })} /></td>)}</tr>;
-          })}</tbody></table></div></details>)}
+          })}</tbody></table></div>}</PermissionFieldGroup>)}
           </details>
         </>}
         {tab === 'users' && !openUserId && !creatingUser && <UserDirectoryTable rows={userRecords} access={draft}

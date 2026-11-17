@@ -1,6 +1,6 @@
 /* Public Une Solutions marketing site: isolated from the authenticated workspace. */
 html{scroll-behavior:smooth}
-html,body,#root{min-width:320px;min-height:100%;margin:0}
+html,body,#root{min-width:0;min-height:100%;margin:0}
 body{background:#fff}
 .une-marketing{--une-ink:var(--md-text,#192230);--une-muted:var(--md-muted,#596579);--une-blue:var(--md-primary,#1d4ed8);--une-border:var(--md-border,#e0e5eb);--une-gradient:linear-gradient(115deg,#086af9 0%,#7449ec 34%,#ef3a9e 68%,#ff9f40 100%);font-family:var(--md-font,Inter,ui-sans-serif,system-ui,sans-serif);color:var(--une-ink);background:#fff;font-size:16px;line-height:var(--md-leading-body,1.5);overflow-x:hidden;}
 .une-marketing *{box-sizing:border-box}

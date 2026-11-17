@@ -35,6 +35,7 @@ export default function TenantLicenses({request,canManage}:{request:Request;canM
  </section>;
 }
 function PlatformLicenseIssuer({request}:{request:Request}){
+ const [issuerOpen,setIssuerOpen]=useState(false);
  const [capabilitySearch,setCapabilitySearch]=useState(''),[issuing,setIssuing]=useState(false);
  const [tenants,setTenants]=useState<{id:string;name:string;slug:string}[]>([]),[tenant,setTenant]=useState(''),[label,setLabel]=useState(''),[key,setKey]=useState(''),[kind,setKind]=useState('User'),[seats,setSeats]=useState(''),[expiry,setExpiry]=useState(''),[auto,setAuto]=useState(false),[capabilities,setCapabilities]=useState<{permission_key:string;label:string;resource:string;action:string}[]>([]),[selected,setSelected]=useState<string[]>([]),[message,setMessage]=useState('');
  useEffect(()=>{void request<{tenants:{id:string;name:string;slug:string}[]}>('/security/licenses/tenants').then(r=>setTenants(Array.isArray(r?.tenants)?r.tenants:[])).catch(e=>setMessage('Unable to load tenant licence catalog: '+String(e)));void request<{permissions:typeof capabilities}>('/security/permissions').then(r=>setCapabilities(Array.isArray(r?.permissions)?r.permissions:[])).catch(()=>setCapabilities([]));},[]);
@@ -66,7 +67,7 @@ function PlatformLicenseIssuer({request}:{request:Request}){
   finally{setIssuing(false);}
  };
  if(!tenants.length)return null;
- return <details className="md-admin-issuer"><summary>Platform: issue licence pool</summary><p>For restricted user licences, choose the permitted system operations. Object and field access is still limited by permission sets. A full platform licence permits all resource types.</p>
+ return <details className="md-admin-issuer" onToggle={event=>setIssuerOpen(event.currentTarget.open)}><summary>Platform: issue licence pool</summary>{issuerOpen&&<><p>For restricted user licences, choose the permitted system operations. Object and field access is still limited by permission sets. A full platform licence permits all resource types.</p>
  <div className="md-admin-form-grid"><label className="form-label">Tenant<select className="form-control" value={tenant} onChange={e=>setTenant(e.target.value)}><option value="">Select tenant</option>{tenants.map(t=><option key={t.id} value={t.id}>{t.name||t.slug}</option>)}</select></label>
  <label className="form-label">Licence pool<select className="form-control" value={poolId} onChange={e=>{const p=pools.find(p=>p.id===e.target.value);setPoolId(e.target.value);setKey(p?.license_key??'');setLabel(p?.label??'');setKind(p?.kind??'User');setSeats(p?.seat_limit==null?'':String(p.seat_limit));setExpiry(p?.expires_at?new Date(new Date(p.expires_at).getTime()-new Date(p.expires_at).getTimezoneOffset()*60000).toISOString().slice(0,16):'');setAuto(p?.auto_assign??false);setEnabled(p?.enabled??true);setCustomCaps(p?.capabilities.filter(c=>!(c.resource==='*'&&c.action==='*')&&!capabilities.some(v=>v.resource===c.resource&&v.action===c.action))??[]);setSelected(p?.capabilities.map(c=>c.resource==='*'&&c.action==='*'?'*':capabilities.find(v=>v.resource===c.resource&&v.action===c.action)?.permission_key??'').filter(Boolean)??[]);}}><option value="">New pool</option>{pools.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
  <label className="checkbox-row md-admin-span-all"><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/>Enabled</label>
@@ -85,5 +86,5 @@ function PlatformLicenseIssuer({request}:{request:Request}){
  <div className="md-admin-checkbox-grid md-admin-capability-options">{[{permission_key:'*',label:'Full platform resource coverage',resource:'*',action:'*'},...displayedCapabilities].map(p=><label className="checkbox-row" key={p.permission_key}><input type="checkbox" checked={selected.includes(p.permission_key)} onChange={()=>setSelected(selected.includes(p.permission_key)?selected.filter(v=>v!==p.permission_key):[...selected,p.permission_key])}/>{p.label}</label>)}</div></fieldset>
  {customCaps.map((c,i)=><p key={c.resource+':'+c.action}>Additional coverage: {c.resource} / {c.action} <button className="btn" onClick={()=>setCustomCaps(customCaps.filter((_,n)=>n!==i))}>Remove coverage</button></p>)}
  <div className="md-admin-actions"><button type="button" className="btn btn-brand" disabled={!validPool||!poolChanged||issuing} onClick={()=>void issue()}>{issuing?'Saving…':'Save licence pool'}</button></div>{message&&<p role="status">{message}</p>}
- </details>;
+ </>}</details>;
 }

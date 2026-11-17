@@ -486,7 +486,6 @@ export function renderSetupShell(ctx: any) {
               return result;
             }}
             onRotate={rotateNamedCredential}
-            onTest={testNamedCredential}
             canTest={canManageNamedCredentials}
             onOAuthAuthorize={authorizeNamedCredential}
             onToggleEnabled={toggleNamedCredentialEnabled}

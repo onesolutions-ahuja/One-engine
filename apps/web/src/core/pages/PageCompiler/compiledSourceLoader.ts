@@ -5,6 +5,7 @@ import {pageComponentRecordQuery,filterPageComponentRecords,pageComponentRelated
 import {filterRelatedRecords} from '../PageRuntime/filterRelatedRecords.mjs';
 import type {CompiledDataSource} from './compilePage';
 import type {SourceLoad} from './compiledPageStore';
+import {EMPTY_FILTER_VALUE} from '../PageRuntime/recordFilterFormula';
 
 type RecordPageLoader=(objectApiName:string,options:{limit:number;offset:number;
  filter?:{field:string;value:string;related:boolean};
@@ -51,9 +52,10 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   const fields=objects.find(object=>object.apiName===source.objectApiName)?.fields??[];
   const query=pageComponentRecordQuery(source.filters,fields,{pageState:state,sessionId,recordId},
    source.filterLogic,source.filterFormula);
-  // Missing context never widens a query to "all records".
+  // Missing context never widens a query to "all records". A page value that is
+  // not set yet (e.g. the start action's STATE) shows an empty list, not an error.
   if(query.blocked){
-   if(query.error)throw Error(query.error);
+   if(query.error&&query.error!==EMPTY_FILTER_VALUE)throw Error(query.error);
    return null;
   }
   const related=await scopeFor(source,fields,state,sessionId);

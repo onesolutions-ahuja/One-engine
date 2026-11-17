@@ -54,7 +54,9 @@ export function scopedFieldAllows(collection:unknown,key:string,record:Record<st
    &&filterPageComponentRecords([record],rule.filters,fields,context,rule.filterLogic).length===0)
   return false;
  if(rule.filterMode==='Field'||!rule.filterFormula.trim())return true;
- const compiled=compileRecordFilterFormula(rule.filterFormula,fields,context.pageState??{});
+ // Same session as the component's own record query: @ThisPage.Session.Id in a
+ // per-field rule must not read blank ("Selected formula state value is empty").
+ const compiled=compileRecordFilterFormula(rule.filterFormula,fields,context.pageState??{},context.sessionId??'');
  if(compiled.blocked)return false;
  if(compiled.filters.length===0)return true;
  const matches=compiled.filters.map(f=>{

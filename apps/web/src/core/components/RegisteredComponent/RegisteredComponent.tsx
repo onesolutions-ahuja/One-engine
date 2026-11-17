@@ -246,7 +246,7 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const formulaCode=(props.__formulaCode as {functions?:unknown}|undefined)?.functions;
   const codeFunctions=formulaCode instanceof Map
     ?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
-  const sqlProps=resolveComponentFormulaProps(configuredProps,definition.apiName,codeFunctions);
+  const sqlProps=resolveComponentFormulaProps(configuredProps,definition.apiName,codeFunctions,editorPreview===true);
   let effectiveProps:Record<string,unknown>;
   try{
     effectiveProps=resolveRegisteredTextProperties(definitions,applyRecordViewAdapter(sqlProps),undefined,formulaScope?.read);

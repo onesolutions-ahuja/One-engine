@@ -219,11 +219,11 @@ export function usePageComponentProperties(
   // Shared Action-button visibility is component metadata, independent of the
   // configured Flow or formula. No app-specific action implementation is needed.
   const mixedActionButtonVisibilityKeys=actionMembers.length<2?[]:
-    (['qtyIncrease','qtyDecrease','customButton1','customButton2','customButton3'] as const)
+    (['qtyIncrease','qtyDecrease','customButton1','customButton2','customButton3','customButton4'] as const)
       .filter(key=>actionMembers.some(item=>
         (item.properties[key+'Visible']!==false)!==
         (actionMembers[0].properties[key+'Visible']!==false)));
-  const applyCartButtonVisibility=(key:'qtyIncrease'|'qtyDecrease'|'customButton1'|'customButton2'|'customButton3',visible:boolean)=>{
+  const applyCartButtonVisibility=(key:'qtyIncrease'|'qtyDecrease'|'customButton1'|'customButton2'|'customButton3'|'customButton4',visible:boolean)=>{
     if(!selected||actionSelectionDisabled||!actionMembers.length||
       actionMembers.some(member=>!supportsSmartActionEvent(
         member.type.startsWith('Custom:')?member.type.slice(7):member.type,key)))return;

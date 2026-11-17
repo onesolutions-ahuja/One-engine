@@ -689,7 +689,6 @@ onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:t
             })}
             onSave={saveAccessControl}
             onNotify={notify}
-            onOpenUserRecords={() => navigateRoute({kind:'record-list',objectApiName:'User'})}
           /></PlatformWorkspaceSurface>)}
           </React.Fragment>}
         </main>

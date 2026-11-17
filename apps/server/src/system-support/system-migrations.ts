@@ -12,6 +12,8 @@ import {DEVICE_JOB_DDL} from './cloudprnt-routes.js';
 import {applySmartChart} from './smart-chart.js';
 import {applySmartSearch} from './smart-search.js';
 import {applySmartQr} from './smart-qr.js';
+import {applySmartTableRowButtons} from './smart-table-row-buttons.js';
+import {applySmartSelectorMulti} from './smart-selector-multi.js';
 import {applySmartVisibleFormula} from './smart-visible-formula.js';
 
 /** Recover original migration files from the immutable SQL baseline.
@@ -770,6 +772,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await applySmartChart(client);
   await applySmartSearch(client);
   await applySmartQr(client);
+  await applySmartTableRowButtons(client);
+  await applySmartSelectorMulti(client);
   await applySmartVisibleFormula(client);
   // Retire the duplicate Key Gap control. Existing page JSON keeps numpadGap
   // until authored again; all three renderers and the ribbon read that legacy

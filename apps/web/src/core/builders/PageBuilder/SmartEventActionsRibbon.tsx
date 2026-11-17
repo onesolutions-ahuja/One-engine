@@ -17,8 +17,10 @@ export const supportsSmartActionEvent=(api:string,event:string):boolean=>
  event==='select'?selectComponents.has(api):
  event==='start'?api.startsWith('smart_'):
  ['qtyIcon','qtyIncrease','qtyDecrease'].includes(event)?api==='smart_cart':
- ['customButton1','customButton2'].includes(event)?['smart_cart','smart_card_grid','smart_numpad'].includes(api):
- event==='customButton3'||event==='clear'||event==='backspace'?api==='smart_numpad':
+ ['customButton1','customButton2'].includes(event)?['smart_cart','smart_card_grid','smart_numpad','smart_table'].includes(api):
+ event==='customButton3'?api==='smart_numpad'||api==='smart_table':
+ event==='customButton4'?api==='smart_table':
+ event==='clear'||event==='backspace'?api==='smart_numpad':
  event==='dismiss'?api==='smart_keyboard':
  event==='enter'?api==='smart_search':
  (dockItemEvents as readonly string[]).includes(event)?api==='smart_dock':false;
@@ -42,9 +44,10 @@ export default function SmartEventActionsRibbon({api,actions,flows,onChange,sele
  ];
  const qtySlot={key:'qtyIcon',label:'Qty icon',enabled:members.every(member=>member==='smart_cart')};
  const customSlots=[
-  {key:'customButton1',label:'Custom Button 1',enabled:['smart_cart','smart_card_grid','smart_numpad'].includes(api)},
-  {key:'customButton2',label:'Custom Button 2',enabled:['smart_cart','smart_card_grid','smart_numpad'].includes(api)},
-  {key:'customButton3',label:'Custom Button 3',enabled:api==='smart_numpad'}
+  {key:'customButton1',label:'Custom Button 1',enabled:['smart_cart','smart_card_grid','smart_numpad','smart_table'].includes(api)},
+  {key:'customButton2',label:'Custom Button 2',enabled:['smart_cart','smart_card_grid','smart_numpad','smart_table'].includes(api)},
+  {key:'customButton3',label:'Custom Button 3',enabled:api==='smart_numpad'||api==='smart_table'},
+  {key:'customButton4',label:'Custom Button 4',enabled:api==='smart_table'}
  ];
  const active=flows.filter(flow=>flow.status==='Active'&&
   (flow.flowType==='Autolaunched Flow'||flow.flowType==='Screen Flow'||flow.flowType==='In-Screen Flow'));

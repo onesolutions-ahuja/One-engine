@@ -44,7 +44,7 @@ export function actionArgumentSuggestions(before:string,objects:readonly Source[
  if(index===0&&['SCREEN','PRINT','CREATEPDF'].includes(frame.name))
   return {query:suffix,choices:pages.filter(item=>item.status==='Active'&&(['PRINT','CREATEPDF'].includes(frame.name)
    ?item.pageType==='Print Template':['App Page','In-Screen Page'].includes(item.pageType)))};
- if(index===1&&frame.name==='SCREEN')return {query:suffix,choices:['current','popup','newwindow'].map(apiName=>({apiName,label:apiName}))};
+ if(index===1&&frame.name==='SCREEN')return {query:suffix,choices:['current','popup','newwindow','second'].map(apiName=>({apiName,label:apiName}))};
  if(index===0&&['EMAIL','WHATSAPP','SMS'].includes(frame.name))return {query:suffix,choices:credentials};
  if(frame.name==='FLOW'&&index===0)return {query:suffix,choices:flows};
  if(!['CREATERECORD','UPDATERECORD','DELETERECORD'].includes(frame.name))return null;

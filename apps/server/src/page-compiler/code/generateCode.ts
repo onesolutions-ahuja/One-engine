@@ -307,11 +307,23 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   case 'SCREEN':{
    const page=literalName(args[0],'SCREEN page');
    const mode=args[1]?literalName(args[1],'SCREEN mode').toLowerCase():'current';
-   if(!['current','popup','newwindow'].includes(mode))fail('SCREEN mode must be current, popup or newwindow');
+   if(!['current','popup','newwindow','second'].includes(mode))fail('SCREEN mode must be current, popup, newwindow or second');
    scope.ui.add('SCREEN');
    return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(args[2]?', '+value(args[2]):'')+');'];
   }
-  case 'CLOSESCREEN':case 'LOCKSCREEN':scope.ui.add(node.name);return ['await $.ui('+q(node.name)+');'];
+  case 'CLOSESCREEN':case 'LOCKSCREEN':{
+   scope.ui.add(node.name);
+   // CLOSESCREEN("second"): close the page shown on the second monitor.
+   if(node.name==='CLOSESCREEN'&&args.length){
+    const which=literalName(args[0],'CLOSESCREEN target').toLowerCase();
+    if(which!=='second')fail('CLOSESCREEN takes no target or "second"');
+    return ['await $.ui("CLOSESCREEN", "second");'];
+   }
+   if(args.length)fail(node.name+' takes no arguments');
+   return ['await $.ui('+q(node.name)+');'];
+  }
+  // The page converter splits a whole-action CONFIRMSCREEN/INFOSCREEN into its branches.
+  case 'CONFIRMSCREEN':case 'INFOSCREEN':return fail(node.name+' must be the whole action (not inside ACTIONS or IF)');
   case 'PRINT':{
    scope.ui.add('PRINT');
    return ['await $.ui("PRINT", '+q(literalName(args[0],'print template'))+', '+value(args[1])+');'];

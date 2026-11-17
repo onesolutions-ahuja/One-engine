@@ -112,3 +112,28 @@
  background:var(--md-surface-2,#f1f6fd);outline:2px solid var(--md-primary,#1d4ed8);outline-offset:-2px;
 }
 .app-manager-stepper .app-manager-step:focus-visible { outline:2px solid var(--md-primary,#1d4ed8); }
+
+/* Compact wizard: one step visible at a time, Next/Back in the footer. */
+.app-manager-workspace .app-manager-form-card{max-width:880px}
+.app-manager-stepper{max-width:880px;padding:6px;margin:8px 0;gap:4px}
+.app-manager-stepper .app-manager-step{width:100%;border:0;background:transparent;cursor:pointer;font:inherit;padding:4px 8px;min-height:34px;gap:8px}
+.app-manager-step-number{width:22px;height:22px;font-size:12px}
+.app-manager-stepper .app-manager-step[aria-current="step"] .app-manager-step-number,
+.app-manager-step.is-done .app-manager-step-number{background:var(--md-primary,#1d4ed8);color:#fff}
+.app-manager-step.is-first .app-manager-step-number{background:#edf1f7;color:inherit}
+.app-manager-form-section{padding:12px 16px}
+.app-manager-form-section .app-manager-selectors{border-top:0;gap:12px}
+.app-manager-form-section .app-manager-fieldset{margin:12px 0 0;padding:8px 12px}
+.app-manager-navigation-order{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.app-manager-navigation-order li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #eef1f5;font-size:13px}
+.app-manager-navigation-label small{margin-left:8px;color:var(--md-muted,#64748b)}
+.app-manager-order-controls{display:flex;gap:4px}
+.app-manager-order-controls .btn-small{min-height:26px;padding:2px 6px}
+.app-manager-review{display:grid;gap:0;margin:0;font-size:13px}
+.app-manager-review>div{display:grid;grid-template-columns:120px 1fr;padding:6px 0;border-bottom:1px solid #eef1f5}
+.app-manager-review dt{color:var(--md-muted,#64748b)}
+.app-manager-review dd{margin:0;overflow-wrap:anywhere}
+.app-manager-review dd small{color:var(--md-muted,#64748b);margin-left:6px}
+.app-manager-form-section .app-manager-readiness{margin-top:12px}
+.app-manager-workspace .app-manager-actions{border-top:1px solid var(--md-border,#e0e5eb)}
+.app-manager-workspace .app-manager-actions .app-manager-delete{margin-right:auto}

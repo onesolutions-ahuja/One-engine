@@ -398,9 +398,12 @@ export function createPageRibbon(
               buttonVisibility={{
                 qtyIncrease:selected?.properties.qtyIncreaseVisible!==false,
                 qtyDecrease:selected?.properties.qtyDecreaseVisible!==false,
-                customButton1:selected?.properties.customButton1Visible!==false,
-                customButton2:selected?.properties.customButton2Visible!==false,
-                customButton3:selected?.properties.customButton3Visible!==false
+                ...Object.fromEntries([1,2,3,4].map(n=>{
+                  const key='customButton'+n,flag=selected?.properties[key+'Visible'];
+                  // Smart Table row buttons are hidden until shown (or already given an action).
+                  const table=selected?.type==='Custom:smart_table'||selected?.type==='smart_table';
+                  return [key,table?flag===true||(flag!==false&&Boolean((selected?.properties.actionFlows as Record<string,unknown>|undefined)?.[key])):flag!==false];
+                }))
               }}
               onButtonVisibilityChange={applyCartButtonVisibility}/>}
           {ribbonTab==='Component Action' && <PageBuilderAdvancedSections

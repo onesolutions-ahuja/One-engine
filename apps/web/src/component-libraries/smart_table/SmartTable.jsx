@@ -1,3 +1,6 @@
+import icons from "../smart_icon/iconCatalog.json";
+import {smartCustomButtonAppearance} from "../smart/shared/SmartCustomButtonAppearance.js";
+import {smartPartSide} from "../smart/shared/SmartPartPlacement.js";
 /** Smart Table is presentation-only: Object API, filters, formula projections,
  * selected-field permissions and action execution are owned by shared runtimes.
  */
@@ -9,6 +12,7 @@ const colour=(value,fallback)=>typeof value==="string"&&value?value:fallback;
 const plain=value=>value===undefined||value===null?"":String(value);
 const fieldKey=source=>/^=?\s*@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(plain(source).trim())?.[1];
 const own=(row,key)=>row&&Object.prototype.hasOwnProperty.call(row,key);
+const knownIcons=new Set(icons.map(icon=>icon.id));
 export default function SmartTable({p,records,expression,fieldAllowed,fire}){
  const realRows=Array.isArray(records)?records:[];
  const preview=p.builderPreview===true&&realRows.length===0;
@@ -28,10 +32,19 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   key,index,label:fields.find(item=>item.apiName===key)?.label||key,
   override:index>0&&index<5?p["column"+(index+1)+"Source"]:null
  }));
- const actions=[
-  {event:"customButton1",label:p.customButton1Label||"Delete",enabled:p.customButton1Visible!==false},
-  {event:"customButton2",label:p.customButton2Label||"View",enabled:p.customButton2Visible!==false}
- ].filter(action=>action.enabled);
+ // Up to four row buttons, hidden by default: a button shows when made visible
+ // (eye on), or — for tables saved before this — when it already has an action.
+ const actions=[1,2,3,4].map(n=>{
+  const event="customButton"+n;
+  const visible=p[event+"Visible"]===true||(p[event+"Visible"]!==false&&Boolean(p.actionFlows?.[event]));
+  const icon=knownIcons.has(p[event+"Icon"])?p[event+"Icon"]:"";
+  const display=icon?(p[event+"Display"]||"icon+text"):"text";
+  return {event,visible,icon,display,
+   label:plain(p[event+"Label"])||(n===1?"Delete":n===2?"View":"Button "+n),
+   side:smartPartSide(p[event+"Placement"],"right")};
+ }).filter(action=>action.visible||(p.builderPreview&&p[action.event+"Visible"]===true));
+ const startActions=actions.filter(action=>action.side==="left");
+ const endActions=actions.filter(action=>action.side!=="left");
  const [selected,setSelected]=React.useState(null);
  // Style = iOS (saved on new inserts). Configured colours still win; this only
  // changes the defaults used when nothing was set. Older tables stay Classic.
@@ -74,6 +87,24 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   setSelected(String(id));
   fire?.("rowSelect",{record:row,recordId:id});
  };
+ const buttonCell=(list,row,id,side)=><td className={"smart-table-actions smart-table-actions-"+side}
+   style={{borderBottom:border(p.rowBorderColor??(ios?"rgb(60 60 67 / .12)":undefined))}}>
+   {list.map(action=>{
+    const iconOnly=action.icon&&action.display==="icon";
+    return <button type="button" key={action.event} className="smart-table-row-button"
+     data-design-area={p.builderPreview?(action.event==="customButton1"?"Button":"Button "+action.event.slice(-1)):undefined}
+     aria-label={action.label+" "+id} title={iconOnly?action.label:undefined}
+     style={smartCustomButtonAppearance(p,action.event)}
+     disabled={preview||p.previewOnly===true||!p.actionFlows?.[action.event]}
+     onClick={event=>{event.stopPropagation();
+      fire?.(action.event,{record:row,recordId:row?.Id??row?.id??null});
+     }}>
+     {action.icon&&<span className="smart-table-row-icon" aria-hidden="true" style={{
+      WebkitMaskImage:"url(/smart-icons/"+action.icon+".svg)",maskImage:"url(/smart-icons/"+action.icon+".svg)"}}/>}
+     {!iconOnly&&<span>{action.label}</span>}
+    </button>;
+   })}
+  </td>;
  const total=typeof p.recordPagination?.total==="number"
   ?p.recordPagination.total:realRows.length;
  const shown=realRows.length;
@@ -111,11 +142,13 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    {columns.length?<table className="smart-table-native"
     style={p.rowWidth!==undefined&&p.rowWidth!==null&&p.rowWidth!==""
      ?{width:finite(p.rowWidth,0,0,10000)+"px",minWidth:0}:undefined}>
-    <thead><tr data-design-area={p.builderPreview?"Header":undefined} >{columns.map(col=><th scope="col" key={col.key}
+    <thead><tr data-design-area={p.builderPreview?"Header":undefined} >
+      {startActions.length>0&&<th scope="col" style={headingStyle}><span className="smart-table-sr">Actions</span></th>}
+      {columns.map(col=><th scope="col" key={col.key}
       data-md-bind={p.builderPreview&&col.index>0&&col.index<5?"column"+(col.index+1)+"Source":undefined}
       data-md-bind-titles={p.builderPreview?(col.label+" column value"):undefined}
       style={headingStyle}>{col.label}</th>)}
-      {actions.length>0&&<th scope="col" style={headingStyle}>Actions</th>}
+      {endActions.length>0&&<th scope="col" style={headingStyle}><span className="smart-table-sr">Actions</span></th>}
     </tr></thead>
     <tbody>{rows.map((row,index)=>{
      const id=String(row?.Id??row?.id??index);
@@ -127,26 +160,17 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
        onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){
         event.preventDefault();pick(row);
        }}}>
+       {startActions.length>0&&buttonCell(startActions,row,id,"start")}
        {columns.map((col,i)=><td key={col.key}
          style={{borderBottom:border(borderColor??(ios?"rgb(60 60 67 / .12)":undefined)),
           borderTop:active?border(borderColor):undefined,
           borderTopLeftRadius:i===0?finite(p.rowRadius,0,0,100):undefined,
           borderBottomLeftRadius:i===0?finite(p.rowRadius,0,0,100):undefined,
-          borderTopRightRadius:i===columns.length-1&&!actions.length?finite(p.rowRadius,0,0,100):undefined,
-          borderBottomRightRadius:i===columns.length-1&&!actions.length?finite(p.rowRadius,0,0,100):undefined,
+          borderTopRightRadius:i===columns.length-1&&!endActions.length?finite(p.rowRadius,0,0,100):undefined,
+          borderBottomRightRadius:i===columns.length-1&&!endActions.length?finite(p.rowRadius,0,0,100):undefined,
           textAlign:p.rowAlignment||"left",height:rowHeight}}>
          {value(row,col)}</td>)}
-       {actions.length>0&&<td className="smart-table-actions"
-         style={{borderBottom:border(borderColor??(ios?"rgb(60 60 67 / .12)":undefined)),
-          borderTopRightRadius:finite(p.rowRadius,0,0,100),
-          borderBottomRightRadius:finite(p.rowRadius,0,0,100)}}>
-         {actions.map(action=><button type="button" key={action.event}
-           aria-label={action.label+" "+id}
-           disabled={preview||p.previewOnly===true||!p.actionFlows?.[action.event]}
-           onClick={event=>{event.stopPropagation();
-            fire?.(action.event,{record:row,recordId:row?.Id??row?.id??null});
-           }}>{action.label}</button>)}
-       </td>}
+       {endActions.length>0&&buttonCell(endActions,row,id,"end")}
       </tr>;
     })}</tbody>
    </table>:<p className="smart-table-empty">Select a table source to display fields.</p>}

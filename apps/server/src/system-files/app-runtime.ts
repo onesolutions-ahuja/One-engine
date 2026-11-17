@@ -23,9 +23,15 @@ export class AppRuntime {
       ||!Array.isArray(p.navigationItems)||!Array.isArray(p.navigationPageApiNames)
       ||!Array.isArray(p.navigationOrder)||!Array.isArray(p.utilityItems)
       ||p.navigationItems.length>100||p.navigationPageApiNames.length>100
-      ||p.navigationOrder.length>200||p.utilityItems.length>2)
+      ||p.navigationOrder.length>200||p.utilityItems.length>2
+      ||(p.homePageApiName!==undefined&&typeof p.homePageApiName!=='string'))
       throw new Error('Invalid App metadata');
     const {objects,pages,order,utilityItems}=validateAppNavigation(p);
+    // Home Page: the chosen App Page, else the first App Page in navigation order.
+    const firstPage=order.find(item=>item.type==='App Page')?.apiName??'';
+    const homePageApiName=String(p.homePageApiName??'')||firstPage;
+    if(homePageApiName&&!pages.includes(homePageApiName))
+      throw new Error('Home Page must be one of the app\'s App Pages');
     await this.db.transaction(async client=>{
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',
         [tenantId+':app:'+apiName]);
@@ -93,6 +99,12 @@ export class AppRuntime {
       for(const [position,item] of utilityItems.entries())await client.query(`
         INSERT INTO md_tenant_app_utilities(tenant_id,app_id,utility_name,sort_order)
         VALUES($1,$2,$3,$4)`,[tenantId,appId,item,position]);
+      await client.query('DELETE FROM md_app_home_pages WHERE tenant_id=$1 AND app_id=$2',[tenantId,appId]);
+      if(homePageApiName)await client.query(`
+        INSERT INTO md_app_home_pages(tenant_id,app_id,form_factor,page_id)
+        SELECT $1,$2,f,p.id FROM md_page_definitions p,
+          unnest(ARRAY['desktop','tablet','phone','custom']) f
+        WHERE p.tenant_id=$1 AND p.api_name=$3 AND p.enabled=true`,[tenantId,appId,homePageApiName]);
     });
     const found=(await this.listMetadata(tenantId)).find(item=>item.apiName===apiName);
     if(!found)throw new Error('Saved App unavailable');
@@ -281,7 +293,7 @@ export class AppRuntime {
           (CASE $3 WHEN 'desktop' THEN 'Desktop'
             WHEN 'tablet' THEN 'Tablet' WHEN 'phone' THEN 'Phone'
             WHEN 'custom' THEN 'Custom' ELSE '' END)=ANY(home_detail.devices)
-        THEN p.api_name ELSE NULL END) AS api_name FROM md_apps a
+        THEN p.api_name ELSE NULL END,first_page.api_name) AS api_name FROM md_apps a
       JOIN md_app_installations i ON i.app_id=a.id AND i.tenant_id=$1
       JOIN md_app_entitlements e ON e.app_id=a.id AND e.tenant_id=$1
       LEFT JOIN md_tenant_app_metadata m ON m.app_id=a.id AND m.tenant_id=$1
@@ -303,6 +315,13 @@ export class AppRuntime {
         ORDER BY CASE x.scope WHEN 'App and Profile' THEN 2 ELSE 1 END DESC,
           d.updated_at DESC LIMIT 1
       ) home ON true
+      -- No Home Page assigned: open the app's first App Page in navigation order.
+      LEFT JOIN LATERAL (
+        SELECT np.api_name FROM md_tenant_app_navigation n
+        JOIN md_page_definitions np ON np.tenant_id=n.tenant_id AND np.api_name=n.api_name AND np.enabled=true
+        WHERE n.tenant_id=$1 AND n.app_id=a.id AND n.entry_type='App Page'
+        ORDER BY n.sort_order LIMIT 1
+      ) first_page ON true
       WHERE COALESCE(m.api_name,a.api_name)=$2 AND a.enabled=true
         AND (a.tenant_owner_id IS NULL OR a.tenant_owner_id=$1)
         AND e.active=true AND (e.expires_at IS NULL OR e.expires_at>now())

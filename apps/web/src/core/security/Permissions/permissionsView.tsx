@@ -1,4 +1,5 @@
 import {AdminUserAccountAssist} from '../AccountAssist/AccountAssist';
+import {UserDirectoryTable,UserDetailsFields,userDetailsFrom,type UserDetailsDraft,type UserRecordRow} from './UserDirectory';
 import {ObjectPermissionPhoneList} from './ObjectPermissionPhoneList';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import { createObjectManager } from '../../builders/ObjectManager/objectManagerView';
@@ -81,7 +82,6 @@ function Permissions({
   routeResourceApiName,
   routeResourceId,
   onRouteResourceChange,
-  onOpenUserRecords,
   onSave,
   onNotify
 }: {
@@ -91,7 +91,8 @@ function Permissions({
   routeResourceApiName?: string;
   routeResourceId?: string;
   onRouteResourceChange: (resourceApiName: string, resourceId?: string) => void;
-  onOpenUserRecords: () => void;
+  /** Retired: users are managed in this workspace. */
+  onOpenUserRecords?: () => void;
   onSave: (accessControl: AccessControlMetadata) => Promise<void>;
   onNotify: (message: string) => void;
 }) {
@@ -144,6 +145,62 @@ function Permissions({
     return () => { active = false; };
   }, []);
   const [error, setError] = useState('');
+  // Users: one place for the user list, the User record and its RBAC assignments.
+  const [userRecords,setUserRecords]=useState<UserRecordRow[]>([]);
+  const [userMode,setUserMode]=useState<'view'|'edit'>('view');
+  const [userDetails,setUserDetails]=useState<UserDetailsDraft>(userDetailsFrom());
+  const [userCanEdit,setUserCanEdit]=useState(true);
+  const [userSaving,setUserSaving]=useState(false);
+  const loadUserRecords=async()=>{
+    const result=await apiRequest<{records:UserRecordRow[]}>('/records/User?limit=100');
+    setUserRecords(result.records);
+    return result.records;
+  };
+  useEffect(()=>{
+    if(tab!=='users')return;
+    void loadUserRecords().catch(()=>setUserRecords([]));
+  },[tab]);
+  const creatingUser=tab==='users'&&routeResourceId==='new';
+  const openUserId=tab==='users'&&routeResourceId&&routeResourceId!=='new'?routeResourceId:'';
+  useEffect(()=>{
+    if(creatingUser){setUserDetails(userDetailsFrom());setUserMode('edit');setUserCanEdit(true);return;}
+    if(!openUserId)return;
+    setUserDetails(userDetailsFrom(userRecords.find(row=>row.Id===openUserId)));
+    let active=true;
+    void apiRequest<{record:UserRecordRow;recordPermissions?:{Edit?:boolean}}>('/records/User/'+encodeURIComponent(openUserId))
+      .then(result=>{if(!active)return;setUserDetails(userDetailsFrom(result.record));
+        const editable=result.recordPermissions?.Edit!==false;setUserCanEdit(editable);if(!editable)setUserMode('view');})
+      .catch(()=>{if(active)setUserCanEdit(true);});
+    return ()=>{active=false;};
+  },[openUserId,creatingUser,userRecords.length]);
+  const openUser=(id:string,mode:'view'|'edit')=>{setUserMode(mode);setSelectedId(id);setMobilePermissionDetail(true);onRouteResourceChange('Users',id);};
+  const saveUser=async()=>{
+    setUserSaving(true);setError('');
+    try{
+      const body:Record<string,unknown>={Name:userDetails.Name,Email:userDetails.Email,Enabled:userDetails.Enabled,LandingApp:userDetails.LandingApp};
+      if(creatingUser){
+        const created=await apiRequest<{record:UserRecordRow}>('/records/User',{method:'POST',body:JSON.stringify({...body,Password:userDetails.Password})});
+        await loadUserRecords();
+        const snapshot=await apiRequest<AccessControlMetadata>('/metadata/permissions');
+        setDraft(current=>({...current,users:snapshot.users}));
+        setSavedDraft(current=>({...current,users:snapshot.users}));
+        onNotify('User created. Set role, profile and permissions, then Save.');
+        openUser(created.record.Id,'edit');
+        return;
+      }
+      const original=userRecords.find(row=>row.Id===openUserId);
+      const changed=Object.fromEntries(Object.entries(body).filter(([key,value])=>
+        (original as Record<string,unknown>|undefined)?.[key]!==value));
+      if(Object.keys(changed).length)await apiRequest('/records/User/'+encodeURIComponent(openUserId),{method:'PATCH',body:JSON.stringify(changed)});
+      if(permissionDirty)await saveDraft();
+      await loadUserRecords();
+      setUserMode('view');
+      onNotify('User saved');
+    }catch(failure){
+      const message=failure instanceof Error?failure.message:String(failure);
+      setError(message);onNotify('Unable to save user: '+message);
+    }finally{setUserSaving(false);}
+  };
   useEffect(() => {
     setDraft(accessControl);
     setSavedDraft(accessControl);
@@ -466,7 +523,7 @@ function Permissions({
       <button className={tab === 'sharingRules' ? 'active' : ''} onClick={() => changeTab('sharingRules')}>Sharing Rules</button>
     </div></></PlatformPageSlot>
     <section className={`surface permission-workspace${tab === 'sharing' ? ' sharing-full-width' : ''}${(tab === 'sets'||tab==='users') ? mobilePermissionDetail ? ' md-permission-sets-detail-mode' : ' md-permission-sets-list-mode' : ''}`} style={tab === 'sharing' ? {gridTemplateColumns: 'minmax(0, 1fr)'} : undefined}>
-      {tab !== 'sharing' && <PlatformPageSlot slotKey="rbac-list"><aside className="permission-list">
+      {tab !== 'sharing' && tab !== 'users' && <PlatformPageSlot slotKey="rbac-list"><aside className="permission-list">
         <div className="mini-search"><Search size={13} /><input placeholder={`Search ${tabLabel.toLowerCase()}…`} aria-label={`Search ${tabLabel}`} value={query} onChange={(event) => {setQuery(event.target.value);setPermissionListPage(0);}} /></div>
         {tab === 'profiles' && visibleProfiles.map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); onRouteResourceChange('Profiles', item.apiName); }}><strong>{item.label}</strong><small>{item.apiName} · {item.license}</small></button>)}
         {tab === 'sets' && pagedSets.map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); setMobilePermissionDetail(true); onRouteResourceChange('PermissionSets', item.apiName); }}><strong>{item.label}</strong><small>{item.apiName}</small></button>)}
@@ -476,7 +533,6 @@ function Permissions({
           <button type="button" className="btn" disabled={currentSetPage>=totalSetPages-1} onClick={()=>setPermissionListPage(p=>Math.min(totalSetPages-1,p+1))}>Next</button>
         </nav>}
         {tab === 'groups' && visibleGroups.map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); onRouteResourceChange('PermissionSetGroups', item.apiName); }}><strong>{item.label}</strong><small>{item.apiName} · {item.permissionSetIds.length} sets</small></button>)}
-        {tab === 'users' && draft.users.filter((item) => `${item.name} ${item.username} ${item.role}`.toLowerCase().includes(normalizedQuery)).map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); setMobilePermissionDetail(true); onRouteResourceChange('Users', item.id); }}><strong>{item.name?.trim() || item.username}</strong><small>{item.name?.trim() !== item.username ? item.username : 'Display name not set'}</small><span className="md-user-role-label">Role: {draft.roles.find(role=>role.id===item.roleId)?.name||item.role||'None'}</span></button>)}
         {tab === 'roles' && visibleRoles.map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); onRouteResourceChange('Roles', item.id); }}><strong>{item.name}{item.id === newRoleId ? ' · Unsaved draft' : ''}</strong><small>{item.apiName} · {item.parentRoleId ? draft.roles.find((role) => role.id === item.parentRoleId)?.name ?? 'Unknown parent' : 'Top level'}</small></button>)}
         {tab === 'publicGroups' && visiblePublicGroups.map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); onRouteResourceChange('PublicGroups', item.id); }}><strong>{item.label}</strong><small>{item.apiName} · {item.userIds.length + item.roleIds.length + item.roleAndSubordinateIds.length + item.groupIds.length} members</small></button>)}
         {tab === 'queues' && visibleQueues.map((item) => <button key={item.id} className={`permission-list-item ${item.id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(item.id); onRouteResourceChange('Queues', item.id); }}><strong>{item.label}</strong><small>{item.apiName} · {item.supportedObjectApiNames.length} object types</small></button>)}
@@ -484,7 +540,6 @@ function Permissions({
         {tab === 'profiles' && visibleProfiles.length === 0 && <div className="empty-state">No profiles found.</div>}
         {tab === 'sets' && visibleSets.length === 0 && <div className="empty-state">No permission sets found.</div>}
         {tab === 'groups' && visibleGroups.length === 0 && <div className="empty-state">No permission set groups found. Use New Permission Set Group to create one.</div>}
-        {tab === 'users' && draft.users.length === 0 && <div className="empty-state">No users are available for assignment.</div>}
         {tab === 'roles' && visibleRoles.length === 0 && <div className="empty-state">No roles found.</div>}
         {tab === 'publicGroups' && visiblePublicGroups.length === 0 && <div className="empty-state">No public groups found.</div>}
         {tab === 'queues' && visibleQueues.length === 0 && <div className="empty-state">No queues found.</div>}
@@ -858,9 +913,24 @@ function Permissions({
           })}</tbody></table></div></details>)}
           </details>
         </>}
-        {tab === 'users' && <>
-          <div className="section-toolbar"><div><h2>User Assignments</h2><p>Direct permission-set and permission-set-group memberships for this tenant.</p></div><button className="btn btn-brand" onClick={onOpenUserRecords}>Manage Users (CRUD)</button></div>
-          {draft.users.filter(user=>user.id===selectedId||(!draft.users.some(item=>item.id===selectedId)&&viewportWidth>=1024&&user.id===draft.users[0]?.id)).map((user) => <details className="permission-user-card" key={user.id} open><summary><strong>{user.name}</strong><span>{user.username}</span><span>{draft.roles.find((role) => role.id === user.roleId)?.name ?? user.role}</span></summary><PlatformPageSlot slotKey="field-rbac-29"><label className="form-label">Role<select className="form-control" value={user.roleId} onChange={(event) => patchUser(user.id, { roleId: event.target.value, role: draft.roles.find((role) => role.id === event.target.value)?.name ?? user.role })}><option value="">No role</option>{draft.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-30"><label className="form-label">Profile<select className="form-control" value={user.profileId} onChange={(event) => patchUser(user.id, { profileId: event.target.value })}><option value="">No profile</option>{draft.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.label} · {profile.license}</option>)}</select></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-31"><label className="form-label">Time Zone (IANA)<input className="form-control" value={user.timeZone} onChange={(event) => patchUser(user.id, { timeZone: event.target.value })} placeholder="America/Los_Angeles" /></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-32"><label className="form-label">Locale (BCP 47)<input className="form-control" value={user.locale} onChange={(event) => patchUser(user.id, { locale: event.target.value })} placeholder="en-US" /></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-33"><label className="form-label">Currency (ISO 4217)<input className="form-control" value={user.currencyIsoCode ?? ''} onChange={(event) => patchUser(user.id, { currencyIsoCode: event.target.value.toUpperCase() || undefined })} placeholder="USD" /></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-34"><label className="form-label">User Type
+        {tab === 'users' && !openUserId && !creatingUser && <UserDirectoryTable rows={userRecords} access={draft}
+          query={query} onQuery={setQuery} onView={id=>openUser(id,'view')} onEdit={id=>openUser(id,'edit')}
+          onNew={()=>{setUserMode('edit');onRouteResourceChange('Users','new');}}/>}
+        {tab === 'users' && (openUserId || creatingUser) && <div className="md-user-form">
+          <div className="md-user-form-header">
+            <button type="button" className="text-action" onClick={()=>{setUserMode('view');onRouteResourceChange('Users');}}>← All users</button>
+            <h2>{creatingUser?'New User':userDetails.Name||userDetails.Email||'User'}</h2>
+            <div className="md-user-form-actions">
+              {userMode==='view'&&userCanEdit&&<button type="button" className="btn" onClick={()=>setUserMode('edit')}>Edit</button>}
+              {userMode==='edit'&&!creatingUser&&<button type="button" className="btn" onClick={()=>{setUserMode('view');setDraft(savedDraft);setUserDetails(userDetailsFrom(userRecords.find(row=>row.Id===openUserId)));}}>Cancel</button>}
+              {userMode==='edit'&&<button type="button" className="btn btn-brand" disabled={userSaving} onClick={()=>void saveUser()}><Save size={14}/>{userSaving?'Saving…':creatingUser?'Create User':'Save'}</button>}
+            </div>
+          </div>
+          {!userCanEdit&&<p className="permission-help">You can view this user but your access does not allow editing.</p>}
+          <h3 className="permission-section-heading">Details</h3>
+          <UserDetailsFields value={userDetails} creating={creatingUser} editing={userMode==='edit'} apps={navigationApps} onChange={setUserDetails}/>
+          {creatingUser&&<p className="permission-help">Role, profile and permissions can be set after the user is created.</p>}
+          {draft.users.filter(user=>user.id===openUserId).map((user) => <fieldset className="permission-user-card md-user-access" key={user.id} disabled={userMode!=='edit'}><h3 className="permission-section-heading">Access</h3><div className="md-user-access-grid"><PlatformPageSlot slotKey="field-rbac-29"><label className="form-label">Role<select className="form-control" value={user.roleId} onChange={(event) => patchUser(user.id, { roleId: event.target.value, role: draft.roles.find((role) => role.id === event.target.value)?.name ?? user.role })}><option value="">No role</option>{draft.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-30"><label className="form-label">Profile<select className="form-control" value={user.profileId} onChange={(event) => patchUser(user.id, { profileId: event.target.value })}><option value="">No profile</option>{draft.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.label} · {profile.license}</option>)}</select></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-31"><label className="form-label">Time Zone (IANA)<input className="form-control" value={user.timeZone} onChange={(event) => patchUser(user.id, { timeZone: event.target.value })} placeholder="America/Los_Angeles" /></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-32"><label className="form-label">Locale (BCP 47)<input className="form-control" value={user.locale} onChange={(event) => patchUser(user.id, { locale: event.target.value })} placeholder="en-US" /></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-33"><label className="form-label">Currency (ISO 4217)<input className="form-control" value={user.currencyIsoCode ?? ''} onChange={(event) => patchUser(user.id, { currencyIsoCode: event.target.value.toUpperCase() || undefined })} placeholder="USD" /></label></PlatformPageSlot><PlatformPageSlot slotKey="field-rbac-34"><label className="form-label">User Type
           <select className="form-control" value={user.userType ?? 'internal'}
             onChange={(event) => patchUser(user.id, {
               userType: event.target.value as 'internal' | 'external',
@@ -872,8 +942,9 @@ function Permissions({
             <input className="form-control" value={user.externalAccountId ?? ''}
               onChange={(event) => patchUser(user.id, { externalAccountId: event.target.value })}
               placeholder="Tenant account record ID" />
-          </label></PlatformPageSlot>}<h3 className="permission-section-heading">Permission Sets</h3><div className="permission-check-grid">{draft.permissionSets.map((permissionSet) => <label className="checkbox-row" key={permissionSet.id}><input type="checkbox" checked={user.permissionSetIds.includes(permissionSet.id)} onChange={() => patchUser(user.id, { permissionSetIds: toggleString(user.permissionSetIds, permissionSet.id) })} />{permissionSet.label}</label>)}</div><h3 className="permission-section-heading">Permission Set Groups</h3><div className="permission-check-grid">{draft.permissionSetGroups.map((group) => <label className="checkbox-row" key={group.id}><input type="checkbox" checked={user.permissionSetGroupIds.includes(group.id)} onChange={() => patchUser(user.id, { permissionSetGroupIds: toggleString(user.permissionSetGroupIds, group.id) })} />{group.label}</label>)}</div>{/^[0-9a-f-]{36}$/i.test(user.id)&&<AdminUserAccountAssist userId={user.id} userLabel={user.name}/>}</details>)}
-        </>}
+          </label></PlatformPageSlot>}</div><h3 className="permission-section-heading">Permission Sets</h3><div className="permission-check-grid">{draft.permissionSets.map((permissionSet) => <label className="checkbox-row" key={permissionSet.id}><input type="checkbox" checked={user.permissionSetIds.includes(permissionSet.id)} onChange={() => patchUser(user.id, { permissionSetIds: toggleString(user.permissionSetIds, permissionSet.id) })} />{permissionSet.label}</label>)}</div><h3 className="permission-section-heading">Permission Set Groups</h3><div className="permission-check-grid">{draft.permissionSetGroups.map((group) => <label className="checkbox-row" key={group.id}><input type="checkbox" checked={user.permissionSetGroupIds.includes(group.id)} onChange={() => patchUser(user.id, { permissionSetGroupIds: toggleString(user.permissionSetGroupIds, group.id) })} />{group.label}</label>)}</div></fieldset>)}
+          {openUserId&&/^[0-9a-f-]{36}$/i.test(openUserId)&&<AdminUserAccountAssist userId={openUserId} userLabel={userDetails.Name||userDetails.Email}/>}
+        </div>}
         {tab === 'profiles' && !selectedProfile && <div className="empty-state">Select a profile or create one to get started.</div>}
         {tab === 'sets' && !selectedSet && <div className="empty-state">Select a permission set or create one to get started.</div>}
         {tab === 'groups' && !selectedGroup && visibleGroups.length>0 && <div className="empty-state">Select a permission set group to edit it.</div>}

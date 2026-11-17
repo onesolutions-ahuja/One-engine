@@ -91,7 +91,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|LOCKSCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|CONFIRMSCREEN|INFOSCREEN|LOCKSCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source)).parse();
@@ -106,7 +106,9 @@ export type ActionStep={
  name:string;object:string;id?:Expression;values?:Expression[];fields:Map<string,Expression>;alias?:string;
  guards?:readonly {condition:Expression;expected:boolean}[];
  /** FOREACH: the loop body, and a TABLE()/COLLECTION() source instead of record criteria. */
- body?:ActionStep[];source?:Expression
+ body?:ActionStep[];source?:Expression;
+ /** CONFIRMSCREEN: the steps run when the user answers No. */
+ elseBody?:ActionStep[]
 };
 const reservedAliases=['state','event','session','constructor','prototype','repeat'];
 
@@ -137,8 +139,25 @@ export function compileActionPlan(source:string):ActionStep[] {
    return;
   }
   if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'){
-   if(args.length)throw Error(node.name+' takes no arguments');
-   steps.push({name:node.name,object:'',fields:new Map(),guards});
+   // CLOSESCREEN("second") closes the second-monitor screen; otherwise no arguments.
+   const second=node.name==='CLOSESCREEN'&&args.length===1&&nameOf(args[0],'CLOSESCREEN target').toLowerCase()==='second';
+   if(args.length&&!second)throw Error(node.name+' takes no arguments (CLOSESCREEN also accepts "second")');
+   steps.push({name:node.name,object:second?'second':'',fields:new Map(),guards});
+   return;
+  }
+  if(node.name==='CONFIRMSCREEN'||node.name==='INFOSCREEN'){
+   // CONFIRMSCREEN(Message, ActionsOnYes, [ActionsOnNo], [YesLabel], [NoLabel]): a Yes/No box;
+   // INFOSCREEN(Message, [ActionsAfterOk]): a message with OK. The box closes itself.
+   const confirm=node.name==='CONFIRMSCREEN';
+   if(confirm?args.length<2||args.length>5:args.length<1||args.length>2)
+    throw Error(confirm?'CONFIRMSCREEN requires a message, actions on Yes, and optional actions on No and button labels'
+     :'INFOSCREEN requires a message and optional actions after OK');
+   const labels=confirm?[args[0],...args.slice(3)]:[args[0]];
+   labels.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
+   const body:ActionStep[]=[],elseBody:ActionStep[]=[];
+   if(args[1])add(body,args[1],[],loop);
+   if(confirm&&args[2])add(elseBody,args[2],[],loop);
+   steps.push({name:node.name,object:'',values:labels,fields:new Map(),guards,body,elseBody});
    return;
   }
   if(node.name==='WAIT'){
@@ -337,6 +356,18 @@ export function splitServerDataActionPlan(formula:string):ActionPlanDataSplit|nu
  return {dataSteps:count,totalSteps:steps.length};
 }
 
+/** CONFIRMSCREEN / INFOSCREEN: the page shows the box and answers (Yes/OK = true). */
+export function askMessageScreen(kind:'confirm'|'info',message:string,yesLabel='',noLabel=''):Promise<boolean>{
+ return new Promise<boolean>((resolve,reject)=>{
+  const host=globalThis as unknown as {dispatchEvent?:(event:unknown)=>boolean;
+   CustomEvent?:new(type:string,init:{cancelable:boolean;detail:unknown})=>unknown};
+  if(typeof host.dispatchEvent!=='function'||typeof host.CustomEvent!=='function')
+   return reject(Error((kind==='confirm'?'CONFIRMSCREEN':'INFOSCREEN')+' runs only on a page'));
+  const handled=!host.dispatchEvent(new host.CustomEvent('metadrive:message-screen',
+   {cancelable:true,detail:{kind,message,yesLabel,noLabel,resolve}}));
+  if(!handled)reject(Error('This page has no message box host'));
+ });
+}
 export const isScreenAction=(source:string)=>/^\s*=?\s*SCREEN\s*\(/i.test(source);
 export function parseScreenAction(source:string){
  const node=new Parser(tokenize(source)).parse();
@@ -344,7 +375,7 @@ export function parseScreenAction(source:string){
   throw Error('SCREEN requires a page API name, optional mode and optional record Id');
  const page=nameOf(node.args[0],'page API name');
  const mode=node.args[1]?nameOf(node.args[1],'window mode').toLowerCase():'current';
- if(!['current','popup','newwindow'].includes(mode))throw Error('Choose current, popup or newwindow');
+ if(!['current','popup','newwindow','second'].includes(mode))throw Error('Choose current, popup, newwindow or second');
  // Optional 3rd argument: the record the screen opens with, e.g.
  // SCREEN(Payment,popup,@ThisPage.Cart2.recordId). The caller evaluates it.
  if(node.args[2])validateFormulaFunctions(node.args[2],'ribbon_binding');
@@ -822,9 +853,18 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
       completed++;
       continue;
      }
+     if(step.name==='CONFIRMSCREEN'||step.name==='INFOSCREEN'){
+      const [message,yesLabel,noLabel]=(step.values??[]).map(evaluate)
+       .map(value=>value===null||value===undefined?'':String(value));
+      const yes=await askMessageScreen(step.name==='CONFIRMSCREEN'?'confirm':'info',message,yesLabel,noLabel);
+      completed++;
+      const next=yes?step.body??[]:step.elseBody??[];
+      if(next.length&&!(await run(next,variables,top)))return false;
+      continue;
+     }
      if(step.name==='CLOSESCREEN'||step.name==='LOCKSCREEN'){
       if(!runPageAction)throw Error('Page runtime unavailable');
-      await runPageAction(step.name,'');
+      await runPageAction(step.name,step.object);
       completed++;
       continue;
      }

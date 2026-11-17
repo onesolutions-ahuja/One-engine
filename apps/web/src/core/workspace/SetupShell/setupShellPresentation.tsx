@@ -245,7 +245,11 @@ export function renderSetupShell(ctx: any) {
             <section className="setup-card" role="status">Checking Setup permissions…</section>}
           {route.kind==='setup' && sessionPermissionsLoaded && !setupRouteAllowed &&
             <section className="setup-card" role="alert">
-              Access denied. Your OneEngine permission sets do not grant access to this Setup page.
+              <h1>{workspace==='rbac'&&route.resourceApiName==='Queues'?'Queues access required':
+                workspace==='named-credentials'&&route.resourceApiName==='NamedDevices'?'Named Devices access required':
+                  'Setup access required'}</h1>
+              <p>Ask your organisation’s administrator to review your access to this page.</p>
+              <a className="btn" href="/une/setup/home">Back to Setup Home</a>
             </section>}
           {(route.kind!=='setup'||(sessionPermissionsLoaded&&setupRouteAllowed)) && <React.Fragment>
           {route.kind === 'setup' && runtimeFormFactor === 'Phone' && workspace !== 'home' && !route.dashboardView &&
@@ -486,7 +490,6 @@ export function renderSetupShell(ctx: any) {
               return result;
             }}
             onRotate={rotateNamedCredential}
-            onTest={testNamedCredential}
             canTest={canManageNamedCredentials}
             onOAuthAuthorize={authorizeNamedCredential}
             onToggleEnabled={toggleNamedCredentialEnabled}
@@ -647,7 +650,7 @@ export function renderSetupShell(ctx: any) {
 securitySubsection={route.resourceId}
 onSelectSection={(section)=>navigateRoute({kind:'setup',workspace:'company-settings',...(section?{resourceApiName:section}:{})})}
 onSelectSecurityArea={area=>navigateRoute({kind:'setup',workspace:'company-settings',resourceApiName:'security',resourceId:area})}
-onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:target})} developerAccess={{metadata:canReadMetadata,apps:canManageApps,flows:canManageFlows,dashboards:canManageDashboards,reports:canReadMetadata,approvals:canManageApprovalProcesses,security:canReadSecurity}} company={<CompanySettings canManage={canManageUserIdentities} />} domains={<p>Custom domain inspection is temporarily unavailable.</p>} developer={<PlatformPageSlot slotKey="developer-accounts"><DeveloperAccountSettings request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>} usage={<p>Tenant usage inspection is temporarily unavailable.</p>} recovery={<PlatformPageSlot slotKey="recovery"><TenantRecoveryPanel request={apiRequest} operator={false} permitted={canManageUserIdentities} /></PlatformPageSlot>} mfa={<PlatformPageSlot slotKey="mfa"><TenantMfaSettings onReauthenticate={onLogout} canManage={canManageUserIdentities} governanceTab={route.resourceId === 'connected-apps' ? 'connected apps' : 'audit'} governanceFocus={route.resourceId === 'connected-apps' || route.resourceId === 'audit-trail'} /></PlatformPageSlot>} emailRecovery={<PlatformPageSlot slotKey="email-recovery"><TenantEmailRecoverySettings canManage={canManageUserIdentities} /></PlatformPageSlot>} locks={<PlatformPageSlot slotKey="locks"><TenantUserLockSettings /></PlatformPageSlot>} sessions={<PlatformPageSlot slotKey="sessions"><AccountSessionSecurity onReauthenticate={onLogout} /></PlatformPageSlot>} audit={<PlatformPageSlot slotKey="audit"><TenantSecurityAudit /></PlatformPageSlot>} /></PlatformWorkspaceSurface>}
+onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:target})} developerAccess={{metadata:canReadMetadata,apps:canManageApps,flows:canManageFlows,dashboards:canManageDashboards,reports:canReadMetadata,approvals:canManageApprovalProcesses,security:canReadSecurity}} company={<CompanySettings canManage={canManageUserIdentities} />} domains={<p>Custom domain inspection is temporarily unavailable.</p>} developer={<PlatformPageSlot slotKey="developer-accounts"><DeveloperAccountSettings request={apiRequest} permitted={canManageUserIdentities} /></PlatformPageSlot>} usage={<p>Tenant usage inspection is temporarily unavailable.</p>} recovery={<PlatformPageSlot slotKey="recovery"><TenantRecoveryPanel request={apiRequest} operator={false} permitted={canManageUserIdentities} /></PlatformPageSlot>} mfa={<PlatformPageSlot slotKey="mfa"><TenantMfaSettings onReauthenticate={onLogout} canManage={canManageUserIdentities} governanceTab={route.resourceId === 'connected-apps' ? 'connected apps' : route.resourceId === 'monitoring' || route.resourceId === 'licences' ? route.resourceId : 'audit'} governanceFocus={['connected-apps','audit-trail','monitoring','licences'].includes(route.resourceId??'')} /></PlatformPageSlot>} emailRecovery={<PlatformPageSlot slotKey="email-recovery"><TenantEmailRecoverySettings canManage={canManageUserIdentities} /></PlatformPageSlot>} locks={<PlatformPageSlot slotKey="locks"><TenantUserLockSettings /></PlatformPageSlot>} sessions={<PlatformPageSlot slotKey="sessions"><AccountSessionSecurity onReauthenticate={onLogout} /></PlatformPageSlot>} audit={<PlatformPageSlot slotKey="audit"><TenantSecurityAudit /></PlatformPageSlot>} /></PlatformWorkspaceSurface>}
           {route.kind === 'setup' && workspace === 'tenant-management' && !sessionPermissionsLoaded && <section className="setup-card" role="status">Checking access…</section>}
           {route.kind === 'setup' && workspace === 'tenant-management' && sessionPermissionsLoaded && !canManagePlatformTenants && <PlatformWorkspaceSurface
             workspace="company-settings" componentRuntime={protectedPageRuntime}

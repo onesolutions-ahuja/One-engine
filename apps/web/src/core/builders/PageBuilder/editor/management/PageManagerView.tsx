@@ -37,6 +37,10 @@ export default function PageManagerView({ props, editorState, management, layout
     pageListPageCount,
   } = management;
   const { openPageDesignLayout } = layoutActions;
+  const pageApplications = (item: LightningPageMetadata) => pageAppIds(item)
+    .map(id=>apps.find(app=>app.apiName===id)?.label??id).join(', ')||'—';
+  const modifiedDate = (item: LightningPageMetadata) => item.updatedAt
+    ? new Date(item.updatedAt).toLocaleString(undefined, {dateStyle:'medium',timeStyle:'short'}) : '—';
   return <>
 {!editorMode && <section className="page-manager-view" aria-label="Page management">
         <header className="page-manager-header"><div><h1>{recordPageContext ? 'Record Page Editor' : 'Page Builder'}</h1><p>{recordPageContext ? 'Object-owned record pages: view, edit, activate and publish device layouts.' : 'Manage Home and App Pages. Record Pages are managed inside Object Manager.'}</p></div>
@@ -73,6 +77,9 @@ export default function PageManagerView({ props, editorState, management, layout
             {pageListSortDescending?'↓ Descending':'↑ Ascending'}
           </button>
         </div>
+        {!recordPageContext && pageListTypeTab==='Record Page' && <p className="info-callout">
+          Open <a href="/une/setup/object-manager">Object Manager</a> and choose an object to manage its record pages.
+        </p>}
         <ResponsiveDataList rows={paginatedPages} includeTablet includeNarrowDesktop getId={item=>item.apiName}
           label="Page Manager pages" emptyText={pageListSearch||pageListObject||pageListDeviceTab!=="all"?"No pages match the selected filters.":"No pages of this type exist yet."}
           onOpen={item=>void openPageDesign(item.apiName)} openLabel="Open page designer"
@@ -81,6 +88,9 @@ export default function PageManagerView({ props, editorState, management, layout
             {apiName:'api',label:'API name',phoneRole:'subtitle',render:item=>item.apiName},
             {apiName:'status',label:'Status',phoneRole:'badge',render:item=>item.status},
             {apiName:'type',label:'Type',render:item=>item.pageType},
+            {apiName:'application',label:'Application',render:pageApplications},
+            {apiName:'version',label:'Version',render:item=>item.publishedRevision?'v'+item.publishedRevision:'Unpublished'},
+            {apiName:'updatedAt',label:'Last modified',render:modifiedDate},
             {apiName:'device',label:'Devices',phoneRole:'trailing',render:item=><>{pageDeviceLabel(item)}{layoutBadges(item)}</>},
             {apiName:'actions',label:'Actions',render:item=><div className="page-manager-mobile-actions">
               <button type="button" className="btn" aria-label={"Page properties for "+item.label} disabled={saving} onClick={()=>setPageDetailsApi(item.apiName)}>Page properties</button>
@@ -92,10 +102,10 @@ export default function PageManagerView({ props, editorState, management, layout
                 onOpenDefault={()=>void openPageDesign(item.apiName)}
                 onOpenLayout={variant=>void openPageDesignLayout(item.apiName,variant)}/>
               <button type="button" className="btn" aria-label={(item.status==="Active"?"Deactivate ":"Activate ")+item.label} disabled={saving} onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):activateListedPage(item))}>{item.status==='Active'?'Deactivate':'Activate'}</button>
-              <button type="button" className="btn" aria-label={"Delete "+item.label} disabled={saving||Boolean(archivingPageApiName)} onClick={()=>setPendingArchivePageApiName(item.apiName)}>Delete</button>
+              <button type="button" className="btn btn-danger" aria-label={"Archive "+item.label} disabled={saving||Boolean(archivingPageApiName)} onClick={()=>setPendingArchivePageApiName(item.apiName)}>Archive</button>
             </div>}
           ]}/>
-        <div className="page-manager-table-scroll md-mobile-table-replaced md-tablet-table-replaced"><table className="records-table page-manager-table"><thead><tr>
+        <div className="page-manager-table-scroll md-mobile-table-replaced md-tablet-table-replaced" role="region" aria-label="Pages table" tabIndex={0}><table className="records-table page-manager-table"><thead><tr>
           <th scope="col" className="page-manager-actions-heading">Actions</th>
           {([['label','Page name'],['apiName','API name']] as const).map(([key,label])=>
             <th key={key} scope="col" aria-sort={pageListSort===key?(pageListSortDescending?'descending':'ascending'):undefined}>
@@ -132,23 +142,23 @@ export default function PageManagerView({ props, editorState, management, layout
                 onClick={()=>void(item.status==='Active'?onDeactivate(item.apiName):activateListedPage(item))}><Power size={16}/></button>
               <button className="page-manager-icon-action page-manager-delete" type="button"
                 disabled={saving||Boolean(archivingPageApiName)}
-                aria-label={(archivingPageApiName===item.apiName?'Deleting ':'Delete ')+item.label}
-                title={archivingPageApiName===item.apiName?'Deleting page…':'Delete page'}
+                aria-label={(archivingPageApiName===item.apiName?'Archiving ':'Archive ')+item.label}
+                title={archivingPageApiName===item.apiName?'Archiving page…':'Archive page'}
                 onClick={()=>setPendingArchivePageApiName(item.apiName)}><Trash2 size={16}/></button>
             </div>
           </td>
           <td><button type="button" className="page-manager-page-link" onClick={()=>void openPageDesign(item.apiName)}>{item.label}</button></td><td title={item.apiName}><code>{item.apiName}</code></td>
-          <td>{pageAppIds(item).map(id=>apps.find(app=>app.apiName===id)?.label??id).join(', ')||'—'}</td>
+          <td>{pageApplications(item)}</td>
           <td>{item.publishedRevision?'v'+item.publishedRevision:'—'}</td>
           {showRelatedObjectColumn&&<td>{item.targetObject ? objects.find(object=>object.apiName===item.targetObject)?.label ?? item.targetObject : '—'}</td>}
           <td title={item.pageType+' · '+pageDeviceLabel(item)+' · '+item.canvasWidth+' × '+item.canvasHeight+' · '+canvasOrientation(item.canvasWidth,item.canvasHeight)}>
             <strong>{pageDeviceLabel(item)}{layoutBadges(item)}</strong>
             <small className="page-manager-layout-metadata">{item.pageType} · {item.canvasWidth} × {item.canvasHeight}</small>
           </td>
-          <td>{item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '—'}</td>
+          <td>{modifiedDate(item)}</td>
           <td><span className={item.status === 'Active' ? 'page-status-badge active' : 'page-status-badge'}>{item.status}</span></td>
 
-        </tr>)}</tbody></table>{!visiblePages.length && <div className="records-empty">{!recordPageContext && pageListTypeTab === 'Record Page' ? 'Record Pages are managed inside Object Manager. Choose an object there to manage its record pages.' : pageListSearch||pageListObject||pageListDeviceTab!=='all'?'No pages match the selected filters. Clear filters to see all pages.':'No pages of this type exist yet. Create a new page to begin.'}</div>}</div>
+        </tr>)}</tbody></table>{!visiblePages.length && <div className="records-empty">{pageListSearch||pageListObject||pageListDeviceTab!=='all'?'No pages match the selected filters. Clear filters to see all pages.':'No pages of this type exist yet. Create a new page to begin.'}</div>}</div>
         <nav className="flow-existing-pagination" aria-label="Page list pagination">
           <span>{visiblePages.length} {visiblePages.length===1?"page":"pages"} · Page {safePageListPage} of {pageListPageCount}</span>
           <button className="btn" disabled={safePageListPage<=1} onClick={()=>setPageListPage(safePageListPage-1)}>Previous</button>

@@ -626,7 +626,7 @@
 }
 .connector-settings-page p { font-size: 12px; line-height: 1.5; }
 .permissions-page .permission-tabs { min-height: 44px; gap: 12px; }
-.permissions-page .permission-tabs button {
+.permissions-page .permission-tabs :is(button,a) {
   min-height: 44px;
   padding-inline: 5px;
   font-size: 12px;
@@ -694,7 +694,7 @@
     gap: 4px;
     height: auto;
   }
-  .permissions-page .permission-tabs button {
+  .permissions-page .permission-tabs :is(button,a) {
     min-width: 0;
     padding: 4px 5px;
     line-height: 1.2;
@@ -710,3 +710,12 @@
 .exchange-tabs button:not(.active) { color: #67716b; }
 .company-information .permission-help,
 .company-settings .permission-help { color: #617087; }
+.named-credentials-search{display:flex;margin-block:12px}
+.named-credentials-search .form-control{height:44px;min-height:44px;min-width:0;width:min(100%,30rem)}
+
+/* Keep table and card presentations mutually exclusive on constrained Setup layouts. */
+@media(max-width:1199px), (max-height:500px) and (pointer:coarse) {
+  .lightning .flow-start-existing .flow-existing-table-scroll,
+  .lightning .named-credentials-page > .table-scroll { display:none; }
+  .lightning .named-credentials-page .md-responsive-details .btn { min-height:44px; }
+}

@@ -1,21 +1,38 @@
 import {useEffect,useRef,useState} from 'react';
-import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import TenantConnectedApps from './TenantConnectedApps';
 import TenantLicenses from './TenantLicenses';
+import {appRoutePath} from '../../workspace/Navigation/appRouting';
+const governanceViews = [
+ {id:'audit', route:'audit-trail', label:'Audit Trail'},
+ {id:'monitoring', route:'monitoring', label:'Monitoring'},
+ {id:'licences', route:'licences', label:'Licences'},
+ {id:'connected apps', route:'connected-apps', label:'Connected Apps'}
+] as const;
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 type Audit={id:string;actor_user_id:string|null;table_name:string;operation:string;row_identifier:string;changed_fields:string[];created_at:string};
 export default function TenantGovernance({request,canManage,initialTab='audit',focusOnMount=false}:{request:Request;canManage:boolean;initialTab?:string;focusOnMount?:boolean}){
- const [tab,setTab]=useState(initialTab);
+ const tab=initialTab;
  const rootRef=useRef<HTMLElement>(null);
- useEffect(()=>setTab(initialTab),[initialTab]);
  useEffect(()=>{if(focusOnMount)rootRef.current?.scrollIntoView({block:'start',behavior:'auto'});},[focusOnMount,initialTab]);
- return <section ref={rootRef} className="surface permission-section md-security-governance"><h2>Security governance</h2><div className="permission-tabs md-admin-tabstrip" role="tablist" aria-label="Security governance views">{(['audit','monitoring','licences','connected apps'] as const).map(t=><button type="button" role="tab" id={'governance-tab-'+t.replace(' ','-')} aria-controls={'governance-panel-'+t.replace(' ','-')} aria-selected={tab===t} className={tab===t?'active':''} key={t} onClick={()=>setTab(t)}>{({audit:'Audit Trail',monitoring:'Monitoring',licences:'Licences','connected apps':'Connected Apps'} as const)[t]}</button>)}</div>
+ return <section ref={rootRef} className="surface permission-section md-security-governance"><h2>Security governance</h2><nav className="permission-tabs md-admin-tabstrip" role="tablist" aria-label="Security governance views">
+ {governanceViews.map(({id:t,route,label},index)=><a key={t} role="tab" id={'governance-tab-'+t.replace(' ','-')}
+  aria-selected={tab===t} aria-controls={'governance-panel-'+t.replace(' ','-')} tabIndex={tab===t?0:-1}
+  className={tab===t?'active':''}
+  onKeyDown={event=>{
+   const count=governanceViews.length;
+   const next=event.key==='ArrowRight'?(index+1)%count:event.key==='ArrowLeft'?(index+count-1)%count:
+    event.key==='Home'?0:event.key==='End'?count-1:-1;
+   if(next<0)return;
+   event.preventDefault();
+   event.currentTarget.parentElement?.querySelectorAll<HTMLAnchorElement>('[role="tab"]')[next]?.focus();
+  }}
+  href={appRoutePath({kind:'setup',workspace:'company-settings',resourceApiName:'security',resourceId:route})}>{label}</a>)}
+ </nav>
  <div role="tabpanel" id={'governance-panel-'+tab.replace(' ','-')} aria-labelledby={'governance-tab-'+tab.replace(' ','-')} className="md-admin-tabpanel">{tab==='audit'&&<AuditTrail request={request}/>}{tab==='monitoring'&&<Monitoring request={request}/>}{tab==='licences'&&<TenantLicenses request={request} canManage={canManage}/>}{tab==='connected apps'&&<TenantConnectedApps request={request}/>}</div>
  </section>;
 }
 function AuditTrail({request}:{request:Request}){
- const width=useViewportWidth();
- const pageSize=width>0&&width<=600?10:25;
+ const pageSize=10;
  const [page,setPage]=useState(0);
  const [auditDraft,setAuditDraft]=useState({actor:'',from:'',to:''});
  const [auditFilters,setAuditFilters]=useState({actor:'',from:'',to:''});
@@ -44,7 +61,7 @@ function AuditTrail({request}:{request:Request}){
  {message&&<p role="status">{message}</p>}<div className="md-admin-table-wrap" role="region" aria-label="Setup audit events" tabIndex={0}><table className="data-table md-admin-table md-audit-table"><thead><tr><th scope="col">Time</th><th scope="col">Actor</th><th scope="col">Setup table</th><th scope="col">Operation</th><th scope="col">Row</th><th scope="col">Changed fields</th></tr></thead><tbody>{events.slice(page*pageSize,(page+1)*pageSize).map(e=><tr key={e.id}><td data-label="Time">{new Date(e.created_at).toLocaleString()}</td><td data-label="Actor">{e.actor_user_id??'System'}</td><td data-label="Setup table">{e.table_name}</td><td data-label="Operation">{e.operation}</td><td data-label="Row" data-long-id title={e.row_identifier}>{e.row_identifier}</td><td data-label="Changed fields">{e.changed_fields.join(', ')}</td></tr>)}{events.length===0&&<tr><td colSpan={6} className="md-admin-empty-row">No setup changes match these filters.</td></tr>}</tbody></table></div>
  <div className="md-admin-pagination" role="group" aria-label="Audit event pages">
   <button type="button" className="btn" disabled={page===0} onClick={()=>setPage(p=>Math.max(0,p-1))}>Previous {pageSize}</button>
-  <span>Page {page+1} · {events.length} events loaded</span>
+  <span>Page {page+1} · {pageSize} events per page · {events.length} loaded</span>
   <button type="button" className="btn" disabled={(page+1)*pageSize>=events.length&&!next}
    onClick={()=>{if((page+1)*pageSize<events.length)setPage(p=>p+1);else if(next)void load(next).then(()=>setPage(p=>p+1)).catch(e=>setMessage(String(e)));}}>Next {pageSize}</button>
  </div></>;
@@ -53,8 +70,7 @@ type Rule={id?:string;label:string;enabled:boolean;event_type:string;method:stri
 type Monitor={events:{id:string;created_at:string;event_type:string;resource:string;method:string;status_code:number;elapsed_ms:number}[];rules:Rule[];settings:{enabled:boolean;retention_days:number};summary:{requests:number;errors:number;average_ms:number};nextCursor:string|null};
 const emptyRule=():Rule=>({label:'',enabled:false,event_type:'api',method:'*',path_prefix:'/api',threshold:100,window_seconds:60,response:'Block',flow_api:null,service_user_id:null});
 function Monitoring({request}:{request:Request}){
- const width=useViewportWidth();
- const pageSize=width>0&&width<=600?10:25;
+ const pageSize=10;
  const [page,setPage]=useState(0);
  useEffect(()=>setPage(0),[pageSize]);
  const [eventQuery,setEventQuery]=useState('');
@@ -114,10 +130,14 @@ function Monitoring({request}:{request:Request}){
   finally{setPruning(false);}
  };
  return <><h3>Event Monitoring and Transaction Security</h3><p>Rules count authenticated requests per user and time window. Blocking starts at the threshold. Flow responses run once per window through the durable Flow worker, using the selected service identity.</p>{message&&<p role="status">{message}</p>}
- {data&&<><p>Last 24 hours: {data.summary.requests} requests, {data.summary.errors} errors, average {data.summary.average_ms} ms</p>
+ {data&&<><dl className="md-monitoring-metrics" aria-label="Event totals for the last 24 hours">
+  <div><dt>Requests</dt><dd>{data.summary.requests.toLocaleString()}</dd></div>
+  <div><dt>Errors</dt><dd>{data.summary.errors.toLocaleString()}</dd></div>
+  <div><dt>Average response</dt><dd>{data.summary.average_ms.toLocaleString()} ms</dd></div>
+ </dl>
  <div className="md-admin-settings-block"><div className="md-admin-form-grid"><label className="checkbox-row md-admin-span-all"><input type="checkbox" checked={data.settings.enabled} onChange={e=>setData({...data,settings:{...data.settings,enabled:e.target.checked}})}/>Record request events (rules remain enforced)</label>
  <label className="form-label md-admin-field-short">Event retention days<input className="form-control" type="number" min="90" max="3650" value={data.settings.retention_days} onChange={e=>setData({...data,settings:{...data.settings,retention_days:Number(e.target.value)}})}/></label>
- </div><div className="md-admin-actions"><button type="button" className="btn btn-brand" disabled={!settingsValid||!settingsChanged||pruning} onClick={()=>save('/security/monitoring',data.settings)}>Save monitoring settings</button><button type="button" className="btn" disabled={pruning} onClick={()=>{
+ </div><div className="md-admin-actions"><button type="button" className="btn btn-brand" disabled={!settingsValid||!settingsChanged||pruning} onClick={()=>save('/security/monitoring',data.settings)}>Save monitoring settings</button><button type="button" className="btn btn-danger" disabled={pruning} onClick={()=>{
    setPruneConfirmation('');setPruneOpen(true);setPrunePreview(null);
    void request<{eligible:number;retentionDays:number}>('/security/monitoring/prune-preview')
      .then(setPrunePreview).catch(e=>{setMessage('Could not load cleanup preview: '+String(e));setPruneOpen(false);});
@@ -129,7 +149,7 @@ function Monitoring({request}:{request:Request}){
      :'Loading the saved retention policy and event count…'}
    This cannot be undone. Unsaved retention changes do not affect the cutoff.</p>
   <label className="form-label">Type PRUNE to confirm<input className="form-control" value={pruneConfirmation} disabled={pruning} onChange={e=>setPruneConfirmation(e.target.value)}/></label>
-  <div className="md-admin-actions"><button type="button" className="btn" disabled={pruning} onClick={()=>{setPruneOpen(false);setPruneConfirmation('');}}>Cancel</button>
+  <div className="md-admin-actions"><button type="button" className="btn btn-danger" disabled={pruning} onClick={()=>{setPruneOpen(false);setPruneConfirmation('');}}>Cancel</button>
    <button type="button" className="btn btn-danger" disabled={pruning||!prunePreview||pruneConfirmation!=='PRUNE'} onClick={()=>void prune()}>{pruning?'Removing…':'Remove old events'}</button>
   </div>
  </div>}</div><h4 className="md-admin-subheading">Transaction rule</h4><div className="md-admin-form-grid">

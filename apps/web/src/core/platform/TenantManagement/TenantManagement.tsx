@@ -125,7 +125,10 @@ export default function TenantManagement({ request, permitted }: { request: Requ
     setLegalHold(tenant.legalHold ?? false);
     setEditing({ name: tenant.name, description: tenant.description });
   };
+  const [openingTenant,setOpeningTenant]=useState<string|null>(null);
   const selectTenant = async (id: string) => {
+    if(openingTenant)return;
+    setOpeningTenant(id);
     setError(''); setNotice('');
     try {
       const result = await request<{ tenant: TenantSummary }>('/platform/tenants/' + encodeURIComponent(id));
@@ -134,6 +137,8 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setDetailTab('details'); setEditDetails(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to open tenant');
+    } finally {
+      setOpeningTenant(null);
     }
   };
   const administratorEmailMatchesDeveloper = create.email.trim().length>0
@@ -244,8 +249,12 @@ export default function TenantManagement({ request, permitted }: { request: Requ
       setError(cause instanceof Error ? cause.message : 'Unable to change lifecycle');
     } finally { setBusy(false); }
   };
+  const retentionChanged = Boolean(selected && (
+    retentionUntil !== (selected.retentionUntil?.slice(0,10) ?? '') ||
+    legalHold !== Boolean(selected.legalHold)
+  ));
   const saveRetention = async () => {
-    if (!selected || busy || !permitted) return;
+    if (!selected || busy || !permitted || !retentionChanged) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await request<{ tenant: TenantSummary }>(
@@ -275,6 +284,7 @@ export default function TenantManagement({ request, permitted }: { request: Requ
   const mailboxLabel = { active: 'Ready', pending: 'Provisioning', error: 'Failed', missing: 'Not created' } as const;
   const closeTenant = () => { setSelected(null); setEditDetails(false); setError(''); setNotice(''); };
 
+  const tenantDetailTabs = [['details','Overview'],['users','Users'],['recovery','Recovery'],['seeders','Seeders']] as const;
   return <div className="tenant-console">
     {selected ? <header className="tenant-heading tenant-heading-detail">
       <div>
@@ -298,13 +308,14 @@ export default function TenantManagement({ request, permitted }: { request: Requ
     </header>}
     {error && !showCreate && <div className="tenant-alert tenant-alert-error" role="alert"><CircleAlert size={17} /> {error}</div>}
     {notice && <div className="tenant-alert" role="status">{notice}</div>}
+    {openingTenant && <p role="status">Loading tenant details…</p>}
 
     {!selected && <>
     <section className="tenant-overview" aria-label="Tenant overview"><div><strong>{total}</strong><span>Matching tenants</span></div><div><strong>{activeOnPage}</strong><span>Active on this page</span></div><div><strong>{suspendedOnPage}</strong><span>Suspended on this page</span></div><div><strong>{archivedOnPage}</strong><span>Archived on this page</span></div></section>
     <div className="tenant-columns" aria-hidden={showCreate || undefined}>
       <PlatformPageSlot slotKey="directory"><section className="tenant-panel" aria-label="Tenants">
         <div className="tenant-toolbar">
-          <label className="tenant-search"><Search size={16} /><input type="search" aria-label="Search tenants" placeholder="Search name or tenant ID" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
+          <label className="tenant-search"><Search size={16} /><input type="search" aria-label="Search by name or tenant ID" placeholder="Search by name or tenant ID" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
           <label className="tenant-filter">Status <select aria-label="Filter tenant status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="ALL">All</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="ARCHIVED">Archived</option></select></label>
         </div>
         <ResponsiveDataList rows={tenants} getId={item=>item.tenantId} label="Tenant organisations"
@@ -317,12 +328,13 @@ export default function TenantManagement({ request, permitted }: { request: Requ
             {apiName:'users',label:'Users',phoneRole:'subtitle',render:item=>usersLabel(item)},
             {apiName:'created',label:'Created',phoneRole:'trailing',render:item=>shortDate(item.createdAt)}
           ]}/>
-        <div className="tenant-table-wrap md-mobile-table-replaced"><table className="tenant-table"><thead><tr><th>Organisation</th><th>Tenant ID</th><th>Status</th><th>Users</th><th>Created</th></tr></thead>
+        <div className="tenant-table-wrap md-mobile-table-replaced"><table className="tenant-table"><thead><tr><th scope="col">Organisation</th><th scope="col">Tenant ID</th><th scope="col">Status</th><th scope="col">Users</th><th scope="col">Created</th></tr></thead>
           <tbody>{tenants.map((item) => <tr key={item.tenantId} className="tenant-row-link" onClick={() => void selectTenant(item.tenantId)}>
-            <td><button className="tenant-name-link" onClick={(event) => { event.stopPropagation(); void selectTenant(item.tenantId); }}>{item.name}</button></td><td title={item.tenantId}><code>{item.tenantId}</code></td>
+            <td><button type="button" className="tenant-name-link" onClick={(event) => { event.stopPropagation(); void selectTenant(item.tenantId); }}>{item.name}</button></td><td title={item.tenantId}><code>{item.tenantId}</code></td>
             <td>{statusPill(item.status)}</td>
             <td>{usersLabel(item)}</td><td>{shortDate(item.createdAt)}</td></tr>)}
-            {!loading && tenants.length === 0 && <tr><td colSpan={5} className="tenant-empty">No tenants match this search.</td></tr>}
+            {!loading && tenants.length === 0 && <tr><td colSpan={5} className="tenant-empty">No tenants match these filters. {(query || status !== 'ALL') && <button type="button" className="tenant-button"
+              onClick={()=>{setQuery('');setStatus('ALL');setPage(1);}}>Clear filters</button>}</td></tr>}
             {loading && <tr><td colSpan={5} className="tenant-empty">Loading tenants…</td></tr>}
           </tbody></table></div>
         <footer className="tenant-pagination"><span>{total} tenant{total === 1 ? '' : 's'} · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span><div>
@@ -337,7 +349,22 @@ export default function TenantManagement({ request, permitted }: { request: Requ
         <Mail size={17} /><span>Developer mailbox <strong>{developer.email}</strong> was not created ({mailboxLabel[developer.mailboxStatus ?? 'missing'].toLowerCase()}).</span>
         <button type="button" className="tenant-button tenant-button-primary" onClick={() => void retryMailbox()} disabled={busy}>{busy ? 'Working…' : 'Retry developer mailbox'}</button>
       </div>}
-      <div className="tenant-detail-tabs" role="tablist" aria-label="Tenant details sections">{([["details","Overview"],["users","Users"],["recovery","Recovery"],["seeders","Seeders"]] as const).map(([id,label]) => <button type="button" key={id} role="tab" aria-selected={detailTab === id} className={detailTab === id ? "active" : ""} onClick={() => setDetailTab(id)}>{label}</button>)}</div>
+      <div className="tenant-detail-tabs" role="tablist" aria-label="Tenant details sections">
+        {tenantDetailTabs.map(([id,label],index)=><button type="button" key={id} role="tab"
+          id={'tenant-tab-'+id} aria-controls="tenant-detail-panel" aria-selected={detailTab===id}
+          tabIndex={detailTab===id?0:-1} className={detailTab===id?'active':''}
+          onClick={()=>setDetailTab(id)}
+          onKeyDown={event=>{
+            const count=tenantDetailTabs.length;
+            const next=event.key==='ArrowRight'?(index+1)%count:event.key==='ArrowLeft'?(index+count-1)%count:
+              event.key==='Home'?0:event.key==='End'?count-1:-1;
+            if(next<0)return;
+            event.preventDefault();
+            setDetailTab(tenantDetailTabs[next][0]);
+            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+          }}>{label}</button>)}
+      </div>
+      <div id="tenant-detail-panel" role="tabpanel" aria-labelledby={'tenant-tab-'+detailTab}>
       {detailTab === "details" && <div className="tenant-overview-grid">
         <form className="tenant-card" onSubmit={(event) => void saveTenant(event)}>
           <div className="tenant-card-heading"><h3>Organisation</h3>{!editDetails && <button type="button" className="tenant-button tenant-button-small" onClick={() => setEditDetails(true)}>Edit</button>}</div>
@@ -366,14 +393,15 @@ export default function TenantManagement({ request, permitted }: { request: Requ
         <section className="tenant-card tenant-card-wide" aria-label="Retention controls">
           <div className="tenant-card-heading"><h3>Retention and legal hold</h3></div>
           <div className="tenant-retention-row">
-            <label>Retain until (optional)<input type="date" value={retentionUntil} onChange={(event) => setRetentionUntil(event.target.value)} /></label>
+            <label>Retain until (optional)<input aria-describedby="tenant-retention-help" type="date" value={retentionUntil} onChange={(event) => setRetentionUntil(event.target.value)} /></label>
             <label className="tenant-checkbox"><input type="checkbox" checked={legalHold} onChange={(event) => setLegalHold(event.target.checked)} /> Legal hold</label>
-            <button type="button" className="tenant-button" onClick={() => void saveRetention()} disabled={busy}>Save retention</button>
+            <button type="button" className="tenant-button" onClick={() => void saveRetention()} disabled={busy||!retentionChanged}>Save retention</button>
           </div>
-          <p className="tenant-help">Changes are audited. Nothing is ever deleted automatically.</p>
+          <p id="tenant-retention-help" className="tenant-help">Leave the date blank if no retention deadline applies. Changes are audited. Nothing is ever deleted automatically.</p>
         </section>
       </div>}
       {detailTab === "users" && <TenantUsersPanel request={request} tenantId={selected.tenantId} permitted={permitted} />}{detailTab === "seeders" && <SeederManager request={request} tenantId={selected.tenantId} />}{detailTab === "recovery" && <PlatformPageSlot slotKey="tenant-recovery"><TenantRecoveryPanel request={request} operator permitted={permitted} tenantId={selected.tenantId} /></PlatformPageSlot>}
+      </div>
     </section></PlatformPageSlot>}
     {showCreate&&<div className="tenant-create-backdrop" role="presentation">
       <section className="tenant-create-dialog" role="dialog" aria-modal="true" aria-labelledby="tenant-create-title"

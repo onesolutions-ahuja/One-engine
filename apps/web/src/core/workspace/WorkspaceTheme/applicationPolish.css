@@ -56,7 +56,7 @@
 .lightning :is(.permission-tabs,.company-workspace-tabs,.exchange-tabs){
  background:var(--md-surface-2);border-color:var(--md-separator);
 }
-.lightning :is(.permission-tabs button,.company-workspace-tabs button,.exchange-tabs button).active{
+.lightning :is(.permission-tabs :is(button,a),.company-workspace-tabs button,.exchange-tabs button).active{
  background:var(--md-surface);color:var(--md-primary);box-shadow:var(--md-shadow-sm);border-radius:var(--md-radius-md);
 }
 .lightning .exchange-hero{
@@ -96,18 +96,18 @@
  .lightning .welcome-banner .welcome-quick button{flex:1 1 100%;width:100%}
 }
 @media(pointer:coarse){
- .lightning :is(.app-manager-step,.exchange-tabs button,.permission-tabs button,.shortcut-card,.company-workspace-tabs button){min-height:44px}
+ .lightning :is(.app-manager-step,.exchange-tabs button,.permission-tabs :is(button,a),.shortcut-card,.company-workspace-tabs button){min-height:44px}
 }
 @media(prefers-reduced-transparency:reduce){.lightning .exchange-backdrop{backdrop-filter:none}}
 
 
 /* Permission labels need text contrast, not only coloured selection fills. */
-.lightning :is(.permission-tabs button.active,.permission-list-item.selected,
+.lightning :is(.permission-tabs :is(button,a).active,.permission-list-item.selected,
  .permission-list-item[aria-current="page"]){
  color:var(--md-action-ink,#0058bd);
 }
 
 /* WebKit dark native-button fallback must not paint light-grey inactive tabs. */
-.lightning .permission-tabs button:not(.active){
+.lightning .permission-tabs :is(button,a):not(.active){
  background:transparent;color:var(--md-text);border-color:transparent;
 }

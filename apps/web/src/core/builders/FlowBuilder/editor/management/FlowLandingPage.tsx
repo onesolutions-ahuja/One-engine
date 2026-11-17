@@ -82,7 +82,7 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
       </div>
       {remoteFlowLoading && <p role="status" className="settings-panel-copy">Loading flows…</p>}
       {totalFlowCount ? <>
-        <ResponsiveDataList rows={displayedFlows} includeTablet getId={item=>item.apiName}
+        <ResponsiveDataList rows={displayedFlows} includeTablet includeNarrowDesktop getId={item=>item.apiName}
          label="Existing Flows" onOpen={item=>onSelectFlow(item.apiName)} openLabel="Edit Flow"
          columns={[
           {apiName:'label',label:'Flow',phoneRole:'title',render:item=>item.label},
@@ -90,21 +90,24 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
           {apiName:'status',label:'Status',phoneRole:'badge',render:item=>item.status},
           {apiName:'version',label:'Version',phoneRole:'trailing',render:item=>'v'+item.versionNumber},
           {apiName:'apiName',label:'API Name',render:item=>item.apiName},
+          {apiName:'createdBy',label:'Created by',render:item=>item.createdBy||'—'},
+          {apiName:'created',label:'Created',render:item=>item.createdAt?new Date(item.createdAt).toLocaleString():'—'},
+          {apiName:'modifiedBy',label:'Modified by',render:item=>item.lastModifiedBy||'—'},
           {apiName:'modified',label:'Modified',render:item=>item.lastModifiedAt?new Date(item.lastModifiedAt).toLocaleString():'—'}
          ]}/>
-        <div className="flow-existing-table-scroll md-mobile-table-replaced md-tablet-table-replaced">
+        <div className="flow-existing-table-scroll md-mobile-table-replaced md-tablet-table-replaced" role="region" aria-label="Flows table" tabIndex={0}>
         <table className="flow-existing-table">
-          <thead><tr><th aria-label="Edit flow">Edit</th><th>Flow Name</th><th>Flow Type</th><th>Status</th><th>Version</th><th>Details</th></tr></thead>
+          <thead><tr><th scope="col">Edit</th><th scope="col">Flow Name</th><th scope="col">Flow Type</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Details</th></tr></thead>
           <tbody>{displayedFlows.map((candidate) =>
             <tr key={candidate.apiName}>
               <td><button type="button" className="icon-button subtle" aria-label={`Edit ${candidate.label}`} title={`Edit ${candidate.label}`} onClick={() => onSelectFlow(candidate.apiName)}><Pencil size={16} /></button></td>
               <td><button type="button" className="text-action" onClick={() => onSelectFlow(candidate.apiName)}>{candidate.label}</button></td>
               <td>{candidate.flowType}</td><td>{candidate.status}</td><td>v{candidate.versionNumber}</td>
-              <td><details><summary>View details</summary><dl><dt>Created by</dt><dd>{candidate.createdBy || '—'}</dd><dt>Created</dt><dd>{candidate.createdAt ? new Date(candidate.createdAt).toLocaleString() : '—'}</dd><dt>Modified by</dt><dd>{candidate.lastModifiedBy || '—'}</dd><dt>Modified</dt><dd>{candidate.lastModifiedAt ? new Date(candidate.lastModifiedAt).toLocaleString() : '—'}</dd></dl></details></td>
+              <td>{(candidate.createdBy||candidate.createdAt||candidate.lastModifiedBy||candidate.lastModifiedAt)?<details><summary aria-label={'View details for '+candidate.label}>View details</summary><dl><dt>Created by</dt><dd>{candidate.createdBy || '—'}</dd><dt>Created</dt><dd>{candidate.createdAt ? new Date(candidate.createdAt).toLocaleString() : '—'}</dd><dt>Modified by</dt><dd>{candidate.lastModifiedBy || '—'}</dd><dt>Modified</dt><dd>{candidate.lastModifiedAt ? new Date(candidate.lastModifiedAt).toLocaleString() : '—'}</dd></dl></details>:<span>Unavailable</span>}</td>
             </tr>)}</tbody>
         </table>
-      </div></> : <p className="settings-panel-copy">No matching flows found.</p>}
-      <nav aria-label="Flow list pagination" className="flow-existing-pagination">
+      </div></> : !remoteFlowLoading && <p className="settings-panel-copy" role="status">No matching flows found.</p>}
+      {flowPageCount>1&&<nav aria-label="Flow list pagination" className="flow-existing-pagination">
         <span>{totalFlowCount} flow{totalFlowCount === 1 ? '' : 's'} · Page {safeFlowPage} of {flowPageCount}</span>
         <button className="btn" disabled={safeFlowPage === 1} onClick={() => setExistingFlowPage(1)}>First</button>
         <button className="btn" disabled={safeFlowPage === 1} onClick={() => setExistingFlowPage(safeFlowPage - 1)}>Previous</button>
@@ -118,7 +121,7 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
         })}
         <button className="btn" disabled={safeFlowPage === flowPageCount} onClick={() => setExistingFlowPage(safeFlowPage + 1)}>Next</button>
         <button className="btn" disabled={safeFlowPage === flowPageCount} onClick={() => setExistingFlowPage(flowPageCount)}>Last</button>
-      </nav>
+      </nav>}
     </section>
     </div>
   </div>;

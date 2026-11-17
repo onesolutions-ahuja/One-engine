@@ -327,7 +327,14 @@
 .lightning .surface.permission-section .form-label{font-size:var(--md-label-size,13px)}
 .lightning .surface.permission-section .permission-help{font-size:var(--md-helper-size,12px);line-height:1.5}
 .lightning .surface.permission-section>p{max-width:var(--md-reading-width,76ch)}
-.lightning .setup-layout .btn:disabled{opacity:.68}
+.lightning .setup-layout .btn:disabled {
+  background: var(--md-surface-soft, #f1f5f9);
+  border-color: var(--md-border, #dbe1e8);
+  color: var(--md-muted, #596579);
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
 @media(max-width:1023px){.lightning .md-admin-form-grid--3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.lightning .md-admin-form-grid,.lightning .md-admin-form-grid--3{grid-template-columns:minmax(0,1fr)}.lightning .md-admin-table :is(th,td){padding:8px 10px}}
 

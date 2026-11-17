@@ -79,7 +79,7 @@ export default function ScheduledFlows({ flows, objects, loading, onEdit, initia
                 <th scope="col">Start Date &amp; Time</th>
                 <th scope="col">Frequency</th>
                 <th scope="col">Status</th>
-                <th scope="col" aria-label="Actions"></th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -112,7 +112,7 @@ export default function ScheduledFlows({ flows, objects, loading, onEdit, initia
               {!loading && scheduledFlows.length === 0 && (
                 <tr>
                   <td className="scheduled-flows-empty" colSpan={7}>
-                    {search ? 'No scheduled flows match your search.' : 'No scheduled flows yet. Create a Schedule-Triggered Flow in Flow Builder to see it here.'}
+                    {search ? 'No scheduled flows match your search.' : <>No scheduled flows yet. <a href="/une/setup/flow-builder">Open Flow Builder</a> to create a schedule-triggered flow.</>}
                   </td>
                 </tr>
               )}

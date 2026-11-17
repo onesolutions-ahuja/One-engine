@@ -103,6 +103,8 @@ export default function NamedCredentials({
     catch{setError('Unable to copy automatically. Open webhook details and select the URL to copy.');}
   };
   const [removedKeys,setRemovedKeys]=useState<string[]>([]);
+  const [variableName,setVariableName]=useState('');
+  const [variableError,setVariableError]=useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const webhookSecretLength=draft?.webhookSecret?.length??0;
   const webhookNeedsSecret=Boolean(draft?.webhookRequired && !credentials.some(item=>item.id===draft?.id && item.webhookId));
@@ -126,6 +128,8 @@ export default function NamedCredentials({
     setError('');
     setSavedWebhook(null);
     setRemovedKeys([]);
+    setVariableName('');
+    setVariableError('');
     setRevealedVerifyToken(null);
     setTouched({});
     setViewing(readOnly);
@@ -255,19 +259,23 @@ export default function NamedCredentials({
     }
   };
 
-  return <section className="surface object-setting-surface named-credentials-page">
+  const listName=webhookOnly?'Webhook Endpoints':'Named Credentials';
+  const emptyMessage=query.trim()
+    ? 'No '+listName.toLowerCase()+' match your search.'
+    : 'No '+listName.toLowerCase()+' are configured yet.';
+  return <section className="surface object-setting-surface named-credentials-page" aria-label={listName}>
     <div className="section-toolbar">
-      <div><h1 className="audit-page-heading">{embedded ? 'Connection Settings' : webhookOnly ? 'Webhook Endpoints' : 'Named Credentials'}</h1><p>{embedded ? 'Tenant-specific HTTPS connection configuration. Secrets remain encrypted and masked.' : 'Manage tenant-wide HTTPS credentials used by HTTP Callouts and webhook integrations.'}</p></div>
-      <button className="btn btn-brand" disabled={!canManage || encryptionReady === false} title={!canManage ? 'Requires namedCredentials:manage permission' : encryptionReady === false ? 'Credential encryption is not configured on the server' : undefined} onClick={() => editCredential()}><Plus size={14} />{embedded ? 'Configure Connection' : 'New Named Credential'}</button>
+      <div><h1 id="credential-list-title" className="audit-page-heading">{embedded ? 'Connection Settings' : webhookOnly ? 'Webhook Endpoints' : 'Named Credentials'}</h1><p>{embedded ? 'Tenant-specific HTTPS connection configuration. Secrets remain encrypted and masked.' : webhookOnly ? 'Manage inbound HTTPS endpoints and signing configuration.' : 'Manage tenant-wide HTTPS credentials used by HTTP Callouts and webhook integrations.'}</p></div>
+      <button className="btn btn-brand" disabled={!canManage || encryptionReady === false} title={!canManage ? 'Requires namedCredentials:manage permission' : encryptionReady === false ? 'Credential encryption is not configured on the server' : undefined} onClick={() => editCredential()}><Plus size={14} />{embedded ? 'Configure Connection' : webhookOnly ? 'New Webhook Endpoint' : 'New Named Credential'}</button>
     </div>
-    {!embedded && <div className="record-type-create">
-      <input className="form-control" type="search" aria-label="Search Named Credentials" placeholder="Search credentials…" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} />
+    {!embedded && <div className="named-credentials-search">
+      <input className="form-control" type="search" aria-label={'Search '+listName} placeholder={'Search '+listName.toLowerCase()+'…'} value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} />
     </div>}
     {error && <div className="records-message" role="alert">{error}</div>}
     {!canManage && <div className="info-callout" role="alert">This account cannot edit connector configuration. Ask an administrator for connectorApps:edit.</div>}
     {encryptionReady === false && <div className="records-message" role="alert">Credential encryption is not configured on the server. Check METADRIVE_CREDENTIAL_KEYS and METADRIVE_CREDENTIAL_ACTIVE_KEY_ID in the active server environment (or the legacy METADRIVE_CREDENTIAL_ENCRYPTION_KEY). Preserve existing keys when moving between hosting providers.</div>}
-    <ResponsiveDataList rows={pagedCredentials} getId={credential=>credential.id}
-      label="Named credentials" onOpen={credential=>editCredential(credential,true)} openLabel="View connection"
+    <ResponsiveDataList rows={pagedCredentials} includeTablet includeNarrowDesktop getId={credential=>credential.id}
+      label={listName} emptyText={emptyMessage} onOpen={credential=>editCredential(credential,true)} openLabel={webhookOnly?'View webhook endpoint':'View connection'}
       columns={[
         {apiName:'label',label:'Connection',phoneRole:'title',render:credential=>credential.label},
         {apiName:'name',label:'API name',phoneRole:'subtitle',render:credential=>credential.name},
@@ -291,7 +299,7 @@ export default function NamedCredentials({
             onClick={()=>void performAction(credential,'delete')}>Delete</button>}
         </div>}
       ]}/>
-    <div className="table-scroll md-mobile-table-replaced" role="region" aria-label="Named Credential connections" tabIndex={0}>
+    <div className="table-scroll md-mobile-table-replaced" role="region" aria-label="Named Credential connections" tabIndex={0} aria-labelledby={webhookOnly?'credential-list-title':undefined}>
       <table className="slds-table">
         <thead><tr><th scope="col">Connection</th><th scope="col">Authentication</th><th scope="col">Connection test</th>{!embedded && <th scope="col">Status</th>}<th scope="col">Actions</th></tr></thead>
         <tbody>{pagedCredentials.map((credential) => <tr key={credential.id}>
@@ -315,7 +323,7 @@ export default function NamedCredentials({
         </tr>)}</tbody>
       </table>
     </div>
-    {!embedded && <div className="section-toolbar md-admin-pagination">
+    {!embedded && totalPages>1 && <div className="section-toolbar md-admin-pagination">
       <span>{visibleCredentials.length===0?'No credentials':totalPages===1?`${visibleCredentials.length} credential${visibleCredentials.length===1?'':'s'} · showing all`:`Showing ${currentPage*50+1}–${Math.min((currentPage+1)*50,visibleCredentials.length)} of ${visibleCredentials.length} credentials · Page ${currentPage+1} of ${totalPages}`}</span>
       <div className="toolbar-actions">
         <button className="btn btn-small" disabled={currentPage === 0} onClick={() => setPage(0)}>First</button>
@@ -324,12 +332,13 @@ export default function NamedCredentials({
         <button className="btn btn-small" disabled={currentPage + 1 >= totalPages} onClick={() => setPage(totalPages - 1)}>Last</button>
       </div>
     </div>}
-    {!visibleCredentials.length && <div className="empty-state">{credentials.length ? 'No Named Credentials match your search.' : 'No Named Credentials are configured yet.'}</div>}
+    {!visibleCredentials.length && <div className="empty-state md-mobile-table-replaced" role="status">{emptyMessage}</div>}
     {draft && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setDraft(null); }}>
       <section ref={modalRef} tabIndex={-1} className="modal named-credential-modal" role="dialog" aria-modal="true" aria-labelledby="named-credential-title">
-        <div className="modal-header"><h2 id="named-credential-title">{viewing ? 'Connection Details' : draft.id ? 'Edit Connection' : 'Configure Connection'}</h2><button className="icon-button dark" aria-label="Close" disabled={saving} onClick={() => setDraft(null)}><X size={18} /></button></div>
+        <div className="modal-header"><h2 id="named-credential-title">{webhookOnly ? (viewing?'Webhook Endpoint Details':draft.id?'Edit Webhook Endpoint':'New Webhook Endpoint') : (viewing?'Connection Details':draft.id?'Edit Connection':'Configure Connection')}</h2><button className="icon-button dark" aria-label="Close connection dialog" disabled={saving} onClick={() => setDraft(null)}><X size={18} /></button></div>
         <p className="modal-copy"><KeyRound size={14} /> Credentials are shared within this tenant. Secrets are encrypted at rest and never displayed after saving.</p>
         <fieldset disabled={viewing} style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend>Connection configuration</legend>
         <div className="named-credential-form-grid">
         <PlatformPageSlot slotKey="field-credentials-01"><label className="form-label">API Name<input className="form-control" autoComplete="off" disabled={Boolean(providerName)} value={draft.name} aria-invalid={Boolean(touched.name && fieldErrors.name)} onBlur={() => blurField('name')} onChange={(event) => {setManualCredentialName(true);updateDraft({ name: event.target.value.replace(/[^A-Za-z0-9_]/g, '') });}} placeholder="Partner_API" />{touched.name && fieldErrors.name && <small role="alert" className="field-error">{fieldErrors.name}</small>}</label></PlatformPageSlot>
         <PlatformPageSlot slotKey="field-credentials-02"><label className="form-label">Label<input className="form-control" value={draft.label} aria-invalid={Boolean(touched.label && fieldErrors.label)} onBlur={() => blurField('label')} onChange={(event) => updateDraft({label:event.target.value,...(!draft.id && !providerName && !manualCredentialName ? {name:generateMetadataApiName(event.target.value)} : {})})} placeholder="Partner API" />{touched.label && fieldErrors.label && <small role="alert" className="field-error">{fieldErrors.label}</small>}</label></PlatformPageSlot>
@@ -355,22 +364,31 @@ export default function NamedCredentials({
               }}><Trash2 size={16}/></button>}
             </div>
           ))}
-          {!viewing && <button type="button" className="btn btn-small" onClick={() => {
-            const input = window.prompt('Variable name (letters, numbers, underscore)');
-            if (input === null) return;
-            const name = input.trim();
-            const key = name.startsWith('public_') ? name : `public_${name}`;
-            // Public variables survive the credential API's safe-list. Never expose
-            // secrets through the editable and client-readable variable collection.
-            if (!/^public_[A-Za-z][A-Za-z0-9_]*$/.test(key) ||
-                /(secret|token|password|passphrase|private|pin|credential|authorization|api_?key)/i.test(key)) {
-              setError('Use a non-secret variable name containing letters, numbers or underscores.');
-              return;
-            }
-            setError('');
-            setRemovedKeys(previous=>previous.filter(item=>item!==key));
-            updateDraft({ configuration: { ...draft.configuration, [key]: draft.configuration?.[key] ?? '' } });
-          }}>Add variable</button>}
+          {!viewing && canManage && <div className="toolbar-actions">
+            <label className="form-label">New variable name
+              <input className="form-control" value={variableName}
+                aria-invalid={Boolean(variableError)} aria-describedby={variableError?'credential-variable-error':undefined}
+                onChange={event=>{setVariableName(event.target.value);setVariableError('');}} />
+            </label>
+            <button type="button" className="btn" disabled={!variableName.trim()} onClick={()=>{
+              const name=variableName.trim();
+              const key=name.startsWith('public_')?name:'public_'+name;
+              if(!/^public_[A-Za-z][A-Za-z0-9_]*$/.test(key)||
+                /(secret|token|password|passphrase|private|pin|credential|authorization|api_?key)/i.test(key)){
+                setVariableError('Use a non-secret name starting with a letter. Letters, numbers and underscores are allowed.');
+                return;
+              }
+              if(Object.hasOwn(draft.configuration??{},key)){
+                setVariableError('A variable with this name already exists.');
+                return;
+              }
+              setRemovedKeys(previous=>previous.filter(item=>item!==key));
+              updateDraft({configuration:{...draft.configuration,[key]:''}});
+              setVariableName('');
+              setVariableError('');
+            }}>Add variable</button>
+            {variableError&&<p id="credential-variable-error" className="form-error" role="alert">{variableError}</p>}
+          </div>}
         </fieldset>
         {['OAuth Client Credentials','OAuth Authorization Code'].includes(draft.authType) && <div className="info-callout named-credential-span-full">Configure clientId and scope. Client Credentials requires tokenPath (relative to Base URL); Authorization Code requires public HTTPS authorizationUrl and tokenUrl. Enter the client secret in the encrypted Secret field. OAuth tokens are protected and never exposed to Flows.</div>}
         {['API Key', 'Authorization Scheme'].includes(draft.authType) && <PlatformPageSlot slotKey="field-credentials-06"><label className="form-label">{draft.authType === 'Authorization Scheme' ? 'Authorization Scheme' : 'API Key Header'}<input className="form-control" value={draft.headerName ?? ''} onChange={(event) => updateDraft({ headerName: event.target.value })} placeholder="X-API-Key" /></label></PlatformPageSlot>}

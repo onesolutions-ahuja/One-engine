@@ -527,11 +527,43 @@
   box-sizing:border-box!important;width:100%!important;height:30px!important;
   min-width:0!important;padding:3px 8px!important;
 }
-/* The design reference intentionally shows only the three primary events and
- * the formula bar. Preserve custom/other-event metadata and controls in the
- * existing ribbon fallback instead of deleting or altering their behavior. */
+/* Keep supported component events reachable in the narrow design dock. */
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
-  .page-action-compact-sections { display:none!important; }
+  .page-action-compact-sections {
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  min-width:0;
+  height:auto;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
+  .page-action-compact-sections > .page-action-compact-group {
+  width:100%;
+  min-width:0;
+  max-width:none;
+  height:auto;
+  min-height:0;
+  max-height:none;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
+  .page-action-compact-custom-grid {
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:none;
+  grid-auto-flow:row;
+  height:auto;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
+  .page-action-compact-custom:not(:has(.page-action-slot > select:enabled)),
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
+  .page-action-compact-custom .page-action-slot:has(> select:disabled) {
+  display:none;
+}
+.page-builder-design-dock .office-builder-ribbon #page-builder-tab-content[aria-label="Component Action"]
+  .page-action-compact-custom .page-action-slot {
+  width:100%;
+  min-width:0;
+  max-width:none;
+}
 
 /* Canvas Width, Height and Fill are existing Page-level Design controls.
  * Keep the very same mounted control group available when Design is docked. */

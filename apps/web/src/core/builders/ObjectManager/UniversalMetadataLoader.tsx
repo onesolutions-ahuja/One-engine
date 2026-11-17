@@ -112,7 +112,7 @@ export default function UniversalMetadataLoader({apiRequest,currentObject,onClos
      <input ref={fileRef} type="file" accept=".xlsx" aria-label="Upload metadata Excel workbook" style={{minWidth:0,maxWidth:"100%",width:"100%",boxSizing:"border-box"}}
       onChange={e=>void selectFile(e)}/>
      <button type="button" className="btn btn-brand" onClick={()=>void validate()}
-      disabled={busy||!hasWorkbook} aria-describedby={!hasWorkbook?"metadata-loader-validate-hint":undefined}>1. Validate first</button>
+      disabled={busy||!hasWorkbook} aria-describedby={!hasWorkbook?"metadata-loader-validate-hint":undefined}>Validate workbook</button>
     </div>
     {!hasWorkbook&&<small id="metadata-loader-validate-hint">Select an exported workbook to enable validation.</small>}
     <p className="properties-help">{fileName||'Upload an exported .xlsx workbook with Objects and/or Fields sheets. Actions: Create, Update, Upsert, Delete, HardDelete.'}</p>
@@ -150,7 +150,7 @@ export default function UniversalMetadataLoader({apiRequest,currentObject,onClos
     </div>
     {execution&&<p className="properties-help">Executed rows are listed above and in the Excel report. Refresh Object Manager to see newly created definitions.</p>}
    </section>}
-   <p className="properties-help">Hard Delete requires a separate OneEngine RBAC grant, an exported revision, and dependency checks. Dependent metadata may prevent permanent deletion.</p>
+   <p className="properties-help">Hard Delete requires a separate permission, an exported revision, and dependency checks. Dependent metadata may prevent permanent deletion.</p>
   </section>
  </div>;
 }

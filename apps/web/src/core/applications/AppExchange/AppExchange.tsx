@@ -1,8 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, BadgeCheck, ChevronRight, Download, LockKeyhole, PackageCheck, Puzzle, Search, ShieldCheck, X } from 'lucide-react';
 import type { ConnectorApp, ConnectorFlowSummary, CommunicationPage, CredentialInput } from '../../integrations/ConnectorAppWorkspace/ConnectorAppWorkspace';
 const ConnectorAppWorkspace = lazy(() => import('../../integrations/ConnectorAppWorkspace/ConnectorAppWorkspace'));
 import type { NamedCredentialMetadata } from '../../metadata/Definitions/metadata';
+import {useModalAccessibility} from '../../accessibility/Modal/useModalAccessibility';
 import {PlatformPageSlot} from '../../platform/Workspace/PlatformPageSlot';
 
 /** Server preview of installing a published AppExchange app into this tenant. */
@@ -85,6 +86,9 @@ export default function AppExchange(props: Props) {
   ), [apps, view, category, query]);
   const installed = apps.filter((app) => app.Installed__c).length;
   const details = selected ? apps.find((app) => app.AppKey__c === selected) : undefined;
+  const detailFocus=useRef<HTMLElement>(null);
+  const closeDetails=useCallback(()=>setSelected(null),[]);
+  useModalAccessibility(Boolean(details),detailFocus,closeDetails);
   const opened = openedKey ? apps.find((app) => app.AppKey__c === openedKey) : undefined;
   const previewKey = details && details.AppType__c !== 'ConnectorApp' && props.previewInstall
     && (!details.Installed__c || (details.PackageVersion__c ?? 0) > (details.InstalledPackageVersion__c ?? 0))
@@ -173,35 +177,44 @@ export default function AppExchange(props: Props) {
       {error && <div className="records-message" role="alert">{error}</div>}
       {notice && <div className="records-message" role="status">{notice}</div>}
       <PlatformPageSlot slotKey="marketplace-filters"><div className="exchange-tabs" role="tablist" aria-label="Marketplace views">
-        <button role="tab" aria-selected={view === 'discover'} className={view === 'discover' ? 'active' : ''} onClick={() => setView('discover')}>Discover apps</button>
-        <button role="tab" aria-selected={view === 'installed'} className={view === 'installed' ? 'active' : ''} onClick={() => setView('installed')}>Installed apps <span aria-live="polite">{loading ? 'Loading…' : error ? 'Unavailable' : installed}</span></button>
+        {(['discover','installed'] as const).map(tab=><button key={tab} type="button" role="tab"
+          id={'exchange-tab-'+tab} aria-controls="exchange-panel" aria-selected={view===tab}
+          tabIndex={view===tab?0:-1} className={view===tab?'active':''} onClick={()=>setView(tab)}
+          onKeyDown={event=>{
+            const next=event.key==='Home'?'discover':event.key==='End'?'installed':
+              event.key==='ArrowLeft'||event.key==='ArrowRight'?(tab==='discover'?'installed':'discover'):null;
+            if(!next)return;
+            event.preventDefault();
+            setView(next);
+            document.getElementById('exchange-tab-'+next)?.focus();
+          }}>{tab==='discover'?'Discover apps':<>Installed apps <span aria-live="polite">{loading?'Loading…':error?'Unavailable':installed}</span></>}</button>)}
       </div>
+      </PlatformPageSlot>
+      <div id="exchange-panel" role="tabpanel" aria-labelledby={'exchange-tab-'+view}>
       <div className="exchange-section-heading"><div><h2>{view === 'installed' ? 'Installed packages' : 'Available packages'}</h2>
         <p>Published package versions, installation status and licences come from tenant-scoped SQL metadata.</p></div>
         <div className="exchange-trust-note"><ShieldCheck size={16}/> Permission-aware setup</div>
       </div>
       <div className="exchange-category-row" aria-label="Filter by category">
-        {categories.map((name) => <button key={name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}
+        {categories.map((name) => <button type="button" key={name} aria-pressed={category===name} className={category === name ? 'active' : ''} onClick={() => setCategory(name)}>{name}</button>)}
       </div>
-      </PlatformPageSlot>
-      {loading && <div className="records-loading">Loading app metadata…</div>}
+      {loading && <div role="status" className="records-loading">Loading app metadata…</div>}
       <PlatformPageSlot slotKey="marketplace-catalog"><div className="exchange-app-grid">
         {visible.map((app) => <article className="exchange-app-card" key={app.AppKey__c}>
           <div className="exchange-card-top">
             <span className="exchange-app-mark teal"><Puzzle size={23}/></span>
             <span className={app.Installed__c ? 'exchange-installed-tag' : 'exchange-price'}>{app.Installed__c ? 'Installed' : app.AppType__c === 'ConnectorApp' ? 'Connector App' : 'Application'}</span>
           </div>
-          <button className="exchange-card-info" onClick={() => setSelected(app.AppKey__c)}>
-            <strong>{app.Name}</strong><span>{app.AppType__c === 'ConnectorApp' ? 'Tenant connector' : 'Tenant application'} <BadgeCheck size={12}/></span>
+          <button type="button" className="exchange-card-info" aria-label={'View '+app.Name} onClick={() => setSelected(app.AppKey__c)}>
+            <strong>{app.Name}</strong><span>{app.AppType__c === 'ConnectorApp' ? 'Tenant connector' : 'Tenant application'} <BadgeCheck size={12} aria-hidden="true"/></span>
             <p>{app.Description__c || 'Metadata-driven application package'}</p>
           </button>
           <div className="exchange-card-meta"><span>{app.Category__c || 'Applications'}</span>
-            <span>{app.LicenceStatus__c === 'ACTIVE' ? 'Licence active' : 'Licence required'}{app.PackageVersion__c ? ' · v'+app.PackageVersion__c : ''}</span></div>
+            <span>{app.LicenceStatus__c === 'ACTIVE' ? 'Licence active' : 'Licence required'}{app.PackageVersion__c ? ' · v'+app.PackageVersion__c : ' · Version unavailable'}</span></div>
           <div className="exchange-card-footer">
-            <span className="exchange-category-label">{app.Category__c || 'Applications'}</span>
             {app.Installed__c
               ? <div className="toolbar-actions">
-                  <button className="btn btn-small btn-brand" disabled={busy} onClick={() => setSelected(app.AppKey__c)}>
+                  <button type="button" className="btn btn-small btn-brand" aria-label={'Details for '+app.Name} disabled={busy} onClick={() => setSelected(app.AppKey__c)}>
                     {app.PackageVersion__c && app.PackageVersion__c > (app.InstalledPackageVersion__c ?? 0)
                       ? 'Update available' : 'Details'} <ArrowRight size={13}/></button>
                   <button className="btn btn-small btn-danger" disabled={busy || !props.canInstall}
@@ -210,17 +223,18 @@ export default function AppExchange(props: Props) {
                     Uninstall
                   </button>
                 </div>
-              : <button className="btn btn-brand btn-small" onClick={() => setSelected(app.AppKey__c)}>Details <Download size={13}/></button>}
+              : <button type="button" className="btn btn-brand btn-small" aria-label={'Details for '+app.Name} onClick={() => setSelected(app.AppKey__c)}>Details <Download size={13}/></button>}
           </div>
         </article>)}
       </div>
       </PlatformPageSlot>
-      {!loading && !visible.length && <div className="exchange-empty"><strong>No matching apps.</strong>
+      {!loading && !visible.length && <div className="exchange-empty" role="status"><strong>No matching apps.</strong>
         <p>Check metadata permissions or adjust search filters.</p></div>}
+      </div>
       <div className="exchange-safe-note"><LockKeyhole size={15}/> Uninstall deactivates package resources while preserving saved credentials and tenant records.</div>
     </div>
     {details && <PlatformPageSlot slotKey="marketplace-details"><div className="exchange-backdrop" role="presentation" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelected(null);}}>
-      <section className="exchange-detail" role="dialog" aria-modal="true" aria-labelledby="app-detail-title">
+      <section ref={detailFocus} tabIndex={-1} className="exchange-detail" role="dialog" aria-modal="true" aria-labelledby="app-detail-title">
         <button className="exchange-close" aria-label="Close" onClick={() => setSelected(null)}><X size={18}/></button>
         <div className="exchange-detail-head"><span className="exchange-app-mark green"><Puzzle size={25}/></span>
           <div><div className="exchange-detail-category">{details.Category__c || 'Applications'}</div>

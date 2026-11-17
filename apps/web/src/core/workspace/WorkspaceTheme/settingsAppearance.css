@@ -396,6 +396,10 @@
   color: var(--md-text);
   border-color: var(--md-border);
 }
+:root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .object-titlebar h1 {
+  color: var(--md-text);
+}
+
 :root:not([data-theme="dark"]) .lightning.md-setup-light:not([data-theme="dark"]) .page-manager-table-scroll {
   background: var(--md-surface);
   border-color: var(--md-border);

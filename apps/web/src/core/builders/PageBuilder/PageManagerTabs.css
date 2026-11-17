@@ -76,3 +76,18 @@
 .page-layout-badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;
   border:1px solid #c9d7ea;background:#eef4fc;color:#1d4f8f;font-size:11px;line-height:16px;
   font-weight:600;white-space:nowrap;vertical-align:middle}
+
+@media(max-width:640px) {
+  .lightning .page-manager-view .page-manager-tab-groups .md-admin-tabstrip {
+    flex-wrap:wrap;
+    width:100%;
+    box-sizing:border-box;
+  }
+  .lightning .page-manager-view .page-manager-tab-groups .md-admin-tabstrip > button {
+    flex:0 1 auto;
+    max-width:100%;
+    min-height:44px;
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+}

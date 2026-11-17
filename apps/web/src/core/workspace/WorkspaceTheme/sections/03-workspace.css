@@ -259,9 +259,9 @@
 
 /* Permissions */
 .permission-tabs { display: flex; gap: 20px; height: 38px; margin: -7px 0 13px; border-bottom: 1px solid var(--md-border,#e0e5eb); }
-.permission-tabs button { position: relative; border: 0; background: transparent; color: var(--md-text,#192230); font-size: var(--md-fs-sm,12px); }
-.permission-tabs button.active { color: #181818; font-weight: 700; }
-.permission-tabs button.active::after { position: absolute; content: ''; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--md-primary,#1d4ed8); }
+.permission-tabs :is(button,a) { position: relative; border: 0; background: transparent; color: var(--md-text,#192230); font-size: var(--md-fs-sm,12px); }
+.permission-tabs :is(button,a).active { color: #181818; font-weight: 700; }
+.permission-tabs :is(button,a).active::after { position: absolute; content: ''; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--md-primary,#1d4ed8); }
 .permission-surface { overflow: hidden; }
 .permission-workspace { display: grid; grid-template-columns: 255px minmax(0,1fr); min-height: 520px; overflow: hidden; }
 .permission-list { padding: 12px; border-right: 1px solid var(--md-border,#e0e5eb); background: #fafaf9; }

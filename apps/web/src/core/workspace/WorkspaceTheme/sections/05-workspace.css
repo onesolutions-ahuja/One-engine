@@ -92,8 +92,8 @@
 .object-titlebar { flex-wrap: wrap; }
 .object-title-actions { flex-wrap: wrap; }
 .object-subnav { align-items: center; gap: 4px; background: transparent; overflow: visible; flex-wrap: wrap; padding: 4px 0; }
-.object-subnav button { height: 36px; padding: 0 12px; border-radius: 7px; font-size: 12px; white-space: nowrap; }
-.object-subnav button.active { background: var(--md-surface-soft, #eff6ff); color: var(--md-text-strong, #181818); }
+.object-subnav :is(button,a) { height: 36px; padding: 0 12px; border-radius: 7px; font-size: 12px; white-space: nowrap; }
+.object-subnav :is(button,a).active { background: var(--md-surface-soft, #eff6ff); color: var(--md-text-strong, #181818); }
 .object-subnav-more { min-width: 160px; max-width: 210px; height: 36px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px; background: #fff; }
 @media (max-width: 780px) {
   .object-details { padding: 14px; }
@@ -322,3 +322,6 @@
    every device: users are assigned the app, they don't switch from inside it. */
 .lightning.md-app-runtime > .salesforce-header { display: none !important; }
 .lightning.md-app-runtime > .setup-layout { height: 100vh; height: 100dvh; min-height: 100vh; min-height: 100dvh; }
+
+.object-subnav a{display:inline-flex;align-items:center;text-decoration:none}
+.object-manager-mobile-row{text-decoration:none}

@@ -49,9 +49,9 @@ export default function ScheduledActionRecords({request}:{request:Request}){
  };
  return <section className="setup-card" aria-label="ScheduledAction records">
   <div className="page-heading">
-   <div><h2>Scheduled Actions</h2>
-    <p>Action Formula WAIT jobs continue on the server after logout. Completed and cancelled jobs remain in history.</p></div>
-   <button type="button" className="btn btn-small" onClick={()=>void refresh()} disabled={loading||!!busy}>Refresh</button>
+   <div><h1>Scheduled Actions</h1>
+    <p>Scheduled actions continue on the server after logout. Completed and cancelled jobs remain in history.</p></div>
+   <button type="button" className="btn btn-small" onClick={()=>void refresh()} disabled={loading||!!busy} aria-busy={loading}>{loading?'Refreshing…':'Refresh'}</button>
   </div>
   {error&&<p role="alert">{error}</p>}
   {loading?<p>Loading scheduled actions…</p>:records.length===0?<p>No scheduled actions recorded.</p>:

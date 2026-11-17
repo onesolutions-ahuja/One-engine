@@ -3,20 +3,20 @@ import {writeNativeValues} from '../system-files/native-values.js';
 import type {RecordStoredValue} from '../system-files/record-value-write.js';
 
 /**
- * Multi-store / multi-till document numbering (metadata, one validation rule and two
- * starter records). Numbers themselves are built by page formulas with existing
- * functions; this only provides the fields they read and write:
- *  - Location.Code is the number prefix (unique, tenant-editable); Location keeps one
- *    counter per document type (NextOrderSeq / NextInvoiceSeq) and LastNumberedAt,
- *    which an action writes first so the Location row is locked before it reads a counter.
+ * Multi-store / multi-till document numbers (metadata, two starter records).
+ *  - Invoice.InvoiceNumber and Order.OrderNumber are Auto Numbers numbered separately for
+ *    each Location (INV-{0}, ORD-{0}): the system gives the number on save, one atomic
+ *    counter per Location, so every till of a shop shares one series. No formula needed.
+ *  - Invoices and Orders can't be deleted (Object setting): they are set to Cancelled.
  *  - Till (Name, Code, Location, Active, DeviceKey). A device makes its own key; the
  *    server maps it to a Till (@ThisPage.Till.*). TillId and UserId are saved on Cart, Order,
  *    Invoice and CashLedger records (CashLedger keeps its existing User field; Cart its
  *    UserId), with DeviceKey / DeviceIp / DeviceAgent for audit.
- *  - InvoiceNumber / OrderNumber (unique text, frozen at save) and InvoiceSeq / OrderSeq.
  * Order is an app-owned Object: its fields are added only once the Object exists.
  */
-type Field={api:string;label:string;type:string;related?:string;unique?:boolean};
+type Field={api:string;label:string;type:string;related?:string;unique?:boolean;
+ /** Auto Number: format and the field it is numbered separately for. */
+ format?:string;per?:string};
 export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;appOwned?:boolean;fields:readonly Field[]}>=[
  {object:'Till',label:'Till',fields:[
   {api:'Name',label:'Name',type:'text'},
@@ -31,10 +31,7 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'DeviceAgent',label:'Device Browser / App',type:'text'}
  ]},
  {object:'Location',fields:[
-  {api:'Code',label:'Code',type:'text',unique:true},
-  {api:'NextOrderSeq',label:'Next Order Number',type:'number'},
-  {api:'NextInvoiceSeq',label:'Next Invoice Number',type:'number'},
-  {api:'LastNumberedAt',label:'Last Numbered At',type:'datetime'}
+  {api:'Code',label:'Code',type:'text',unique:true}
  ]},
  {object:'Cart',fields:[
   {api:'TillId',label:'Till',type:'reference',related:'Till'},
@@ -43,8 +40,7 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'DeviceAgent',label:'Device Browser / App',type:'text'}
  ]},
  {object:'Invoice',fields:[
-  {api:'InvoiceNumber',label:'Invoice Number',type:'text',unique:true},
-  {api:'InvoiceSeq',label:'Invoice Sequence',type:'number'},
+  {api:'InvoiceNumber',label:'Invoice Number',type:'autonumber',format:'INV-{0}',per:'Location'},
   {api:'Location',label:'Store / Location',type:'reference',related:'Location'},
   {api:'TillId',label:'Till',type:'reference',related:'Till'},
   {api:'UserId',label:'User',type:'reference',related:'User'},
@@ -53,8 +49,7 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'DeviceAgent',label:'Device Browser / App',type:'text'}
  ]},
  {object:'Order',appOwned:true,fields:[
-  {api:'OrderNumber',label:'Order Number',type:'text',unique:true},
-  {api:'OrderSeq',label:'Order Sequence',type:'number'},
+  {api:'OrderNumber',label:'Order Number',type:'autonumber',format:'ORD-{0}',per:'Location'},
   {api:'Location',label:'Store / Location',type:'reference',related:'Location'},
   {api:'TillId',label:'Till',type:'reference',related:'Till'},
   {api:'UserId',label:'User',type:'reference',related:'User'},
@@ -66,14 +61,8 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'TillId',label:'Till',type:'reference',related:'Till'}
  ]}
 ];
-/** Admins may move a counter forward (e.g. to continue an old system's numbers), never back. */
-export const LOCATION_NUMBERS_FORWARD_RULE={
- api:'NumbersOnlyMoveForward',label:'Next numbers only move forward',
- expression:'OR(BLANKVALUE(NextOrderSeq, 0) < BLANKVALUE(PRIORVALUE(NextOrderSeq), 0), '
-  +'BLANKVALUE(NextInvoiceSeq, 0) < BLANKVALUE(PRIORVALUE(NextInvoiceSeq), 0))',
- message:'Next order and invoice numbers can only move forward, so a number is never issued twice.',
- field:'NextInvoiceSeq'
-} as const;
+/** Numbered documents: delete is refused, Status is set to Cancelled instead. */
+export const NO_DELETE_OBJECTS=['Invoice','Order'] as const;
 export const STARTER_LOCATION={Name:'Location 1',Code:'LOC1'} as const;
 export const STARTER_TILL={Name:'Till 1',Code:'TILL1'} as const;
 /** Per-tenant receipt: uniqueness upgrades and starter records happen once, so a tenant
@@ -81,7 +70,6 @@ export const STARTER_TILL={Name:'Till 1',Code:'TILL1'} as const;
 export const tillNumberingReceipt=(tenantId:string)=>'till-numbering-v1:'+tenantId;
 
 const text=(value:string):RecordStoredValue=>({value_text:value,reference_record_id:null,is_unique:false,case_sensitive:false});
-const number=(value:number):RecordStoredValue=>({value_text:null,value_number:String(value),reference_record_id:null,is_unique:false,case_sensitive:false});
 const flag=(value:boolean):RecordStoredValue=>({value_text:null,value_boolean:value,reference_record_id:null,is_unique:false,case_sensitive:false});
 const reference=(id:string):RecordStoredValue=>({value_text:null,reference_record_id:id,is_unique:false,case_sensitive:false});
 
@@ -96,19 +84,15 @@ export async function seedTillNumberingMetadata(client:PoolClient,tenantId:strin
    if(!exists.rowCount)continue;
   }
   for(const field of object.fields)await client.query(`INSERT INTO md_field_definitions
-   (tenant_id,object_api,api_name,label,data_type,related_object,is_unique,required)
-   VALUES($1,$2,$3,$4,$5,$6,$7,false) ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
-   [tenantId,object.object,field.api,field.label,field.type,field.related??null,field.unique===true]);
+   (tenant_id,object_api,api_name,label,data_type,related_object,is_unique,auto_number_format,auto_number_scope_field,required)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,false) ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
+   [tenantId,object.object,field.api,field.label,field.type,field.related??null,field.unique===true,
+    field.format??null,field.per??null]);
  }
- const rule=LOCATION_NUMBERS_FORWARD_RULE;
- await client.query(`INSERT INTO md_validation_rules
-  (tenant_id,object_api,api_name,label,expression,error_message,error_field_api,active,sort_order)
-  VALUES($1,'Location',$2,$3,$4,$5,$6,true,0) ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
-  [tenantId,rule.api,rule.label,rule.expression,rule.message,rule.field]);
 }
 
-/** Once per tenant: unique codes/numbers on fields that predate this catalog, then the
- * starter Location and Till. A field whose existing values are duplicated stays as it is
+/** Once per tenant: unique codes and Auto Number invoice/order numbers on fields that predate
+ * this catalog, "can't be deleted" on Invoice and Order, then the starter Location and Till. A field whose existing values are duplicated stays as it is
  * (the admin fixes the duplicates); the rest of the startup is never blocked by it. */
 export async function seedTillNumberingStarters(client:PoolClient,tenantId:string):Promise<'seeded'|'done'|'waiting'>{
  const receipt=tillNumberingReceipt(tenantId);
@@ -118,6 +102,13 @@ export async function seedTillNumberingStarters(client:PoolClient,tenantId:strin
   WHERE tenant_id=$1 AND object_api IN ('Location','Till')`,[tenantId]);
  if(native.rows.length<2)return 'waiting';
  for(const object of TILL_NUMBERING_FIELDS)for(const field of object.fields){
+  if(field.type==='autonumber'){
+   // An older Text number field becomes this Auto Number (values already saved stay).
+   await client.query(`UPDATE md_field_definitions SET data_type='autonumber',auto_number_format=$4,
+    auto_number_scope_field=$5,is_unique=false WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3
+    AND data_type='text' AND deleted_at IS NULL`,[tenantId,object.object,field.api,field.format??'{0}',field.per??null]);
+   continue;
+  }
   if(!field.unique)continue;
   await client.query('SAVEPOINT till_numbering_unique');
   try{
@@ -129,6 +120,8 @@ export async function seedTillNumberingStarters(client:PoolClient,tenantId:strin
    await client.query('RELEASE SAVEPOINT till_numbering_unique');
   }
  }
+ await client.query(`UPDATE md_object_definitions SET prevent_delete=true WHERE tenant_id=$1
+  AND api_name=ANY($2::text[])`,[tenantId,[...NO_DELETE_OBJECTS]]);
  // Starter records only where the tenant never had any (deleted ones count: no resurrection).
  const used=await client.query<{object_api:string}>(`SELECT DISTINCT object_api FROM md_records
   WHERE tenant_id=$1 AND object_api IN ('Location','Till')`,[tenantId]);
@@ -142,8 +135,7 @@ export async function seedTillNumberingStarters(client:PoolClient,tenantId:strin
  };
  let locationId:string|undefined;
  if(!had.has('Location'))locationId=await insert('Location',new Map([
-  ['Name',text(STARTER_LOCATION.Name)],['Code',text(STARTER_LOCATION.Code)],['Active',flag(true)],
-  ['NextOrderSeq',number(1)],['NextInvoiceSeq',number(1)]]));
+  ['Name',text(STARTER_LOCATION.Name)],['Code',text(STARTER_LOCATION.Code)],['Active',flag(true)]]));
  else{
   const first=await client.query<{id:string}>(`SELECT id FROM md_records WHERE tenant_id=$1 AND object_api='Location'
    AND is_deleted=false ORDER BY created_at,id LIMIT 1`,[tenantId]);

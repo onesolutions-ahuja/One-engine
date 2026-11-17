@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import {applySmartIosKeyboardDock} from './smart-ios-keyboard-dock.js';
 import {TILL_DEVICE_DDL} from './till-device-service.js';
+import {AUTO_NUMBER_SCOPE_DDL} from '../field-engine/types/AutoNumberScope.js';
 import {DEVICE_JOB_DDL} from './cloudprnt-routes.js';
 import {applySmartChart} from './smart-chart.js';
 import {applySmartSearch} from './smart-search.js';
@@ -128,6 +129,9 @@ export async function applySystemMigrations(db:SqlPersistence) {
    appliedNewMigration=true;
    await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2)',[name,checksum]);
   }
+  // Auto Number "number separately for each <field>" and "records can't be deleted"
+  // (idempotent; the SQL baseline is immutable).
+  await client.query(AUTO_NUMBER_SCOPE_DDL);
   // Upgrade-safe shared-till saved sign-ins (idempotent; the SQL baseline is immutable).
   await client.query(TILL_DEVICE_DDL);
   await client.query(DEVICE_JOB_DDL);

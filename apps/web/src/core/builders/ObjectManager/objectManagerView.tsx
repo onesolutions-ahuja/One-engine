@@ -1,4 +1,5 @@
 import {appRoutePath} from '../../workspace/Navigation/appRouting';
+import AutoNumberSeriesSettings,{PreventDeleteSetting} from './AutoNumberSeriesSettings';
 import {generateMetadataApiName} from '../../metadata/Definitions/metadataApiNames';
 import { PicklistValueRows } from './PicklistValueRows';
 import {confirmDestructiveAction} from '../../components/ConfirmAction/confirmDestructiveAction';
@@ -1728,6 +1729,7 @@ function ObjectManager({
         ['Reports enabled', draft.settings?.allowReports ? 'Yes' : 'No']] as Array<[string,string]>)
         .map(([label, value]) => <div className="metadata-row" key={label}>
           <dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      {draft.apiName && <PreventDeleteSetting request={apiRequest} objectApi={draft.apiName} onNotify={onNotify}/>}
       </section>;
     if (sectionMode === 'view' && selectedMetadata && selectedSetting !== 'Lightning Record Pages') return <section className="surface object-setting-surface">
       <div className="section-toolbar"><div><h2>{selectedMetadata.label}</h2><p>{selectedSetting} · Read only</p></div>
@@ -2064,6 +2066,10 @@ function ObjectManager({
             <input className="form-control" maxLength={80} value={editingField.autoNumberFormat ?? '{0000}'}
               onChange={(event) => setEditingField({ ...editingField, autoNumberFormat: event.target.value })} />
           </label>}
+          {/^Auto ?Number$/i.test(editingField.dataType)
+            && object.fields.some((field) => field.apiName === editingField.apiName && /^Auto ?Number$/i.test(field.dataType))
+            && <AutoNumberSeriesSettings request={apiRequest} object={object} objects={objects}
+              fieldApi={editingField.apiName} onNotify={onNotify} />}
           {editingField.dataType === 'Roll-Up Summary' && (() => {
             const rollup = editingField.rollup ?? {
               childObject: '', relationshipField: '', operation: 'COUNT' as const,

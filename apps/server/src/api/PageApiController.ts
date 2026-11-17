@@ -106,7 +106,9 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
     const page=await pages.editor(actor.tenant_id,name,variant) as unknown as InventoryPage;
     const definitions=await inventoryDefinitions(db,actor.tenant_id,page.components,variant);
     res.setHeader('Cache-Control','private, no-store');
-    res.json({csv:exportInventoryCsv(page,definitions,variant),variant,draftRevision:page.draftRevision??0});
+    // ?only=formulas: the rows "Download all formulas" needs (upload upserts them back).
+    res.json({csv:exportInventoryCsv(page,definitions,variant,{formulasOnly:req.query.only==='formulas'}),
+     variant,draftRevision:page.draftRevision??0});
   }));
   /**
    * Multi-page CSV upsert: pageapi is the sole page locator. Existing page drafts

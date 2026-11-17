@@ -33,7 +33,7 @@ export default function PageManagerView({ props, editorState, management, layout
   } = editorState;
   const {
     openCreatePage, pageAppTabs, paginatedPages, openPageDesign, pageDeviceLabel, layoutBadges,
-    downloadPageInventory, downloadCompiledPageScript, activateListedPage, pageAppIds, showRelatedObjectColumn, visiblePages, safePageListPage,
+    downloadPageInventory, downloadAllPageFormulas, downloadCompiledPageScript, activateListedPage, pageAppIds, showRelatedObjectColumn, visiblePages, safePageListPage,
     pageListPageCount,
   } = management;
   const { openPageDesignLayout } = layoutActions;
@@ -47,6 +47,9 @@ export default function PageManagerView({ props, editorState, management, layout
           <div className="page-manager-header-actions">
             <button ref={createPageTriggerRef} className="btn btn-brand" type="button" onClick={openCreatePage}><Plus size={16}/> New Page</button>
             <button className="btn" type="button" disabled={saving} onClick={()=>setInventoryUploadOpen(true)}><Upload size={16}/> Upload CSV</button>
+            {!recordPageContext && <button className="btn" type="button" disabled={Boolean(inventoryDownloading)}
+              title="One CSV with every formula of every page. Edit it, then send it back with Upload CSV."
+              onClick={()=>void downloadAllPageFormulas()}><Download size={16}/> {inventoryDownloading==='*'?'Downloading…':'Download all formulas'}</button>}
             <select className="form-control" aria-label="Inventory CSV device layout" title="Layout used by page inventory downloads"
               style={{width:'min(172px, 100%)',minWidth:0,maxWidth:'100%',boxSizing:'border-box'}} value={inventoryExportVariant} onChange={event=>setInventoryExportVariant(event.target.value as PageLayoutVariant|'Auto')}>
               <option value="Auto">CSV: Page’s layout</option>

@@ -8,7 +8,7 @@ import {executePageCodeAction,parsePageCodeRequest} from '../../server/src/syste
 import {deviceTill,setDeviceTill} from '../../server/src/system-support/till-assignment-service';
 import {TILL_NUMBERING_FIELDS,seedTillNumberingMetadata,seedTillNumberingStarters,
  tillNumberingReceipt} from '../../server/src/app-seeders/core-till-numbering';
-import {autoNumberScopeTypeAllowed,nextScopedAutoNumber,setScopedAutoNumberStart} from '../../server/src/field-engine/types/AutoNumberScope';
+import {autoNumberFieldTokens,autoNumberScopeTypeAllowed,autoNumberSeriesKey,nextScopedAutoNumber,setScopedAutoNumberStart} from '../../server/src/field-engine/types/AutoNumberScope';
 import {autoNumberSettings,setAutoNumberScope} from '../../server/src/api/AutoNumberSettingsController';
 import {formatAutoNumberValue} from '../../server/src/field-engine/types/AutoNumberField';
 import {compileRecordFilterFormula} from '../src/core/pages/PageRuntime/recordFilterFormula';
@@ -36,8 +36,6 @@ function fakeRecords(tables:Record<string,Row[]>){
   async get(_t:string,_u:string,object:string,id:string){calls.push('get '+object);return {...(tables[object]??[]).find(row=>row.Id===id)};},
   async create(_t:string,_u:string,object:string,values:Row){
    calls.push('create '+object);
-   // As the record engine: InvoiceNumber is numbered separately for each Location.
-   if(object==='Invoice'&&!values.Location)throw Error('Fill in Store / Location first: InvoiceNumber is numbered separately for each Store / Location');
    const id='00000000-0000-4000-8000-'+String(++next).padStart(12,'0');
    (tables[object]??=[]).push({Id:id,...values});
    return id;
@@ -83,12 +81,12 @@ test('a sale is saved with the device\'s Till, its Location, the user and the de
  assert.equal('InvoiceNumber' in invoice,false,'the number is given by the system on save, not by the formula');
 });
 
-test('a device that is not set up as a Till (or an inactive Till) saves nothing: the sale has no Location to number it by',async()=>{
+test('a device that is not set up as a Till (or an inactive Till): no Till or Location is saved on the sale',async()=>{
  for(const fake of [store(),(()=>{const f=store();f.tables.Till[0].Active=false;return f;})()]){
   const result=await run(fake,fake.tables.Till[0].Active?'another-device-key-123':deviceKey);
-  assert.equal(result.ok,false);
-  assert.match(result.error??'',/Fill in Store \/ Location first/);
-  assert.equal(fake.tables.Invoice.length,0);
+  assert.equal(result.ok,true,result.error);
+  assert.equal(fake.tables.Invoice[0].TillId,'');
+  assert.equal(fake.tables.Invoice[0].Location,'');
  }
 });
 
@@ -122,8 +120,23 @@ test('Auto Number per Location: each shop has its own series; an admin moves a s
  assert.equal(formatAutoNumberValue('{0}',7),'7','no padding unless the format asks for it');
 });
 
+test('two fields split the series and the type shows in the number: INV-… sales, SRN-… returns per shop',async()=>{
+ const {client}=counterClient();
+ const give=async(loc:string,type:string)=>formatAutoNumberValue(
+  autoNumberFieldTokens('{InvoiceType}-{0}',name=>name==='InvoiceType'?type:''),
+  await nextScopedAutoNumber(client,'t','Invoice','InvoiceNumber',autoNumberSeriesKey([loc,type])));
+ assert.equal(await give('LOC1','INV'),'INV-1');
+ assert.equal(await give('LOC1','SRN'),'SRN-1');
+ assert.equal(await give('LOC1','INV'),'INV-2');
+ assert.equal(await give('LOC2','INV'),'INV-1');
+ // An invoice with no Location (e.g. made by Smart Assist) has its own series.
+ assert.equal(autoNumberSeriesKey(['','INV']),'\u2205|INV');
+ assert.equal(autoNumberFieldTokens('{YYYY}/{Code}-{000}',()=>'A{B}'),'{YYYY}/AB-{000}');
+});
+
 test('"Number separately for each": a Lookup or Picklist field of the Object, fixed once numbers exist',async()=>{
  assert.ok(['reference','Lookup','Master-Detail','picklist'].every(autoNumberScopeTypeAllowed));
+ assert.ok(['text'].every(type=>!autoNumberScopeTypeAllowed(type)));
  assert.ok(!['text','number','autonumber'].some(autoNumberScopeTypeAllowed));
  const fields=[{api_name:'InvoiceNumber',label:'Invoice Number',data_type:'autonumber',related_object:null,auto_number_scope_field:null},
   {api_name:'Location',label:'Store / Location',data_type:'reference',related_object:'Location',auto_number_scope_field:null},
@@ -140,6 +153,7 @@ test('"Number separately for each": a Lookup or Picklist field of the Object, fi
  const before=await autoNumberSettings(db,'t','Invoice','InvoiceNumber');
  assert.deepEqual(before.scopeOptions.map(o=>o.apiName),['Location']);
  await assert.rejects(setAutoNumberScope(db,'t','Invoice','InvoiceNumber','Notes'),/Lookup or Picklist/);
+ await assert.rejects(setAutoNumberScope(db,'t','Invoice','InvoiceNumber','Location,Notes,Location2'),/at most two/);
  const after=await setAutoNumberScope(db,'t','Invoice','InvoiceNumber','Location');
  assert.equal(after.scopeField,'Location');
  issued=1;
@@ -200,7 +214,7 @@ test('catalog: Till object, unique codes, Auto Number per Location; Order fields
  const unique=TILL_NUMBERING_FIELDS.flatMap(o=>o.fields.filter(f=>f.unique).map(f=>o.object+'.'+f.api)).sort();
  assert.deepEqual(unique,['Location.Code','Till.Code','Till.DeviceKey']);
  const numbers=TILL_NUMBERING_FIELDS.flatMap(o=>o.fields.filter(f=>f.type==='autonumber').map(f=>[o.object,f.api,f.format,f.per]));
- assert.deepEqual(numbers,[['Invoice','InvoiceNumber','INV-{0}','Location'],['Order','OrderNumber','ORD-{0}','Location']]);
+ assert.deepEqual(numbers,[['Invoice','InvoiceNumber','{InvoiceType}-{0}','Location,InvoiceType'],['Order','OrderNumber','ORD-{0}','Location']]);
  for(const object of ['Cart','Invoice','Order','CashLedger'])
   assert.ok(TILL_NUMBERING_FIELDS.find(o=>o.object===object)!.fields.some(f=>f.api==='TillId'),object+'.TillId');
  const without=fakeClient({});
@@ -218,7 +232,10 @@ test('starter Location LOC1 + Till 1: once per tenant, never brought back after 
  const fresh=fakeClient({native:['Location','Till']});
  assert.equal(await seedTillNumberingStarters(fresh.client,'t'),'seeded');
  // The older Text InvoiceNumber becomes the Auto Number per Location; Invoice/Order can't be deleted.
- assert.ok(fresh.calls.some(c=>c.sql.includes("SET data_type='autonumber'")&&c.params[2]==='InvoiceNumber'&&c.params[3]==='INV-{0}'));
+ assert.ok(fresh.calls.some(c=>c.sql.includes("SET data_type='autonumber'")&&c.params[2]==='InvoiceNumber'
+  &&c.params[3]==='{InvoiceType}-{0}'&&c.params[4]==='Location,InvoiceType'));
+ assert.ok(fresh.calls.some(c=>c.sql.includes("SET data_type='picklist'")&&c.params[2]==='InvoiceType'&&c.params[3]==='INV'));
+ assert.ok(fresh.calls.some(c=>c.sql.includes('md_field_picklist_values')&&c.params[3]==='SRN'));
  assert.ok(fresh.calls.some(c=>c.sql.includes('prevent_delete=true')&&JSON.stringify(c.params[1])==='["Invoice","Order"]'));
  const records=fresh.calls.filter(c=>c.sql.includes('INSERT INTO md_records')).map(c=>c.params[1]);
  assert.deepEqual(records,['Location','Till']);

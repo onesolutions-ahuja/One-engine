@@ -2,7 +2,7 @@ import type {Express} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import {authenticated,wrap} from './ApiAuthenticationGuard.js';
-import {autoNumberScopeTypeAllowed,setScopedAutoNumberStart} from '../field-engine/types/AutoNumberScope.js';
+import {AUTO_NUMBER_MAX_SCOPE_FIELDS,autoNumberScopeFields,autoNumberScopeTypeAllowed,autoNumberSeriesKey,setScopedAutoNumberStart} from '../field-engine/types/AutoNumberScope.js';
 import {assertMetadataPackageEditable} from '../system-support/metadata-package-service.js';
 
 /**
@@ -30,22 +30,28 @@ export async function autoNumberSettings(db:Pick<SqlPersistence,'query'>,tenantI
  const issued=await db.query<{n:string}>(`SELECT (SELECT count(*) FROM md_auto_number_counters WHERE tenant_id=$1
    AND object_api=$2 AND field_api=$3 AND next_value>1)+(SELECT count(*) FROM md_auto_number_scoped_counters
    WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3 AND next_value>1) AS n`,[tenantId,objectApi,fieldApi]);
- return {scopeField:field.auto_number_scope_field??'',scopeOptions,
+ return {scopeField:field.auto_number_scope_field??'',scopeFields:autoNumberScopeFields(field.auto_number_scope_field),scopeOptions,
   // Once numbers were given, changing the split would mix two series.
   locked:Number(issued.rows[0]?.n??0)>0,
   series:series.map(row=>({value:row.scope_value,next:Number(row.next_value)}))};
 }
 
+/** scopeField: "" (one series), "Location", or "Location,InvoiceType" (or the same as an array). */
 export async function setAutoNumberScope(db:Pick<SqlPersistence,'query'>,tenantId:string,objectApi:string,
  fieldApi:string,scopeField:unknown){
- if(scopeField!==''&&(typeof scopeField!=='string'||!api.test(scopeField)))throw Error('Choose a field');
+ const list=Array.isArray(scopeField)?scopeField:typeof scopeField==='string'?scopeField.split(','):null;
+ if(!list||list.some(item=>typeof item!=='string'))throw Error('Choose a field');
+ const fields=[...new Set((list as string[]).map(item=>item.trim()).filter(Boolean))];
+ if(fields.length>AUTO_NUMBER_MAX_SCOPE_FIELDS)throw Error('Number separately for each: at most two fields');
+ if(fields.some(item=>!api.test(item)))throw Error('Choose a field');
  const current=await autoNumberSettings(db,tenantId,objectApi,fieldApi);
- if(current.scopeField===scopeField)return current;
+ const next=fields.join(',');
+ if(current.scopeField===next)return current;
  if(current.locked)throw Error('This Auto Number has already given numbers; its series can no longer be split differently');
- if(scopeField&&!current.scopeOptions.some(option=>option.apiName===scopeField))
-  throw Error('Number separately for each: choose a Lookup or Picklist field of this Object');
+ if(fields.some(item=>!current.scopeOptions.some(option=>option.apiName===item)))
+  throw Error('Number separately for each: choose Lookup or Picklist fields of this Object');
  await db.query(`UPDATE md_field_definitions SET auto_number_scope_field=$4 WHERE tenant_id=$1 AND object_api=$2
-  AND api_name=$3 AND data_type='autonumber'`,[tenantId,objectApi,fieldApi,scopeField||null]);
+  AND api_name=$3 AND data_type='autonumber'`,[tenantId,objectApi,fieldApi,next||null]);
  return autoNumberSettings(db,tenantId,objectApi,fieldApi);
 }
 
@@ -76,9 +82,11 @@ export function registerAutoNumberSettingsRoutes(app:Express,{db,rbac}:Deps){
   const body=(req.body??{}) as Record<string,unknown>;
   const settings=await autoNumberSettings(db,actor.tenant_id,objectApi,fieldApi);
   if(!settings.scopeField)throw Error('Choose "Number separately for each" first');
+  // value: one value per "separately for each" field, in order (a series key is also accepted).
+  const value=Array.isArray(body.values)?autoNumberSeriesKey(body.values):String(body.value??'');
   const next=await db.transaction(client=>setScopedAutoNumberStart(client,actor.tenant_id,objectApi,fieldApi,
-   String(body.value??''),Number(body.next)));
-  res.json({value:body.value,next});
+   value,Number(body.next)));
+  res.json({value,next});
  }));
  app.get('/api/metadata/objects/:objectApi/prevent-delete',wrap(async(req,res)=>{
   const actor=authenticated(req);

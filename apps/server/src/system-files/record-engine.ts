@@ -1,6 +1,6 @@
 import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {recordReadScope,forgetScopedRecords} from '../system-support/record-read-scope.js';
-import {nextScopedAutoNumber} from '../field-engine/types/AutoNumberScope.js';
+import {autoNumberFieldTokens,autoNumberScopeFields,autoNumberSeriesKey,nextScopedAutoNumber} from '../field-engine/types/AutoNumberScope.js';
 export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
@@ -1075,14 +1075,16 @@ export class RecordEngine {
     for(const field of autoFields.rows){
       if(typeof field.api_name!=='string')continue;
       if(prepared.has(field.api_name))continue;
-      // Numbered separately for each value of another field (e.g. each Location).
-      if(field.auto_number_scope_field){
-        const scope=prepared.get(field.auto_number_scope_field);
-        const scopeValue=scope?.reference_record_id??scope?.value_text??'';
-        if(!scopeValue)throw new Error('Fill in '+(field.scope_label||field.auto_number_scope_field)
-          +' first: '+field.api_name+' is numbered separately for each '+(field.scope_label||field.auto_number_scope_field));
-        const sequence=await nextScopedAutoNumber(client,tenantId,objectApi,field.api_name,scopeValue);
-        prepared.set(field.api_name,{value_text:formatAutoNumberValue(field.auto_number_format??'{000000}',sequence),
+      const storedValue=(name:string)=>{const stored=prepared.get(name);return stored?.reference_record_id??stored?.value_text??'';};
+      // {FieldName} tokens: the record's own value in the number ("{InvoiceType}-{0}").
+      const format=autoNumberFieldTokens(field.auto_number_format??'{000000}',storedValue);
+      // Numbered separately for each value (or pair of values) of other fields, e.g. each
+      // Location, or each Location and Invoice Type. A blank value has its own series.
+      const scopeFields=autoNumberScopeFields(field.auto_number_scope_field);
+      if(scopeFields.length){
+        const sequence=await nextScopedAutoNumber(client,tenantId,objectApi,field.api_name,
+          autoNumberSeriesKey(scopeFields.map(storedValue)));
+        prepared.set(field.api_name,{value_text:formatAutoNumberValue(format,sequence),
           reference_record_id:null,is_unique:false,case_sensitive:field.case_sensitive});
         continue;
       }
@@ -1093,7 +1095,7 @@ export class RecordEngine {
         RETURNING (next_value-1)::text AS sequence`,[tenantId,objectApi,field.api_name]);
       const sequence=counter.rows[0]?.sequence;
       if(!sequence)throw new Error('Unable to allocate auto-number value');
-      const value=formatAutoNumberValue(field.auto_number_format??'{000000}',Number(sequence));
+      const value=formatAutoNumberValue(format,Number(sequence));
       prepared.set(field.api_name,{value_text:value,reference_record_id:null,
         is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive});
     }

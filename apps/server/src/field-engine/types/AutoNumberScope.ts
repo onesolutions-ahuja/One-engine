@@ -2,7 +2,9 @@ import type {PoolClient} from 'pg';
 
 /**
  * Auto Number "Number separately for each <field>": one counter per value of a Lookup or
- * Picklist field on the same Object (Invoice by Location, Product by Product Group …).
+ * Picklist field on the same Object (Invoice by Location, Product by Product Group …), or
+ * per combination of two such fields (Location + InvoiceType: INV and SRN series per shop).
+ * {FieldName} in the format shows a field's value in the number ("{InvoiceType}-{0}").
  * Blank setting = one counter for the whole Object (unchanged behaviour). The counter is a
  * single atomic SQL upsert, so any number of users saving at once never get the same number.
  * An admin may move a counter forward (to continue an old system's numbers), never back.
@@ -25,6 +27,24 @@ CREATE TABLE IF NOT EXISTS md_auto_number_scoped_counters (
 ALTER TABLE md_object_definitions ADD COLUMN IF NOT EXISTS prevent_delete boolean NOT NULL DEFAULT false;
 `;
 
+/** "Location" or "Location,InvoiceType": at most two fields split the series. */
+export const AUTO_NUMBER_MAX_SCOPE_FIELDS=2;
+export function autoNumberScopeFields(stored:string|null|undefined):string[]{
+ return (stored??'').split(',').map(part=>part.trim()).filter(Boolean).slice(0,AUTO_NUMBER_MAX_SCOPE_FIELDS);
+}
+/** One series per combination of values; a blank value is its own series (∅). */
+export function autoNumberSeriesKey(values:ReadonlyArray<unknown>):string{
+ return values.map(value=>value===null||value===undefined||value===''?'\u2205':String(value)).join('|').slice(0,255);
+}
+/** {FieldName} in the format puts that field's value in the number: "{InvoiceType}-{0}" -> SRN-12.
+ * {0…} (the running number) and {YYYY} are kept for formatAutoNumberValue. */
+export function autoNumberFieldTokens(format:string,valueOf:(field:string)=>unknown):string{
+ return format.replace(/\{([A-Za-z][A-Za-z0-9_]{0,79})\}/g,(token,name:string)=>{
+  if(name==='YYYY')return token;
+  const value=valueOf(name);
+  return value===null||value===undefined?'':String(value).replace(/[{}]/g,'');
+ });
+}
 /** Field types a series can be split by: one value per record, stable, chosen from a list. */
 export const AUTO_NUMBER_SCOPE_TYPES=['reference','lookup','masterdetail','picklist'] as const;
 export const autoNumberScopeTypeAllowed=(dataType:string)=>

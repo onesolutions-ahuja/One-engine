@@ -14,7 +14,7 @@
  * / publish and cached per page revision. The Builder never edits this code.
  */
 import type {CompiledPage} from '../compilePage.js';
-import {compileActionFormula,compileDisplayFormula,FormulaCodeError,type RecordSetNeed} from './generateCode.js';
+import {ACTION_KEY_MARK,compileActionFormula,compileActionNode,compileDisplayFormula,FormulaCodeError,type RecordSetNeed} from './generateCode.js';
 import {F,O} from './formulaLibrary.js';
 
 export const PAGE_CODE_VERSION=2;
@@ -120,10 +120,15 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
       data:false,reads:[],writes:[],ui:[box.kind]});
      continue;
     }
-    const code=compileActionFormula(source,object);
-    actions.push({key,componentId:component.id,event:action.event,objectApiName:object,
-     js:code.js,data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
-    addSets(code.sets);
+    // Message boxes inside the action: each answer (Yes/No/OK steps) is its own action.
+    const add=(actionKey:string,event:string,code:ReturnType<typeof compileActionFormula>)=>{
+     actions.push({key:actionKey,componentId:component.id,event,objectApiName:object,
+      js:code.js.split(ACTION_KEY_MARK).join(actionKey),data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
+     addSets(code.sets);
+     for(const box of code.boxes)for(const [part,branch] of [['__yes',box.yes],['__no',box.no]] as const)
+      if(branch)add(actionKey+box.suffix+part,event+box.suffix+part,compileActionNode(branch,object));
+    };
+    add(key,action.event,compileActionFormula(source,object));
    }catch(error){
     if(!(error instanceof FormulaCodeError)&&!(error instanceof Error))throw error;
     issues.push({componentId:component.id,where:'actionFlows.'+action.event,source,error:error instanceof Error?error.message:String(error)});

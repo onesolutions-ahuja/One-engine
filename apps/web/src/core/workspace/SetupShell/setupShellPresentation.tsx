@@ -245,7 +245,11 @@ export function renderSetupShell(ctx: any) {
             <section className="setup-card" role="status">Checking Setup permissions…</section>}
           {route.kind==='setup' && sessionPermissionsLoaded && !setupRouteAllowed &&
             <section className="setup-card" role="alert">
-              Access denied. Your OneEngine permission sets do not grant access to this Setup page.
+              <h1>{workspace==='rbac'&&route.resourceApiName==='Queues'?'Queues access required':
+                workspace==='named-credentials'&&route.resourceApiName==='NamedDevices'?'Named Devices access required':
+                  'Setup access required'}</h1>
+              <p>Ask your organisation’s administrator to review your access to this page.</p>
+              <a className="btn" href="/une/setup/home">Back to Setup Home</a>
             </section>}
           {(route.kind!=='setup'||(sessionPermissionsLoaded&&setupRouteAllowed)) && <React.Fragment>
           {route.kind === 'setup' && runtimeFormFactor === 'Phone' && workspace !== 'home' && !route.dashboardView &&

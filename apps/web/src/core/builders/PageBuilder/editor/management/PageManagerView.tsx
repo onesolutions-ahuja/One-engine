@@ -77,6 +77,9 @@ export default function PageManagerView({ props, editorState, management, layout
             {pageListSortDescending?'↓ Descending':'↑ Ascending'}
           </button>
         </div>
+        {!recordPageContext && pageListTypeTab==='Record Page' && <p className="info-callout">
+          Open <a href="/une/setup/object-manager">Object Manager</a> and choose an object to manage its record pages.
+        </p>}
         <ResponsiveDataList rows={paginatedPages} includeTablet includeNarrowDesktop getId={item=>item.apiName}
           label="Page Manager pages" emptyText={pageListSearch||pageListObject||pageListDeviceTab!=="all"?"No pages match the selected filters.":"No pages of this type exist yet."}
           onOpen={item=>void openPageDesign(item.apiName)} openLabel="Open page designer"
@@ -155,7 +158,7 @@ export default function PageManagerView({ props, editorState, management, layout
           <td>{modifiedDate(item)}</td>
           <td><span className={item.status === 'Active' ? 'page-status-badge active' : 'page-status-badge'}>{item.status}</span></td>
 
-        </tr>)}</tbody></table>{!visiblePages.length && <div className="records-empty">{!recordPageContext && pageListTypeTab === 'Record Page' ? 'Record Pages are managed inside Object Manager. Choose an object there to manage its record pages.' : pageListSearch||pageListObject||pageListDeviceTab!=='all'?'No pages match the selected filters. Clear filters to see all pages.':'No pages of this type exist yet. Create a new page to begin.'}</div>}</div>
+        </tr>)}</tbody></table>{!visiblePages.length && <div className="records-empty">{pageListSearch||pageListObject||pageListDeviceTab!=='all'?'No pages match the selected filters. Clear filters to see all pages.':'No pages of this type exist yet. Create a new page to begin.'}</div>}</div>
         <nav className="flow-existing-pagination" aria-label="Page list pagination">
           <span>{visiblePages.length} {visiblePages.length===1?"page":"pages"} · Page {safePageListPage} of {pageListPageCount}</span>
           <button className="btn" disabled={safePageListPage<=1} onClick={()=>setPageListPage(safePageListPage-1)}>Previous</button>

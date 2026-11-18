@@ -1,3 +1,4 @@
+import {startDevicePresence} from '../../authentication/TillDevice/devicePresence';
 import {showMessageScreen} from '../PageRuntime/messageScreen';
 import * as React from 'react';
 import {createContext,useContext,useEffect,useMemo,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
@@ -183,6 +184,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
  },[compiled,script,components,objects,request,pageSessionKey,sessionIdOverride,recordId]);
  useEffect(()=>{
   void runtime.data.start();
+  // While the app is open in this tab, the server knows this device's open sale is live.
+  startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
   if(runtime.code?.usesTill)void askWhichTill(runtime.request);
   // Rows for instant taps and totals: one request with the first data.

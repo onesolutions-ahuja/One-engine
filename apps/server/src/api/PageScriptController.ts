@@ -21,6 +21,7 @@ import {deviceTill,setDeviceTill} from '../system-support/till-assignment-servic
  * Scripts are built only from SAVED page metadata, so nothing a browser sends
  * becomes code. Every request re-checks the user's permissions.
  */
+import {stampDeviceCarts,validDeviceKey,DEVICE_OFFLINE_AT} from '../system-support/device-presence-service.js';
 export type PageScriptDeps={db:SqlPersistence;rbac:RbacEngine;records:RecordEngine;pages:PageRuntime;
  definitions:ObjectDefinitionService;scripts:PageScriptService;
  verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>};
@@ -167,6 +168,26 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   res.json(await deviceTill(deps,actor,(req.body??{}).deviceKey));
+ }));
+ // Device presence: open while the app is open on this device (see device-presence-service).
+ app.get('/api/device-presence',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  const deviceKey=req.query.key;
+  if(!validDeviceKey(deviceKey))throw new Error('Invalid device key');
+  res.setHeader('Content-Type','text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control','private, no-store');
+  res.setHeader('X-Accel-Buffering','no');
+  res.flushHeaders();
+  let closed=false,ticks=0;
+  const stamp=(at:string)=>stampDeviceCarts(deps.records,actor,deviceKey,at);
+  await stamp(new Date().toISOString());
+  // A ping every 25 s keeps proxies from closing the line; the carts are stamped every minute.
+  const timer=setInterval(()=>{
+   if(closed)return;
+   res.write(': ping\n\n');
+   if(++ticks%2===0)void stamp(new Date().toISOString());
+  },25_000);
+  req.on('close',()=>{closed=true;clearInterval(timer);void stamp(DEVICE_OFFLINE_AT);});
  }));
  app.post('/api/till-device/assign',wrap(async(req,res)=>{
   const actor=authenticated(req);

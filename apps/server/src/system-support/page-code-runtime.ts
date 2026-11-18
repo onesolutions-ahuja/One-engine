@@ -146,14 +146,18 @@ class ServerScope{
  tenant(name:string){return name==='name'?this.identity?.tenant.name??'':this.identity?.tenant.logo??'';}
  private tillRow:Row|null=null;
  /** Read once before the code runs (page values are plain, synchronous reads). */
- async loadTill(){this.tillRow=await findDeviceTill(this.records,this.actor,this.request.deviceKey);}
+ async loadTill(){
+  this.tillRow=await findDeviceTill(this.records,this.actor,this.request.deviceKey);
+  this.mirrorKey=await findMirrorKey(this.records,this.actor,this.request.deviceKey);
+ }
+ private mirrorKey='';
  /** @ThisPage.Till.*: the active Till whose DeviceKey is this device's key ('' when not set up). */
  till(field:string){
   const value=this.tillRow?.[field];
   return value===undefined||value===null?'':value;
  }
  device(field:string){
-  const value=field==='Key'?this.request.deviceKey:field==='Ip'?this.request.deviceIp:field==='Agent'?this.request.deviceAgent:undefined;
+  const value=field==='Key'?this.request.deviceKey:field==='MirrorKey'?this.mirrorKey||this.request.deviceKey:field==='Ip'?this.request.deviceIp:field==='Agent'?this.request.deviceAgent:undefined;
   return value??'';
  }
  component(){throw Error('A component\'s live value is only available in the browser');}
@@ -403,6 +407,19 @@ function deviceAnswers(value:unknown):Record<string,unknown>|undefined{
 /** Device keys are made on the device: a random UUID (browser) or the OS vendor id (app). */
 export const deviceKeyPattern=/^[A-Za-z0-9_-]{16,128}$/;
 /** The active Till set up for this device, with its Location's Code (the number prefix). */
+/** @ThisPage.Device.MirrorKey: the device whose sale this screen shows. A Till shows its own;
+ * a customer display shows the Till whose CustomerDisplayKey is this device's key; any other
+ * device (e.g. the second monitor of the till computer) shows its own key. */
+export async function findMirrorKey(records:Pick<Records,'list'|'get'>,actor:Actor,deviceKey:unknown):Promise<string>{
+ if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))return '';
+ try{
+  const page=await records.list(actor.tenant_id,actor.user_id,'Till',2,0,{filters:[
+   {field:'CustomerDisplayKey',operator:'eq',value:deviceKey},{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
+  const till=page.records[0];
+  if(till&&typeof till.DeviceKey==='string'&&deviceKeyPattern.test(till.DeviceKey))return till.DeviceKey;
+ }catch{/* no Till access: the screen shows its own device */}
+ return deviceKey;
+}
 export async function findDeviceTill(records:Pick<Records,'list'|'get'>,actor:Actor,deviceKey:unknown):Promise<Row|null>{
  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))return null;
  const page=await records.list(actor.tenant_id,actor.user_id,'Till',2,0,{filters:[

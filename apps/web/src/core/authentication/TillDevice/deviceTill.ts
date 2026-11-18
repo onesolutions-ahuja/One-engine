@@ -9,7 +9,9 @@
 export type DeviceTill={Id:string;Name:string;Code:string;Location:string;LocationCode:string};
 export type DeviceTillChoice={Id:string;Name:string;Code:string;Location:string};
 export type DeviceTillState={status:'unknown'|'loading'|'set'|'unset'|'error';till:DeviceTill|null;
- tills:DeviceTillChoice[];error?:string};
+ tills:DeviceTillChoice[];error?:string;
+ /** The device whose sale this screen shows (a customer display: its Till's key). */
+ mirrorKey?:string};
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 
 const KEY='md.device.key';
@@ -31,6 +33,8 @@ export function tillDeviceKey():string{
  }catch{return '';}
 }
 export const deviceTillState=()=>state;
+/** @ThisPage.Device.MirrorKey in the browser: this device's own key until the server says otherwise. */
+export function mirrorDeviceKey():string{return state.mirrorKey||tillDeviceKey();}
 export function subscribeDeviceTill(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};}
 /** @ThisPage.Till.<field> as the browser knows it ('' until known; the server decides on save). */
 export function deviceTillValue(field:string):string{
@@ -44,9 +48,10 @@ export function loadDeviceTill(request:Request,force=false):Promise<DeviceTillSt
  if(!force&&(state.status==='set'||state.status==='unset'))return Promise.resolve(state);
  const deviceKey=tillDeviceKey();
  publish({...state,status:'loading'});
- loading=request<{till:DeviceTill|null;tills?:DeviceTillChoice[]}>('/till-device/current',
+ loading=request<{till:DeviceTill|null;tills?:DeviceTillChoice[];mirrorKey?:string}>('/till-device/current',
   {method:'POST',body:JSON.stringify({deviceKey})})
-  .then(answer=>{publish({status:answer.till?'set':'unset',till:answer.till,tills:answer.tills??[]});return state;})
+  .then(answer=>{publish({status:answer.till?'set':'unset',till:answer.till,tills:answer.tills??[],
+   mirrorKey:typeof answer.mirrorKey==='string'&&pattern.test(answer.mirrorKey)?answer.mirrorKey:undefined});return state;})
   .catch(error=>{publish({status:'error',till:null,tills:[],error:error instanceof Error?error.message:'Till unavailable'});return state;})
   .finally(()=>{loading=null;});
  return loading;

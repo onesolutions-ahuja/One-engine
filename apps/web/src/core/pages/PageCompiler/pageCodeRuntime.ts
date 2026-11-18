@@ -19,7 +19,7 @@ import {isConnected} from '../../../../../server/src/expression-engine/FormulaCo
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
-import {deviceTillState,deviceTillValue,loadDeviceTill,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
+import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
 type Row=Record<string,unknown>;
 type Criteria=Array<[string,unknown]>;
@@ -48,7 +48,7 @@ export function signedInValue(page:PageReference,state:Readonly<Record<string,un
  if(page.kind==='session')return sessionId;
  if(page.kind==='cart'){const id=state.activeCartId;return typeof id==='string'?id:'';}
  if(page.kind==='till')return deviceTillValue(page.field);
- if(page.kind==='device')return page.field==='Key'?tillDeviceKey():'';
+ if(page.kind==='device')return page.field==='Key'?tillDeviceKey():page.field==='MirrorKey'?mirrorDeviceKey():'';
  if(page.kind==='user')return who?.user?.[sessionUser[USER_FIELDS[page.field]]]??'';
  if(page.kind==='company'){
   if(page.field==='Id')return who?.organization?.Id??'';
@@ -295,7 +295,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  // The device key goes with every request: the server maps it to this device's Till.
  const usesDevice=Object.values(code.sources).some(source=>/@ThisPage\.(?:Till|Device)\./i.test(String(source)))
   ||Object.values(code.actions).some(action=>/\$\.(?:till|device)\(/.test(String(action.run)));
- const usesTill=usesDevice&&(Object.values(code.sources).some(source=>/@ThisPage\.Till\./i.test(String(source)))
+ const usesTill=usesDevice&&(Object.values(code.sources).some(source=>/@ThisPage\.(?:Till\.|Device\.MirrorKey)/i.test(String(source)))
   ||Object.values(code.actions).some(action=>String(action.run).includes('$.till(')));
  if(usesTill){
   subscribeDeviceTill(changed);

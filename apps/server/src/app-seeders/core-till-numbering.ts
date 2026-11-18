@@ -32,7 +32,9 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'DeviceSetUpAt',label:'Device Set Up At',type:'datetime'},
   {api:'DeviceSetUpBy',label:'Device Set Up By',type:'reference',related:'User'},
   {api:'DeviceIp',label:'Device IP Address',type:'text'},
-  {api:'DeviceAgent',label:'Device Browser / App',type:'text'}
+  {api:'DeviceAgent',label:'Device Browser / App',type:'text'},
+  // The customer display of this Till: that screen's device key (its Named Device's Device ID).
+  {api:'CustomerDisplayKey',label:'Customer Display (device key)',type:'text'}
  ]},
  {object:'Location',fields:[
   {api:'Code',label:'Code',type:'text',unique:true}

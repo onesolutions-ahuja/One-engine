@@ -1,4 +1,15 @@
 import * as React from 'react';
+/** The print preview prints only the document: no Close/Print buttons, no scrollbars
+ * (a list scrolls on screen but never on paper), and no layout jump while it loads. */
+const printPreviewStyles=`
+.formula-print-toolbar{display:flex;gap:8px;margin-bottom:8px}
+.formula-print-preview *{scrollbar-width:none}
+.formula-print-preview *::-webkit-scrollbar{display:none}
+@media print{
+ .formula-print-toolbar{display:none!important}
+ dialog.formula-print-preview{max-height:none!important;overflow:visible!important;padding:0!important;box-shadow:none!important}
+ dialog.formula-print-preview::backdrop{background:none}
+}`;
 import type {PopupScreen} from './screenFormula';
 
 const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:12px;overflow:auto;scrollbar-gutter:stable;
@@ -123,9 +134,12 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
  },[screen.instance]);
  if(screen.print)return <dialog ref={inFrame?undefined:ref} open={inFrame||undefined} className="formula-print-preview" aria-label={screen.page}
   onCancel={event=>{event.preventDefault();screen.failed?.(Error('Preview closed'));onClose();}}
-  style={{width:formulaScreenWidth(canvas),maxHeight:'90vh',overflow:'auto',padding:16,border:0,borderRadius:12,background:'#fff'}}>
-  <button type="button" onClick={()=>{screen.failed?.(Error('Preview closed'));onClose();}}>Close</button>
-  <button type="button" onClick={()=>window.print()}>Print / Save PDF</button>
+  style={{width:formulaScreenWidth(canvas),maxHeight:'90vh',overflowY:'auto',scrollbarGutter:'stable',padding:16,border:0,borderRadius:12,background:'#fff'}}>
+  <style>{printPreviewStyles}</style>
+  <div className="formula-print-toolbar">
+   <button type="button" onClick={()=>{screen.failed?.(Error('Preview closed'));onClose();}}>Close</button>
+   <button type="button" onClick={()=>window.print()}>Print / Save PDF</button>
+  </div>
   {children}
  </dialog>;
  const back=<div className="formula-screen-bar">

@@ -30,7 +30,7 @@ export type CompanyField=typeof COMPANY_FIELDS[number];
 export const TILL_FIELDS=['Id','Name','Code','Location','LocationCode'] as const;
 export type TillField=typeof TILL_FIELDS[number];
 /** @ThisPage.Device.Key / Ip / Agent: this device, for audit. The server reads Ip and Agent itself. */
-export const DEVICE_FIELDS=['Key','Ip','Agent'] as const;
+export const DEVICE_FIELDS=['Key','Ip','Agent','MirrorKey'] as const;
 export type DeviceField=typeof DEVICE_FIELDS[number];
 
 export type PageReference=

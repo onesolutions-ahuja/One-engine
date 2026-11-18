@@ -1,6 +1,6 @@
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
-import {deviceKeyPattern,findDeviceTill} from './page-code-runtime.js';
+import {deviceKeyPattern,findDeviceTill,findMirrorKey} from './page-code-runtime.js';
 
 /**
  * Which Till a device is. The device makes its own key (a random UUID kept in the
@@ -15,12 +15,13 @@ type Deps={db:Pick<SqlPersistence,'transaction'>;records:Pick<RecordEngine,'list
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** This device's Till, plus the active Tills to pick from when it is not set up yet. */
-export async function deviceTill(deps:Deps,actor:Actor,deviceKey:unknown):Promise<{till:Row|null;tills:Row[]}>{
+export async function deviceTill(deps:Deps,actor:Actor,deviceKey:unknown):Promise<{till:Row|null;tills:Row[];mirrorKey:string}>{
  const till=await findDeviceTill(deps.records,actor,deviceKey);
- if(till)return {till,tills:[]};
+ const mirrorKey=await findMirrorKey(deps.records,actor,deviceKey);
+ if(till)return {till,tills:[],mirrorKey};
  const page=await deps.records.list(actor.tenant_id,actor.user_id,'Till',100,0,{sortField:'Name',sortDirection:'asc',
   filters:[{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
- return {till:null,tills:page.records.map(row=>({Id:row.Id,Name:row.Name??'',Code:row.Code??'',Location:row.Location??''}))};
+ return {till:null,mirrorKey,tills:page.records.map(row=>({Id:row.Id,Name:row.Name??'',Code:row.Code??'',Location:row.Location??''}))};
 }
 
 /** Set this device up as one Till (a device is one Till; a Till is one device). */

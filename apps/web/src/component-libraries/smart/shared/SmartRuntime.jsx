@@ -22,6 +22,8 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
  if(typeof v!=="string")return {value:text(v)};
  // Keep literal text and asset URLs unchanged; only formulas can fail.
  if(/^(?:https:\/\/|asset:|data:image\/)/i.test(v.trim()))return {value:v};
+ // An email address ("qa@example.com") is a value; an @Object.Field reference starts with @.
+ if(/^\s*[^\s@=(),"&]+@[^\s@]+\.[^\s@]+\s*$/.test(v))return {value:v};
  // A plain date or date-time ("2026-11-16") is a value, not a subtraction.
  if(/^\s*\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?\s*$/.test(v))return {value:v};
  if(!/^\s*=/.test(v)&&!/@[A-Za-z]/.test(v)&&!/^\s*"/.test(v)&&

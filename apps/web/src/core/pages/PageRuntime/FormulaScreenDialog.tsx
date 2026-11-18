@@ -95,7 +95,13 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
  const animatedClose=()=>{
   if(closing.current)return;
   closing.current=true;
-  if(fullPage||screen.print)onClose();else genie(popupBox(),true,onClose);
+  if(fullPage||screen.print){onClose();return;}
+  // The genie runs on animation frames, which a background tab never draws: without this
+  // fallback the closed popup stayed mounted (stale record) and the next SCREEN stacked a second one.
+  let done=false;
+  const finish=()=>{if(done)return;done=true;onClose();};
+  genie(popupBox(),true,finish);
+  window.setTimeout(finish,700);
  };
  const close=React.useRef(animatedClose);
  close.current=animatedClose;

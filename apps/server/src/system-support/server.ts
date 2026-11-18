@@ -3007,7 +3007,7 @@ export function createSystemServer(db:SqlPersistence) {
   registerDockerMailAdminRoutes(app,db,rbac,adminMailAccess,platformTenants);
   app.use('/api',(_req,res)=>{res.status(404).json({error:'API endpoint not implemented in SQL runtime'});});
   registerSecurityWebHost(app,db,process.env.METADRIVE_WEB_DIST);
-  app.use((err:Error,_req:Request,res:Response,_next:NextFunction)=>{
+  app.use((err:Error,errorReq:Request,res:Response,_next:NextFunction)=>{
     if(err instanceof DuplicateMatchError)res.status(409).json({error:err.message,ruleApi:err.ruleApi,code:'DUPLICATE_RULE_BLOCKED'});
     else if(err instanceof DeclarativeRuleError)res.status(400).json({
       error:err.message,ruleApi:err.ruleApi,
@@ -3060,7 +3060,15 @@ export function createSystemServer(db:SqlPersistence) {
     else if(err.message==='Record not found'||err.message.endsWith('not found')) res.status(404).json({error:err.message});
     else if(err.message.startsWith('Flow cannot activate: ')||err.message.startsWith('Invalid ')||err.message.startsWith('Unsupported ')
       ||/^(Unknown |Duplicate |Cyclic |Stale |External |Queue |Active sharing|Restriction |Portal |Too many)/.test(err.message)) res.status(400).json({error:err.message});
-    else {console.error('SQL system request failed',err);res.status(503).json({error:'SQL service unavailable'});}
+    else {
+      console.error('SQL system request failed',err);
+      // Page builders (may edit pages) also see the database's own message, so a broken
+      // query can be diagnosed from the browser; everyone else gets the generic text.
+      const actor=(errorReq as Request&{actor?:Actor}).actor;
+      const detail=String(err.message||'').slice(0,500);
+      void (actor?rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','update').then(()=>true,()=>false):Promise.resolve(false))
+        .then(builder=>{if(!res.headersSent)res.status(503).json(builder&&detail?{error:'SQL service unavailable',detail}:{error:'SQL service unavailable'});});
+    }
   });
   return app;
 }

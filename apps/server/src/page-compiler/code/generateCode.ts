@@ -416,6 +416,33 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
     :[q(literalName(args[0],'Named Credential')),...args.slice(1).map(value)];
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
   }
+  // CALLOUT('QR.CreateOrder', 'Amount', x, ..., AS(qo)): the connector holds the Named Credential;
+  // the server checks connector, credential and device first and stops at once if one is missing.
+  case 'CALLOUT':{
+   const last=args.at(-1);
+   const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
+   const operation=literalName(args.shift(),'Connector.Operation');
+   if(!/^[A-Za-z][A-Za-z0-9_]{0,79}\.[A-Za-z][A-Za-z0-9_]{0,79}$/.test(operation))
+    return fail("CALLOUT needs 'Connector.Operation', for example 'QR.CreateOrder'");
+   if(args.length%2)return fail('CALLOUT needs field and value pairs');
+   const pairs:string[]=[];
+   for(let i=0;i<args.length;i+=2)pairs.push(q(literalName(args[i],'CALLOUT field'))+': '+value(args[i+1]));
+   scope.data=true;
+   return [(alias?'v['+q(alias)+'] = ':'')+'await $.service("CALLOUT", ['+q(operation)+', {'+pairs.join(', ')+'}]);'];
+  }
+  // REPEAT(step, until, every, max): runs the step, stops when `until` is TRUE; waits between
+  // tries on the server (55 seconds in all at most, so a missing reply never hangs the till).
+  case 'REPEAT':{
+   if(scope.loop)return fail('REPEAT cannot be nested or run inside FOREACH');
+   const [body,until,every,times]=args;
+   if(!body||!until)return fail('REPEAT needs a step and an until condition');
+   scope.data=true;
+   const inner:ActionScope={...scope,loop:true};
+   return ['for (let tries = 0, most = Math.max(1, Math.min(200, Math.trunc(Number('+(times?value(times):'10')+') || 1))); tries < most; tries++) {',
+    ...indent(stepCode(body,inner)),
+    '  if ('+value(until)+') break;',
+    '  if (tries < most - 1 && (await $.service("SLEEP", ['+(every?value(every):'2')+'])).timeUp) break;','}'];
+  }
   case 'AS':return fail('AS(name) belongs at the end of GETRECORD, CREATERECORD or FOREACH');
  }
  return fail('Unsupported action step '+node.name);

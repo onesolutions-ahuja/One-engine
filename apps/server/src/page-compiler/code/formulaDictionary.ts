@@ -115,6 +115,8 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  SMS:action(3,3,'SMS(credential, to, message)'),WAIT:action(2,2,'WAIT(minutes, seconds)'),
  LOCATION:action(1,1,'LOCATION(AS(x)): device position'),
  RECORDPAYMENT:action(3,5,'RECORDPAYMENT(InvoiceId, Amount, Method, [Note], [AS(x)])'),
+ CALLOUT:action(1,83,"CALLOUT('Connector.Operation', 'Field', value, ..., AS(x)): server; stops at once when the connector, credential or device is missing"),
+ REPEAT:action(2,4,'REPEAT(step, until, [everySeconds], [maxTimes]): server; waits at most 55 seconds in all'),
  AS:action(1,1,'AS(name): name the result of GETRECORD/CREATERECORD/FOREACH')
 });
 

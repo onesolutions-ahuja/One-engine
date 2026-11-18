@@ -2,7 +2,6 @@ import {requireAvailableMetadataName} from '../system-support/metadata-name-guar
 import {TillPinService} from '../system-support/till-pin-service.js';
 import {enforceFlowRecordAttestation} from './FlowRecordAttestationGuard.js';
 import {resolveFlowLoopResources} from './FlowLoopResourceContract.js';
-import {createLinkedReturnDocument,loadLinkedReturnDocument} from './FlowLinkedReturnDocument.js';
 import {enforceFlowBusinessCalendar} from './FlowBusinessCalendarGuard.js';
 import {failedFlowLogs,pendingFlowInterviews} from './FlowExecutionHistory.js';
 import {executeActionButtonNode} from '../system-files/nodes/ActionButtonNode.js';
@@ -521,16 +520,9 @@ export class FlowRuntime {
         this.db,tenantId,startConfig.businessCalendarGuard,inputs);
       if(startConfig.recordAttestationGuard)await enforceFlowRecordAttestation(
         this.db,tenantId,userId,startConfig.recordAttestationGuard,inputs);
-      if(startConfig.securityOperation==='LoadLinkedReturnDocument'){
-        if(!this.recordQuery)throw Error('Record query services unavailable');
-        return loadLinkedReturnDocument(this.recordQuery,tenantId,userId,
-          startConfig.returnDocumentConfig,inputs);
-      }
-      if(startConfig.securityOperation==='CreateLinkedReturnDocument'){
-        if(!this.records||!this.recordQuery)throw Error('Record services unavailable for return operation');
-        return createLinkedReturnDocument(this.db,this.records,this.recordQuery,
-          tenantId,userId,startConfig.returnDocumentConfig,inputs);
-      }
+      // Returns (SRN) are made with page formulas now: an SRN Invoice that refers to the sale.
+      if(startConfig.securityOperation==='LoadLinkedReturnDocument'||startConfig.securityOperation==='CreateLinkedReturnDocument')
+        throw Error('Returns are now made on the page (an SRN invoice that refers to the sale); this Flow step was removed');
       if(startConfig.securityOperation==='VerifyCurrentUserTillPin'){
         const verified=await new TillPinService(this.db).verify(tenantId,userId,inputs.pin);
         return {completed:true,status:'completed',outputs:{verified}};

@@ -18,6 +18,7 @@ import {isConnected} from '../../../../../server/src/expression-engine/FormulaCo
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
+import {deviceTillState,deviceTillValue,loadDeviceTill,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
 type Row=Record<string,unknown>;
 type Criteria=Array<[string,unknown]>;
@@ -45,6 +46,8 @@ export function signedInValue(page:PageReference,state:Readonly<Record<string,un
  const who=identity();
  if(page.kind==='session')return sessionId;
  if(page.kind==='cart'){const id=state.activeCartId;return typeof id==='string'?id:'';}
+ if(page.kind==='till')return deviceTillValue(page.field);
+ if(page.kind==='device')return page.field==='Key'?tillDeviceKey():'';
  if(page.kind==='user')return who?.user?.[sessionUser[USER_FIELDS[page.field]]]??'';
  if(page.kind==='company'){
   if(page.field==='Id')return who?.organization?.Id??'';
@@ -140,6 +143,14 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    throw Error('Unsupported tenant value: '+path);
   }
   tenant(name:string){const brand=getTenantBrand();return (name==='name'?brand.name:brand.logo)??'';}
+  /** @ThisPage.Till.*: known once this device's Till has loaded; the server decides on save. */
+  till(field:string){
+   const known=deviceTillState().status;
+   if(known==='set'||known==='unset'||known==='error')return deviceTillValue(field);
+   return notHeld('This device\'s Till is loading');
+  }
+  /** @ThisPage.Device.Ip / Agent are seen by the server: blank in the prediction. */
+  device(field:string){return field==='Key'?tillDeviceKey():'';}
   component(id:string,property:string){
    if(!host.readComponent)throw Error('Select a component and property on this page');
    return host.readComponent(id,property);
@@ -269,12 +280,24 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   }
  };
  const post=<T>(path:string,body:unknown)=>host.request<T>(host.endpoint+path,{method:'POST',body:JSON.stringify(body)});
+ // The device key goes with every request: the server maps it to this device's Till.
+ const usesDevice=Object.values(code.sources).some(source=>/@ThisPage\.(?:Till|Device)\./i.test(String(source)))
+  ||Object.values(code.actions).some(action=>/\$\.(?:till|device)\(/.test(String(action.run)));
+ const usesTill=usesDevice&&(Object.values(code.sources).some(source=>/@ThisPage\.Till\./i.test(String(source)))
+  ||Object.values(code.actions).some(action=>String(action.run).includes('$.till(')));
+ if(usesTill){
+  subscribeDeviceTill(changed);
+  void loadDeviceTill(host.request);
+ }
  const requestFor=(ev:Row,rowObject:string)=>({sessionId:host.sessionId(),state:host.state(),rowObject,
+  ...(usesDevice?{deviceKey:tillDeviceKey()}:{}),
   event:{recordId:ev.recordId,value:ev.value,index:ev.index,label:ev.label},
   timeZone:typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:undefined});
 
  const api={
   code,
+  /** The page reads @ThisPage.Till: this device must be set up as a Till. */
+  usesTill,
   /** Lookups the held rows could not answer (shown by the till speed test). */
   misses:[] as string[],
   subscribe(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};},

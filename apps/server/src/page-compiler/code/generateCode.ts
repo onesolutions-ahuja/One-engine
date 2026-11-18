@@ -86,6 +86,8 @@ function pageValueCode(page:PageReference):string{
  switch(page.kind){
   case 'session':return '$.sessionId';
   case 'cart':return '$.session("cartId")';
+  case 'till':return '$.till('+q(page.field)+')';
+  case 'device':return '$.device('+q(page.field)+')';
   case 'user':return '$.session('+q('user.'+USER_FIELDS[page.field])+')';
   case 'company':return page.field==='Id'?'$.session("tenant.id")':'$.tenant('+q(page.field.toLowerCase())+')';
   case 'selected':return '$.componentState('+q(page.name)+', '+q(page.field)+')';
@@ -220,7 +222,30 @@ export function compileDisplayFormula(source:string,rowObject=''):CompiledFormul
 }
 
 /* ======================= Action formulas ======================= */
-type ActionScope=Scope&{writes:Set<string>;ui:Set<string>;data:boolean;loop:boolean;aliasesMutable:Set<string>};
+type ActionScope=Scope&{writes:Set<string>;ui:Set<string>;data:boolean;loop:boolean;aliasesMutable:Set<string>;
+ /** CONFIRMSCREEN/INFOSCREEN inside the action: their Yes/No/OK steps run as separate actions. */
+ boxes:MessageBox[]};
+/** A message box inside an action. Its answer steps run after the tap, as action
+ * <action key><suffix>__yes / __no (ACTION_KEY is replaced by the page's action key). */
+export type MessageBox={suffix:string;yes:Expression|null;no:Expression|null};
+export const ACTION_KEY_MARK='@@ACTION_KEY@@';
+/** True when the step (or an IF branch of it) is a message box with answer steps. */
+function hasAnsweredBox(node:Expression):boolean{
+ if(node.kind!=='call')return false;
+ if(node.name==='INFOSCREEN')return Boolean(node.args[1]&&!blankStep(node.args[1]));
+ if(node.name==='CONFIRMSCREEN')return true;
+ if(node.name==='IF'||node.name==='ACTIONS')return node.args.some(hasAnsweredBox);
+ return false;
+}
+const blankStep=(node:Expression)=>node.kind==='literal'&&(node.value===''||node.value===null);
+/** Names a step reads (AS results such as inv in inv.Id). */
+function referencedRoots(node:Expression,into=new Set<string>()):Set<string>{
+ if(node.kind==='reference')into.add(node.value.split('.')[0]);
+ else if(node.kind==='call')node.args.forEach(arg=>referencedRoots(arg,into));
+ else if(node.kind==='binary'){referencedRoots(node.left,into);referencedRoots(node.right,into);}
+ else if(node.kind==='unary')referencedRoots(node.value,into);
+ return into;
+}
 const indent=(lines:string[],by='  ')=>lines.map(line=>by+line);
 
 function takeAlias(node:Expression|undefined,scope:ActionScope,label:string):string{
@@ -249,7 +274,11 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
  const args=[...node.args];
  const value=(arg:Expression)=>expression(arg,scope);
  switch(node.name){
-  case 'ACTIONS':return args.flatMap(arg=>stepCode(arg,scope));
+  case 'ACTIONS':
+   // A box's Yes/No/OK steps run after the tap: steps written after it would run first.
+   if(args.slice(0,-1).some(hasAnsweredBox))
+    fail('Put the steps that should wait for the answer inside the box (its Yes/No/OK actions), or move the box to the end');
+   return args.flatMap(arg=>stepCode(arg,scope));
   case 'STATE':{
    const key=literalName(args[0],'Page State key');
    return ['$.setState('+q(key)+', '+value(args[1])+');'];
@@ -322,8 +351,31 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    if(args.length)fail(node.name+' takes no arguments');
    return ['await $.ui('+q(node.name)+');'];
   }
-  // The page converter splits a whole-action CONFIRMSCREEN/INFOSCREEN into its branches.
-  case 'CONFIRMSCREEN':case 'INFOSCREEN':return fail(node.name+' must be the whole action (not inside ACTIONS or IF)');
+  // A message box anywhere in an action (e.g. inside IF): shown after the save; its
+  // answer steps are separate actions, run when the user taps.
+  case 'CONFIRMSCREEN':case 'INFOSCREEN':{
+   if(scope.loop)fail(node.name+' cannot run inside FOREACH');
+   const confirm=node.name==='CONFIRMSCREEN';
+   const yes=args[1]&&!blankStep(args[1])?args[1]:null;
+   const no=confirm&&args[2]&&!blankStep(args[2])?args[2]:null;
+   const own=(node:Expression,into=new Set<string>()):Set<string>=>{
+    if(node.kind==='call'){
+     if(node.name==='AS'&&node.args[0]?.kind==='reference')into.add(node.args[0].value);
+     node.args.forEach(arg=>own(arg,into));
+    }
+    return into;
+   };
+   for(const branch of [yes,no])if(branch){const mine=own(branch);for(const root of referencedRoots(branch))
+    if(scope.aliases.has(root)&&!mine.has(root))fail('The steps after the answer run as a new action: they cannot use '+root
+     +' from before the box. Read it again there (GETRECORD) or put the box first.');}
+   const suffix='__box'+(scope.boxes.length+1);
+   scope.boxes.push({suffix,yes,no});
+   scope.ui.add(confirm?'CONFIRM':'INFO');
+   const key=(part:string,branch:Expression|null)=>branch?q(ACTION_KEY_MARK+suffix+part):'""';
+   const label=(arg:Expression|undefined)=>arg&&!blankStep(arg)?value(arg):'""';
+   return ['await $.ui('+q(confirm?'CONFIRM':'INFO')+', '+value(args[0])+', '+key('__yes',yes)+', '+key('__no',no)
+    +', '+(confirm?label(args[3]):'""')+', '+(confirm?label(args[4]):'""')+');'];
+  }
   case 'PRINT':{
    scope.ui.add('PRINT');
    return ['await $.ui("PRINT", '+q(literalName(args[0],'print template'))+', '+value(args[1])+');'];
@@ -382,17 +434,24 @@ export type CompiledActionCode={
  /** true: the action touches records, so it is saved on the server. */
  data:boolean;
  sets:RecordSetNeed[];functions:string[];references:string[];
+ /** Message boxes inside the action; their answer steps are compiled as their own actions. */
+ boxes:MessageBox[];
 };
 /** An action formula -> one async function. */
 export function compileActionFormula(source:string,rowObject=''):CompiledActionCode{
- const aliases=new Set<string>();
- const scope:ActionScope={rowObject,row:'$.row',aliases,aliasesMutable:aliases,async:true,functions:new Set(),
-  references:new Set(),sets:[],reads:new Set(),writes:new Set(),ui:new Set(),data:false,loop:false,aliasSets:new Map()};
- (scope as {source?:string}).source=source;
- // Aliases are visible to later steps: collect them first (AS names are unique per action).
  // `@state.x := value`, `@filter.x := value`, `@navigate.page|list|home := value`.
  const assignment=parseActionFormulaAssignment(source);
  const root=assignment?parseFormula('='+assignment.value):parseFormula(source);
+ return compileActionNode(root,rowObject,source,assignment);
+}
+/** An already parsed action (also a message box's Yes/No/OK steps) -> one async function. */
+export function compileActionNode(root:Expression,rowObject='',source='',
+ assignment:ReturnType<typeof parseActionFormulaAssignment>=null):CompiledActionCode{
+ const aliases=new Set<string>();
+ const scope:ActionScope={rowObject,row:'$.row',aliases,aliasesMutable:aliases,async:true,functions:new Set(),
+  references:new Set(),sets:[],reads:new Set(),writes:new Set(),ui:new Set(),data:false,loop:false,aliasSets:new Map(),boxes:[]};
+ (scope as {source?:string}).source=source;
+ // Aliases are visible to later steps: collect them first (AS names are unique per action).
  const collect=(node:Expression)=>{
   if(node.kind!=='call')return;
   if(node.name==='AS'&&node.args[0])aliases.add(literalName(node.args[0],'result variable'));
@@ -402,5 +461,5 @@ export function compileActionFormula(source:string,rowObject=''):CompiledActionC
  const lines=assignment?assignmentCode(assignment,scope):stepCode(root,scope);
  return {js:'async ($) => {\n  const v = Object.create(null);\n'+indent(lines).join('\n')+(lines.length?'\n':'')+'}',
   reads:[...scope.reads],writes:[...scope.writes],ui:[...scope.ui],data:scope.data,sets:scope.sets,
-  functions:[...scope.functions],references:[...scope.references]};
+  functions:[...scope.functions],references:[...scope.references],boxes:scope.boxes};
 }

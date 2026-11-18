@@ -26,6 +26,12 @@ export const USER_FIELDS={
 export type UserField=keyof typeof USER_FIELDS;
 export const COMPANY_FIELDS=['Id','Name','Logo'] as const;
 export type CompanyField=typeof COMPANY_FIELDS[number];
+/** @ThisPage.Till.Id …: the Till this device is set up as (the server looks it up by device key). */
+export const TILL_FIELDS=['Id','Name','Code','Location','LocationCode'] as const;
+export type TillField=typeof TILL_FIELDS[number];
+/** @ThisPage.Device.Key / Ip / Agent: this device, for audit. The server reads Ip and Agent itself. */
+export const DEVICE_FIELDS=['Key','Ip','Agent'] as const;
+export type DeviceField=typeof DEVICE_FIELDS[number];
 
 export type PageReference=
  |{kind:'session'}
@@ -34,7 +40,9 @@ export type PageReference=
  |{kind:'selected';name:string;field:ComponentStateField}
  |{kind:'user';field:UserField}
  |{kind:'cart'}
- |{kind:'company';field:CompanyField};
+ |{kind:'company';field:CompanyField}
+ |{kind:'till';field:TillField}
+ |{kind:'device';field:DeviceField};
 
 const NAME=/^[A-Za-z_][A-Za-z0-9_]{0,79}$/;
 const same=(a:string,b:string)=>a.toLowerCase()===b.toLowerCase();
@@ -76,6 +84,14 @@ export function parsePageReference(raw:string):PageReference|null{
  if(same(second,'Session')){
   if(parts.length===3&&same(third,'Id'))return {kind:'session'};
   throw Error('Unknown session value @'+reference+' (use @ThisPage.Session.Id)');
+ }
+ if(same(second,'Till')&&parts.length===3){
+  const field=pick(TILL_FIELDS,third);
+  if(field)return {kind:'till',field};
+ }
+ if(same(second,'Device')&&parts.length===3){
+  const field=pick(DEVICE_FIELDS,third);
+  if(field)return {kind:'device',field};
  }
  if(same(second,'Input')){
   if(parts.length===3)return {kind:'input',key:third};

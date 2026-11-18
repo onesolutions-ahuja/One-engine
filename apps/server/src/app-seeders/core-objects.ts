@@ -10,6 +10,7 @@ import {APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,seedAppointmentObjects} from '.
 import {CART_OBJECTS,seedCartObjects} from './cart-objects.js';
 import {CORE_CASH_LEDGER_FIELDS,seedCoreCashLedger} from './core-cash-ledger.js';
 import {NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,seedNamedDeviceObjects} from './core-named-devices.js';
+import {TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,seedTillNumbering} from './core-till-numbering.js';
 import {PRODUCT_IMAGE_FIELD,seedFreshProductImageField} from './product-image-field.js';
 import {SMART_COMPONENTS,seedFreshSmartComponents} from './smart-components.js';
 import {deactivateUnavailableBundledComponents} from './bundled-components.js';
@@ -33,18 +34,22 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  await seedNamedDeviceObjects(client,tenantId);
  await seedFreshProductImageField(client,tenantId);
  await seedFreshSmartComponents(client,tenantId);
+ // After Location, Cart, Invoice and CashLedger: adds to them, then the starter Location/Till.
+ await seedTillNumbering(client,tenantId);
 }
 
 // Bump this whenever any catalog below changes (for example a new Smart
 // component in SMART_COMPONENTS). A changed catalog under an old version stops
 // API startup on purpose. v3: smart_keyboard, smart_dock, smart_chart. v4: smart_search.
 // v5: smart_qr, NamedDevice and IncomingWebhook objects. v6: Cart payment hand-off fields.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v6';
+// v7: Till, Auto Number invoice/order numbers per Location, TillId/UserId on sales documents.
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v7';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
  LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,
- CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS
+ CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,
+ TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL
 ];
 
 /** One upgrade-safe reconciliation for all shared Core metadata. Existing

@@ -98,6 +98,7 @@ import {registerSeederManagerRoutes} from './seeder-manager-routes.js';
 import {registerPlatformDeploymentRoutes} from './platform-deployment-routes.js';
 import {assertMetadataPackageEditable,MetadataPackageService} from './metadata-package-service.js';
 import {registerPackageApiController} from '../api/PackageApiController.js';
+import {registerAutoNumberSettingsRoutes} from '../api/AutoNumberSettingsController.js';
 import {OpenApiExternalService,registerOpenApiExternalServiceRoutes} from './openapi-external-service.js';
 
 import { ComponentRuntime } from '../system-files/component-runtime.js';
@@ -2984,6 +2985,8 @@ export function createSystemServer(db:SqlPersistence) {
   }));
   registerDynamicApiRoutes(app,db,rbac,records,flows);
   registerPackageApiController(app,metadataPackages);
+  // Auto Number "Number separately for each" and the "Records can't be deleted" Object setting.
+  registerAutoNumberSettingsRoutes(app,{db,rbac});
   registerOpenApiExternalServiceRoutes(app,externalServices);
   registerDurableJobAdminRoutes(app,db,rbac);
   registerScheduledActionRoutes(app,db,rbac,records);

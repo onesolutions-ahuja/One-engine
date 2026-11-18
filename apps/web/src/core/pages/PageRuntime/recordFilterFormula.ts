@@ -27,7 +27,8 @@ const valueFunctions=new Set(['TODAY','NOW','TIMENOW','ADDDAYS','ADDMONTHS','DAT
 const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=''):unknown=>{
  if(node.kind==='literal')return node.value;
  const page=node.kind==='reference'?parsePageReference(node.value):null;
- if(page?.kind==='session'||page?.kind==='user'||page?.kind==='company'||page?.kind==='cart'){
+ if(page?.kind==='session'||page?.kind==='user'||page?.kind==='company'||page?.kind==='cart'
+   ||page?.kind==='till'||page?.kind==='device'){
   return signedInValue(page,state,sessionId);
  }
  // @ThisPage.Tabs1.Selected.Id: what that component published (blank until picked).

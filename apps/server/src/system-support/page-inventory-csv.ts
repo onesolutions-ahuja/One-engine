@@ -169,8 +169,10 @@ export async function inventoryDefinitions(db:SqlPersistence,tenant:string,
 }
 /** A stable, metadata-complete list per component type, independent of how many
  * instance keys happen to have been saved. Never writes defaults back to SQL. */
+/** A value that is a formula or reads a record/page value: what "Download all formulas" keeps. */
+export const isFormulaInventoryValue=(text:string)=>/^\s*=/.test(text)||/(?:^|[^A-Za-z0-9_.])@[A-Za-z]/.test(text);
 export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=new Map(),
- variant:PageLayoutVariant='Desktop'):string{
+ variant:PageLayoutVariant='Desktop',options:{formulasOnly?:boolean}={}):string{
  const rows:unknown[][]=[[...INVENTORY_EXPORT_COLUMNS]];
  const names=componentInstanceNames(page.components);
  for(const component of page.components){
@@ -202,8 +204,11 @@ export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=ne
    values.set(id,{value:effective(pathValue(properties,ribbon?.valueKey??id),descriptor.defaultValue),
     tab:descriptor.tab});
   }
-  for(const [key,{value,tab}] of values)
-   rows.push([page.apiName,componentApi(component.type),names.get(component.id),key,valueText(value),variant,tab]);
+  for(const [key,{value,tab}] of values){
+   const text=valueText(value);
+   if(options.formulasOnly&&!isFormulaInventoryValue(text))continue;
+   rows.push([page.apiName,componentApi(component.type),names.get(component.id),key,text,variant,tab]);
+  }
  }
  return inventoryCsv(rows);
 }
@@ -300,9 +305,9 @@ export function inventoryCsvPageGroups(text:string,defaultVariant:PageLayoutVari
   const key=inventoryGroupKey(pageapi,variant);
   let entry=grouped.get(key);
   if(!entry){
-   if(grouped.size>=50){
+   if(grouped.size>=100){
     issues.push({row:row.line,pageapi,component_name:'',component_property:'',
-      remark:'CSV may reference at most 50 existing page layouts'});
+      remark:'CSV may reference at most 100 existing page layouts'});
     continue;
    }
    entry={pageapi,variant,rows:[],originalLines:{},nextLine:2,firstRow:row.line};

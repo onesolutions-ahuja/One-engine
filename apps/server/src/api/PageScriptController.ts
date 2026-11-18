@@ -9,6 +9,7 @@ import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
+import {deviceTill,setDeviceTill} from '../system-support/till-assignment-service.js';
 
 /**
  * Compiled page scripts (Page Builder Preview).
@@ -135,7 +136,9 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    if(!build||!compiledActionKeyPattern.test(key)){res.json({ok:false,stale:true,error:'This page was republished; reload it'});return;}
    const started=performance.now();
    const source=build.pageCode.actions.find(item=>item.key===key)?.js??'';
-   const result=await executePageCodeAction(deps,actor,build.serverCode,key,parsePageCodeRequest(body.request),source);
+   // @ThisPage.Device.Ip / Agent: what the server itself saw, never what the browser says.
+   const result=await executePageCodeAction(deps,actor,build.serverCode,key,
+    parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent')}),source);
    res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1));
    res.json(result);
   }));
@@ -159,6 +162,19 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    res.json({ok:true,sets});
   }));
  };
+ // Which Till this device is (@ThisPage.Till.*), and setting a device up as a Till.
+ app.post('/api/till-device/current',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(await deviceTill(deps,actor,(req.body??{}).deviceKey));
+ }));
+ app.post('/api/till-device/assign',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  const body=(req.body??{}) as Record<string,unknown>;
+  res.json({till:await setDeviceTill(deps,actor,body.deviceKey,body.tillId,
+   {ip:req.ip,agent:req.get('user-agent')})});
+ }));
  codeRoutes('/api/apps/:appId',true);
  codeRoutes('/api/pages/:apiName',false);
  app.post('/api/pages/:apiName/script-ticket',wrap(async(req,res)=>{

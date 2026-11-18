@@ -1,5 +1,6 @@
 import {scopedMetadata} from '../system-support/record-read-scope.js';
 import {recordReadScope,forgetScopedRecords} from '../system-support/record-read-scope.js';
+import {autoNumberFieldTokens,autoNumberScopeFields,autoNumberSeriesKey,nextScopedAutoNumber} from '../field-engine/types/AutoNumberScope.js';
 export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
@@ -1051,9 +1052,12 @@ export class RecordEngine {
     const {rows}=await client.query<{id:string}>(
       'INSERT INTO md_records (tenant_id,object_api,record_type_id,owner_id,owner_queue_id,is_clone) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
       [tenantId,objectApi,selectedType,queue?null:selectedOwner,queue?selectedOwner:null,isClone]);
-    const autoFields=await scopedMetadata('auto-number-fields\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{api_name:string;auto_number_format:string|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean}>(
-      `SELECT api_name,auto_number_format,is_unique,external_id,case_sensitive FROM md_field_definitions
-       WHERE tenant_id=$1 AND object_api=$2 AND data_type='autonumber' AND deleted_at IS NULL`,[tenantId,objectApi]));
+    const autoFields=await scopedMetadata('auto-number-fields\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{api_name:string;auto_number_format:string|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;auto_number_scope_field:string|null;scope_label:string|null}>(
+      `SELECT f.api_name,f.auto_number_format,f.is_unique,f.external_id,f.case_sensitive,f.auto_number_scope_field,
+        s.label AS scope_label FROM md_field_definitions f
+       LEFT JOIN md_field_definitions s ON s.tenant_id=f.tenant_id AND s.object_api=f.object_api
+        AND s.api_name=f.auto_number_scope_field AND s.deleted_at IS NULL
+       WHERE f.tenant_id=$1 AND f.object_api=$2 AND f.data_type='autonumber' AND f.deleted_at IS NULL`,[tenantId,objectApi]));
     const rollupFields=await scopedMetadata('rollup-fields\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{api_name:string;operation:string;source_data_type:string|null}>(
       `SELECT f.api_name,f.rollup_operation AS operation,
         (SELECT s.data_type FROM md_field_definitions s
@@ -1071,6 +1075,19 @@ export class RecordEngine {
     for(const field of autoFields.rows){
       if(typeof field.api_name!=='string')continue;
       if(prepared.has(field.api_name))continue;
+      const storedValue=(name:string)=>{const stored=prepared.get(name);return stored?.reference_record_id??stored?.value_text??'';};
+      // {FieldName} tokens: the record's own value in the number ("{InvoiceType}-{0}").
+      const format=autoNumberFieldTokens(field.auto_number_format??'{000000}',storedValue);
+      // Numbered separately for each value (or pair of values) of other fields, e.g. each
+      // Location, or each Location and Invoice Type. A blank value has its own series.
+      const scopeFields=autoNumberScopeFields(field.auto_number_scope_field);
+      if(scopeFields.length){
+        const sequence=await nextScopedAutoNumber(client,tenantId,objectApi,field.api_name,
+          autoNumberSeriesKey(scopeFields.map(storedValue)));
+        prepared.set(field.api_name,{value_text:formatAutoNumberValue(format,sequence),
+          reference_record_id:null,is_unique:false,case_sensitive:field.case_sensitive});
+        continue;
+      }
       const counter=await client.query<{sequence:string}>(`INSERT INTO md_auto_number_counters
         (tenant_id,object_api,field_api,next_value) VALUES($1,$2,$3,2)
         ON CONFLICT(tenant_id,object_api,field_api)
@@ -1078,7 +1095,7 @@ export class RecordEngine {
         RETURNING (next_value-1)::text AS sequence`,[tenantId,objectApi,field.api_name]);
       const sequence=counter.rows[0]?.sequence;
       if(!sequence)throw new Error('Unable to allocate auto-number value');
-      const value=formatAutoNumberValue(field.auto_number_format??'{000000}',Number(sequence));
+      const value=formatAutoNumberValue(format,Number(sequence));
       prepared.set(field.api_name,{value_text:value,reference_record_id:null,
         is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive});
     }
@@ -1834,6 +1851,10 @@ export class RecordEngine {
   private async removeRecordTree(client:PoolClient,tenantId:string,userId:string,objectApi:string,id:string,
     root:boolean,visiting:Set<string>,deletionGroupId:string,rootId:string){
     if(objectApi==='CashLedger')throw Error('CashLedger entries cannot be deleted; post a reversal');
+    // Object setting "Records can't be deleted" (numbered documents): cancel them instead.
+    const locked=await scopedMetadata('prevent-delete\u0000'+tenantId+'\u0000'+objectApi,()=>client.query<{label:string}>(
+      'SELECT label FROM md_object_definitions WHERE tenant_id=$1 AND api_name=$2 AND prevent_delete=true',[tenantId,objectApi]));
+    if(locked.rows[0])throw Error(locked.rows[0].label+' records can\'t be deleted. Change the Status to Cancelled instead.');
     await this.lockObjectForWrite(client,tenantId,objectApi);
     const recordKey=JSON.stringify([objectApi,id]);
     if(visiting.has(recordKey))throw new Error('Cascading relationship record cycle detected');

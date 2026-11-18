@@ -13,7 +13,7 @@ import {
   applyFieldTypeMigration,fieldTypeSignature,rollbackFieldTypeMigration,
   type FieldTypeMigrationRuntime,type FieldTypeTarget
 } from './field-type-migration.js';
-type SqlObject={id:string;api_name:string;label:string;is_system:boolean};
+type SqlObject={id:string;api_name:string;label:string;is_system:boolean;is_standard?:boolean};
 type SqlField={id:string;label:string|null;object_api:string;api_name:string;data_type:string;related_object:string|null;relationship_type:string|null;required:boolean;max_length:number|null;precision:number|null;scale:number|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;default_value:string|null;help_text:string|null;description:string|null;formula_expression:string|null;formula_return_type:string|null;auto_number_format:string|null;rollup_child_object?:string|null;rollup_relationship_field?:string|null;rollup_operation?:string|null;rollup_source_field?:string|null;rollup_filter_logic?:string;picklist_restricted?:boolean;controller_field_api_name?:string|null;global_value_set_api?:string|null;relationship_name?:string|null;child_relationship_name?:string|null;delete_behavior?:string|null;allow_reparenting?:boolean;track_history?:boolean;deleted_at?:Date|null};
 const sqlFieldTypes:Record<string,string>={
   text:'text',number:'number',checkbox:'boolean',boolean:'boolean',date:'date',
@@ -1253,7 +1253,7 @@ export class ObjectDefinitionService {
   }
   async list(tenantId:string) {
     const {rows:objects}=await this.db.query<SqlObject>(
-      'SELECT id,api_name,label,is_system FROM md_object_definitions WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY api_name',[tenantId]);
+      'SELECT id,api_name,label,is_system,is_standard FROM md_object_definitions WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY api_name',[tenantId]);
     const {rows:fields}=await this.db.query<SqlField>(
       `SELECT f.id,f.object_api,f.api_name,f.label,f.data_type,f.related_object,f.relationship_type,f.required,f.max_length,
         f.precision,f.scale,f.is_unique,f.external_id,f.case_sensitive,f.default_value,f.help_text,f.description,
@@ -1354,7 +1354,7 @@ export class ObjectDefinitionService {
     }
     return objects.map(obj=>({
       id:obj.id,apiName:obj.api_name,label:obj.label,pluralLabel:obj.label,
-      kind:obj.is_system?'Standard Object' as const:'Custom Object' as const,
+      kind:obj.is_system?'System Object' as const:obj.is_standard?'Standard Object' as const:'Custom Object' as const,
       description:'',
       ...(layouts.get(obj.api_name)??{revision:0,pageLayouts:[],pageLayoutAssignments:[]}),
       recordTypes:typeByObject.get(obj.api_name)??[],

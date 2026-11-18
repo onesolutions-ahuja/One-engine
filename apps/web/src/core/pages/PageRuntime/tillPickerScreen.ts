@@ -37,7 +37,7 @@ export async function askWhichTill(request:Request):Promise<void>{
  const help=document.createElement('p');
  help.textContent=deviceTillState().tills.length
   ?'Set this device up once. Everyone who signs in here then uses this till.'
-  :'There are no active tills yet. Ask a manager to add one under Till.';
+  :'There are no active tills yet. Ask a manager to add a Named Device of type POS Terminal.';
  const list=document.createElement('ul');
  for(const till of deviceTillState().tills){
   const item=document.createElement('li');

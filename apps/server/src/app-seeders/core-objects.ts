@@ -8,6 +8,7 @@ import {QUOTATION_OBJECTS,seedQuotationObjects} from './core-quotation-objects.j
 import {LOCATION_SRN_FIELDS,seedLocationSrnMetadata} from './core-location-srn.js';
 import {APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,seedAppointmentObjects} from './core-appointment-objects.js';
 import {CART_OBJECTS,seedCartObjects} from './cart-objects.js';
+import {CATALOGUE_OBJECTS,seedCatalogueObjects} from './core-catalogue-objects.js';
 import {CORE_CASH_LEDGER_FIELDS,seedCoreCashLedger} from './core-cash-ledger.js';
 import {NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,seedNamedDeviceObjects} from './core-named-devices.js';
 import {TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,seedTillNumbering} from './core-till-numbering.js';
@@ -15,6 +16,24 @@ import {PRODUCT_IMAGE_FIELD,seedFreshProductImageField} from './product-image-fi
 import {SMART_COMPONENTS,seedFreshSmartComponents} from './smart-components.js';
 import {deactivateUnavailableBundledComponents} from './bundled-components.js';
 import {reconcileCoreObjectDefaults} from './core-object-defaults.js';
+
+/** System Objects: the platform's own Objects (identity, access, metadata, devices, webhooks,
+ * payments ledger, communication log). They can never be deleted (database trigger). */
+export const SYSTEM_OBJECTS=['User','Tenant','Role','PermissionSet','PermissionAssignment','AppExchange',
+ 'FieldDefinition','ComponentDefinition','PageDefinition','FlowDefinition',
+ 'NamedDevice','IncomingWebhook','CashLedger','Communication'] as const;
+/** Standard Objects: the shared business catalogue every app uses. */
+export const STANDARD_OBJECTS=['Product','ProductCategory','ProductOptionGroup','ProductOption',
+ 'Customer','Contact','Vendor','Invoice','InvoiceLine','Quotation','QuotationLine','Purchase','PurchaseLine',
+ 'Cart','CartLine','CartLineOption','Choice','Appointment','Location'] as const;
+
+/** Mark each Core Object's kind. Only adds the flags: a System Object stays one forever. */
+export async function markCoreObjectKinds(client:PoolClient,tenantId:string):Promise<void>{
+ await client.query(`UPDATE md_object_definitions SET is_system=true
+  WHERE tenant_id=$1 AND api_name=ANY($2::text[]) AND is_system=false AND deleted_at IS NULL`,[tenantId,[...SYSTEM_OBJECTS]]);
+ await client.query(`UPDATE md_object_definitions SET is_standard=true
+  WHERE tenant_id=$1 AND api_name=ANY($2::text[]) AND is_system=false AND is_standard=false`,[tenantId,[...STANDARD_OBJECTS]]);
+}
 
 /** The single CoreObjects entry point for tenant creation and existing-tenant reconciliation.
  * The imported modules are metadata catalogs, not independent startup seeders.
@@ -30,12 +49,15 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  await seedLocationSrnMetadata(client,tenantId);
  await seedAppointmentObjects(client,tenantId);
  await seedCartObjects(client,tenantId);
+ // After Product and CartLine: shared categories and product options for every selling app.
+ await seedCatalogueObjects(client,tenantId);
  await seedCoreCashLedger(client,tenantId);
  await seedNamedDeviceObjects(client,tenantId);
  await seedFreshProductImageField(client,tenantId);
  await seedFreshSmartComponents(client,tenantId);
  // After Location, Cart, Invoice and CashLedger: adds to them, then the starter Location/Till.
  await seedTillNumbering(client,tenantId);
+ await markCoreObjectKinds(client,tenantId);
 }
 
 // Bump this whenever any catalog below changes (for example a new Smart
@@ -44,13 +66,17 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v5: smart_qr, NamedDevice and IncomingWebhook objects. v6: Cart payment hand-off fields.
 // v7: Till, Auto Number invoice/order numbers per Location, TillId/UserId on sales documents.
 // v8-v11: Cart/CartLine device fields, Till.CustomerDisplayKey. v12: smart_video.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v12';
+// v13: one global catalogue (ProductCategory, ProductOptionGroup, ProductOption, CartLineOption,
+// Choice, Product.Category and channel flags); Appointment check-in fields and ServiceProduct; Till becomes NamedDevice type POS Terminal (records
+// migrated once, TillId repointed); Order, ProductLine, Account, Lead and Case retired from Core;
+// System Objects (never deletable) and Standard Objects marked.
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v13';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
- LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,
+ LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,CATALOGUE_OBJECTS,
  CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,
- TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL
+ TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,SYSTEM_OBJECTS,STANDARD_OBJECTS
 ];
 
 /** One upgrade-safe reconciliation for all shared Core metadata. Existing

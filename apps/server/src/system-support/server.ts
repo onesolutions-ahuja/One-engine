@@ -1445,6 +1445,16 @@ export function createSystemServer(db:SqlPersistence) {
       throw new Error('Invalid object revision precondition');
     res.json(await objectLifecycle.delete(actor.tenant_id,req.params.apiName,Number(revision.slice(1,-1))));
   }));
+  // Permanent delete of an Object already in the Deleted bin. Body: {confirm:"<API name>"}.
+  app.post('/api/metadata/objects/:apiName/purge',route(async(req,res)=>{
+    const actor=req.actor!;
+    await assertMetadataPackageEditable(db,actor.tenant_id,'object',req.params.apiName);
+    await rbac.require(actor.tenant_id,actor.user_id,'ObjectDefinition','manage');
+    await rbac.require(actor.tenant_id,actor.user_id,req.params.apiName,'edit');
+    const confirm=typeof req.body?.confirm==='string'?req.body.confirm:'';
+    res.setHeader('Cache-Control','private, no-store');
+    res.json(await objectLifecycle.purge(actor.tenant_id,req.params.apiName,confirm));
+  }));
   app.post('/api/metadata/objects/:apiName/restore',route(async(req,res)=>{
     const actor=req.actor!;
     await rbac.require(actor.tenant_id,actor.user_id,'ObjectDefinition','manage');

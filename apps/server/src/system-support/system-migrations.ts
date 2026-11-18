@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import {applySmartIosKeyboardDock} from './smart-ios-keyboard-dock.js';
 import {TILL_DEVICE_DDL} from './till-device-service.js';
+import {OBJECT_KIND_DDL} from '../system-files/object-schema-lifecycle.js';
 import {AUTO_NUMBER_SCOPE_DDL} from '../field-engine/types/AutoNumberScope.js';
 import {DEVICE_JOB_DDL} from './cloudprnt-routes.js';
 import {applySmartChart} from './smart-chart.js';
@@ -135,6 +136,8 @@ export async function applySystemMigrations(db:SqlPersistence) {
   await client.query(AUTO_NUMBER_SCOPE_DDL);
   // Upgrade-safe shared-till saved sign-ins (idempotent; the SQL baseline is immutable).
   await client.query(TILL_DEVICE_DDL);
+  // Standard Object flag and the trigger that keeps System Objects from ever being deleted.
+  await client.query(OBJECT_KIND_DDL);
   await client.query(DEVICE_JOB_DDL);
   // Preserve old receipts for rollback while moving checkout onto a shared order store.
   await client.query(REVOLUT_PAYMENT_DDL);

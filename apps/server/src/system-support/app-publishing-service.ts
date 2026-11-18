@@ -89,7 +89,7 @@ export class AppPublishingService{
     WHERE tenant_id=$1 AND NOT (api_name=ANY($2::text[])) ORDER BY api_name`,[actor.tenant_id,RESERVED_SETS]),
    this.publication(actor.tenant_id,app.id)
   ]);
-  const customObjects=objects.filter(o=>o.kind==='Custom Object');
+  const customObjects=objects.filter(o=>o.kind!=='System Object');
   const navPages=new Set(navigation.rows.filter(n=>n.entry_type==='App Page').map(n=>n.api_name)
    .concat(homes.rows.map(h=>h.api_name)));
   const appFlows=flows.filter(f=>f.appApiName===app.api_name&&['Active','Draft'].includes(String(f.status)));

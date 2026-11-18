@@ -175,7 +175,7 @@ function ObjectManager({
   page: LightningPageMetadata | null;
   onNotify: (message: string) => void;
 }) {
-  const [viewMode, setViewMode] = useState<'All Objects' | 'Standard Objects' | 'Custom Objects'>('All Objects');
+  const [viewMode, setViewMode] = useState<'All Objects' | 'System Objects' | 'Standard Objects' | 'Custom Objects'>('All Objects');
   const [objectListPage,setObjectListPage]=useState(0);
   const [objectSortKey,setObjectSortKey]=useState<'label'|'apiName'|'kind'|'fields'>('label');
   const [objectSortDescending,setObjectSortDescending]=useState(false);
@@ -406,7 +406,7 @@ function ObjectManager({
     if (layoutProfileId !== '*' && !profiles.some((profile) => profile.id === layoutProfileId)) setLayoutProfileId('*');
   }, [layoutProfileId, profiles]);
   const visibleObjects = objects.filter((item) => (viewMode === 'All Objects'
-    || (viewMode === 'Custom Objects' ? item.kind === 'Custom Object' : item.kind === 'Standard Object'))
+    || item.kind === viewMode.slice(0, -1))
     && `${item.label} ${item.apiName}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const sortedVisibleObjects = [...visibleObjects].sort((a, b) => {
     const result=objectSortKey==='fields'?a.fields.length-b.fields.length:objectSortKey==='kind'?a.kind.localeCompare(b.kind):objectSortKey==='apiName'?a.apiName.localeCompare(b.apiName):a.label.localeCompare(b.label);
@@ -852,7 +852,7 @@ function ObjectManager({
     <section className="surface object-setting-surface">
       <div className="section-toolbar"><div><h2>Edit Details</h2><p>Update the object definition.</p></div><div className="toolbar-actions">
         <button className="btn" type="button" onClick={() => {setDraft(object);setSectionMode('view');}}>Cancel</button>
-        {draft.kind === 'Custom Object' && <button className="btn" onClick={() => void openDeleteObject()}><Trash2 size={14} />Delete</button>}
+        {draft.kind !== 'System Object' && <button className="btn" onClick={() => void openDeleteObject()}><Trash2 size={14} />Delete</button>}
         <button className="btn btn-brand" onClick={persistDraft}><Save size={14} />Save</button></div></div>
       <div className="object-edit-form">
         <PlatformPageSlot slotKey="field-object-01"><label className="form-label">Label<input className="form-control" value={draft.label} onChange={(event) => updateDraft({ label: event.target.value })} /></label></PlatformPageSlot>
@@ -1889,7 +1889,14 @@ function ObjectManager({
             <td>{new Date(item.deletedAt).toLocaleString()}</td>
             <td><button className="btn" type="button" onClick={()=>void onRestoreObject(item.apiName).then(()=>
               setDeletedObjects(current=>current.filter(row=>row.apiName!==item.apiName))).catch(error=>
-              onNotify(error instanceof Error?error.message:'Unable to restore object'))}>Restore</button></td>
+              onNotify(error instanceof Error?error.message:'Unable to restore object'))}>Restore</button>{' '}
+              <button className="btn btn-danger" type="button" onClick={()=>{
+                const typed=window.prompt('Delete '+item.label+' permanently? Its records, fields and pages are removed and cannot be restored. Type '+item.apiName+' to confirm.');
+                if(typed!==item.apiName)return;
+                void apiRequest(`/metadata/objects/${encodeURIComponent(item.apiName)}/purge`,{method:'POST',body:JSON.stringify({confirm:typed})})
+                 .then(()=>{setDeletedObjects(current=>current.filter(row=>row.apiName!==item.apiName));onNotify(item.label+' deleted permanently');})
+                 .catch(error=>onNotify(error instanceof Error?error.message:'Unable to delete permanently'));
+              }}>Delete permanently</button></td>
           </tr>)}</tbody></table></div>}
       </section>}
       <div className="field-list-toolbar">
@@ -1898,7 +1905,7 @@ function ObjectManager({
           <input aria-label="Search objects" value={search} placeholder="Search objects…" onChange={event => onSearch(event.target.value)}/>
         </div><select className="form-control" aria-label="Filter object types" value={viewMode}
           onChange={event => setViewMode(event.target.value as typeof viewMode)}>
-          <option>All Objects</option><option>Standard Objects</option><option>Custom Objects</option>
+          <option>All Objects</option><option>System Objects</option><option>Standard Objects</option><option>Custom Objects</option>
         </select></div>
       </div>
       {visibleObjects.length>0&&<div ref={objectListScrollRef} className="table-scroll object-manager-desktop-list"><table className="slds-table">
@@ -1946,7 +1953,7 @@ function ObjectManager({
         {showObjectActionsMenu && <div className="object-manager-menu">
           <button type="button" onClick={() => { setShowObjectActionsMenu(false); refreshObject(); }}>Refresh Metadata</button>
           <button type="button" onClick={() => { setShowObjectActionsMenu(false); onNewField(); }}>New Field</button>
-          {draft.kind === 'Custom Object' && <button type="button" className="danger-action" onClick={() => { setShowObjectActionsMenu(false); void openDeleteObject(); }}>Delete Object</button>}
+          {draft.kind !== 'System Object' && <button type="button" className="danger-action" onClick={() => { setShowObjectActionsMenu(false); void openDeleteObject(); }}>Delete Object</button>}
         </div>}
       </div>
       <div className="object-manager-layout">

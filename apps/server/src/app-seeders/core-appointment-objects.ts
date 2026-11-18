@@ -9,7 +9,8 @@ export const APPOINTMENT_OBJECTS=[{
     {apiName:'Status',label:'Status',dataType:'picklist'},
     {apiName:'Customer',label:'Customer',dataType:'reference',relatedObject:'Customer'},
     {apiName:'Contact',label:'Contact',dataType:'reference',relatedObject:'Contact'},
-    {apiName:'Service',label:'Service',dataType:'text',maxLength:255},
+    // The service booked is a Product (ItemType Service); no free-text copy of its name.
+    {apiName:'ServiceProduct',label:'Service',dataType:'reference',relatedObject:'Product'},
     {apiName:'Location',label:'Location',dataType:'text',maxLength:255},
     {apiName:'AssignedTo',label:'Assigned To',dataType:'text',maxLength:255},
     {apiName:'Description',label:'Description',dataType:'text',maxLength:4000},
@@ -17,7 +18,14 @@ export const APPOINTMENT_OBJECTS=[{
     {apiName:'TimeZone',label:'Time Zone',dataType:'text',maxLength:100},
     {apiName:'ExternalBookingId',label:'External Booking ID',dataType:'text',maxLength:255},
     {apiName:'ReminderAt',label:'Reminder At',dataType:'datetime'},
-    {apiName:'CompletedAt',label:'Completed At',dataType:'datetime'}
+    {apiName:'CompletedAt',label:'Completed At',dataType:'datetime'},
+    // On-site check-in is part of the Appointment (no separate Visit Object).
+    {apiName:'CheckInTime',label:'Check-In Time',dataType:'datetime'},
+    {apiName:'CheckOutTime',label:'Check-Out Time',dataType:'datetime'},
+    {apiName:'Latitude',label:'Check-In Latitude',dataType:'number'},
+    {apiName:'Longitude',label:'Check-In Longitude',dataType:'number'},
+    {apiName:'LocationAccuracy',label:'Location Accuracy (m)',dataType:'number'},
+    {apiName:'CheckInNotes',label:'Check-In Notes',dataType:'text',maxLength:255}
   ]
 }] as const;
 

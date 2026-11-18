@@ -1,4 +1,4 @@
-/** Starter Fields for the 12 Standard Objects. Metadata only; no records. */
+/** Starter Fields for the Standard Objects. Metadata only; no records. */
 export const FRESH_STANDARD_FIELDS = {
   "Invoice": [
     {
@@ -94,18 +94,7 @@ export const FRESH_STANDARD_FIELDS = {
       "maxLength": 60
     }
   ],
-  "ProductLine": [
-    {
-      "apiName": "UnitPrice",
-      "label": "Unit Price",
-      "dataType": "number"
-    },
-    {
-      "apiName": "LineTotal",
-      "label": "Line Total",
-      "dataType": "number"
-    }
-  ],
+
   "Contact": [
     {
       "apiName": "FirstName",
@@ -161,12 +150,6 @@ export const FRESH_STANDARD_FIELDS = {
       "apiName": "Active",
       "label": "Active",
       "dataType": "boolean"
-    },
-    {
-      "apiName": "Account",
-      "label": "Account",
-      "dataType": "reference",
-      "relatedObject": "Account"
     }
   ],
   "Vendor": [
@@ -186,12 +169,6 @@ export const FRESH_STANDARD_FIELDS = {
       "apiName": "Active",
       "label": "Active",
       "dataType": "boolean"
-    },
-    {
-      "apiName": "Account",
-      "label": "Account",
-      "dataType": "reference",
-      "relatedObject": "Account"
     }
   ],
   "Purchase": [
@@ -238,106 +215,6 @@ export const FRESH_STANDARD_FIELDS = {
       "apiName": "LineTotal",
       "label": "Line Total",
       "dataType": "number"
-    }
-  ],
-  "Account": [
-    {
-      "apiName": "AccountNumber",
-      "label": "Account Number",
-      "dataType": "text",
-      "maxLength": 80
-    },
-    {
-      "apiName": "Email",
-      "label": "Email",
-      "dataType": "text",
-      "maxLength": 254
-    },
-    {
-      "apiName": "Industry",
-      "label": "Industry",
-      "dataType": "text",
-      "maxLength": 100
-    },
-    {
-      "apiName": "Address",
-      "label": "Address",
-      "dataType": "text",
-      "maxLength": 1000
-    }
-  ],
-  "Lead": [
-    {
-      "apiName": "FirstName",
-      "label": "First Name",
-      "dataType": "text",
-      "maxLength": 100
-    },
-    {
-      "apiName": "LastName",
-      "label": "Last Name",
-      "dataType": "text",
-      "maxLength": 100
-    },
-    {
-      "apiName": "Phone",
-      "label": "Phone",
-      "dataType": "text",
-      "maxLength": 40
-    },
-    {
-      "apiName": "Company",
-      "label": "Company",
-      "dataType": "text",
-      "maxLength": 150
-    },
-    {
-      "apiName": "Source",
-      "label": "Source",
-      "dataType": "text",
-      "maxLength": 80
-    },
-    {
-      "apiName": "Description",
-      "label": "Description",
-      "dataType": "text",
-      "maxLength": 2000
-    }
-  ],
-  "Case": [
-    {
-      "apiName": "CaseNumber",
-      "label": "Case Number",
-      "dataType": "text",
-      "maxLength": 80
-    },
-    {
-      "apiName": "Description",
-      "label": "Description",
-      "dataType": "text",
-      "maxLength": 2000
-    },
-    {
-      "apiName": "Priority",
-      "label": "Priority",
-      "dataType": "text",
-      "maxLength": 30
-    },
-    {
-      "apiName": "Customer",
-      "label": "Customer",
-      "dataType": "reference",
-      "relatedObject": "Customer"
-    },
-    {
-      "apiName": "OpenedAt",
-      "label": "Opened At",
-      "dataType": "datetime"
-    },
-    {
-      "apiName": "ClosedAt",
-      "label": "Closed At",
-      "dataType": "datetime"
     }
   ]
 } as const;

@@ -201,7 +201,8 @@ export type ObjectMetadata = {
   apiName: string;
   label: string;
   pluralLabel: string;
-  kind: 'Standard Object' | 'Custom Object';
+  /** System Objects are the platform's own and can never be deleted. */
+  kind: 'System Object' | 'Standard Object' | 'Custom Object';
   description: string;
   helpText?: string;
   fields: FieldMetadata[];

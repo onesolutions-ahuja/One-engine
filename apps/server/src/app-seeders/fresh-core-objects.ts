@@ -97,29 +97,7 @@ export const FRESH_CORE_OBJECTS = [
       }
     ]
   },
-  {
-    "apiName": "ProductLine",
-    "label": "Product Line",
-    "category": "standard",
-    "fields": [
-      {
-        "apiName": "Name",
-        "label": "Name",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Product",
-        "label": "Product",
-        "dataType": "reference",
-        "relatedObject": "Product"
-      },
-      {
-        "apiName": "Quantity",
-        "label": "Quantity",
-        "dataType": "number"
-      }
-    ]
-  },
+
   {
     "apiName": "Contact",
     "label": "Contact",
@@ -139,12 +117,6 @@ export const FRESH_CORE_OBJECTS = [
         "apiName": "Phone",
         "label": "Phone",
         "dataType": "text"
-      },
-      {
-        "apiName": "Account",
-        "label": "Account",
-        "dataType": "reference",
-        "relatedObject": "Account"
       }
     ]
   },
@@ -249,78 +221,9 @@ export const FRESH_CORE_OBJECTS = [
       }
     ]
   },
-  {
-    "apiName": "Account",
-    "label": "Account",
-    "category": "standard",
-    "fields": [
-      {
-        "apiName": "Name",
-        "label": "Name",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Phone",
-        "label": "Phone",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Website",
-        "label": "Website",
-        "dataType": "text"
-      }
-    ]
-  },
-  {
-    "apiName": "Lead",
-    "label": "Lead",
-    "category": "standard",
-    "fields": [
-      {
-        "apiName": "Name",
-        "label": "Name",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Email",
-        "label": "Email",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Status",
-        "label": "Status",
-        "dataType": "text"
-      }
-    ]
-  },
-  {
-    "apiName": "Case",
-    "label": "Case",
-    "category": "standard",
-    "fields": [
-      {
-        "apiName": "Name",
-        "label": "Name",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Subject",
-        "label": "Subject",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Status",
-        "label": "Status",
-        "dataType": "text"
-      },
-      {
-        "apiName": "Contact",
-        "label": "Contact",
-        "dataType": "reference",
-        "relatedObject": "Contact"
-      }
-    ]
-  },
+
+
+
   {
     "apiName": "User",
     "label": "User",

@@ -6,6 +6,8 @@ import {FRESH_CORE_OBJECTS} from '../app-seeders/fresh-core-objects.js';
 import {FRESH_STANDARD_FIELDS} from '../app-seeders/fresh-standard-fields.js';
 import {QUOTATION_OBJECTS} from '../app-seeders/core-quotation-objects.js';
 import {CART_OBJECTS} from '../app-seeders/cart-objects.js';
+import {CATALOGUE_OBJECTS} from '../app-seeders/core-catalogue-objects.js';
+import {NAMED_DEVICE_OBJECTS} from '../app-seeders/core-named-devices.js';
 import {APPOINTMENT_OBJECTS} from '../app-seeders/core-appointment-objects.js';
 import {COMMUNICATION_OBJECTS,COMMUNICATION_ACTIVITY_FIELDS} from '../app-seeders/core-communication-objects.js';
 import {LOCATION_SRN_FIELDS} from '../app-seeders/core-location-srn.js';
@@ -39,6 +41,10 @@ function coreCatalog():SeedObject[]{
  add('User','User',[{apiName:'ReportsToId',label:'Reports To',dataType:'reference',relatedObject:'User'}]);
  for(const o of QUOTATION_OBJECTS)add(o.apiName,o.label,o.fields);
  for(const o of CART_OBJECTS)add(o.apiName,o.label,o.fields);
+ for(const o of CATALOGUE_OBJECTS)add(o.apiName,o.label,o.fields);
+ // NamedDevice (tills are POS Terminals), its Cart payment fields and IncomingWebhook.
+ for(const o of NAMED_DEVICE_OBJECTS)add(o.object,o.label,o.fields.map(f=>({
+  apiName:f.api,label:f.label,dataType:f.type,...('related' in f?{relatedObject:f.related}:{})})));
  for(const o of APPOINTMENT_OBJECTS)add(o.apiName,o.label,o.fields);
  for(const o of COMMUNICATION_OBJECTS){
   add(o.apiName,o.label,o.fields);
@@ -49,7 +55,6 @@ function coreCatalog():SeedObject[]{
    apiName:f.api,label:f.label,dataType:f.type,
    ...('related' in f?{relatedObject:f.related}: {})
   })));
- // Order belongs to the app that installs it: not reported as missing from Core.
  for(const o of TILL_NUMBERING_FIELDS)if(!o.appOwned)add(o.object,o.label??o.object,o.fields.map(f=>({
   apiName:f.api,label:f.label,dataType:f.type,...(f.related?{relatedObject:f.related}:{})})));
  add('CashLedger','Cash Ledger',CORE_CASH_LEDGER_FIELDS.map(f=>({

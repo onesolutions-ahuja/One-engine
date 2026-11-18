@@ -152,7 +152,7 @@ class ServerScope{
   this.mirrorKey=await findMirrorKey(this.records,this.actor,this.request.deviceKey);
  }
  private mirrorKey='';
- /** @ThisPage.Till.*: the active Till whose DeviceKey is this device's key ('' when not set up). */
+ /** @ThisPage.Till.*: the active POS Terminal whose DeviceId is this device's key ('' when not set up). */
  till(field:string){
   const value=this.tillRow?.[field];
   return value===undefined||value===null?'':value;
@@ -416,24 +416,30 @@ function deviceAnswers(value:unknown):Record<string,unknown>|undefined{
 }
 /** Device keys are made on the device: a random UUID (browser) or the OS vendor id (app). */
 export const deviceKeyPattern=/^[A-Za-z0-9_-]{16,128}$/;
-/** The active Till set up for this device, with its Location's Code (the number prefix). */
+/** A Till is a Named Device of type POS Terminal: one shared device object for tills,
+ * kiosks, customer displays, printers and card readers. Its DeviceId is the device key. */
+export const TILL_DEVICE_OBJECT='NamedDevice';
+export const TILL_DEVICE_TYPE='POS Terminal';
+export const tillFilters=(...more:RecordFilter[]):RecordFilter[]=>[
+ {field:'DeviceType',operator:'eq',value:TILL_DEVICE_TYPE},{field:'Active',operator:'eq',value:'true'},...more];
 /** @ThisPage.Device.MirrorKey: the device whose sale this screen shows. A Till shows its own;
  * a customer display shows the Till whose CustomerDisplayKey is this device's key; any other
  * device (e.g. the second monitor of the till computer) shows its own key. */
 export async function findMirrorKey(records:Pick<Records,'list'|'get'>,actor:Actor,deviceKey:unknown):Promise<string>{
  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))return '';
  try{
-  const page=await records.list(actor.tenant_id,actor.user_id,'Till',2,0,{filters:[
-   {field:'CustomerDisplayKey',operator:'eq',value:deviceKey},{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
+  const page=await records.list(actor.tenant_id,actor.user_id,TILL_DEVICE_OBJECT,2,0,{filters:tillFilters(
+   {field:'CustomerDisplayKey',operator:'eq',value:deviceKey})}) as {records:Row[]};
   const till=page.records[0];
-  if(till&&typeof till.DeviceKey==='string'&&deviceKeyPattern.test(till.DeviceKey))return till.DeviceKey;
- }catch{/* no Till access: the screen shows its own device */}
+  if(till&&typeof till.DeviceId==='string'&&deviceKeyPattern.test(till.DeviceId))return till.DeviceId;
+ }catch{/* no Named Device access: the screen shows its own device */}
  return deviceKey;
 }
+/** The active Till (POS Terminal) set up for this device, with its Location's Code (the number prefix). */
 export async function findDeviceTill(records:Pick<Records,'list'|'get'>,actor:Actor,deviceKey:unknown):Promise<Row|null>{
  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))return null;
- const page=await records.list(actor.tenant_id,actor.user_id,'Till',2,0,{filters:[
-  {field:'DeviceKey',operator:'eq',value:deviceKey},{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
+ const page=await records.list(actor.tenant_id,actor.user_id,TILL_DEVICE_OBJECT,2,0,{filters:tillFilters(
+  {field:'DeviceId',operator:'eq',value:deviceKey})}) as {records:Row[]};
  const till=page.records[0];
  if(!till)return null;
  let locationCode='';

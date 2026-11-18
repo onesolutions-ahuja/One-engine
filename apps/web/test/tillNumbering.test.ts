@@ -7,7 +7,8 @@ import {compileActionFormula} from '../../server/src/page-compiler/code/generate
 import {executePageCodeAction,parsePageCodeRequest} from '../../server/src/system-support/page-code-runtime';
 import {deviceTill,setDeviceTill} from '../../server/src/system-support/till-assignment-service';
 import {TILL_NUMBERING_FIELDS,seedTillNumberingMetadata,seedTillNumberingStarters,
- tillNumberingReceipt} from '../../server/src/app-seeders/core-till-numbering';
+ tillNumberingReceipt,migrateTillsToNamedDevices,tillMigrationReceipt} from '../../server/src/app-seeders/core-till-numbering';
+import {NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS} from '../../server/src/app-seeders/core-named-devices';
 import {autoNumberFieldTokens,autoNumberScopeTypeAllowed,autoNumberSeriesKey,nextScopedAutoNumber,setScopedAutoNumberStart} from '../../server/src/field-engine/types/AutoNumberScope';
 import {autoNumberSettings,setAutoNumberScope} from '../../server/src/api/AutoNumberSettingsController';
 import {formatAutoNumberValue} from '../../server/src/field-engine/types/AutoNumberField';
@@ -53,7 +54,7 @@ const server=serverPageCode(buildPageCode({apiName:'smart_till_payment',componen
 const yyyymm=()=>{const now=new Date();return String(now.getFullYear())+String(now.getMonth()+1).padStart(2,'0');};
 const store=()=>fakeRecords({
  Location:[{Id:locationId,Name:'Location 1',Code:'LOC1',NextInvoiceSeq:158}],
- Till:[{Id:tillId,Name:'Till 1',Code:'TILL1',Location:locationId,Active:true,DeviceKey:deviceKey}],Invoice:[]});
+ NamedDevice:[{Id:tillId,Name:'Till 1',Code:'TILL1',DeviceType:'POS Terminal',Location:locationId,Active:true,DeviceId:deviceKey}],Invoice:[]});
 const run=(fake:ReturnType<typeof store>,key=deviceKey)=>executePageCodeAction({db,records:fake.records} as never,{tenant_id:'t',user_id:'u'},
  server,'pay:click',parsePageCodeRequest({sessionId:'s-1',state:{},rowObject:'Cart',event:{},deviceKey:key},
   {ip:'203.0.113.7',agent:'Mozilla/5.0 (iPad)'}),'');
@@ -83,8 +84,8 @@ test('a sale is saved with the device\'s Till, its Location, the user and the de
 });
 
 test('a device that is not set up as a Till (or an inactive Till): no Till or Location is saved on the sale',async()=>{
- for(const fake of [store(),(()=>{const f=store();f.tables.Till[0].Active=false;return f;})()]){
-  const result=await run(fake,fake.tables.Till[0].Active?'another-device-key-123':deviceKey);
+ for(const fake of [store(),(()=>{const f=store();f.tables.NamedDevice[0].Active=false;return f;})()]){
+  const result=await run(fake,fake.tables.NamedDevice[0].Active?'another-device-key-123':deviceKey);
   assert.equal(result.ok,true,result.error);
   assert.equal(fake.tables.Invoice[0].TillId,'');
   assert.equal(fake.tables.Invoice[0].Location,'');
@@ -165,7 +166,9 @@ test('"Number separately for each": a Lookup or Picklist field of the Object, fi
 test('setting a device up: the key moves to the chosen Till, with who/where for audit',async()=>{
  const other='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
  const fake=store();
- fake.tables.Till.push({Id:other,Name:'Till 2',Code:'TILL2',Location:locationId,Active:true});
+ fake.tables.NamedDevice.push({Id:other,Name:'Till 2',Code:'TILL2',DeviceType:'POS Terminal',Location:locationId,Active:true});
+ // A customer display is a Named Device too, but never offered as a Till.
+ fake.tables.NamedDevice.push({Id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',Name:'Display',DeviceType:'Customer Display',Active:true,DeviceId:'display-device-key-0001'});
  const before=await deviceTill({db,records:fake.records} as never,{tenant_id:'t',user_id:'u'},'unknown-device-key-0001');
  assert.equal(before.till,null);
  assert.deepEqual(before.tills.map(t=>t.Code),['TILL1','TILL2']);
@@ -173,10 +176,13 @@ test('setting a device up: the key moves to the chosen Till, with who/where for 
   {ip:'198.51.100.2',agent:'UneTill/1.0'});
  assert.equal(bound.Id,other);
  assert.equal(bound.LocationCode,'LOC1');
- assert.equal(fake.tables.Till[0].DeviceKey,null,'the old Till lets the device go');
- assert.equal(fake.tables.Till[1].DeviceKey,deviceKey);
- assert.equal(fake.tables.Till[1].DeviceSetUpBy,'u');
- assert.equal(fake.tables.Till[1].DeviceIp,'198.51.100.2');
+ assert.equal(fake.tables.NamedDevice[0].DeviceId,null,'the old Till lets the device go');
+ assert.equal(fake.tables.NamedDevice[1].DeviceId,deviceKey);
+ assert.equal(fake.tables.NamedDevice[1].DeviceSetUpBy,'u');
+ assert.equal(fake.tables.NamedDevice[1].DeviceIp,'198.51.100.2');
+ assert.equal(fake.tables.NamedDevice[2].DeviceId,'display-device-key-0001','other device types are untouched');
+ await assert.rejects(setDeviceTill({db,records:fake.records} as never,{tenant_id:'t',user_id:'u'},deviceKey,
+  'dddddddd-dddd-4ddd-8ddd-dddddddddddd'),/Choose a Till/);
  await assert.rejects(setDeviceTill({db,records:fake.records} as never,{tenant_id:'t',user_id:'u'},'bad key',other),/device key/);
 });
 
@@ -197,7 +203,7 @@ function fakeClient(answers:{order?:boolean;receipt?:boolean;native?:string[];us
   if(sql.includes('FROM md_object_definitions WHERE'))return {rows:[],rowCount:answers.order?1:0};
   if(sql.includes('FROM md_system_migrations'))return {rows:[],rowCount:answers.receipt?1:0};
   if(sql.includes('FROM md_native_objects o'))return {rows:[{table_name:'md_object_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',field_api:'Name',column_name:null,sql_type:'text',data_type:'text'},
-   ...['Code','DeviceKey'].map(f=>({table_name:'md_object_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',field_api:f,column_name:null,sql_type:'text',data_type:'text'})),
+   ...['Code','DeviceKey','DeviceId','DeviceType'].map(f=>({table_name:'md_object_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',field_api:f,column_name:null,sql_type:'text',data_type:'text'})),
    {table_name:'md_object_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',field_api:'Active',column_name:null,sql_type:'boolean',data_type:'boolean'},
    {table_name:'md_object_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',field_api:'Location',column_name:null,sql_type:'uuid',data_type:'reference'}],rowCount:7};
   if(sql.includes('FROM md_native_objects'))return {rows:(answers.native??[]).map(object_api=>({object_api})),rowCount:0};
@@ -209,47 +215,64 @@ function fakeClient(answers:{order?:boolean;receipt?:boolean;native?:string[];us
  return {client,calls};
 }
 
-test('catalog: Till object, unique codes, Auto Number per Location; Order fields only once an app brings Order',async()=>{
- const till=TILL_NUMBERING_FIELDS.find(o=>o.object==='Till')!;
- assert.deepEqual(till.fields.slice(0,4).map(f=>f.api),['Name','Code','Location','Active']);
+test('catalog: a Till is a Named Device (POS Terminal), unique codes, Auto Number per Location; no Till or Order Object',async()=>{
+ assert.ok(!TILL_NUMBERING_FIELDS.some(o=>o.object==='Till'||o.object==='Order'));
+ const device=NAMED_DEVICE_OBJECTS.find(o=>o.object==='NamedDevice')!;
+ for(const field of ['Name','Code','Location','Active','DeviceId','DeviceSetUpAt','DeviceSetUpBy','DeviceIp','DeviceAgent','CustomerDisplayKey'])
+  assert.ok(device.fields.some(f=>f.api===field),'NamedDevice.'+field);
+ assert.equal(NAMED_DEVICE_PICKLISTS['NamedDevice.DeviceType'][0],'POS Terminal');
  const unique=TILL_NUMBERING_FIELDS.flatMap(o=>o.fields.filter(f=>f.unique).map(f=>o.object+'.'+f.api)).sort();
- assert.deepEqual(unique,['Location.Code','Till.Code','Till.DeviceKey']);
+ assert.deepEqual(unique,['Location.Code']);
  const numbers=TILL_NUMBERING_FIELDS.flatMap(o=>o.fields.filter(f=>f.type==='autonumber').map(f=>[o.object,f.api,f.format,f.per]));
- assert.deepEqual(numbers,[['Invoice','InvoiceNumber','{InvoiceType}-{0}','Location,InvoiceType'],['Order','OrderNumber','ORD-{0}','Location']]);
- for(const object of ['Cart','Invoice','Order','CashLedger'])
-  assert.ok(TILL_NUMBERING_FIELDS.find(o=>o.object===object)!.fields.some(f=>f.api==='TillId'),object+'.TillId');
- const without=fakeClient({});
- await seedTillNumberingMetadata(without.client,'t');
- assert.ok(!without.calls.some(c=>c.params[1]==='Order'&&c.sql.includes('md_field_definitions')));
- assert.ok(!without.calls.some(c=>c.sql.includes('md_validation_rules')));
- const withOrder=fakeClient({order:true});
- await seedTillNumberingMetadata(withOrder.client,'t');
- assert.ok(withOrder.calls.some(c=>c.params[1]==='Order'&&c.params[2]==='OrderNumber'&&c.params[4]==='autonumber'
-  &&c.params[7]==='ORD-{0}'&&c.params[8]==='Location'));
- assert.ok(withOrder.calls.every(c=>!/INSERT/.test(c.sql)||/ON CONFLICT/.test(c.sql)),'never overwrites tenant metadata');
+ assert.deepEqual(numbers,[['Invoice','InvoiceNumber','{InvoiceType}-{0}','Location,InvoiceType']]);
+ for(const object of ['Cart','Invoice','CashLedger'])
+  assert.equal(TILL_NUMBERING_FIELDS.find(o=>o.object===object)!.fields.find(f=>f.api==='TillId')?.related,'NamedDevice',object+'.TillId');
+ const seeded=fakeClient({order:true});
+ await seedTillNumberingMetadata(seeded.client,'t');
+ assert.ok(!seeded.calls.some(c=>c.params[1]==='Order'||c.params[1]==='Till'));
+ assert.ok(!seeded.calls.some(c=>c.sql.includes('md_validation_rules')));
+ assert.ok(seeded.calls.every(c=>!/INSERT/.test(c.sql)||/ON CONFLICT/.test(c.sql)),'never overwrites tenant metadata');
+});
+
+test('Till records move once to POS Terminals; TillId lookups point at NamedDevice; nothing is deleted',async()=>{
+ assert.equal(await migrateTillsToNamedDevices(fakeClient({receipt:true}).client,'t'),'done');
+ // A tenant made after v13 has no Till Object: only the lookups are repointed and the receipt kept.
+ const fresh=fakeClient({native:['NamedDevice']});
+ assert.equal(await migrateTillsToNamedDevices(fresh.client,'t'),'migrated');
+ assert.ok(fresh.calls.some(c=>c.sql.includes("SET related_object='NamedDevice'")&&c.sql.includes("related_object='Till'")));
+ assert.ok(fresh.calls.some(c=>c.sql.includes('INSERT INTO md_system_migrations')&&c.params[0]===tillMigrationReceipt('t')));
+ assert.ok(!fresh.calls.some(c=>/DELETE|is_deleted=true|deleted_at=/.test(c.sql)));
+ // Till exists but NamedDevice tables are not ready: retried at the next start.
+ const waiting=fakeClient({native:['Till']});
+ assert.equal(await migrateTillsToNamedDevices(waiting.client,'t'),'waiting');
+ assert.ok(!waiting.calls.some(c=>c.sql.includes('INSERT')));
 });
 
 test('starter Location LOC1 + Till 1: once per tenant, never brought back after deletion',async()=>{
- const fresh=fakeClient({native:['Location','Till']});
+ const fresh=fakeClient({native:['Location','NamedDevice']});
  assert.equal(await seedTillNumberingStarters(fresh.client,'t'),'seeded');
- // The older Text InvoiceNumber becomes the Auto Number per Location; Invoice/Order can't be deleted.
+ // The older Text InvoiceNumber becomes the Auto Number per Location; Invoices can't be deleted.
  assert.ok(fresh.calls.some(c=>c.sql.includes("SET data_type='autonumber'")&&c.params[2]==='InvoiceNumber'
   &&c.params[3]==='{InvoiceType}-{0}'&&c.params[4]==='Location,InvoiceType'));
  assert.ok(fresh.calls.some(c=>c.sql.includes("SET data_type='picklist'")&&c.params[2]==='InvoiceType'&&c.params[3]==='INV'));
  assert.ok(fresh.calls.some(c=>c.sql.includes('md_field_picklist_values')&&c.params[3]==='SRN'));
- assert.ok(fresh.calls.some(c=>c.sql.includes('prevent_delete=true')&&JSON.stringify(c.params[1])==='["Invoice","Order"]'));
+ assert.ok(fresh.calls.some(c=>c.sql.includes('prevent_delete=true')&&JSON.stringify(c.params[1])==='["Invoice"]'));
  const records=fresh.calls.filter(c=>c.sql.includes('INSERT INTO md_records')).map(c=>c.params[1]);
- assert.deepEqual(records,['Location','Till']);
+ assert.deepEqual(records,['Location','NamedDevice']);
  const values=fresh.calls.filter(c=>c.sql.startsWith('UPDATE ')&&c.sql.includes('extras')).map(c=>JSON.stringify(c.params));
  assert.ok(values.some(v=>v.includes('LOC1')&&v.includes('Location 1')));
- assert.ok(values.some(v=>v.includes('TILL1')&&v.includes('Till 1')));
+ assert.ok(values.some(v=>v.includes('TILL1')&&v.includes('Till 1')&&v.includes('POS Terminal')));
  assert.ok(fresh.calls.some(c=>c.sql.includes('INSERT INTO md_system_migrations')&&c.params[0]===tillNumberingReceipt('t')));
  // Second start: the receipt says done.
- assert.equal(await seedTillNumberingStarters(fakeClient({receipt:true,native:['Location','Till']}).client,'t'),'done');
+ assert.equal(await seedTillNumberingStarters(fakeClient({receipt:true,native:['Location','NamedDevice']}).client,'t'),'done');
  // Tenant had Locations (even deleted ones): no LOC1; Till 1 goes to its first Location.
- const existing=fakeClient({native:['Location','Till'],used:['Location'],firstLocation:locationId});
+ const existing=fakeClient({native:['Location','NamedDevice'],used:['Location'],firstLocation:locationId});
  await seedTillNumberingStarters(existing.client,'t');
- assert.deepEqual(existing.calls.filter(c=>c.sql.includes('INSERT INTO md_records')).map(c=>c.params[1]),['Till']);
+ assert.deepEqual(existing.calls.filter(c=>c.sql.includes('INSERT INTO md_records')).map(c=>c.params[1]),['NamedDevice']);
+ // A tenant that ever had a Till (or any Named Device) gets no starter Till.
+ const hadTill=fakeClient({native:['Location','NamedDevice'],used:['Location','Till'],firstLocation:locationId});
+ await seedTillNumberingStarters(hadTill.client,'t');
+ assert.ok(!hadTill.calls.some(c=>c.sql.includes('INSERT INTO md_records')));
  // Record tables not ready yet: try again at the next start, no receipt.
  const waiting=fakeClient({native:['Location']});
  assert.equal(await seedTillNumberingStarters(waiting.client,'t'),'waiting');

@@ -1,8 +1,10 @@
 import type {PoolClient} from 'pg';
 
 /** Shared device and webhook metadata for every app (till, kiosk, bookings...).
- * NamedDevice: card readers reached through a connector (Cloud API) and local devices on
- * USB, Bluetooth or the network (printers, cash drawers, scanners, customer displays).
+ * NamedDevice: every device in one Object. Tills are type POS Terminal (DeviceId = the
+ * device key the browser/app makes; @ThisPage.Till reads it), kiosks and customer displays
+ * their own types, card readers reached through a connector (Cloud API) and local devices on
+ * USB, Bluetooth or the network (printers, cash drawers, scanners).
  * IncomingWebhook: one record per provider notification, so record-triggered Flows and
  * formulas (GETRECORD) react to payments without code. */
 export const NAMED_DEVICE_OBJECTS=[
@@ -16,7 +18,14 @@ export const NAMED_DEVICE_OBJECTS=[
   {api:'Location',label:'Store / Location',type:'reference',related:'Location'},
   {api:'IsDefault',label:'Default for its type',type:'boolean'},
   {api:'Active',label:'Active',type:'boolean'},
-  {api:'Notes',label:'Notes',type:'text'}
+  {api:'Notes',label:'Notes',type:'text'},
+  // POS Terminal (Till): its code, who set the device up and from where, and its customer display.
+  {api:'Code',label:'Code',type:'text',unique:true},
+  {api:'DeviceSetUpAt',label:'Device Set Up At',type:'datetime'},
+  {api:'DeviceSetUpBy',label:'Device Set Up By',type:'reference',related:'User'},
+  {api:'DeviceIp',label:'Device IP Address',type:'text'},
+  {api:'DeviceAgent',label:'Device Browser / App',type:'text'},
+  {api:'CustomerDisplayKey',label:'Customer Display (device key)',type:'text'}
  ]},
  // Payment hand-off between the till and the customer screen (card prompt, PayPal QR).
  {object:'Cart',label:'Cart',fields:[
@@ -36,8 +45,9 @@ export const NAMED_DEVICE_OBJECTS=[
   {api:'Payload',label:'Payload',type:'longtext'}
  ]}
 ] as const;
+export const POS_TERMINAL_TYPE='POS Terminal';
 export const NAMED_DEVICE_PICKLISTS={
- 'NamedDevice.DeviceType':['Card Reader','Receipt Printer','Label Printer','Cash Drawer','Barcode Scanner','Customer Display','Scale','Other'],
+ 'NamedDevice.DeviceType':['POS Terminal','Kiosk','Customer Display','Card Reader','Receipt Printer','Label Printer','Cash Drawer','Barcode Scanner','Scale','Other'],
  'NamedDevice.Connection':['Cloud API','USB','Bluetooth','Network','Serial'],
  'IncomingWebhook.ProcessingStatus':['New','Processed','Failed']
 } as const;
@@ -48,10 +58,11 @@ export async function seedNamedDeviceObjects(client:PoolClient,tenantId:string):
    VALUES($1,$2,$3,true) ON CONFLICT(tenant_id,api_name) DO NOTHING`,[tenantId,object.object,object.label]);
   for(const field of object.fields){
    await client.query(`INSERT INTO md_field_definitions
-    (tenant_id,object_api,api_name,label,data_type,related_object,required)
-    VALUES($1,$2,$3,$4,$5,$6,false)
+    (tenant_id,object_api,api_name,label,data_type,related_object,is_unique,required)
+    VALUES($1,$2,$3,$4,$5,$6,$7,false)
     ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
-    [tenantId,object.object,field.api,field.label,field.type,'related' in field?field.related:null]);
+    [tenantId,object.object,field.api,field.label,field.type,'related' in field?field.related:null,
+     'unique' in field&&field.unique===true]);
   }
  }
  for(const [key,values] of Object.entries(NAMED_DEVICE_PICKLISTS)){

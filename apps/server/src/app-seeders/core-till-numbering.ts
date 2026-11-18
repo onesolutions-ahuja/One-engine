@@ -45,6 +45,10 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   // Stamped while the device's app is open (device-presence-service); old = device gone.
   {api:'DeviceOnlineAt',label:'Device Online At',type:'datetime'}
  ]},
+ // The device the line is rung up on: the customer display on that device shows these lines.
+ {object:'CartLine',fields:[
+  {api:'DeviceKey',label:'Device Key',type:'text'}
+ ]},
  {object:'Invoice',fields:[
   // INV-838382 for sales, SRN-1201 for returns: one series per shop and type.
   {api:'InvoiceType',label:'Invoice Type',type:'picklist',values:['INV','SRN'],default:'INV'},

@@ -1,6 +1,7 @@
 import {convertedFormula} from "../shared/formulaCodeLookup.js";
 import {evaluateFieldExpression} from "../shared/FieldExpression.js";
 import {encodeQr} from "./qrEncode.mjs";
+import {hiddenByShowWhen} from "../shared/showWhen.js";
 
 /** Smart QR: Text Source is any formula (a field such as @Sale.PaymentLink, page state or
  * text). With an Object it reads the first loaded record, like Smart Image loads a photo. */
@@ -16,6 +17,7 @@ function matrixFor(text){
  return matrix;
 }
 export default function SmartComponent(p){
+ if(hiddenByShowWhen(p))return null;
  const records=Array.isArray(p.records)?p.records:Array.isArray(p.items)?p.items:[];
  const row=records[0]||p.record||{};
  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;

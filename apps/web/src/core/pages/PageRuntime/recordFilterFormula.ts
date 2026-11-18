@@ -71,7 +71,12 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
    case '<':return n(left)<n(right);
    case '<=':return n(left)<=n(right);
    case '+':return n(left)+n(right);
-   case '-':return n(left)-n(right);
+   // A date/time minus days (NOW() - 2/1440 = two minutes ago) stays a date/time.
+   case '-':{
+    const when=left instanceof Date?left.getTime():typeof left==='string'&&/^\d{4}-\d\d-\d\d/.test(left)?Date.parse(left):NaN;
+    if(Number.isFinite(when)&&typeof right==='number')return new Date(when-right*86400000).toISOString();
+    return n(left)-n(right);
+   }
    case '*':return n(left)*n(right);
    case '/':return n(left)/n(right);
    case '&':return String(left??'')+String(right??'');
@@ -134,9 +139,9 @@ const both=(operator:'AND'|'OR',a:Plan,b:Plan):Plan=>{
  return {filters,logic:'('+a.logic+' '+operator+' '+remap(b.logic,a.filters.length)+')'};
 };
 const opNames:Record<string,string>={
- '=':'eq','==':'eq','>':'gt','>=':'gte','<':'lt','<=':'lte'
+ '=':'eq','==':'eq','<>':'ne','!=':'ne','>':'gt','>=':'gte','<':'lt','<=':'lte'
 };
-const flip:Record<string,string>={'<':'>','<=':'>=','>':'<','>=':'<=','=':'=','==':'=='};
+const flip:Record<string,string>={'<':'>','<=':'>=','>':'<','>=':'<=','=':'=','==':'==','<>':'<>','!=':'!='};
 function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Readonly<Record<string,unknown>>,sessionId=''):Plan{
  if(node.kind==='literal'&&typeof node.value==='boolean')
   return {truth:node.value,filters:[],logic:''};

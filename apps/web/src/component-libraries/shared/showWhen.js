@@ -15,7 +15,7 @@ export function hiddenByShowWhen(p,row={}){
    pageState:p.pageState,sessionId:p.sessionId,
    collectionSources:p.formulaCollectionSources,namedCollections:p.namedCollections,
    namedCollectionSelections:p.pageState?.collectionSelections});
- }catch{return false;}
+ }catch{return true;}
  return shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
-  ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0";
+  ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR";
 }

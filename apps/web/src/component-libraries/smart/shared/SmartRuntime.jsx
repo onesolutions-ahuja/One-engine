@@ -1134,8 +1134,9 @@ export default function SmartRuntime(p){
  // Blank always shows; FALSE, 0 or blank text hides at runtime. The builder always shows it.
  if(typeof p.visibleFormula==="string"&&p.visibleFormula.trim()&&!p.builderPreview&&!p.designMode){
   const shown=scopedExpression(p,"visibleFormula",p.visibleFormula,record);
+  // A formula that cannot run hides the component (fail closed), never shows it.
   if(shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
-   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0")return null;
+   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR")return null;
  }
  // Geometry-only technical host; the native Smart surface owns all visible styling.
  return <div className={"smart-runtime "+name+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}

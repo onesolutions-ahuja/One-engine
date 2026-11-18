@@ -41,7 +41,9 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'TillId',label:'Till',type:'reference',related:'Till'},
   {api:'DeviceKey',label:'Device Key',type:'text'},
   {api:'DeviceIp',label:'Device IP Address',type:'text'},
-  {api:'DeviceAgent',label:'Device Browser / App',type:'text'}
+  {api:'DeviceAgent',label:'Device Browser / App',type:'text'},
+  // Stamped while the device's app is open (device-presence-service); old = device gone.
+  {api:'DeviceOnlineAt',label:'Device Online At',type:'datetime'}
  ]},
  {object:'Invoice',fields:[
   // INV-838382 for sales, SRN-1201 for returns: one series per shop and type.

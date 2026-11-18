@@ -43,7 +43,8 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
   {api:'DeviceIp',label:'Device IP Address',type:'text'},
   {api:'DeviceAgent',label:'Device Browser / App',type:'text'},
   // Stamped while the device's app is open (device-presence-service); old = device gone.
-  {api:'DeviceOnlineAt',label:'Device Online At',type:'datetime'}
+  {api:'DeviceOnlineAt',label:'Device Online At',type:'datetime'},
+  {api:'DeviceStatus',label:'Device Status',type:'text'}
  ]},
  // The device the line is rung up on: the customer display on that device shows these lines.
  {object:'CartLine',fields:[

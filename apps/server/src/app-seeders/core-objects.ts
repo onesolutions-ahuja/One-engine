@@ -43,7 +43,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // API startup on purpose. v3: smart_keyboard, smart_dock, smart_chart. v4: smart_search.
 // v5: smart_qr, NamedDevice and IncomingWebhook objects. v6: Cart payment hand-off fields.
 // v7: Till, Auto Number invoice/order numbers per Location, TillId/UserId on sales documents.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v9';
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v10';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,

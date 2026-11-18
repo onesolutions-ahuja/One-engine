@@ -23,3 +23,14 @@ test('category filter: blank or "*" state shows every category, a tab Id filters
 test('a filter on a state that is not picked yet still validates (and so saves)',()=>{
  assert.equal(validateRecordFilterFormula('@Product.MenuCategory = @ThisPage.Input.category',fields),null);
 });
+
+test('multi-select category filter: INCLUDES(ticked ids, @Product.MenuCategory) becomes ORed equals',()=>{
+ const formula='IF(ISBLANK(@ThisPage.CatFilter.Value), TRUE, INCLUDES(@ThisPage.CatFilter.Value, @Product.MenuCategory))';
+ assert.equal(validateRecordFilterFormula(formula,fields),null);
+ const none=compileRecordFilterFormula(formula,fields,{});
+ assert.deepEqual([none.blocked,none.filters],[false,[]]);
+ const pick=(value:string)=>({collectionSelections:{CatFilter:{Id:value,Name:value,Value:value,Text:value,Field:'',Criteria:''}}});
+ const two=compileRecordFilterFormula(formula,fields,pick('a;b'));
+ assert.deepEqual(two.filters,[{field:'MenuCategory',operator:'eq',value:'a'},{field:'MenuCategory',operator:'eq',value:'b'}]);
+ assert.equal(two.filterLogic,'(1 OR 2)');
+});

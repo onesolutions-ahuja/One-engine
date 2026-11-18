@@ -283,10 +283,10 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    if(args.slice(0,-1).some(hasAnsweredBox))
     fail('Put the steps that should wait for the answer inside the box (its Yes/No/OK actions), or move the box to the end');
    return args.flatMap(arg=>stepCode(arg,scope));
-  case 'STATE':{
-   const key=literalName(args[0],'Page State key');
-   return ['$.setState('+q(key)+', '+value(args[1])+');'];
-  }
+  // Values belong to components, as in VB: `@ThisPage.CashBox.Value = …` replaces STATE.
+  case 'STATE':
+   return fail('STATE is no longer used. Give the value to a component instead, e.g. @ThisPage.CashBox.Value = '
+    +(args[1]?'…':'"1"')+', and read it with @ThisPage.CashBox.Value');
   case 'GETRECORD':{
    const object=literalName(args.shift(),'GETRECORD Object');
    const alias=takeAlias(args.pop(),scope,'GETRECORD needs AS(variable) at the end');

@@ -151,6 +151,18 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    &&node.args.length<=20)
   return node.args.map(arg=>compile(arg,fields,state,sessionId))
    .reduce((a,b)=>both(node.name as 'AND'|'OR',a,b));
+ // INCLUDES(@ThisPage.Categories.Value, @Product.MenuCategory): the record's value is one of the
+ // ticked values (a multi-select joins them with ";"). Each becomes `field = value`, joined with OR.
+ if(node.kind==='call'&&node.name==='INCLUDES'&&node.args.length===2){
+  const field=simpleField(node.args[1],fields);
+  if(!field)throw Error('INCLUDES in a filter needs the ticked values first, then a direct readable @Field');
+  const picked=asState(node.args[0],state,sessionId);
+  const values=[...new Set(String(picked??'').split(';').map(value=>value.trim()).filter(Boolean))];
+  if(!values.length)throw Error(EMPTY_FILTER_VALUE);
+  if(values.length>18)throw Error('Tick at most 18 values for this filter');
+  return values.map(value=>({filters:[{field:field.apiName,operator:'eq',value}],logic:'1'}) as Plan)
+   .reduce((a,b)=>both('OR',a,b));
+ }
  if(node.kind==='binary'&&Object.hasOwn(opNames,node.operator)){
   let field=simpleField(node.left,fields);
   let op=node.operator;

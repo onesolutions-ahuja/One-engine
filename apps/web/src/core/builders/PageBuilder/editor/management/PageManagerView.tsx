@@ -48,8 +48,8 @@ export default function PageManagerView({ props, editorState, management, layout
             <button ref={createPageTriggerRef} className="btn btn-brand" type="button" onClick={openCreatePage}><Plus size={16}/> New Page</button>
             <button className="btn" type="button" disabled={saving} onClick={()=>setInventoryUploadOpen(true)}><Upload size={16}/> Upload CSV</button>
             {!recordPageContext && <button className="btn" type="button" disabled={Boolean(inventoryDownloading)}
-              title="One CSV with every formula of every page. Edit it, then send it back with Upload CSV."
-              onClick={()=>void downloadAllPageFormulas()}><Download size={16}/> {inventoryDownloading==='*'?'Downloading…':'Download all formulas'}</button>}
+              title="One CSV with every property of every page (colours, labels, formulas…). Edit it, then send it back with Upload CSV."
+              onClick={()=>void downloadAllPageFormulas()}><Download size={16}/> {inventoryDownloading==='*'?'Downloading…':'Download all pages'}</button>}
             <select className="form-control" aria-label="Inventory CSV device layout" title="Layout used by page inventory downloads"
               style={{width:'min(172px, 100%)',minWidth:0,maxWidth:'100%',boxSizing:'border-box'}} value={inventoryExportVariant} onChange={event=>setInventoryExportVariant(event.target.value as PageLayoutVariant|'Auto')}>
               <option value="Auto">CSV: Page’s layout</option>

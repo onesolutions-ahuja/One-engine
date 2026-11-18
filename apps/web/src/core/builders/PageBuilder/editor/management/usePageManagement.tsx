@@ -359,8 +359,8 @@ export function usePageManagement(
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download page inventory');}
     finally{setInventoryDownloading('');}
   };
-  /** One CSV with every formula of every page (formula or @ value rows only). Edit it and
-   * send it back with Upload CSV: the upload upserts those rows, page by page. */
+  /** One CSV with every property of every page, same columns as a single page's download.
+   * Edit any value (colours, labels, formulas) and send it back with Upload CSV. */
   const downloadAllPageFormulas = async () => {
     if(inventoryDownloading||!pages.length)return;
     setInventoryDownloading('*');
@@ -374,7 +374,7 @@ export function usePageManagement(
           ?primaryPageLayout(summaries.get(item.apiName)??layoutSummaries[item.apiName]):inventoryExportVariant;
         try{
           const {csv}=await request<{csv:string}>('/metadata/pages/'+encodeURIComponent(item.apiName)
-            +'/inventory?only=formulas&variant='+variant);
+            +'/inventory?variant='+variant);
           // The header is one line: keep it from the first page only.
           const rows=csv.replace(/\r?\n$/,'');
           const cut=rows.search(/\r?\n/);
@@ -385,11 +385,11 @@ export function usePageManagement(
       const csv=parts.filter(Boolean).join('\r\n')+'\r\n';
       const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
       const link=document.createElement('a');
-      link.href=url;link.download='all_pages_formulas.csv';
+      link.href=url;link.download='all_pages_inventory.csv';
       document.body.append(link);link.click();link.remove();
       setTimeout(()=>URL.revokeObjectURL(url),1000);
       if(failed.length)onNotify('Not included (could not be read): '+failed.slice(0,10).join(', '));
-    }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the page formulas');}
+    }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the pages');}
     finally{setInventoryDownloading('');}
   };
   /** Download the page's converted (compiled) TypeScript, from the same layout the inventory uses. */

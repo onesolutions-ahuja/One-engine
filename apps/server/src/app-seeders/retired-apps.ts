@@ -1,4 +1,5 @@
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
+import {purgeRows} from '../system-files/object-schema-lifecycle.js';
 
 /** Stop exposing discontinued built-in apps before full metadata retirement.
  * This step does not mutate any business records, Objects, or Flows.
@@ -9,8 +10,9 @@ export async function retireRemovedApps(db:Pick<SqlPersistence,'query'>):Promise
     [['Acetill','AceAssist','AceKiosk']]);
 }
 
-/** Only presentation/app metadata is retired; business Objects, their records,
- * and every Flow definition/version/run are deliberately outside this transaction.
+/** Retired app metadata is removed: apps, pages, permission sets, components, webhooks and
+ * their Flows (with versions, runs and triggers). Business Objects and their records are
+ * deliberately outside this transaction.
  * These names are exact built-in identities, never broad Communication matches.
  */
 export const CHATTER_APP_APIS = ['AceChatter','OneChatter','UNEAceChatter'] as const;
@@ -144,6 +146,28 @@ export async function deleteRetiredChatterMetadata(
     const {rows:remaining}=await client.query<{count:string}>(
       'SELECT count(*)::text AS count FROM md_component_definitions d WHERE '+retiredRenderer);
 
+    // Every Flow a retired app brought (by its trigger registration or its builder app), with
+    // its versions, runs and triggers: nothing of Acetill, AceAssist, AceKiosk or the chat apps
+    // is left to run or to block an Object delete. Business records are not touched.
+    // Isolated: if anything still depends on these rows, skip (logged) and keep starting up.
+    await client.query('SAVEPOINT retired_app_flows');
+    try{
+      const retiredFlows=`(tenant_id,id) IN (
+        SELECT tenant_id,flow_id FROM md_flow_trigger_subscriptions WHERE app_api_name=ANY($1::text[])
+        UNION SELECT tenant_id,flow_id FROM md_flow_editor_values
+         WHERE property_path='/builder/appApiName' AND value_text=ANY($1::text[]))`;
+      await purgeRows(client,'md_flow_definitions',retiredFlows,[[...REMOVED_APP_APIS]]);
+      await client.query('DELETE FROM md_flow_trigger_subscriptions WHERE app_api_name=ANY($1::text[])',
+        [[...REMOVED_APP_APIS]]);
+      // Disabled pages the retired apps left behind (named after the app).
+      await purgeRows(client,'md_page_definitions',
+        "enabled=false AND api_name ~* '^(acetill|aceassist|acekiosk|acechatter|onechatter|uneacechatter)'",[]);
+      await client.query('RELEASE SAVEPOINT retired_app_flows');
+    }catch(error){
+      await client.query('ROLLBACK TO SAVEPOINT retired_app_flows');
+      await client.query('RELEASE SAVEPOINT retired_app_flows');
+      console.warn('Retired app Flows/pages kept for now:',error instanceof Error?error.message:error);
+    }
     // These are app-owned webhook/integration registrations, never Communication
     // Object records. Deleting their metadata leaves all Flows and Objects intact.
     await client.query('DELETE FROM md_inbound_webhook_events e USING md_inbound_webhook_endpoints p '+

@@ -40,6 +40,10 @@ jobs:
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
         run: node --import tsx apps/server/scripts/native-unique-search-smoke.mjs
+      - name: System Objects and permanent Object delete (PostgreSQL)
+        env:
+          METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
+        run: node --import tsx apps/server/scripts/object-purge-sql-smoke.mjs
       - name: Till tap SQL round trips (PostgreSQL)
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test

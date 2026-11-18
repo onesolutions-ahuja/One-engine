@@ -68,7 +68,7 @@ export default function MetadataPackageManager({ request, permitted, canManage }
         request<{ components: Array<{ apiName: string; label: string }> }>('/component-library'),
         request<{ packages: InstalledPackage[] }>('/metadata/packages')
       ]);
-      setObjects(objectsResult.objects.filter(item => item.kind === 'Custom Object'));
+      setObjects(objectsResult.objects.filter(item => item.kind !== 'System Object'));
       setPages(pagesResult.pages);
       setComponents(componentsResult.components);
       setInstalled(packagesResult.packages);

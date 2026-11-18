@@ -147,7 +147,7 @@ function typedValidation(item:Item){
  if(item.action==='HardDelete'&&value(r,'Revision')==='')throw Error('Hard Delete requires the exported Revision');
  if(item.action==='Delete'||item.action==='HardDelete')return;
  if(item.sheet==='Objects'){
-  if(value(r,'Kind')==='Standard Object'&&item.action==='Create')throw Error('Standard objects cannot be created');
+  if(['System Object','Standard Object'].includes(value(r,'Kind'))&&item.action==='Create')throw Error(value(r,'Kind')+'s cannot be created');
   if(value(r,'Label').length>200||value(r,'Description').length>10000)throw Error('Object property is too long');
   objectSettings(r);
  }else{
@@ -278,8 +278,8 @@ export function registerMetadataLoaderRoutes(app:Express,db:SqlPersistence,rbac:
       &&!value(i.cells,'Label'))throw Error('Object Label is required');
     if(i.sheet==='Fields'&&!exists&&!deleted&&['Create','Upsert'].includes(i.action)
       &&!value(i.cells,'Label'))throw Error('Field Label is required');
-    if(i.sheet==='Objects'&&obj?.kind==='Standard Object'&&['Delete','HardDelete'].includes(i.action))
-     throw Error('Standard objects cannot be deleted');
+    if(i.sheet==='Objects'&&obj?.kind==='System Object'&&['Delete','HardDelete'].includes(i.action))
+     throw Error('System Objects can never be deleted');
     if(i.sheet==='Fields'&&!obj&&!planned.has(i.objectApi.toLowerCase()))
      throw Error('Parent object does not exist or is not in the workbook');
     if(i.sheet==='Fields'&&i.action==='Create'&&!value(i.cells,'DataType'))throw Error('DataType is required');

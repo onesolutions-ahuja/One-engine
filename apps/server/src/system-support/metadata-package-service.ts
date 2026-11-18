@@ -161,7 +161,7 @@ function validatePackage(raw:unknown):MetadataPackage{
   const item=object as Record<string,unknown>;
   if(typeof item.apiName!=='string'||!apiNamePattern.test(item.apiName)
     ||typeof item.label!=='string'||!item.label.trim()||item.label.length>200
-    ||item.kind!=='Custom Object'
+    ||(item.kind!=='Custom Object'&&item.kind!=='Standard Object')
     ||!Array.isArray(item.fields)||item.fields.length>1000
     ||(item.fields as unknown[]).some(field=>!field||typeof field!=='object'||Array.isArray(field)))
    throw Error('Invalid package object');
@@ -432,7 +432,7 @@ export class MetadataPackageService{
     &&!configurationNames.length&&!permissionSetNames.length)
    throw Error('Select at least one metadata component to package');
   const current=await this.loaded(tenant,user);
-  const objectMap=new Map(current.objects.filter(item=>item.kind==='Custom Object')
+  const objectMap=new Map(current.objects.filter(item=>item.kind!=='System Object')
    .map(item=>[item.apiName,item]));
   const pageMap=new Map(current.pages.map(item=>[item.apiName,item]));
   const componentMap=new Map(current.components.map(item=>[item.apiName,item]));

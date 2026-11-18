@@ -72,6 +72,13 @@ export function criteriaMatch(rowValue:unknown,wanted:unknown):boolean{
  if(isBlank(wanted))return isBlank(rowValue);
  if(hasExcelWildcardCriteria(wanted))return matchesExcelWildcard(text(rowValue),wanted);
  if(isBlank(rowValue))return false;
+ // A day (TODAY(), "2026-11-18") matches a Date or Date/Time field on that day (UTC, like
+ // the Record API), so SUMIFS(Invoice, Total, InvoiceDate, TODAY()) agrees with COUNTIFS.
+ const day=text(wanted);
+ if(/^\d{4}-\d{2}-\d{2}$/.test(day)){
+  const value=rowValue instanceof Date?rowValue.toISOString():text(rowValue);
+  if(/^\d{4}-\d{2}-\d{2}(?:[T ]|$)/.test(value))return value.slice(0,10)===day;
+ }
  return text(rowValue)===text(wanted);
 }
 export const rowMatches=(row:Readonly<Record<string,unknown>>,criteria:ReadonlyArray<readonly [string,unknown]>)=>

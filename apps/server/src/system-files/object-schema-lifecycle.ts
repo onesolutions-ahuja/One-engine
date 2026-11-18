@@ -74,10 +74,12 @@ const quoteTable=(name:string)=>{
  if(!parts.length||parts.length>2||parts.some(part=>!identifier.test(part)))throw new Error('Invalid table for permanent delete');
  return parts.map(part=>'"'+part+'"').join('.');
 };
-const columns=(names:string[])=>{
+const columnList=(names:string[])=>{
  if(!names.length||names.some(name=>!identifier.test(name)))throw new Error('Invalid key for permanent delete');
- return '('+names.map(name=>'"'+name+'"').join(',')+')';
+ return names.map(name=>'"'+name+'"').join(',');
 };
+/** A row value on the left of IN: (a,b). The select list of the subquery stays a plain list. */
+const columns=(names:string[])=>'('+columnList(names)+')';
 type ForeignKey={child:string;child_cols:string[];parent_cols:string[]};
 async function foreignKeysTo(client:QueryClient,table:string):Promise<ForeignKey[]>{
  const {rows}=await client.query<ForeignKey>(`SELECT con.conrelid::regclass::text AS child,
@@ -102,7 +104,7 @@ export async function purgeRows(client:QueryClient,table:string,where:string,par
  }
  for(const key of await foreignKeysTo(client,table)){
   if(key.child===table)continue; // self references go in the same DELETE statement
-  await purgeRows(client,key.child,`${columns(key.child_cols)} IN (SELECT ${columns(key.parent_cols)} FROM ${quoted} WHERE ${where})`,params,depth+1);
+  await purgeRows(client,key.child,`${columns(key.child_cols)} IN (SELECT ${columnList(key.parent_cols)} FROM ${quoted} WHERE ${where})`,params,depth+1);
  }
  const result=await client.query(`DELETE FROM ${quoted} WHERE ${where}`,params);
  return result.rowCount??0;
@@ -231,7 +233,7 @@ export class ObjectSchemaLifecycle {
     WHERE tenant_id=$1 AND related_object=$2 AND object_api<>$2 AND deleted_at IS NOT NULL`,[tenantId,apiName]);
    // Everything else that hangs off the Object definition (fields, layouts, settings...).
    for(const key of await foreignKeysTo(client,'md_object_definitions')){
-    await purgeRows(client,key.child,`${columns(key.child_cols)} IN (SELECT ${columns(key.parent_cols)}
+    await purgeRows(client,key.child,`${columns(key.child_cols)} IN (SELECT ${columnList(key.parent_cols)}
      FROM md_object_definitions WHERE tenant_id=$1 AND api_name=$2)`,[tenantId,apiName],1);
    }
    await client.query('DELETE FROM md_native_fields WHERE tenant_id=$1 AND object_api=$2',[tenantId,apiName]);

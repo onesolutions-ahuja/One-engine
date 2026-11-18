@@ -13,6 +13,7 @@ import {DEVICE_JOB_DDL} from './cloudprnt-routes.js';
 import {applySmartChart} from './smart-chart.js';
 import {applySmartSearch} from './smart-search.js';
 import {applySmartQr} from './smart-qr.js';
+import {applySmartVideo} from './smart-video.js';
 import {applySmartTableRowButtons} from './smart-table-row-buttons.js';
 import {applySmartSelectorMulti} from './smart-selector-multi.js';
 import {applySmartVisibleFormula} from './smart-visible-formula.js';
@@ -776,6 +777,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await applySmartChart(client);
   await applySmartSearch(client);
   await applySmartQr(client);
+  await applySmartVideo(client);
   await applySmartTableRowButtons(client);
   await applySmartSelectorMulti(client);
   await applySmartVisibleFormula(client);

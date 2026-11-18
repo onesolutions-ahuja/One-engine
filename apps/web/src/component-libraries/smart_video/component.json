@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_video",
+  "label": "Smart Video",
+  "category": "Display",
+  "description": "Video player driven by metadata: a URL, a record field or a formula (several videos separated by ; play in turn). Plays muted and on a loop by default, for promotions, welcome loops or offers on any page.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_video/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_video/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 480,
+    "defaultHeight": 270,
+    "minWidth": 96,
+    "minHeight": 54
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "ended",
+      "label": "Ended"
+    }
+  ]
+}

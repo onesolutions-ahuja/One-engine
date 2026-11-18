@@ -14,6 +14,7 @@ import {formulaShape} from '../../../component-libraries/shared/formulaCodeLooku
  */
 import {F,O,aggregateRows,fieldValue,rowMatches} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
 import {readComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
+import {COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {isConnected} from '../../../../../server/src/expression-engine/FormulaConnections.js';
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
@@ -155,7 +156,12 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(!host.readComponent)throw Error('Select a component and property on this page');
    return host.readComponent(id,property);
   }
-  componentState(name:string,field:string){return readComponentState(host.state().collectionSelections,name,field as never);}
+  componentState(name:string,field:string){
+   // A value this action just set (`@ThisPage.CashBox.Value = …`) reads back at once.
+   const set=this.stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined;
+   if(set&&Object.prototype.hasOwnProperty.call(set,name)&&(field==='Value'||field==='Text'))return set[name]??'';
+   return readComponentState(host.state().collectionSelections,name,field as never);
+  }
   /** @ThisPage.Cart1.CartTotal: the component's own property, else the value its action saved. */
   pageValue(name:string,key:string){
    if(host.readComponent){
@@ -258,6 +264,12 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    this.changes.push({objectApiName:object,operation:'delete',record:{Id:String(id)}});
   }
   setState(name:string,value:unknown){this.stateChanges[name]=value;}
+  /** `@ThisPage.CashBox.Value = …`: the component shows and holds the new value. */
+  setValue(name:string,value:unknown){
+   const set={...(this.stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined)};
+   set[name]=value===undefined?'':value;
+   this.stateChanges[COMPONENT_VALUES]=set;
+  }
   async ui(name:string,...args:unknown[]){this.effects.push({name,args});}
   async service(name:string):Promise<never>{return notHeld(name+' runs on the server');}
  }

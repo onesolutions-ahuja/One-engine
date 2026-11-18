@@ -13,6 +13,7 @@ import type {RecordFilter} from '../object-engine/QueryBuilder.js';
 import {hasExcelWildcardCriteria} from '../expression-engine/FormulaWildcard.js';
 import {aggregateRows,fieldValue,rowMatches} from '../page-compiler/code/formulaLibrary.js';
 import {readComponentState} from '../expression-engine/FormulaComponentState.js';
+import {COMPONENT_VALUES} from '../expression-engine/PageReferences.js';
 import {isConnected,type ConnectionSnapshot} from '../expression-engine/FormulaConnections.js';
 import type {ServerPageCode} from '../page-compiler/code/pageCode.js';
 import {trustedFormulaSession,type TrustedFormulaSession} from './formula-data-action-runtime.js';
@@ -156,7 +157,18 @@ class ServerScope{
  /** @ThisPage.PayButton.CartTotal on the server: the value that action saved. */
  pageValue(_name:string,key:string){return this.state(key);}
  componentState(name:string,field:string){
+  const set=this.stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined;
+  if(set&&Object.prototype.hasOwnProperty.call(set,name)&&(field==='Value'||field==='Text'))return set[name]??'';
   return readComponentState(this.request.state.collectionSelections,name,field as never);
+ }
+ /** `@ThisPage.CashBox.Value = …`: sent back to the page, which shows it in that component. */
+ setValue(name:string,value:unknown){
+  if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))throw Error('Invalid component name');
+  if(value!==null&&value!==undefined&&!['string','number','boolean'].includes(typeof value))
+   throw Error('A component value must be text, a number or TRUE/FALSE');
+  const set={...(this.stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined)};
+  set[name]=value??'';
+  this.stateChanges[COMPONENT_VALUES]=set;
  }
  event(name:string){
   if(name==='record')return this.eventRecord;

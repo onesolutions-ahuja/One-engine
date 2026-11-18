@@ -74,6 +74,8 @@ export function createCompiledPageStore(compiled:CompiledPage,initial:State={},
    state={...next};
    notify(keys);
   },
+  /** Redraw these components (a value given to them by an action). */
+  redraw(ids:readonly string[]){for(const id of ids)byComponent.get(id)?.forEach(listener=>listener());},
   subscribeComponent(id:string,listener:Listener):()=>void{
    const set=byComponent.get(id)??new Set<Listener>();
    set.add(listener);byComponent.set(id,set);

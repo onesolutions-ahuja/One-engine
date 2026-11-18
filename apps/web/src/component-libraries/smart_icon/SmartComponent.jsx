@@ -3,7 +3,7 @@ import {SmartShapeGlyph,smartShapes} from "./SmartShapes";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
 const fallbackIcon=icons.find(icon=>icon.id==="house");
 export default function SmartComponent(p){
- if(hiddenByShowWhen(p))return null;
+ if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const selected=icons.find(icon=>icon.id===p.iconId)??smartShapes.find(shape=>shape.id===p.iconId)??fallbackIcon;
  const url="/smart-icons/"+selected.id+".svg";
  // Style = iOS (new inserts): soft blue glyph and press effect. Older icons stay Classic.

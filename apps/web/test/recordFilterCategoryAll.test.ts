@@ -33,6 +33,7 @@ test('multi-select category filter: INCLUDES(ticked ids, @Product.MenuCategory) 
  const two=compileRecordFilterFormula(formula,fields,pick('a;b'));
  assert.deepEqual(two.filters,[{field:'MenuCategory',operator:'eq',value:'a'},{field:'MenuCategory',operator:'eq',value:'b'}]);
  assert.equal(two.filterLogic,'(1 OR 2)');
+});
 
 test('Field mode with no field conditions uses the written filter formula',async()=>{
  const {activePageRecordFilters}=await import('../../server/src/page-compiler/pageCompilerSupport');

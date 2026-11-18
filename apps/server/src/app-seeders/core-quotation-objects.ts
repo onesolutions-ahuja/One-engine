@@ -11,7 +11,6 @@ export const QUOTATION_OBJECTS = [
     {apiName:'QuotationNumber',label:'Quotation Number',dataType:'text',maxLength:80},
     {apiName:'Customer',label:'Customer',dataType:'reference',relatedObject:'Customer'},
     {apiName:'Contact',label:'Contact',dataType:'reference',relatedObject:'Contact'},
-    {apiName:'Account',label:'Account',dataType:'reference',relatedObject:'Account'},
     {apiName:'IssueDate',label:'Issue Date',dataType:'date'},
     {apiName:'ExpiryDate',label:'Expiry Date',dataType:'date'},
     {apiName:'Status',label:'Status',dataType:'text',maxLength:40},

@@ -8,6 +8,7 @@ import {QUOTATION_OBJECTS,seedQuotationObjects} from './core-quotation-objects.j
 import {LOCATION_SRN_FIELDS,seedLocationSrnMetadata} from './core-location-srn.js';
 import {APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,seedAppointmentObjects} from './core-appointment-objects.js';
 import {CART_OBJECTS,seedCartObjects} from './cart-objects.js';
+import {CATALOGUE_OBJECTS,seedCatalogueObjects} from './core-catalogue-objects.js';
 import {CORE_CASH_LEDGER_FIELDS,seedCoreCashLedger} from './core-cash-ledger.js';
 import {NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,seedNamedDeviceObjects} from './core-named-devices.js';
 import {TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,seedTillNumbering} from './core-till-numbering.js';
@@ -30,6 +31,8 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  await seedLocationSrnMetadata(client,tenantId);
  await seedAppointmentObjects(client,tenantId);
  await seedCartObjects(client,tenantId);
+ // After Product and CartLine: shared categories and product options for every selling app.
+ await seedCatalogueObjects(client,tenantId);
  await seedCoreCashLedger(client,tenantId);
  await seedNamedDeviceObjects(client,tenantId);
  await seedFreshProductImageField(client,tenantId);
@@ -44,11 +47,14 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v5: smart_qr, NamedDevice and IncomingWebhook objects. v6: Cart payment hand-off fields.
 // v7: Till, Auto Number invoice/order numbers per Location, TillId/UserId on sales documents.
 // v8-v11: Cart/CartLine device fields, Till.CustomerDisplayKey. v12: smart_video.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v12';
+// v13: one global catalogue (ProductCategory, ProductOptionGroup, ProductOption, CartLineOption,
+// Product.Category and channel flags); Till becomes NamedDevice type POS Terminal (records
+// migrated once, TillId repointed); Order, ProductLine, Account, Lead and Case retired from Core.
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v13';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
- LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,
+ LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,CATALOGUE_OBJECTS,
  CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,
  TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL
 ];

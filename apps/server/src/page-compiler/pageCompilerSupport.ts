@@ -118,7 +118,13 @@ export function needsMetadataComponentRuntime(properties: Record<string, unknown
  * Legacy pages without a mode retain their existing combined semantics. */
 export function activePageRecordFilters(properties:Readonly<Record<string,unknown>>):{filters:unknown;formula:unknown}{
  if(properties.filterMode==='Formula')return {filters:[],formula:properties.filterFormula};
- if(properties.filterMode==='Field')return {filters:properties.filters,formula:undefined};
+ // Field mode with no field conditions but a written formula: the formula is the filter
+ // (CSV uploads write filterFormula without switching the mode).
+ if(properties.filterMode==='Field'){
+  const none=!Array.isArray(properties.filters)||properties.filters.length===0;
+  const formula=typeof properties.filterFormula==='string'&&properties.filterFormula.trim()?properties.filterFormula:undefined;
+  return {filters:properties.filters,formula:none?formula:undefined};
+ }
  return {filters:properties.filters,formula:properties.filterFormula};
 }
 

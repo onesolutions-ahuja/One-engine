@@ -2,6 +2,7 @@ import {useLayoutEffect,useRef,useState,type CSSProperties,type ReactNode} from 
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import {isStandalonePagePresentation,pageCanvasPresentationStyle} from './pageRuntimePresentation';
 import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth} from './runtimeCanvasSizing';
+import {flowPrintCanvas} from './printTemplateFlow';
 
 /**
  * Published pages and compiled Builder Preview use the same width-first layout.
@@ -15,7 +16,7 @@ import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth} from 
 export default function ResponsivePageCanvas({
   page,children
 }:{
-  page:Pick<LightningPageMetadata,'canvasWidth'|'canvasHeight'|'layoutMode'|'components'>;
+  page:Pick<LightningPageMetadata,'canvasWidth'|'canvasHeight'|'layoutMode'|'components'>&{pageType?:string};
   children:ReactNode;
 }) {
   const frame=useRef<HTMLDivElement>(null);
@@ -40,11 +41,31 @@ export default function ResponsivePageCanvas({
     return()=>observer.disconnect();
   },[page.canvasWidth]);
 
+  // Print templates fit their content (see printTemplateFlow): lists grow or shrink to their rows.
+  const printTemplate=page.pageType==='Print Template';
+  const canvasRef=useRef<HTMLDivElement>(null);
+  const [fittedHeight,setFittedHeight]=useState<number|null>(null);
+  useLayoutEffect(()=>{
+   const canvas=canvasRef.current;
+   if(!printTemplate||!canvas)return;
+   let frameId=0;
+   const fit=()=>{cancelAnimationFrame(frameId);frameId=requestAnimationFrame(()=>{
+    observer.disconnect();
+    const height=flowPrintCanvas(canvas);
+    setFittedHeight(previous=>previous===height?previous:height);
+    observer.observe(canvas,{childList:true,subtree:true,characterData:true});
+   });};
+   const observer=new MutationObserver(fit);
+   fit();
+   return()=>{cancelAnimationFrame(frameId);observer.disconnect();};
+  },[printTemplate]);
+  const canvasHeight=printTemplate&&fittedHeight?fittedHeight:page.canvasHeight;
   const standalone=isStandalonePagePresentation(page);
   const scale=standalone?1:runtimeCanvasWidthScale(page.canvasWidth,availableWidth);
   const extra=standalone?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
   const canvasStyle: CSSProperties & { '--md-runtime-canvas-extra': string }={
     ...pageCanvasPresentationStyle(page),
+    ...(printTemplate&&fittedHeight?{height:fittedHeight}:{}),
     ...(!standalone && extra > 0 ? {width:'100%'} : {}),
     '--md-runtime-canvas-extra':extra+'px',
     transform:scale<1?`scale(${scale})`:undefined,
@@ -53,10 +74,11 @@ export default function ResponsivePageCanvas({
 
   return <div ref={frame} className="page-responsive-canvas-frame" style={{
     position:'relative',width:'100%',minWidth:0,
-    height:standalone?'100dvh':Math.ceil(page.canvasHeight*scale),
+    height:standalone?'100dvh':Math.ceil(canvasHeight*scale),
     overflow:'hidden'
   }}>
-    <div className="free-canvas-runtime" data-layout-mode="free-canvas" style={canvasStyle}>
+    <div ref={canvasRef} className="free-canvas-runtime" data-layout-mode="free-canvas"
+     data-print-template={printTemplate?'true':undefined} style={canvasStyle}>
       {children}
     </div>
   </div>;

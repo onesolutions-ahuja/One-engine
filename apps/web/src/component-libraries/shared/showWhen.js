@@ -5,7 +5,10 @@ import {evaluateFieldExpression} from "./FieldExpression.js";
  * Blank always shows; FALSE, 0 or blank text hides at runtime. The builder always shows it. */
 export function hiddenByShowWhen(p,row={}){
  const formula=p.visibleFormula;
- if(typeof formula!=="string"||!formula.trim()||p.builderPreview||p.designMode)return false;
+ if(formula===undefined||formula===null||p.builderPreview||p.designMode)return false;
+ // Page code may already have run it (a total such as COUNTIFS): then it is TRUE/FALSE/0.
+ if(typeof formula!=="string")return formula===false||formula===0;
+ if(!formula.trim())return false;
  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
  const run=code?convertedFormula(code,formula):null;
  let shown;

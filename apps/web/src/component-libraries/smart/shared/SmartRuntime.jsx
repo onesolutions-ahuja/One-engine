@@ -1132,8 +1132,10 @@ export default function SmartRuntime(p){
  }}>{p.children||(p.builderPreview?<span className="smart-editor-container-placeholder">Drop components here</span>:null)}</div>;
  // Show when (Data): a formula such as COUNTIFS(Cart, ..., PaymentStatus, "Card") > 0.
  // Blank always shows; FALSE, 0 or blank text hides at runtime. The builder always shows it.
- if(typeof p.visibleFormula==="string"&&p.visibleFormula.trim()&&!p.builderPreview&&!p.designMode){
-  const shown=scopedExpression(p,"visibleFormula",p.visibleFormula,record);
+ // Page code may already have run it (a total such as COUNTIFS): then it arrives as TRUE/FALSE/0.
+ const showWhen=p.visibleFormula;
+ if(showWhen!==undefined&&showWhen!==null&&!(typeof showWhen==="string"&&!showWhen.trim())&&!p.builderPreview&&!p.designMode){
+  const shown=typeof showWhen==="string"?scopedExpression(p,"visibleFormula",showWhen,record):showWhen;
   // A formula that cannot run hides the component (fail closed), never shows it.
   if(shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
    ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR")return null;

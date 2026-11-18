@@ -17,7 +17,14 @@ export function nativeFieldExpression(field:NativeQueryField,alias='nr',text=fal
   return `CASE WHEN ${json} IS NULL OR jsonb_typeof(${json})='null' THEN NULL
    ELSE ARRAY(SELECT jsonb_array_elements_text(${json}))::${field.native_type} END`;
  }
- return text?expression:`${expression}::${field.native_type}`;
+ if(text)return expression;
+ // A value kept in extras is text: a blank or badly written value reads as NULL instead of
+ // failing the whole query (e.g. a date/time filter on a field one record stored as "").
+ if(field.native_type==='date'||field.native_type==='timestamptz')
+  return `(CASE WHEN ${expression} ~ '^\\d{4}-\\d{2}-\\d{2}' THEN ${expression}::${field.native_type} END)`;
+ if(field.native_type==='numeric')
+  return `(CASE WHEN ${expression} ~ '^\\s*-?(\\d+\\.?\\d*|\\.\\d+)([eE][-+]?\\d+)?\\s*\\Z' THEN ${expression}::numeric END)`;
+ return `NULLIF(${expression},'')::${field.native_type}`;
 }
 export function nativeRecordJoin(fields:readonly NativeQueryField[],alias='nr'){
  const table=fields.find(f=>f.native_table)?.native_table;

@@ -63,14 +63,6 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
     </section></div>}
     <section className="flow-start-existing surface" aria-labelledby="flow-start-existing-title">
       <h2 id="flow-start-existing-title">Existing flows</h2>
-      <nav className="flow-existing-type-tabs" aria-label="Flows by type" style={{display:'flex',gap:6,flexWrap:'wrap',padding:'10px 0'}}>
-        {[{type:'all',label:'All Flows'},...flowTypeOptions.map(option=>({type:option.type,label:option.type})),
-          ...(['Screen Flow','In-Screen Flow','Autolaunched Flow','Record-Triggered Flow','Schedule-Triggered Flow','Platform Event-Triggered Flow','Flow Orchestration'] as const)
-            .filter(type=>!flowTypeOptions.some(option=>option.type===type)).map(type=>({type,label:type}))].map(option=>
-          <button type="button" className={'btn btn-small'+(existingFlowTypeTab===option.type?' btn-brand':'')}
-            key={option.type} aria-pressed={existingFlowTypeTab===option.type}
-            onClick={()=>{setExistingFlowTypeTab(option.type);setExistingFlowPage(1);setRemoteFlowResults(null);}}>{option.label}</button>)}
-      </nav>
       <label className="form-label flow-existing-type-select">Flow type
        <select className="form-control" aria-label="Filter flows by type" value={existingFlowTypeTab}
         onChange={e=>{setExistingFlowTypeTab(e.target.value);setExistingFlowPage(1);setRemoteFlowResults(null);}}>

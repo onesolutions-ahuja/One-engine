@@ -57,7 +57,7 @@ test('native SQL read helpers validate identifiers and produce the EAV-shaped la
  assert.equal(nativeTableSql(meta),'"'+table+'"');
  assert.equal(nativeValueSql(meta,'Name'),'nr."'+column+'"');
  assert.equal(nativeValueSql(meta,'Name','nr',true),'nr."'+column+'"::text');
- assert.equal(nativeValueSql(meta,'Amount'),"(CASE WHEN (nr.extras->>'Amount') ~ '^\\s*-?(\\d+\\.?\\d*|\\.\\d+)([eE][-+]?\\d+)?\\s*$' THEN (nr.extras->>'Amount')::numeric END)");
+ assert.equal(nativeValueSql(meta,'Amount'),"(CASE WHEN (nr.extras->>'Amount') ~ '^\\s*-?(\\d+\\.?\\d*|\\.\\d+)([eE][-+]?\\d+)?\\s*\\Z' THEN (nr.extras->>'Amount')::numeric END)");
  assert.match(nativeValueSql(meta,'Lookup'),/::uuid$/);
  assert.match(nativeValueSql(meta,'Geo'),/jsonb_array_elements_text/);
  assert.match(nativeValueSql(meta,'Geo'),/::double precision\[\]/);

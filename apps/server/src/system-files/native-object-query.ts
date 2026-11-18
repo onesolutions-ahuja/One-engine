@@ -23,7 +23,7 @@ export function nativeFieldExpression(field:NativeQueryField,alias='nr',text=fal
  if(field.native_type==='date'||field.native_type==='timestamptz')
   return `(CASE WHEN ${expression} ~ '^\\d{4}-\\d{2}-\\d{2}' THEN ${expression}::${field.native_type} END)`;
  if(field.native_type==='numeric')
-  return `(CASE WHEN ${expression} ~ '^\\s*-?(\\d+\\.?\\d*|\\.\\d+)([eE][-+]?\\d+)?\\s*$' THEN ${expression}::numeric END)`;
+  return `(CASE WHEN ${expression} ~ '^\\s*-?(\\d+\\.?\\d*|\\.\\d+)([eE][-+]?\\d+)?\\s*\\Z' THEN ${expression}::numeric END)`;
  return `NULLIF(${expression},'')::${field.native_type}`;
 }
 export function nativeRecordJoin(fields:readonly NativeQueryField[],alias='nr'){

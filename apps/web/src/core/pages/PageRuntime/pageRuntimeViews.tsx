@@ -1355,7 +1355,7 @@ function LightningAppRuntime({
             sessionIdOverride={inScreenPage?inScreenContext?.sessionId:undefined}
             children={nestedChildren}
             onNavigate={onNavigate} onLaunchFlow={onLaunchFlow} />
-        : <PageCodeFormulas key={component.id} componentId={component.id}>{formulaCode=><RegisteredComponent definition={definition} layoutTransparent props={{
+        : <PageCodeFormulas key={component.id} componentId={component.id}>{(formulaCode,given)=><RegisteredComponent definition={definition} layoutTransparent props={{
             ...component.properties, pageState:layoutState,
             ...(formulaCode?{__formulaCode:formulaCode}:{}),
             ...componentLayoutProps(component.properties, layoutDevice),
@@ -1373,7 +1373,7 @@ function LightningAppRuntime({
             label: runtimeComponentLabel(component, component.properties.label),
             properties: component.properties,
             pageSessionKey: runtimeSessionKey, componentId: component.id,
-            device: layoutDevice, children: nestedChildren
+            device: layoutDevice, children: nestedChildren, ...given
           }} />}</PageCodeFormulas>;
       const rendered = nestedChildren?.length && definition.trustedBundled !== true
         ? <div className="metadata-nested-host" data-nested-host={component.id}>{content}{nestedChildren}</div>

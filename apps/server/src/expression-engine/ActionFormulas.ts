@@ -1,6 +1,6 @@
 import {Parser,formulaTruth,type Expression} from './FormulaParser.js';
 import {tokenize} from './FormulaTokenizer.js';
-import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey} from './PageReferences.js';
+import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey,assignedComponent,COMPONENT_VALUES} from './PageReferences.js';
 import {validateFormulaFunctions} from './FormulaFunctionRegistry.js';
 import {runDeviceCommand} from './ActionDevices.js';
 import {actionFormulaFunctions} from './FormulaCategories.js';
@@ -129,6 +129,13 @@ export function compileActionPlan(source:string):ActionStep[] {
    validateFormulaFunctions(node.args[0],'ribbon_binding');
    add(steps,node.args[1],[...(guards??[]),{condition:node.args[0],expected:true}],loop);
    add(steps,node.args[2],[...(guards??[]),{condition:node.args[0],expected:false}],loop);
+   return;
+  }
+  // `@ThisPage.CashBox.Value = …`: the component is given a new value.
+  const assigned=assignedComponent(node,aliases);
+  if(assigned&&node.kind==='binary'){
+   validateFormulaFunctions(node.right,'ribbon_binding');
+   steps.push({name:'VALUE',object:assigned,values:[node.right],fields:new Map(),guards});
    return;
   }
   if(node.kind!=='call'||!actionFunctionNames.includes(node.name))throw Error('Expected an action formula');
@@ -751,6 +758,16 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
      const nodes=stepNodes(step);
      if(nodes.length>1&&nodes.every(parallelSafe))await Promise.all(nodes.map(resolveServer));
      else for(const node of nodes)await resolveServer(node);
+     if(step.name==='VALUE'){
+      const value=evaluate(step.values![0]);
+      if(value!==null&&!['string','number','boolean'].includes(typeof value))
+       throw Error('A component value must be text, a number or TRUE/FALSE');
+      const given={...(stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined),[step.object]:value??''};
+      stateChanges[COMPONENT_VALUES]=given;
+      changes.push({key:COMPONENT_VALUES,value:given});
+      completed++;
+      continue;
+     }
      if(step.name==='STATE'){
       const value=evaluate(step.values![0]);
       if(!['string','number','boolean'].includes(typeof value)||typeof value==='number'&&!Number.isFinite(value))

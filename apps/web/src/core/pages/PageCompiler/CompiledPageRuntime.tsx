@@ -30,7 +30,7 @@ import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
-import {isCompiledStateReference,declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
+import {isCompiledStateReference,declarativeSource,COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import type {LoadedPageScript} from './serverPageScript';
 import {createPageCodeRuntime,type PageCodeRuntime,type Effect} from './pageCodeRuntime';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
@@ -62,6 +62,10 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  /** Remember what the user picked/typed/toggled in a component, under its page
   * name, so any formula, filter or action reads @ThisPage.Name.Selected.Id / Value / Text. */
  publishState(componentId:string,value:unknown):void;
+ /** `@ThisPage.Name.Value = …`: set what that component holds and shows. Changed state names. */
+ giveValue(name:string,value:unknown):string[];
+ /** The component's value set by an action (shown instead of its own value until typed over). */
+ givenValue(componentId:string):{value:unknown}|null;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
  resetSession(next?:string):void;
@@ -117,15 +121,39 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    const changed=store.select('collection',name,value);
    if(changed.length)void data.stateChanged(changed);
   };
+  const idsByName=new Map([...stateNames].filter(([,name])=>name).map(([id,name])=>[String(name).toLowerCase(),id]));
+  const givenKey=(name:string)=>COMPONENT_VALUES+'.'+name.toLowerCase();
   return {
    publishState(componentId:string,value:unknown){
     const name=stateNames.get(componentId);
     const next=name?componentStateFromEvent(value):null;
     if(!name||!next)return;
+    // Typed or picked by the user: a value given by an action no longer overrides it.
+    if(store.get()[givenKey(name)]!==undefined){store.set(givenKey(name),undefined);store.redraw([componentId]);}
     window.clearTimeout(typing.get(componentId));
-    // Typed text (Search Box) waits for a short pause, so lists reload once, not per key.
-    if(typeof value==='string')typing.set(componentId,window.setTimeout(()=>publish(name,next),250));
+    // The value is held at once (a button tapped right after typing reads it);
+    // typed text (Search Box) reloads lists after a short pause, once, not per key.
+    if(typeof value==='string'){
+     const changed=store.select('collection',name,next);
+     if(changed.length)typing.set(componentId,window.setTimeout(()=>void data.stateChanged(changed),250));
+    }
     else publish(name,next);
+   },
+   giveValue(name:string,value:unknown){
+    const id=idsByName.get(name.toLowerCase());
+    const stateName=id?stateNames.get(id):null;
+    if(!stateName)throw Error('There is no component named '+name+' on this page');
+    const plain=value===null||value===undefined?'':value;
+    const next=componentStateFromEvent(plain);
+    store.set(givenKey(stateName),{value:plain});
+    const changed=next?store.select('collection',stateName,next):[];
+    store.redraw([id!]);
+    return changed;
+   },
+   givenValue(componentId:string){
+    const name=stateNames.get(componentId);
+    const held=name?store.get()[givenKey(name)]:undefined;
+    return held&&typeof held==='object'?held as {value:unknown}:null;
    },compiled,script,code,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
    searchRecords:async(sourceId:string,query:string)=>{
     const source=compiled.dataSources.find(item=>item.id===sourceId);
@@ -303,6 +331,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const runtime=useCompiledPageRuntime()!;
  const compiled=runtime.byId.get(component.id)!;
  const state=useComponentState(runtime,component.id);
+ const given=runtime.givenValue(component.id);
  const source=useSourceSnapshot(runtime,compiled.dataSourceId);
  const sessionId=useSyncExternalStore(runtime.subscribeSession,runtime.sessionId,runtime.sessionId);
  const [actionError,setActionError]=useState('');
@@ -423,8 +452,14 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  // Screen Flow outputs arrive by event when the interview completes.
  const pendingFlows=useRef(new Map<string,{flowApiName:string;mappings:Record<string,unknown>}>());
  // Same selection rule as every other state write: dependants of a changed key are cleared.
- const applyState=(changes:ReadonlyArray<{key:string;value:unknown}>)=>{
-  const changed=[...new Set(changes.flatMap(change=>identifier.test(change.key)?runtime.store.select('state',change.key,change.value):[]))];
+ const applyState=(all:ReadonlyArray<{key:string;value:unknown}>)=>{
+  // `@ThisPage.CashBox.Value = …`: each named component holds (and shows) its new value.
+  const given=all.find(change=>change.key===COMPONENT_VALUES)?.value;
+  const changes=all.filter(change=>change.key!==COMPONENT_VALUES);
+  const valueChanges=given&&typeof given==='object'&&!Array.isArray(given)
+   ?Object.entries(given as Record<string,unknown>).flatMap(([name,value])=>runtime.giveValue(name,value)):[];
+  const changed=[...new Set([...valueChanges,
+   ...changes.flatMap(change=>identifier.test(change.key)?runtime.store.select('state',change.key,change.value):[])])];
   runtime.broadcastState(changes);
   if(changed.length)void runtime.data.stateChanged(changed);
  };
@@ -778,7 +813,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     loadingMore:source.loadingMore,loadMore:()=>compiled.dataSourceId&&runtime.data.loadMore(compiled.dataSourceId)}}:{}),
    ...(contactChoices?{contactChoices}:{}),
    ...(toggleBinding?{toggleFieldBound:true,toggleFieldReady:toggleCanWrite,toggleFieldError:toggleBinding.error??'',
-    value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{})
+    value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{}),
+   // `@ThisPage.Name.Value = …`: shown until the user types or picks again.
+   ...(given?{textSource:'',defaultValue:'',value:given.value===null||given.value===undefined?'':String(given.value)}:{})
   }}/>
   {source.loadingMore&&<div className="records-loading" role="status">Loading more…</div>}
  </div>;
@@ -788,16 +825,22 @@ export const MemoizedCompiledComponentNode=React.memo(CompiledComponentNode);
 /** Display-only components (labels, headers, logos) are drawn without the data node, but
  * their formulas still run as the page's converted code, never on the previous engine. */
 export function PageCodeFormulas({componentId,children}:{componentId:string;
- children:(formulaCode:{functions:Map<string,(row:Record<string,unknown>)=>unknown>;version:number}|null)=>ReactNode}){
+ children:(formulaCode:{functions:Map<string,(row:Record<string,unknown>)=>unknown>;version:number}|null,
+  given:Record<string,unknown>)=>ReactNode}){
  const runtime=useCompiledPageRuntime();
  const code=runtime?.code??null;
+ // A value given by an action (`@ThisPage.Total.Value = …`) is shown instead of the label's own.
+ useSyncExternalStore(listener=>runtime?runtime.store.subscribeComponent(componentId,listener):()=>{},
+  ()=>runtime?.store.get(),()=>runtime?.store.get());
+ const held=runtime?.givenValue(componentId);
+ const given=held?{textSource:'',defaultValue:'',value:held.value===null||held.value===undefined?'':String(held.value)}:{};
  const version=useSyncExternalStore(listener=>code?code.subscribe(listener):()=>{},
   ()=>code?.version()??0,()=>code?.version()??0);
  const formulaCode=useMemo(()=>{
   const map=code?.formulasFor(componentId);
   return map&&map.size?{functions:map,version}:null;
  },[code,componentId,version]);
- return <>{children(formulaCode)}</>;
+ return <>{children(formulaCode,given)}</>;
 }
 
 /** Builder canvas slot: in Preview the compiled node runs; while editing the

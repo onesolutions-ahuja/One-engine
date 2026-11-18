@@ -18,7 +18,7 @@
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
 import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
-import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,type PageReference} from '../../expression-engine/PageReferences.js';
+import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,type PageReference} from '../../expression-engine/PageReferences.js';
 import {formulaEntry} from './formulaDictionary.js';
 import {parseActionFormulaAssignment} from '../pageCompilerSupport.js';
 
@@ -257,6 +257,10 @@ function takeAlias(node:Expression|undefined,scope:ActionScope,label:string):str
 }
 function stepCode(node:Expression,scope:ActionScope):string[]{
  if(node.kind==='literal'&&(node.value===''||node.value===null))return [];
+ const assigned=assignedComponent(node,scope.aliases);
+ if(assigned&&node.kind==='binary'){
+  return ['$.setValue('+q(assigned)+', '+expression(node.right,scope)+');'];
+ }
  if(node.kind!=='call')return fail('Expected an action step, found a value');
  const entry=formulaEntry(node.name);
  if(node.name==='IF'){

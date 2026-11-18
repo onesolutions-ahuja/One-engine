@@ -102,9 +102,16 @@ export function parsePageReference(raw:string):PageReference|null{
   if(field)return {kind:'selected',name:second,field};
   throw Error('Unknown selection value @'+reference+' (use Id, Name, Value or Text)');
  }
+ // @ThisPage.CashBox.Value / .Text: what that component holds now (typed, picked or set
+ // with `@ThisPage.CashBox.Value = …`), the same value as @ThisPage.CashBox.Selected.Value.
+ if(parts.length===3&&(same(third,'Value')||same(third,'Text')))
+  return {kind:'selected',name:second,field:same(third,'Value')?'Value':'Text'};
  if(parts.length===3)return {kind:'component',name:second,key:third};
  throw Error('Invalid page value @'+reference);
 }
+
+/** Page-code result key holding values given with `@ThisPage.Name.Value = …` ({Name: value}). */
+export const COMPONENT_VALUES='componentValues';
 
 /** Live values every component publishes in the browser. Any other key on a
  * component is a value its action saved (server-readable page state). */
@@ -260,4 +267,18 @@ export function modernizeReferences(code:string,ownerOf:(key:string)=>string|und
   })
   .replace(/\$(?:session\.)?tenant\.([A-Za-z]+)\b/g,(_m,key)=>'@ThisTenant.Company.'+cap(key.toLowerCase()))
   .replace(/[$@]session(?:\.id)?(?![A-Za-z0-9_.])/g,'@ThisPage.Session.Id');
+}
+
+/** The parts of a parsed formula node an assignment check needs. */
+type AssignmentNode={kind:string;operator?:string;left?:{kind:string;value?:unknown}};
+/** `@ThisPage.CashBox.Value = …` (or `CashBox.Value = …`) as a step: the name of the
+ * component given a new value, else null (an ordinary comparison). */
+export function assignedComponent(node:AssignmentNode,aliases:ReadonlySet<string>=new Set()):string|null{
+ if(node.kind!=='binary'||node.operator!=='='||node.left?.kind!=='reference'||typeof node.left.value!=='string')return null;
+ const path=node.left.value.replace(/^@/,'');
+ const bare=/^([A-Za-z][A-Za-z0-9_]{0,79})\.(value|text)$/i.exec(path);
+ if(bare&&!aliases.has(bare[1])&&!/^(?:event|record|ThisPage|ThisTenant)$/i.test(bare[1]))return bare[1];
+ const page=/^ThisPage\.([A-Za-z][A-Za-z0-9_]{0,79})\.(value|text)$/i.exec(path);
+ if(page&&!/^(?:Session|Input|Till|Device|Selected)$/i.test(page[1]))return page[1];
+ return null;
 }

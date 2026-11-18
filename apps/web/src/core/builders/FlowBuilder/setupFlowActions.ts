@@ -537,9 +537,10 @@ export function createSetupFlowActions(ctx: any) {
     }
   };
 
-  const deleteFlow = async (apiName: string) => {
+  const deleteFlow = async (apiName: string, label?: string): Promise<boolean> => {
     const candidate = flows.find((item) => item.apiName === apiName);
-    if (!candidate || !window.confirm(`Delete flow "${candidate.label}"? This cannot be undone.`)) return;
+    const name = candidate?.label ?? label ?? apiName;
+    if (!window.confirm(`Delete flow "${name}"? This cannot be undone.`)) return false;
     try {
       await apiRequest<void>(`/metadata/flows/${encodeURIComponent(apiName)}`, { method: 'DELETE' });
       flowSnapshots.current.delete(apiName);
@@ -556,8 +557,10 @@ export function createSetupFlowActions(ctx: any) {
           : { kind: 'setup', workspace: 'flow-builder' }, true);
       }
       notify('Flow deleted');
+      return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Unable to delete flow');
+      return false;
     }
   };
 

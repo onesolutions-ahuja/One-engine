@@ -1,5 +1,5 @@
 import ResponsiveDataList from '../../../../records/ResponsiveDataList/ResponsiveDataList';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 import type { useFlowEditorState } from '../useFlowEditorState';
 import type { useFlowCreateDialog } from './useFlowCreateDialog';
@@ -17,7 +17,12 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
     safeFlowPage, flowPageCount,
   } = editorState;
   const { setShowCreateFlow, showCreateFlow, createFlowDialog } = createDialog;
-  const { onCreateFlow, onSelectFlow } = props;
+  const { onCreateFlow, onSelectFlow, onDeleteFlow, canManageFlows } = props;
+  const removeFlow = async (apiName: string, label: string) => {
+    if (!canManageFlows) return;
+    const deleted = await onDeleteFlow(apiName, label);
+    if (deleted) setRemoteFlowResults((current) => current ? { ...current, flows: current.flows.filter((row) => row.apiName !== apiName), total: Math.max(0, current.total - 1) } : current);
+  };
   return <div className="flow-start-page flow-start-page-split">
     <div className="flow-start-heading">
       <div className="eyebrow">AUTOMATION</div>
@@ -84,6 +89,7 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
       {totalFlowCount ? <>
         <ResponsiveDataList rows={displayedFlows} includeTablet includeNarrowDesktop getId={item=>item.apiName}
          label="Existing Flows" onOpen={item=>onSelectFlow(item.apiName)} openLabel="Edit Flow"
+         rowAction={canManageFlows?{label:'Delete',onAction:item=>void removeFlow(item.apiName,item.label)}:undefined}
          columns={[
           {apiName:'label',label:'Flow',phoneRole:'title',render:item=>item.label},
           {apiName:'flowType',label:'Type',phoneRole:'subtitle',render:item=>item.flowType},
@@ -97,10 +103,10 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
          ]}/>
         <div className="flow-existing-table-scroll md-mobile-table-replaced md-tablet-table-replaced" role="region" aria-label="Flows table" tabIndex={0}>
         <table className="flow-existing-table">
-          <thead><tr><th scope="col">Edit</th><th scope="col">Flow Name</th><th scope="col">Flow Type</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Details</th></tr></thead>
+          <thead><tr><th scope="col">{canManageFlows ? "Actions" : "Edit"}</th><th scope="col">Flow Name</th><th scope="col">Flow Type</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Details</th></tr></thead>
           <tbody>{displayedFlows.map((candidate) =>
             <tr key={candidate.apiName}>
-              <td><button type="button" className="icon-button subtle" aria-label={`Edit ${candidate.label}`} title={`Edit ${candidate.label}`} onClick={() => onSelectFlow(candidate.apiName)}><Pencil size={16} /></button></td>
+              <td><button type="button" className="icon-button subtle" aria-label={`Edit ${candidate.label}`} title={`Edit ${candidate.label}`} onClick={() => onSelectFlow(candidate.apiName)}><Pencil size={16} /></button>{canManageFlows && <button type="button" className="icon-button subtle" aria-label={`Delete ${candidate.label}`} title={`Delete ${candidate.label}`} onClick={() => void removeFlow(candidate.apiName, candidate.label)}><Trash2 size={16} /></button>}</td>
               <td><button type="button" className="text-action" onClick={() => onSelectFlow(candidate.apiName)}>{candidate.label}</button></td>
               <td>{candidate.flowType}</td><td>{candidate.status}</td><td>v{candidate.versionNumber}</td>
               <td>{(candidate.createdBy||candidate.createdAt||candidate.lastModifiedBy||candidate.lastModifiedAt)?<details><summary aria-label={'View details for '+candidate.label}>View details</summary><dl><dt>Created by</dt><dd>{candidate.createdBy || '—'}</dd><dt>Created</dt><dd>{candidate.createdAt ? new Date(candidate.createdAt).toLocaleString() : '—'}</dd><dt>Modified by</dt><dd>{candidate.lastModifiedBy || '—'}</dd><dt>Modified</dt><dd>{candidate.lastModifiedAt ? new Date(candidate.lastModifiedAt).toLocaleString() : '—'}</dd></dl></details>:<span>Unavailable</span>}</td>

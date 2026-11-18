@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {PoolClient} from 'pg';
 import type {RecordStoredValue} from '../../src/system-files/record-value-write.js';
-import {loadNativeFields,nativeTableSql,nativeValueSql,readNativeValueRows,
+import {loadNativeFields,nativeTableSql,nativeValueSql,nativeTypedValueSql,readNativeValueRows,
  type NativeFieldsMetadata} from '../../src/system-files/native-object-query.js';
 import {writeNativeValues} from '../../src/system-files/native-values.js';
 
@@ -169,4 +169,15 @@ test('hostile field names cannot enter SQL; missing native records fail closed',
  const absent=fixture([metadataRow('Name')],false);
  await assert.rejects(writeNativeValues(absent.client,tenant,'Product',record,
   new Map([['Name',scalar({value_text:'A'})]])),/Native record not found/);
+});
+
+test('a Date/Time kept as text in native storage still compares as a date/time',()=>{
+ const meta:NativeFieldsMetadata={table,fields:new Map([
+  ['OnlineAt',{column:null,sqlType:'text',dataType:'datetime'}],
+  ['HeldAt',{column:null,sqlType:'timestamptz',dataType:'datetime'}]
+ ])};
+ const asText=nativeTypedValueSql(meta,'OnlineAt','timestamptz');
+ assert.match(asText,/^\(CASE WHEN \(nr\.extras->>'OnlineAt'\) ~ '\^\\d\{4\}-\\d\{2\}-\\d\{2\}' THEN \(\(nr\.extras->>'OnlineAt'\)\)::timestamptz END\)$/);
+ assert.ok(!asText.includes("$'"),'no String.replace tokens');
+ assert.equal(nativeTypedValueSql(meta,'HeldAt','timestamptz'),nativeValueSql(meta,'HeldAt'));
 });

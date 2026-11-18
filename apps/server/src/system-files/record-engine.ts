@@ -5,7 +5,7 @@ export {withRecordReadScope} from '../system-support/record-read-scope.js';
 import type {RecordStoredValue} from './record-value-write.js';
 import {writeNativeValues} from './native-values.js';
 import {activateNativeObject} from '../system-support/native-object-storage.js';
-import {nativeRecordJoin,nativeValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeFieldsMetadata,type NativeQueryField} from './native-object-query.js';
+import {nativeRecordJoin,nativeValueSql,nativeTypedValueSql,nativeTableSql,loadNativeFields,readNativeValueRows,type NativeFieldsMetadata,type NativeQueryField} from './native-object-query.js';
 import {fastRecordAccess} from '../system-support/record-access-fast.js';
 import {validateAndMatchRecord} from '../business-rule-engine/RuleExecutionCoordinator.js';
 import {requiresUniqueValue} from '../business-rule-engine/UniqueConstraintManager.js';
@@ -1228,7 +1228,8 @@ export class RecordEngine {
       // One-level lookup paths (e.g. Product.AgeRestricted) are checked against
       // the lookup field, the related Object and the related Field, and the SQL
       // predicate re-applies record access to the related record.
-      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name):undefined,nativeText:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name,'nr',true):undefined}]));
+      const compareAs=(f:{data_type:string;rollup_source_data_type?:string|null})=>({datetime:'timestamptz',date:'date',number:'numeric',currency:'numeric',percent:'numeric',boolean:'boolean'} as Record<string,string>)[String(f.data_type==='rollup'?f.rollup_source_data_type:f.data_type)];
+      const filterFields=new Map<string,QueryField>(definitions.map(f=>[f.api_name,{...f,nativeValue:nativeMeta.fields.has(f.api_name)?(compareAs(f)?nativeTypedValueSql(nativeMeta,f.api_name,compareAs(f)!):nativeValueSql(nativeMeta,f.api_name)):undefined,nativeText:nativeMeta.fields.has(f.api_name)?nativeValueSql(nativeMeta,f.api_name,'nr',true):undefined}]));
       for(const filter of options.filters){
         const path=/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/.exec(filter.field);
         if(!path){

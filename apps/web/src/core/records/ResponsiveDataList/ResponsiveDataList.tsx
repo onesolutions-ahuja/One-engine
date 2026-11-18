@@ -17,6 +17,8 @@ type Props<T> = {
   label: string;
   onOpen?: (record: T) => void;
   openLabel?: string;
+  /** Optional second action (e.g. Delete); callers decide permission before passing it. */
+  rowAction?: { label: string; onAction: (record: T) => void };
   loading?: boolean;
   includeTablet?: boolean;
   /** Show cards on 1024–1199px admin layouts that cannot fit their action columns. */
@@ -26,7 +28,7 @@ type Props<T> = {
 /** Phone presentation only; keep the caller's existing tablet/desktop table and operations.
  * All text comes from already-authorised caller data; permission filtering remains upstream.
  */
-export default function ResponsiveDataList<T>({rows,columns,getId,label,onOpen,openLabel='Open',loading=false,emptyText='No records',includeTablet=false,includeNarrowDesktop=false}: Props<T>) {
+export default function ResponsiveDataList<T>({rows,columns,getId,label,onOpen,openLabel='Open',rowAction,loading=false,emptyText='No records',includeTablet=false,includeNarrowDesktop=false}: Props<T>) {
   const formFactor=useFormFactor();
   const narrowDesktopQuery='(min-width: 1024px) and (max-width: 1199px)';
   const [isNarrowDesktop,setIsNarrowDesktop]=React.useState(()=>
@@ -62,6 +64,7 @@ export default function ResponsiveDataList<T>({rows,columns,getId,label,onOpen,o
             <dt>{col.label}</dt><dd>{col.render(record)}</dd>
           </div>)}
           {onOpen&&<button type="button" onClick={()=>onOpen(record)}>{openLabel}</button>}
+          {rowAction&&<button type="button" onClick={()=>rowAction.onAction(record)}>{rowAction.label}</button>}
         </div>
       </details>;
     })}

@@ -621,7 +621,8 @@ export function renderSetupShell(ctx: any) {
               onImportFlow={(file) => void importFlow(file)}
               onCloneFlow={(candidate) => void cloneFlow(candidate)}
               onDeactivateFlow={(apiName) => void deactivateFlow(apiName)}
-              onDeleteFlow={(apiName) => void deleteFlow(apiName)}
+              onDeleteFlow={(apiName: string, label?: string) => deleteFlow(apiName, label)}
+              canManageFlows={canManageFlows}
               onCreateFlow={createFlow}
               onUndo={undoFlow}
               onRedo={redoFlow}

@@ -1,5 +1,5 @@
 import ResponsiveDataList from '../../../../records/ResponsiveDataList/ResponsiveDataList';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 import type { useFlowEditorState } from '../useFlowEditorState';
 import type { useFlowCreateDialog } from './useFlowCreateDialog';
@@ -17,7 +17,12 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
     safeFlowPage, flowPageCount,
   } = editorState;
   const { setShowCreateFlow, showCreateFlow, createFlowDialog } = createDialog;
-  const { onCreateFlow, onSelectFlow } = props;
+  const { onCreateFlow, onSelectFlow, onDeleteFlow, canManageFlows } = props;
+  const removeFlow = async (apiName: string, label: string) => {
+    if (!canManageFlows) return;
+    const deleted = await onDeleteFlow(apiName, label);
+    if (deleted) setRemoteFlowResults((current) => current ? { ...current, flows: current.flows.filter((row) => row.apiName !== apiName), total: Math.max(0, current.total - 1) } : current);
+  };
   return <div className="flow-start-page flow-start-page-split">
     <div className="flow-start-heading">
       <div className="eyebrow">AUTOMATION</div>
@@ -58,14 +63,6 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
     </section></div>}
     <section className="flow-start-existing surface" aria-labelledby="flow-start-existing-title">
       <h2 id="flow-start-existing-title">Existing flows</h2>
-      <nav className="flow-existing-type-tabs" aria-label="Flows by type" style={{display:'flex',gap:6,flexWrap:'wrap',padding:'10px 0'}}>
-        {[{type:'all',label:'All Flows'},...flowTypeOptions.map(option=>({type:option.type,label:option.type})),
-          ...(['Screen Flow','In-Screen Flow','Autolaunched Flow','Record-Triggered Flow','Schedule-Triggered Flow','Platform Event-Triggered Flow','Flow Orchestration'] as const)
-            .filter(type=>!flowTypeOptions.some(option=>option.type===type)).map(type=>({type,label:type}))].map(option=>
-          <button type="button" className={'btn btn-small'+(existingFlowTypeTab===option.type?' btn-brand':'')}
-            key={option.type} aria-pressed={existingFlowTypeTab===option.type}
-            onClick={()=>{setExistingFlowTypeTab(option.type);setExistingFlowPage(1);setRemoteFlowResults(null);}}>{option.label}</button>)}
-      </nav>
       <label className="form-label flow-existing-type-select">Flow type
        <select className="form-control" aria-label="Filter flows by type" value={existingFlowTypeTab}
         onChange={e=>{setExistingFlowTypeTab(e.target.value);setExistingFlowPage(1);setRemoteFlowResults(null);}}>
@@ -84,6 +81,7 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
       {totalFlowCount ? <>
         <ResponsiveDataList rows={displayedFlows} includeTablet includeNarrowDesktop getId={item=>item.apiName}
          label="Existing Flows" onOpen={item=>onSelectFlow(item.apiName)} openLabel="Edit Flow"
+         rowAction={canManageFlows?{label:'Delete',onAction:item=>void removeFlow(item.apiName,item.label)}:undefined}
          columns={[
           {apiName:'label',label:'Flow',phoneRole:'title',render:item=>item.label},
           {apiName:'flowType',label:'Type',phoneRole:'subtitle',render:item=>item.flowType},
@@ -97,10 +95,10 @@ export default function FlowLandingPage({ editorState, createDialog, props }: {
          ]}/>
         <div className="flow-existing-table-scroll md-mobile-table-replaced md-tablet-table-replaced" role="region" aria-label="Flows table" tabIndex={0}>
         <table className="flow-existing-table">
-          <thead><tr><th scope="col">Edit</th><th scope="col">Flow Name</th><th scope="col">Flow Type</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Details</th></tr></thead>
+          <thead><tr><th scope="col">{canManageFlows ? "Actions" : "Edit"}</th><th scope="col">Flow Name</th><th scope="col">Flow Type</th><th scope="col">Status</th><th scope="col">Version</th><th scope="col">Details</th></tr></thead>
           <tbody>{displayedFlows.map((candidate) =>
             <tr key={candidate.apiName}>
-              <td><button type="button" className="icon-button subtle" aria-label={`Edit ${candidate.label}`} title={`Edit ${candidate.label}`} onClick={() => onSelectFlow(candidate.apiName)}><Pencil size={16} /></button></td>
+              <td><button type="button" className="icon-button subtle" aria-label={`Edit ${candidate.label}`} title={`Edit ${candidate.label}`} onClick={() => onSelectFlow(candidate.apiName)}><Pencil size={16} /></button>{canManageFlows && <button type="button" className="icon-button subtle" aria-label={`Delete ${candidate.label}`} title={`Delete ${candidate.label}`} onClick={() => void removeFlow(candidate.apiName, candidate.label)}><Trash2 size={16} /></button>}</td>
               <td><button type="button" className="text-action" onClick={() => onSelectFlow(candidate.apiName)}>{candidate.label}</button></td>
               <td>{candidate.flowType}</td><td>{candidate.status}</td><td>v{candidate.versionNumber}</td>
               <td>{(candidate.createdBy||candidate.createdAt||candidate.lastModifiedBy||candidate.lastModifiedAt)?<details><summary aria-label={'View details for '+candidate.label}>View details</summary><dl><dt>Created by</dt><dd>{candidate.createdBy || '—'}</dd><dt>Created</dt><dd>{candidate.createdAt ? new Date(candidate.createdAt).toLocaleString() : '—'}</dd><dt>Modified by</dt><dd>{candidate.lastModifiedBy || '—'}</dd><dt>Modified</dt><dd>{candidate.lastModifiedAt ? new Date(candidate.lastModifiedAt).toLocaleString() : '—'}</dd></dl></details>:<span>Unavailable</span>}</td>

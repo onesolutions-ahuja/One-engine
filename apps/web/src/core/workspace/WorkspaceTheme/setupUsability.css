@@ -440,10 +440,9 @@
 .lightning .md-recovery-save-bar>.btn{min-height:44px}
 
 /* Builder landing pages: show flow list before wide desktop metadata columns. */
-.lightning .flow-existing-type-select{display:none}
+.lightning .flow-existing-type-select{display:grid;gap:6px;padding:8px 0;max-width:320px}
 @media(max-width:1023px){
  .lightning .flow-start-existing{min-width:0;overflow:visible}
- .lightning .flow-existing-type-tabs{display:none!important}
  .lightning .flow-existing-type-select{display:grid;gap:6px;padding:8px 0;width:100%;max-width:440px}
  .lightning .flow-existing-type-select .form-control{min-height:44px;width:100%}
  .lightning .flow-existing-controls{min-width:0;max-width:100%}

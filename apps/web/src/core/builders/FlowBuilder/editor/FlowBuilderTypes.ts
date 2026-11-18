@@ -50,7 +50,8 @@ export type FlowBuilderProps = {
   onImportFlow: (file: File) => void;
   onCloneFlow: (flow: FlowDefinitionMetadata) => void;
   onDeactivateFlow: (apiName: string) => void;
-  onDeleteFlow: (apiName: string) => void;
+  onDeleteFlow: (apiName: string, label?: string) => void | Promise<boolean>;
+  canManageFlows?: boolean;
   onCreateFlow: (label: string, flowType: FlowDefinitionMetadata['flowType']) => void;
   onUndo: () => void;
   onRedo: () => void;

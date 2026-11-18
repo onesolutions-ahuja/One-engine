@@ -2,13 +2,13 @@ import { availableComponentSettings, resolveComponentSettings, validateComponent
 import { pagePropertyIssues } from '../../../../components/Properties/pagePropertyContract';
 import { generateMetadataApiName, metadataNameConflictExcept, suggestMetadataApiName } from '../../../../metadata/Definitions/metadataApiNames';
 import { reconcileNavigationOrder } from '../../../../workspace/Navigation/appNavigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { duplicatePageComponentId } from '../../componentIdentity';
 import { remapComponentInteractionTargets } from '../../pageComponentTree';
 import { findRegisteredComponent } from '../../../../components/Registry/componentRegistryLookup';
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary';
-import { pageActivationAppCandidates, resolvePageActivationApp } from '../../pageAppMembership';
+import { pageActivationAppCandidates, resolvePageActivationApp, pageAppsWithPopups } from '../../pageAppMembership';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
 import { downloadCode } from '../../../../pages/PageCompiler/downloadPageScript';
 import { fetchServerPageScriptSource } from '../../../../pages/PageCompiler/serverPageScript';
@@ -280,12 +280,15 @@ export function usePageManagement(
     }
   };
   // Rebuild the app tabs from tenant app metadata on every render. No app names are hardcoded.
-  const pageAppIds = (item: LightningPageMetadata): string[] => pageActivationAppCandidates(apps,item);
+  // A page's apps: the ones that own, assign or navigate to it; an In-Screen page (popup)
+  // also belongs to every app whose pages open it with SCREEN(page, ...).
+  const pageAppIdMap = useMemo(()=>pageAppsWithPopups(apps,pages),[apps,pages]);
+  const pageAppIds = (item: LightningPageMetadata): string[] => pageAppIdMap.get(item.apiName) ?? pageActivationAppCandidates(apps,item);
   const pageAppTabs = [...apps].sort((a,b) => a.label.localeCompare(b.label));
   const pageTabType = (item: LightningPageMetadata) => item.pageType;
   const visiblePages = pages.filter(item => (recordPageContext
     ? item.pageType === 'Record Page' && item.targetObject === recordPageContext
-    : item.pageType !== 'Record Page') && (recordPageContext || pageListTypeTab !== 'App Page' || pageListAppTab === 'all' || (pageListAppTab === 'other'
+    : item.pageType !== 'Record Page') && (recordPageContext || pageListAppTab === 'all' || (pageListAppTab === 'other'
       ? pageAppIds(item).length === 0 : pageAppIds(item).includes(pageListAppTab)))
     && (recordPageContext || pageListTypeTab === 'all' || pageTabType(item) === pageListTypeTab)
     && (pageListDeviceTab === 'all' || (pageListDeviceTab === 'Mobile'

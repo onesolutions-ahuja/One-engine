@@ -48,7 +48,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v7: Till, Auto Number invoice/order numbers per Location, TillId/UserId on sales documents.
 // v8-v11: Cart/CartLine device fields, Till.CustomerDisplayKey. v12: smart_video.
 // v13: one global catalogue (ProductCategory, ProductOptionGroup, ProductOption, CartLineOption,
-// Product.Category and channel flags); Till becomes NamedDevice type POS Terminal (records
+// Choice, Product.Category and channel flags); Appointment check-in fields and ServiceProduct; Till becomes NamedDevice type POS Terminal (records
 // migrated once, TillId repointed); Order, ProductLine, Account, Lead and Case retired from Core.
 export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v13';
 const metadata=[

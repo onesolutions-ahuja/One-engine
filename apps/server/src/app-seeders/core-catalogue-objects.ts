@@ -1,6 +1,7 @@
 import type {PoolClient} from 'pg';
 
 /** Shared product catalogue for every selling app (till, kiosk, online, bookings).
+ * Choice holds simple picture cards any app shows (order type, payment method, receipt).
  * ProductCategory replaces app-named menu categories; ProductOptionGroup/ProductOption
  * replace meal-choice groups and options (sizes, add-ons, service extras); CartLineOption is
  * the option chosen on a cart line. Channel flags say where a Product or Category is sold.
@@ -42,6 +43,14 @@ export const CATALOGUE_OBJECTS:ReadonlyArray<{apiName:string;label:string;existi
   {apiName:'SortOrder',label:'Sort Order',dataType:'number'},
   {apiName:'Active',label:'Active',dataType:'boolean'},
   {apiName:'ImageUrl',label:'Image URL',dataType:'text',maxLength:2048}
+ ]},
+ {apiName:'Choice',label:'Choice',fields:[
+  {apiName:'Name',label:'Name',dataType:'text'},
+  {apiName:'ChoiceGroup',label:'Choice Group',dataType:'text',maxLength:80},
+  {apiName:'Description',label:'Description',dataType:'text',maxLength:255},
+  {apiName:'ImageUrl',label:'Image URL',dataType:'text',maxLength:2048},
+  {apiName:'SortOrder',label:'Sort Order',dataType:'number'},
+  {apiName:'Active',label:'Active',dataType:'boolean'}
  ]},
  {apiName:'CartLineOption',label:'Cart Line Option',fields:[
   {apiName:'Name',label:'Name',dataType:'text'},

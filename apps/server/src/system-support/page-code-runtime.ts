@@ -25,6 +25,7 @@ import {ScheduledActionService} from './scheduled-action-service.js';
 import {compileActionPlan} from '../expression-engine/ActionFormulas.js';
 import {sendActionCommunication,type CommunicationChannel} from './action-formula-communication-service.js';
 import {FlowRecordQuery} from '../system-files/flow-record-query.js';
+import {runActionCallout} from './action-formula-callout-service.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
 import type {NamedCredentialService} from './named-credential-service.js';
 
@@ -112,7 +113,9 @@ class ServerScope{
  constructor(private readonly records:Records,private readonly actor:Actor,private readonly request:PageCodeRequest,
   private readonly identity:TrustedFormulaSession|null,private readonly connections:ConnectionSnapshot|null,
   private readonly verify:((pin:unknown,userId?:unknown)=>Promise<boolean>)|null,
-  private readonly services:{db?:SqlPersistence;rbac?:RbacEngine}={}){}
+  private readonly services:{db?:SqlPersistence;rbac?:RbacEngine;namedCredentials?:NamedCredentialService}={}){}
+ /** Seconds REPEAT has waited in this action. */
+ private slept=0;
  /** Messages are sent after the transaction commits (never for a rolled-back save). */
  readonly messages:Array<{channel:CommunicationChannel;credential:string;values:unknown[]}>=[];
  get sessionId(){return this.request.sessionId;}
@@ -311,6 +314,24 @@ class ServerScope{
    for(const object of ['Invoice','CashLedger']){this.written.add(object);this.forget(object);}
    return result;
   }
+  if(name==='CALLOUT'){
+   const {db,rbac,namedCredentials}=this.services;
+   if(!db||!rbac||!namedCredentials)throw Error('CALLOUT is unavailable');
+   const [operation,values]=args;
+   // Missing connector, Named Credential or default device: fails here, before any wait.
+   return runActionCallout({db,rbac,query:new FlowRecordQuery(db,rbac),
+    callout:(tenantId,userId,config,variables,calloutKey)=>namedCredentials.callout(tenantId,userId,config,variables,calloutKey)},
+   this.actor.tenant_id,this.actor.user_id,operation,values,randomUUID());
+  }
+  if(name==='SLEEP'){
+   // REPEAT pauses: at most 55 seconds of waiting in one action (under the web timeout);
+   // then REPEAT stops and the formula sees the last reply (e.g. Result "Pending").
+   const seconds=Math.max(0,Math.min(30,Number(args[0])||0));
+   if(this.slept+seconds>55)return {timeUp:true};
+   this.slept+=seconds;
+   await new Promise(resolve=>setTimeout(resolve,seconds*1000));
+   return {timeUp:false};
+  }
   if(name==='LOCATION'||name==='CREATEPDF'){
    const key=deviceStepKey(name,args);
    const answers=this.request.device;
@@ -363,7 +384,7 @@ async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{ide
   needs.connections?loadConnectionSnapshot(deps.db,actor.tenant_id):Promise.resolve(null)]);
  const scope=new ServerScope(deps.records,actor,request,identity,connections as ConnectionSnapshot|null,
   deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null,
-  {db:deps.db as SqlPersistence,rbac:deps.rbac});
+  {db:deps.db as SqlPersistence,rbac:deps.rbac,namedCredentials:deps.namedCredentials});
  // Only a request from a page that reads @ThisPage.Till/Device carries a device key.
  if(request.deviceKey)await scope.loadTill();
  return scope;

@@ -48,7 +48,7 @@ test('display formulas become plain functions that match the formula language', 
 });
 
 test('event and related references convert', ()=>{
- const action=compileActionFormula('=ACTIONS(STATE(pick, @event.value), STATE(name, @event.record.Name), SCREEN(edit, popup, @event.recordId))','Product');
+ const action=compileActionFormula('=ACTIONS(@ThisPage.Pick.Value = @event.value, @ThisPage.PickName.Value = @event.record.Name, SCREEN(edit, popup, @event.recordId))','Product');
  assert.match(action.js,/\$\.event\("value"\)/);
  assert.match(action.js,/\$\.f\(\$\.event\("record"\), "Name"\)/);
  const image=compileDisplayFormula('=@Product.ImageUrl','CartLine');
@@ -56,6 +56,7 @@ test('event and related references convert', ()=>{
 });
 
 test('unknown functions are save errors, not run-time interpretation', ()=>{
+ assert.throws(()=>compileActionFormula('=STATE(err, "x")',''),/STATE is no longer used/);
  assert.throws(()=>compileDisplayFormula('=NOPE(1)'),/not in the formula dictionary/);
  assert.throws(()=>compileDisplayFormula('=CREATERECORD(Cart, Name, "x")'),/is an action/);
 });
@@ -67,7 +68,7 @@ test('an action becomes one async function and names the rows the page should ho
  assert.match(action.js,/^async \(\$\) => \{/);
  assert.ok(action.sets.some(set=>set.object==='Cart'&&set.criteria.map(c=>c.field).join()==='SessionKey,Status'));
  assert.ok(action.sets.some(set=>set.object==='CartLine'&&set.parent?.field==='Cart'));
- const ui=compileActionFormula('=ACTIONS(STATE(category, "*"), SCREEN(smart_till_payment, popup, @recordId))','Product');
+ const ui=compileActionFormula('=ACTIONS(@ThisPage.Category.Value = "*", SCREEN(smart_till_payment, popup, @recordId))','Product');
  assert.equal(ui.data,false);
  assert.deepEqual(ui.ui,['SCREEN']);
 });
@@ -190,7 +191,7 @@ test('messages and payments run on the server; device steps stay with the action
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", "a@b\.co", "Receipt", "Thanks"\]\)/);
  const pay=compileActionFormula('=RECORDPAYMENT(@recordId, 10, "Cash", AS(p))','Invoice');
  assert.deepEqual(pay.writes.sort(),['CashLedger','Invoice']);
- const wait=compileActionFormula('=ACTIONS(STATE(a, 1), WAIT(1, 0), STATE(b, 2))','Cart');
+ const wait=compileActionFormula('=ACTIONS(@ThisPage.A.Value = 1, WAIT(1, 0), @ThisPage.B.Value = 2)','Cart');
  assert.equal(wait.data,true);
  assert.match(wait.js,/\$\.service\("WAIT", \[1, 0, 0, "=ACTIONS/);
  assert.match(wait.js,/return;/);
@@ -255,9 +256,9 @@ test('new-style actions: state, filter, navigation, WAIT, LOCATION, CREATEPDF, m
  const nav=compileActionFormula('@navigate.list := @ThisPage.Input.listName','');
  assert.match(nav.js,/\$\.ui\("NAVIGATE", "list", \$\.state\("listName"\)\)/);
  assert.throws(()=>compileActionFormula('@ThisPage.Session.Id := "x"',''),/session cannot be changed/);
- const wait=compileActionFormula('=ACTIONS(WAIT(1, 0), STATE(b, @ThisPage.Input.recordId))','Cart');
+ const wait=compileActionFormula('=ACTIONS(WAIT(1, 0), @ThisPage.B.Value = @ThisPage.Input.recordId)','Cart');
  assert.match(wait.js,/\$\.service\("WAIT", \[1, 0, 0, /);
- assert.match(wait.js,/setState\("b", \$\.state\("recordId"\)\)/);
+ assert.match(wait.js,/setValue\("B", \$\.state\("recordId"\)\)/);
  const pdf=compileActionFormula('=ACTIONS(CREATEPDF(Receipt, @ThisPage.Input.recordId, AS(pdf)), LOCATION(AS(here)))','Cart');
  assert.match(pdf.js,/\$\.service\("CREATEPDF", \["Receipt", \$\.state\("recordId"\)\]\)/);
  assert.match(pdf.js,/v\["here"\] = await \$\.service\("LOCATION", \[\]\)/);

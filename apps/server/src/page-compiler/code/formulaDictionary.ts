@@ -98,7 +98,7 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
 
  /* ---------- Action steps: one button function + one server function ---------- */
  ACTIONS:action(1,64,'ACTIONS(step, step, ...): run steps in order'),
- STATE:action(2,2,'STATE(key, value) -> $.setState(key, value): changes the screen at once'),
+ STATE:action(2,2,'Retired: use @ThisPage.Name.Value = value (the component holds the value)'),
  GETRECORD:action(4,42,'GETRECORD(Object, Field, value, ..., AS(x)) -> x = first matching record'),
  CREATERECORD:action(1,82,'CREATERECORD(Object, Field, value, ...) -> insert in the same transaction'),
  UPDATERECORD:action(4,82,'UPDATERECORD(Object, Id, Field, value, ...) -> update in the same transaction'),

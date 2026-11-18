@@ -53,3 +53,33 @@ export const resolvePageActivationApp=(
  if(page.ownerNamespace&&candidates.includes(page.ownerNamespace))return page.ownerNamespace;
  return candidates.length===1?candidates[0]:null;
 };
+
+/** Apps of every page, where a popup (opened with SCREEN(page, ...)) also belongs to every
+ * app whose pages open it, through popups that open popups. */
+export function pageAppsWithPopups(
+ apps:ReadonlyArray<Pick<LightningAppMetadata,'apiName'|'navigationPageApiNames'|'navigationOrder'>>,
+ pages:ReadonlyArray<Pick<LightningPageMetadata,'apiName'|'activationAssignments'|'ownerNamespace'>&{components?:unknown}>
+):Map<string,string[]>{
+ const result=new Map(pages.map(page=>[page.apiName,new Set(pageActivationAppCandidates(apps,page))]));
+ const opens=new Map(pages.map(page=>{
+  let text='';try{text=JSON.stringify(page.components??[]);}catch{/* not serialisable */}
+  const found=new Set<string>();
+  for(const match of text.matchAll(/SCREEN\(\s*([A-Za-z][A-Za-z0-9_]*)/gi))found.add(match[1].toLowerCase());
+  return [page.apiName,found];
+ }));
+ const byLower=new Map(pages.map(page=>[page.apiName.toLowerCase(),page.apiName]));
+ for(let pass=0,changed=true;changed&&pass<5;pass++){
+  changed=false;
+  for(const [opener,targets] of opens){
+   const openerApps=result.get(opener);
+   if(!openerApps?.size)continue;
+   for(const lower of targets){
+    const target=byLower.get(lower);
+    const targetApps=target?result.get(target):undefined;
+    if(!targetApps||target===opener)continue;
+    for(const app of openerApps)if(!targetApps.has(app)){targetApps.add(app);changed=true;}
+   }
+  }
+ }
+ return new Map([...result].map(([name,set])=>[name,[...set]]));
+}

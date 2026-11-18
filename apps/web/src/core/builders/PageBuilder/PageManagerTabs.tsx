@@ -37,7 +37,7 @@ function TabBar({ label, className, tabs, selected, onSelect }: {
   </nav>;
 }
 
-/** Page categories are primary. App ownership is a secondary filter of App Pages only. */
+/** Application first (In-Screen popups belong to the apps that open them), then page type. */
 export default function PageManagerTabs({ type, app, apps, onTypeChange, onAppChange }: {
   type: string;
   app: string;
@@ -52,14 +52,14 @@ export default function PageManagerTabs({ type, app, apps, onTypeChange, onAppCh
   ];
   return <div className="page-manager-tab-groups">
     <div className="page-manager-tab-level">
+      <span className="page-manager-filter-label">Application</span>
+      <TabBar label="Pages by application" className="page-manager-app-tabs"
+        tabs={appTabs} selected={app} onSelect={onAppChange} />
+    </div>
+    <div className="page-manager-tab-level">
       <span className="page-manager-filter-label">Page type</span>
       <TabBar label="Page types" className="page-manager-main-tabs" tabs={pageTypes}
         selected={type} onSelect={onTypeChange} />
     </div>
-    {type === 'App Page' && <div className="page-manager-tab-level">
-      <span className="page-manager-filter-label">Application</span>
-      <TabBar label="Pages by application" className="page-manager-app-tabs"
-        tabs={appTabs} selected={app} onSelect={onAppChange} />
-    </div>}
   </div>;
 }

@@ -326,7 +326,7 @@ export function compileRecordFilters(
       // Function replacers: a native expression may contain "$'" or "$&" (e.g. a regex).
       const direct=condition.replace(/fv\.reference_record_id::text/g,()=>nativeText)
         .replace(/fv\.value_text/g,()=>nativeText)
-        .replace(/fv\.(?:value_number|value_boolean|value_date|value_datetime)/g,()=>nativeValue);
+        .replace(/fv\.(?:value_datetime|value_number|value_boolean|value_date)\b/g,()=>nativeValue);
       return negated?`(${fieldParameter}::text IS NOT NULL AND NOT COALESCE((${direct}),FALSE))`
         :`(${fieldParameter}::text IS NOT NULL AND (${direct}))`;
     };

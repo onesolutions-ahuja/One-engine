@@ -29,7 +29,7 @@ export default function SmartComponent(p){
  const list=videoList(value);
  const key=list.join(";");
  React.useEffect(()=>setIndex(0),[key]);
- if(hiddenByShowWhen(p))return null;
+ if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const design=p.editing||p.designMode||p.builderPreview;
  const box={borderRadius:p.radius,border:p.borderColor?"1px solid "+p.borderColor:undefined,
   background:p.backgroundColor||undefined};

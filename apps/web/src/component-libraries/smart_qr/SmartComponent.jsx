@@ -17,7 +17,7 @@ function matrixFor(text){
  return matrix;
 }
 export default function SmartComponent(p){
- if(hiddenByShowWhen(p))return null;
+ if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const records=Array.isArray(p.records)?p.records:Array.isArray(p.items)?p.items:[];
  const row=records[0]||p.record||{};
  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;

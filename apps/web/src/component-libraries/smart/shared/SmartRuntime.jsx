@@ -1138,7 +1138,9 @@ export default function SmartRuntime(p){
   const shown=typeof showWhen==="string"?scopedExpression(p,"visibleFormula",showWhen,record):showWhen;
   // A formula that cannot run hides the component (fail closed), never shows it.
   if(shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
-   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR")return null;
+   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR")
+   // Marker only: the page frame around a hidden component must not catch taps meant for what is under it.
+   return <span data-smart-hidden="true" hidden/>;
  }
  // Geometry-only technical host; the native Smart surface owns all visible styling.
  return <div className={"smart-runtime "+name+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}

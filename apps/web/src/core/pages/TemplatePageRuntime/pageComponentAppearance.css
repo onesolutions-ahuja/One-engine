@@ -706,3 +706,7 @@
  outline-offset:3px!important;
  border-radius:var(--md-page-radius,8px)!important;
 }
+
+/* A Smart component hidden by its Show-when formula keeps its canvas frame; let taps pass through
+   (only leaf frames, so a container with one hidden child stays usable). */
+.free-canvas-runtime-component:not(:has(.free-canvas-runtime-component)):has([data-smart-hidden]){pointer-events:none;visibility:hidden}

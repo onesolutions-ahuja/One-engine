@@ -16,6 +16,7 @@ import {
   formulaWeekday,isFormulaDate,parseFormulaDateTime
 } from '../expression-engine/FormulaDate.js';
 import {roundFormulaNumber} from '../expression-engine/FormulaNumeric.js';
+import {formulaFormat} from '../expression-engine/FormulaFormat.js';
 import {createNamedFormulaCollection} from '../expression-engine/FormulaCollection.js';
 import {sumFormulaCollection} from '../expression-engine/FormulaCollection.js';
 import {isExcelWildcardDataReference} from '../expression-engine/FormulaWildcard.js';
@@ -168,6 +169,7 @@ function evaluateNode(node:Expression,resolve:FormulaResolver,context:FormulaEva
       const value=argument(0);return value===null||value===undefined?argument(1):value;
     }
     case 'TEXT':arity(1);return formulaText(argument(0));
+    case 'FORMAT':arity(2);return formulaFormat(argument(0),argument(1),context.timeZone??'UTC');
     case 'VALUE':arity(1);return numeric(argument(0));
     case 'LEN':arity(1);return textPoints(argument(0)).length;
     // Excel CHAR(code): CHAR(10) is a new line.
@@ -417,6 +419,7 @@ export function inferFlowFormulaType(expression:string,resolve:FormulaTypeResolv
         return result;
       }
       case 'TEXT':arity(1);return 'Text';
+    case 'FORMAT':arity(2);return 'Text';
       case 'VALUE':arity(1);requireText(0);return 'Number';
       case 'LEN':arity(1);requireText(0);return 'Number';
       case 'CHAR':arity(1);requireNumber(0);return 'Text';

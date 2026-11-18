@@ -12,6 +12,7 @@
  */
 import {evaluateFormulaBinary,evaluateFormulaUnary,formulaTruth} from '../../expression-engine/FormulaParser.js';
 import {roundFormulaNumber} from '../../expression-engine/FormulaNumeric.js';
+import {formulaFormat} from '../../expression-engine/FormulaFormat.js';
 import {matchesExcelWildcard,hasExcelWildcardCriteria} from '../../expression-engine/FormulaWildcard.js';
 import {
  evaluateFormulaDateBinary,formulaAddDays,formulaAddMonths,formulaDateParts,formulaDateText,
@@ -195,6 +196,7 @@ export const F={
  /** Date and time to the minute (agreed: no seconds); TIMENOW keeps seconds. */
  NOW:(clock:FormulaClock)=>formulaNowIsoDateTime(clock.now()),
  TIMENOW:(clock:FormulaClock)=>formulaTimeText(clock.now(),clock.timeZone()),
+ FORMAT:(clock:FormulaClock,value:unknown,pattern:unknown)=>formulaFormat(value,pattern,clock.timeZone()),
  DAY:(clock:FormulaClock,value:unknown)=>formulaDateTimeParts(text(value),clock.timeZone()).day,
  MONTH:(clock:FormulaClock,value:unknown)=>formulaDateTimeParts(text(value),clock.timeZone()).month,
  YEAR:(clock:FormulaClock,value:unknown)=>formulaDateTimeParts(text(value),clock.timeZone()).year,

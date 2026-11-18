@@ -123,6 +123,20 @@ export function nativeValueSql(meta:NativeFieldsMetadata,fieldApi:string,alias='
  return sql;
 }
 
+/** The field's value as the SQL type its data type compares as (Date/Time -> timestamptz).
+ * A field whose native storage kept it as text (made before its type was set) is cast
+ * with a guard, so `DeviceOnlineAt < now` works and a bad value reads as NULL. */
+export function nativeTypedValueSql(meta:NativeFieldsMetadata,fieldApi:string,cast:string,alias='nr'):string{
+ const field=meta.fields.get(fieldApi);
+ if(!field||field.sqlType===cast||!['date','timestamptz','numeric','boolean'].includes(cast))
+  return nativeValueSql(meta,fieldApi,alias);
+ const text=nativeValueSql(meta,fieldApi,alias,true);
+ if(cast==='date'||cast==='timestamptz')
+  return `(CASE WHEN ${text} ~ '^\\d{4}-\\d{2}-\\d{2}' THEN (${text})::${cast} END)`;
+ if(cast==='numeric')
+  return `(CASE WHEN ${text} ~ '^\\s*-?(\\d+\\.?\\d*|\\.\\d+)([eE][-+]?\\d+)?\\s*\\Z' THEN (${text})::numeric END)`;
+ return `(CASE WHEN lower(${text}) IN ('true','false','t','f') THEN (${text})::boolean END)`;
+}
 /** EAV-shaped lateral rows for a caller's md_records alias (normally r). */
 export function readNativeValueRows(meta:NativeFieldsMetadata,alias='r'):string{
  nativeTableSql(meta);

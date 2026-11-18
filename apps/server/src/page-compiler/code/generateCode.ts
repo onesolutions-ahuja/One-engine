@@ -421,7 +421,8 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   case 'CALLOUT':{
    const last=args.at(-1);
    const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
-   const operation=literalName(args.shift(),'Connector.Operation');
+   const first=args.shift();
+   const operation=first?.kind==='literal'||first?.kind==='reference'?String(first.value):'';
    if(!/^[A-Za-z][A-Za-z0-9_]{0,79}\.[A-Za-z][A-Za-z0-9_]{0,79}$/.test(operation))
     return fail("CALLOUT needs 'Connector.Operation', for example 'QR.CreateOrder'");
    if(args.length%2)return fail('CALLOUT needs field and value pairs');

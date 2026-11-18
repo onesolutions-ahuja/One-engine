@@ -223,7 +223,16 @@ function temporalKind(value:unknown,timeZone:string):{kind:DateKind;instant:Date
 export function evaluateFormulaDateBinary(
   operator:string,left:unknown,right:unknown,timeZone='UTC'
 ):{handled:boolean;value?:unknown} {
-  const leftTemporal=temporalKind(left,timeZone),rightTemporal=temporalKind(right,timeZone);
+  let leftTemporal=temporalKind(left,timeZone),rightTemporal=temporalKind(right,timeZone);
+  // A Date compared with a DateTime (e.g. a Date field read back as "2026-11-12T00:00:00Z"
+  // against TODAY()): compare calendar days in the user's time zone.
+  if(leftTemporal&&rightTemporal&&leftTemporal.kind!==rightTemporal.kind
+    &&['=','==','!=','<>','<','<=','>','>='].includes(operator)){
+    const day=(temporal:{kind:DateKind;instant:Date})=>temporal.kind==='date'?temporal:
+      {kind:'date' as DateKind,instant:new Date(utcMillis({...formulaDateParts(temporal.instant,timeZone),
+        hour:0,minute:0,second:0,millisecond:0}))};
+    leftTemporal=day(leftTemporal);rightTemporal=day(rightTemporal);
+  }
   if(leftTemporal&&rightTemporal&&leftTemporal.kind===rightTemporal.kind){
     const delta=leftTemporal.instant.getTime()-rightTemporal.instant.getTime();
     if(operator==='-')return {handled:true,value:delta/DAY_MS};

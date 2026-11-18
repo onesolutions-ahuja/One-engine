@@ -25,8 +25,10 @@ export function rewriteLegacyCartText(text,{page=false,cartIds=new Map()}={}){
   .replace(/\bGETRECORD\s*\(\s*(['"]?)CartSession\1\s*,\s*(['"]?)SessionKey\2\s*,\s*([^,()]+)(?=\s*,)/gi,
     (_match,_objectQuote,_fieldQuote,value)=>'GETRECORD(Cart, Id, '+(value.includes('$session')?'$session.cartId':
       value.includes('{!')?'{!cartId}':page?'$session.cartId':'{!cartId}'))
+  // Today's page formulas look a Cart up by the page session (@ThisPage.Session.Id):
+  // that is current syntax, not a legacy reference, and must stay as written.
   .replace(/\bGETRECORD\s*\(\s*(['"]?)Cart\1\s*,\s*(['"]?)SessionKey\2\s*,\s*([^,()]+)(?=\s*,)/gi,
-    (_match,_objectQuote,_fieldQuote,value)=>'GETRECORD(Cart, Id, '+(value.includes('$session')?'$session.cartId':
+    (match,_objectQuote,_fieldQuote,value)=>/@ThisPage\./i.test(value)?match:'GETRECORD(Cart, Id, '+(value.includes('$session')?'$session.cartId':
       value.includes('{!')?'{!cartId}':page?'$session.cartId':'{!cartId}'))
   .replace(/\$state\.cartSessionId\b/g,'$state.activeCartId')
   .replace(/\$session\.cartSessionId\b/g,'$session.cartId')

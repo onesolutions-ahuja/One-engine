@@ -406,13 +406,14 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    const list=node.name==='CREATEPDF'?[q(literalName(args[0],'print template')),...args.slice(1).map(value)]:[];
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
   }
-  case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'RECORDPAYMENT':{
+  case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'RECORDPAYMENT':case 'CASHMOVE':{
    const last=args.at(-1);
    const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
    // Runs on the server only: messages are sent after the save, payments in the same transaction.
    scope.data=true;
    if(node.name==='RECORDPAYMENT'){scope.writes.add('Invoice');scope.writes.add('CashLedger');}
-   const list=node.name==='RECORDPAYMENT'?args.map(value)
+   if(node.name==='CASHMOVE')scope.writes.add('CashLedger');
+   const list=node.name==='RECORDPAYMENT'||node.name==='CASHMOVE'?args.map(value)
     :[q(literalName(args[0],'Named Credential')),...args.slice(1).map(value)];
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
   }

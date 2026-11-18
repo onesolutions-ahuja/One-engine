@@ -58,6 +58,7 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  FIND:pure(2,3,'FIND(find, text, [start]): position or 0'),
  SUBSTITUTE:pure(3,3,'SUBSTITUTE(text, old, new)'),TRIM:pure(1,1,'TRIM(text)'),
  LPAD:pure(2,3,'LPAD(text, length, [pad]): pad on the left, e.g. LPAD(5, 3, "0") = "005"'),
+ FORMAT:pure(2,2,'FORMAT(value, pattern): FORMAT(2.5, "0.00") = "2.50", FORMAT(1234, "#,##0") = "1,234", FORMAT(@Invoice.InvoiceDate, "DD/MM/YYYY HH:mm")',true),
  RPAD:pure(2,3,'RPAD(text, length, [pad]): pad on the right'),
  CONTAINS:pure(2,2,'CONTAINS(text, part)'),BEGINS:pure(2,2,'BEGINS(text, start)'),
  CONCAT:pure(1,20,'CONCAT(a, b, ...)'),CONCATENATE:pure(1,20,'CONCATENATE(a, b, ...)'),

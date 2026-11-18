@@ -12,6 +12,7 @@ import {createNamedFormulaCollection,createCriteriaFormulaCollection,deriveFormu
 import {isExcelWildcardDataReference,matchesExcelWildcard,hasExcelWildcardCriteria} from '../../../../server/src/expression-engine/FormulaWildcard.js';
 import {validateFormulaFunctions} from '../../../../server/src/expression-engine/FormulaFunctionRegistry.js';
 import {roundFormulaNumber} from '../../../../server/src/expression-engine/FormulaNumeric.js';
+import {formulaFormat} from '../../../../server/src/expression-engine/FormulaFormat.js';
 import {isConnected} from '../../../../server/src/expression-engine/FormulaConnections.js';
 import {readComponentState} from '../../../../server/src/expression-engine/FormulaComponentState.js';
 import {parsePageReference,isFlowMarker,isBrowserOnlyReference,legacyReferenceError,FLOW_MARKER} from '../../../../server/src/expression-engine/PageReferences.js';
@@ -58,6 +59,7 @@ const evaluateCall=(name,args,context)=>{
  };
  switch(name){
   case 'TEXT':arity(1);return formulaText(args[0]);
+  case 'FORMAT':arity(2);return formulaFormat(args[0],args[1],context.timeZone);
   case 'VALUE':arity(1);return numeric(args[0]);
   case 'UPPER':arity(1);return text(args[0]).toUpperCase();
   case 'LOWER':arity(1);return text(args[0]).toLowerCase();

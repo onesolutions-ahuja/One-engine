@@ -248,6 +248,8 @@ function App() {
   },[needsLandingRedirect,landingApp]);
 
   const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillPeople().length>0;
+  /** Lock pressed while nobody is saved for PIN sign-in here: say why the email page shows. */
+  const [lockedWithoutPin,setLockedWithoutPin]=useState(false);
   // Lock (LOCKSCREEN(), the till's Lock button) or 5 idle minutes: the person's session ends,
   // their open work is put aside, and the till shows the saved people's PIN screen.
   useEffect(()=>{
@@ -255,6 +257,7 @@ function App() {
     let idle:number|undefined;
     const lock=()=>{
       const userId=activeTillUser();
+      setLockedWithoutPin(tillPeople().length===0);
       stashTillWork(userId);
       setActiveTillUser(null);
       void apiRequest('/auth/logout',{method:'POST'}).catch(()=>{}).finally(()=>setAccessToken(undefined));
@@ -302,7 +305,7 @@ function App() {
     onUnlocked={session=>loginSuccess({kind:'login',startedAt:performance.now(),authenticatedAt:performance.now(),landingAppApi:session.landingAppApi})}/>;
   if (authState === 'anonymous' && !standaloneEntry && window.location.pathname!=='/login' && !(tillMode==='email'&&tillPeople().length>0)) return <div role="status">Opening login…</div>;
   if (authState === 'anonymous') return <Login branding={standaloneEntry??undefined} onStart={cancelRestore} onSuccess={loginSuccess}
-    tillDefault={tillPeople().length>0} onBackToTill={tillPeople().length?()=>setTillMode('lock'):undefined} />;
+    tillDefault={tillPeople().length>0||lockedWithoutPin} lockedWithoutPin={lockedWithoutPin} onBackToTill={tillPeople().length?()=>setTillMode('lock'):undefined} />;
   if (authState === 'error') return <Login branding={standaloneEntry??undefined} error={authError} onStart={cancelRestore} onSuccess={loginSuccess} onRetry={() => { setAuthError(''); setAuthState('anonymous'); void restoreSession(); }} />;
   if(window.location.pathname==='/oauth/authorize')return <React.Suspense fallback={<div role="status">Loading consent…</div>}><LazyOAuthConsent/></React.Suspense>;
   const onLogout=()=>{

@@ -28,7 +28,9 @@ let federationCompletion:Promise<LoginResult|undefined>|undefined;
 export type ProductLoginBrand = { label: string; eyebrow: string; tagline: string; accent: string; signInDescription: string };
 
 export function createLoginView(logoUrl: string) {
-  function Login({ error, onStart, onSuccess, onRetry, branding, tillDefault=false, onBackToTill }: {
+  function Login({ error, onStart, onSuccess, onRetry, branding, tillDefault=false, lockedWithoutPin=false, onBackToTill }: {
+    /** The till was locked while nobody was saved here for PIN sign-in. */
+    lockedWithoutPin?: boolean;
     /** Shared till: "Save me on this till" starts ticked (opened from the till lock screen). */
     tillDefault?: boolean;
     onBackToTill?: () => void;
@@ -194,6 +196,7 @@ export function createLoginView(logoUrl: string) {
           aria-label={passwordVisible?'Hide password':'Show password'} aria-pressed={passwordVisible} onClick={()=>setPasswordVisible(value=>!value)}>{passwordVisible?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button>
         </div>
         {fieldErrors.password&&<small id="login-password-error" className="auth-field-error">{fieldErrors.password}</small>}
+        {lockedWithoutPin&&<p className="auth-till-hint" role="status">Till locked. Nobody is saved on this till for PIN sign-in yet, so sign in here once with "Save me on this till" ticked and a PIN. After that, Lock shows the PIN screen.</p>}
         <label className="auth-till-save">
           <input type="checkbox" checked={saveTill} onChange={event=>setSaveTill(event.target.checked)}/>
           <span>Save me on this till (sign back in with a PIN)</span>

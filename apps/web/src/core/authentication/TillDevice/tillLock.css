@@ -31,3 +31,4 @@
 /* "Save me on this till" on the email sign-in form */
 .auth-till-save{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:14px;cursor:pointer}
 .auth-till-save input{width:18px;height:18px}
+.auth-till-hint{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#FFF4E5;color:#7A4B00;font-size:14px;line-height:1.4}

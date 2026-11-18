@@ -43,3 +43,15 @@ test('Field mode with no field conditions uses the written filter formula',async
  assert.deepEqual(activePageRecordFilters({filterMode:'Field',filters:kept,filterFormula:'@Product.Active = TRUE'}),
   {filters:kept,formula:undefined});
 });
+
+test('open carts on other tills: <> and NOW() minus minutes compile to server filters',()=>{
+ const cart=[{apiName:'Status',label:'Status',dataType:'Text'},{apiName:'SessionKey',label:'Session',dataType:'Text'},
+  {apiName:'DeviceOnlineAt',label:'Online',dataType:'DateTime'}] as unknown as FieldMetadata[];
+ const formula='AND(@Cart.Status = "Open", @Cart.SessionKey <> @ThisPage.Session.Id, @Cart.DeviceOnlineAt < NOW() - 2/1440)';
+ const out=compileRecordFilterFormula(formula,cart,{},'s-1');
+ assert.equal(out.blocked,false,out.error);
+ assert.deepEqual(out.filters.slice(0,2),[{field:'Status',operator:'eq',value:'Open'},{field:'SessionKey',operator:'ne',value:'s-1'}]);
+ assert.equal(out.filters[2].operator,'lt');
+ const ago=(Date.now()-Date.parse(out.filters[2].value))/60000;
+ assert.ok(ago>1&&ago<4,String(out.filters[2].value));
+});

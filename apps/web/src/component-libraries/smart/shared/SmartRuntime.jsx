@@ -404,10 +404,17 @@ function SmartSelector({p,fire}){
   return {index,label,value:row.__collectionValue??row.value??row.Id??row.id??index,record:row};
  });
  const fingerprint=JSON.stringify(options.map(item=>[item.label,item.value]));
- const [active,setActive]=React.useState(0);
- React.useEffect(()=>setActive(0),[fingerprint]);
+ // Nothing is chosen until the user picks (or the page gives a value, e.g.
+ // @ThisPage.Category.Value = pr.MenuCategory): the box shows its placeholder, never a
+ // silently pre-selected first row whose value was never published.
+ const [active,setActive]=React.useState(-1);
+ React.useEffect(()=>setActive(-1),[fingerprint]);
  if(p.selectorMultiSelect===true)return <SmartMultiSelector p={p} fire={fire} options={options} fingerprint={fingerprint}/>;
- const selected=options.length?Math.max(0,Math.min(active,options.length-1)):-1;
+ const given=p.value!==undefined&&p.value!==null&&p.value!==""?p.value
+  :typeof p.defaultValue==="string"&&p.defaultValue.trim()?scopedExpression(p,"defaultValue",p.defaultValue,recordOf(p)):"";
+ const preset=given===""||given===undefined||given===null?-1
+  :options.findIndex(item=>String(item.value)===String(given)||item.label===String(given));
+ const selected=active>=0&&active<options.length?active:preset;
  const placeholder=text(scopedExpression(p,"label",p.placeholder??p.label??"Select",recordOf(p)));
  return <div className="smart-selector"
    data-md-bind={p.builderPreview&&p.selectorOptionsFormula?"selectorOptionsFormula":undefined}
@@ -430,8 +437,8 @@ function SmartSelector({p,fire}){
     setActive(index);
     fire("change",{index,value:item.value,label:item.label,record:item.record});
    }}>
-   {options.length?options.map(item=><option value={String(item.index)} key={item.index}>{item.label}</option>)
-    :<option value="">No options</option>}
+   {selected<0&&<option value="" disabled>{options.length?placeholder:"No options"}</option>}
+   {options.map(item=><option value={String(item.index)} key={item.index}>{item.label}</option>)}
   </select>
  </div>;
 }

@@ -216,7 +216,7 @@ test('page and tenant values convert to page code calls', ()=>{
  assert.match(code('=@ThisPage.Session.Id'),/\$\.sessionId/);
  assert.match(code('=@ThisPage.Input.recordId'),/\$\.state\("recordId"\)/);
  assert.match(code('=@ThisPage.Cart1.recordId'),/\$\.component\("Cart1", "recordId"\)/);
- assert.match(code('=@ThisPage.MyBox1.value'),/\$\.component\("MyBox1", "value"\)/);
+ assert.match(code('=@ThisPage.MyBox1.value'),/\$\.componentState\("MyBox1", "Value"\)/);
  assert.match(code('=@ThisPage.PayButton.CartTotal'),/\$\.pageValue\("PayButton", "CartTotal"\)/);
  assert.match(code('=@ThisPage.Tabs1.Selected.Id'),/\$\.componentState\("Tabs1", "Id"\)/);
  assert.match(code('=@ThisTenant.User.Name'),/\$\.session\("user\.name"\)/);
@@ -264,7 +264,7 @@ test('new-style actions: state, filter, navigation, WAIT, LOCATION, CREATEPDF, m
  const email=compileActionFormula('=EMAIL(Mailer, @ThisTenant.User.Email, "Receipt", @ThisTenant.Company.Name)','Cart');
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", \$\.session\("user\.email"\), "Receipt", \$\.tenant\("name"\)\]\)/);
  const sms=compileActionFormula('=SMS(Texter, @ThisPage.Input.phone, @ThisPage.MessageBox.value)','Cart');
- assert.match(sms.js,/\$\.service\("SMS", \["Texter", \$\.state\("phone"\), \$\.component\("MessageBox", "value"\)\]\)/);
+ assert.match(sms.js,/\$\.service\("SMS", \["Texter", \$\.state\("phone"\), \$\.componentState\("MessageBox", "Value"\)\]\)/);
  // Same counts as the save check (credential + values): a 2-value SMS has no recipient.
  assert.throws(()=>compileActionFormula('=SMS(Texter, "Hi")','Cart'));
  // Assignments keep working with the leading "=" the action bar and CSV store.

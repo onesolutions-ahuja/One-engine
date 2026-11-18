@@ -62,7 +62,8 @@ test('@ThisPage.Till.* and @ThisPage.Device.* are page values; a component named
  assert.deepEqual(parsePageReference('@ThisPage.Till.Id'),{kind:'till',field:'Id'});
  assert.deepEqual(parsePageReference('@ThisPage.Till.LocationCode'),{kind:'till',field:'LocationCode'});
  assert.deepEqual(parsePageReference('@ThisPage.Device.Ip'),{kind:'device',field:'Ip'});
- assert.deepEqual(parsePageReference('@ThisPage.Till.value'),{kind:'component',name:'Till',key:'value'});
+ assert.deepEqual(parsePageReference('@ThisPage.Till.value'),{kind:'selected',name:'Till',field:'Value'});
+ assert.deepEqual(parsePageReference('@ThisPage.Till.Total'),{kind:'component',name:'Till',key:'Total'});
  const code=compileActionFormula(completeSale,'Cart').js;
  assert.match(code,/\$\.till\("Location"\)/);
  assert.match(code,/\$\.device\("Ip"\)/);

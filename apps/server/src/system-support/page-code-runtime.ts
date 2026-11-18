@@ -21,6 +21,7 @@ import {loadConnectionSnapshot} from './tenant-connections.js';
 import {withRecordReadScope} from './record-read-scope.js';
 import {randomUUID} from 'node:crypto';
 import {recordInvoicePayment} from './record-payment-service.js';
+import {recordCashMovement} from './cash-movement-service.js';
 import {ScheduledActionService} from './scheduled-action-service.js';
 import {compileActionPlan} from '../expression-engine/ActionFormulas.js';
 import {sendActionCommunication,type CommunicationChannel} from './action-formula-communication-service.js';
@@ -316,6 +317,15 @@ class ServerScope{
    const result=await recordInvoicePayment({db,records:this.records as RecordEngine,query:new FlowRecordQuery(db,rbac)},
     this.actor.tenant_id,this.actor.user_id,{invoiceId,amount,method,note:note??'',reference:'pay-'+randomUUID()});
    for(const object of ['Invoice','CashLedger']){this.written.add(object);this.forget(object);}
+   return result;
+  }
+  if(name==='CASHMOVE'){
+   const {db}=this.services;
+   if(!db)throw Error('CASHMOVE is unavailable');
+   const [direction,amount,reason,session]=args;
+   const result=await recordCashMovement({db,records:this.records as RecordEngine},this.actor.tenant_id,this.actor.user_id,
+    {direction,amount,reason,session,reference:'cash-'+randomUUID()});
+   this.written.add('CashLedger');this.forget('CashLedger');
    return result;
   }
   if(name==='CALLOUT'){

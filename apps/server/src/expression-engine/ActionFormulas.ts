@@ -185,6 +185,17 @@ export function compileActionPlan(source:string):ActionStep[] {
    steps.push({name:'RECORDPAYMENT',object:'',values:args,fields:new Map(),alias,guards});
    return;
   }
+  if(node.name==='CASHMOVE'){
+   // CASHMOVE(Direction "IN"|"OUT", Amount, Reason, TillSession, [AS(x)]): one server
+   // transaction posts a CashLedger cash in/out for the till session. No Flow needed.
+   let alias:string|undefined;
+   const last=args.at(-1);
+   if(last?.kind==='call'&&last.name==='AS'){alias=takeAlias(last,'AS requires one variable');args.pop();}
+   if(args.length!==4)throw Error('CASHMOVE requires Direction ("IN" or "OUT"), Amount, Reason and the till session');
+   args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
+   steps.push({name:'CASHMOVE',object:'',values:args,fields:new Map(),alias,guards});
+   return;
+  }
   if(node.name==='LOCATION'){
    // LOCATION(AS(loc)): the device's current GPS position for later steps,
    // read as loc.Latitude, loc.Longitude, loc.Accuracy (metres) and loc.CapturedAt.
@@ -853,6 +864,7 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
       completed++;
       continue;
      }
+     if(step.name==='CASHMOVE')throw Error('CASHMOVE runs as page code: open the page in the Page Builder and save it again');
      if(step.name==='RECORDPAYMENT'){
       const [invoiceId,amount,method,note]=(step.values??[]).map(evaluate);
       // One idempotency key per run: a retried request can never post the payment twice.

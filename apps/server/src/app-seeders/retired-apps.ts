@@ -152,11 +152,12 @@ export async function deleteRetiredChatterMetadata(
     // Isolated: if anything still depends on these rows, skip (logged) and keep starting up.
     await client.query('SAVEPOINT retired_app_flows');
     try{
-      const retiredFlows=`(tenant_id,id) IN (
-        SELECT tenant_id,flow_id FROM md_flow_trigger_subscriptions WHERE app_api_name=ANY($1::text[])
-        UNION SELECT tenant_id,flow_id FROM md_flow_editor_values
-         WHERE property_path='/builder/appApiName' AND value_text=ANY($1::text[]))`;
-      await purgeRows(client,'md_flow_definitions',retiredFlows,[[...REMOVED_APP_APIS]]);
+      // Ids first: the dependency walk removes the rows these Flows are found by.
+      const {rows:flows}=await client.query<{id:string}>(`
+        SELECT flow_id AS id FROM md_flow_trigger_subscriptions WHERE app_api_name=ANY($1::text[])
+        UNION SELECT flow_id FROM md_flow_editor_values
+         WHERE property_path='/builder/appApiName' AND value_text=ANY($1::text[])`,[[...REMOVED_APP_APIS]]);
+      if(flows.length)await purgeRows(client,'md_flow_definitions','id=ANY($1::uuid[])',[flows.map(flow=>flow.id)]);
       await client.query('DELETE FROM md_flow_trigger_subscriptions WHERE app_api_name=ANY($1::text[])',
         [[...REMOVED_APP_APIS]]);
       // Disabled pages the retired apps left behind (named after the app).

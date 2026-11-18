@@ -222,8 +222,10 @@ export class ObjectSchemaLifecycle {
    if(table&&!/^md_object_[a-f0-9]{32}$/.test(table))throw new Error('Invalid native table');
    if(table)await purgeRows(client,'"'+table+'"','tenant_id=$1',[tenantId],1);
    const records=await purgeRows(client,'md_records','tenant_id=$1 AND object_api=$2',[tenantId,apiName]);
-   await purgeRows(client,'md_page_definitions',`tenant_id=$1 AND id IN (SELECT page_id FROM md_lightning_page_details
-    WHERE tenant_id=$1 AND target_object=$2)`,[tenantId,apiName]);
+   // Ids first: the dependency walk removes the page details these pages are found by.
+   const pages=(await client.query<{page_id:string}>(`SELECT page_id FROM md_lightning_page_details
+    WHERE tenant_id=$1 AND target_object=$2`,[tenantId,apiName])).rows.map(row=>row.page_id);
+   if(pages.length)await purgeRows(client,'md_page_definitions','tenant_id=$1 AND id=ANY($2::uuid[])',[tenantId,pages]);
    await client.query('DELETE FROM md_flow_trigger_subscriptions WHERE tenant_id=$1 AND trigger_key=$2',[tenantId,apiName]);
    await client.query('DELETE FROM md_object_lifecycle_page_states WHERE tenant_id=$1 AND object_api=$2',[tenantId,apiName]);
    await client.query(`DELETE FROM md_permission_rules WHERE tenant_id=$1 AND (resource=$2 OR resource LIKE $3)`,

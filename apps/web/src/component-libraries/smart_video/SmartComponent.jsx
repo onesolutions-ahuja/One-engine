@@ -1,4 +1,3 @@
-import React from "react";
 import {convertedFormula} from "../shared/formulaCodeLookup.js";
 import {evaluateFieldExpression} from "../shared/FieldExpression.js";
 import {hiddenByShowWhen} from "../shared/showWhen.js";

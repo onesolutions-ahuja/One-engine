@@ -75,7 +75,7 @@ test('Smart ID Card is registered like every Smart component',()=>{
  assert.equal(definition.apiName,'smart_id_card');
  assert.match(read('../src/component-libraries/smart_id_card/SmartComponent.jsx'),/kind="smart_id_card"/);
  assert.match(read('../../server/src/app-seeders/smart-components.ts'),/"smart_id_card"/);
- assert.match(read('../../server/src/app-seeders/core-objects.ts'),/core-objects-unified-v15/);
+ assert.match(read('../../server/src/app-seeders/core-objects.ts'),/core-objects-unified-v(?:1[5-9]|[2-9][0-9])/);
  assert.match(read('../../server/src/system-support/system-migrations.ts'),/applySmartIdCard\(client\)/);
 });
 

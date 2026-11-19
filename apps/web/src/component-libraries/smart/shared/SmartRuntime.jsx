@@ -959,7 +959,8 @@ export default function SmartRuntime(p){
      borderStyle:"solid",borderWidth:p.borderWidth===undefined||p.borderWidth===null||p.borderWidth===""
        ?(p.borderColor||(p.builderPreview&&contentResult.error)?1:0):number(p.borderWidth,0,0,24),
      borderColor:contentResult.error&&p.builderPreview?formulaDisplayErrorColor:p.borderColor||"transparent"}}>{text(contentValue)||(name==="smart_label"&&p.builderPreview?"Label":"")}</div>
-   :<SmartReactiveInput value={inputContentValue} title={inputResult.error?"Formula error: "+inputResult.error:undefined} data-md-bind={p.builderPreview?inputKey:undefined} data-md-bind-titles={p.builderPreview?"Input value":undefined} className="smart-input-box" type="text"
+   :<SmartReactiveInput value={inputContentValue} title={inputResult.error?"Formula error: "+inputResult.error:undefined} data-md-bind={p.builderPreview?inputKey:undefined} data-md-bind-titles={p.builderPreview?"Input value":undefined} className="smart-input-box" type={p.maskInput===true&&inputRows<=1?"password":"text"}
+  autoComplete={p.maskInput===true?"off":undefined} spellCheck={p.maskInput===true?false:undefined}
   aria-label={label||text(p.placeholder||"Input")}
   placeholder={p.builderPreview===true&&![p.placeholder,p.textSource,p.defaultValue,p.value].some(v=>v!==undefined&&v!==null&&v!=="")
     &&!(p.properties&&Object.prototype.hasOwnProperty.call(p.properties,"label"))

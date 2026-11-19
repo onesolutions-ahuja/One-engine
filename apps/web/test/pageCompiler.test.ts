@@ -339,3 +339,17 @@ test('compiled data sources reload when a filter formula reads @Name.state.*',()
  const source=compiled.dataSources.find(item=>item.components.includes('grid'));
  assert.ok(source?.stateInputs.map(key=>key.toLowerCase()).includes('categorytabs'));
 });
+
+test('a sortField orders the shared data source and keeps sorted and unsorted reads apart',()=>{
+ const tabs=(id:string,extra:Record<string,unknown>)=>({id,type:'Custom:smart_tabs',label:id,visible:true,
+  properties:{objectApiName:'Product',textSource:'@Product.Name',...extra}});
+ const sorted=compilePage({...page,components:[tabs('byOrder',{sortField:'Price',sortDirection:'desc'}),
+  tabs('byOrder2',{sortField:'Price',sortDirection:'desc'}),tabs('plain',{}),tabs('bad',{sortField:'Price; DROP'})]} as never,objects);
+ const source=(id:string)=>sorted.dataSources.find(item=>item.id===sorted.components.find(c=>c.id===id)!.dataSourceId)!;
+ assert.equal(source('byOrder').sortField,'Price');
+ assert.equal(source('byOrder').sortDirection,'desc');
+ assert.equal(source('byOrder'),source('byOrder2'),'the same order shares one read');
+ assert.notEqual(source('byOrder'),source('plain'),'a sorted read never reuses the unsorted one');
+ assert.equal(source('plain').sortField,undefined);
+ assert.equal(source('bad').sortField,undefined,'an invalid field name is ignored, never sent');
+});

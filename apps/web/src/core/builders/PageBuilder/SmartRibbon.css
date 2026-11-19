@@ -455,6 +455,8 @@
 .smart-filter-dialog header button:hover{background:#144e88}
 .smart-filter-dialog header button:focus-visible{outline:2px solid #1d61a5;outline-offset:3px}
 .smart-filter-dialog .smart-filter-dialog-body{padding:22px 24px 26px;overflow-y:auto;min-height:0}
+.smart-filter-dialog .smart-record-sort{display:flex;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb}
+.smart-filter-dialog .smart-record-sort label{display:flex;flex-direction:column;gap:4px;flex:1;font-size:13px;font-weight:600}
 @media(max-width:600px){
  .smart-filter-backdrop{padding:8px}
  .smart-dialog.smart-filter-dialog{width:100%;max-height:calc(100dvh - 16px)}

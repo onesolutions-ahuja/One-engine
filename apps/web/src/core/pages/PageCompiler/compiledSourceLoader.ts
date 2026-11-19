@@ -10,6 +10,7 @@ import {EMPTY_FILTER_VALUE} from '../PageRuntime/recordFilterFormula';
 type RecordPageLoader=(objectApiName:string,options:{limit:number;offset:number;
  filter?:{field:string;value:string;related:boolean};
  filters?:Array<{field:string;operator:string;value:string}>;filterLogic?:string;
+ sortField?:string;sortDirection?:'asc'|'desc';
  search?:string;searchPrefix?:boolean;forceRefresh?:boolean})=>
  Promise<{records:Record<string,unknown>[];total:number}>;
 type Scope={blocked:boolean;filter?:PageQueryFilter;field:string;parentId:unknown};
@@ -64,7 +65,8 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   const paged=Boolean(query.filters)||!source.filters||(Array.isArray(source.filters)&&source.filters.length===0);
   const page=await loadPage(source.objectApiName,{limit:paged?window.limit:100,offset:paged?window.offset:0,
    filter:related.filter??(query.serverFilterable?query.filter:undefined),
-   filters:query.filters,filterLogic:query.filterLogic});
+   filters:query.filters,filterLogic:query.filterLogic,
+   ...(source.sortField?{sortField:source.sortField,sortDirection:source.sortDirection??'asc'}:{})});
   const filtered=paged?page.records:filterPageComponentRecords(page.records,source.filters,fields,
    {pageState:state,recordId,sessionId},source.filterLogic);
   const records=related.field?filterRelatedRecords(filtered,related.parentId,related.field):filtered;

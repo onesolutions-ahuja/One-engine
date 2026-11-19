@@ -269,6 +269,9 @@ export type FlowScreenRecordPageOptions={
   filter?:{field:string;value:string;related:boolean};
   filters?:Array<{field:string;operator:string;value:string|string[]}>;
   filterLogic?:string;
+  /** Record order (a readable field of the Object); the Record API checks it. */
+  sortField?:string;
+  sortDirection?:'asc'|'desc';
   /** Tenant/RBAC-checked Object search; never replaces list paging. */
   search?:string;
   /** Optional prefix matching is used only by Smart Lookup. */
@@ -295,6 +298,11 @@ export async function loadFlowScreenRecordPage(
     params.set('filters',JSON.stringify(options.filters));
     if(options.filterLogic)params.set('filterLogic',options.filterLogic);
   }
+  if(options.sortField){
+    if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(options.sortField))throw new Error('Invalid record sort');
+    params.set('sortField',options.sortField);
+    params.set('sortDirection',options.sortDirection==='desc'?'desc':'asc');
+  }
   // The key includes auth identity and every server query dimension except
   // limit. A concurrent 2-row and 100-row request then uses the larger page.
   // A short-lived successful page cache avoids remount refetches; a write
@@ -315,6 +323,8 @@ export async function loadFlowScreenRecordPage(
 /** Equality-only, AND-only queries describe an exact record set the store can reuse. */
 function recordSetFilters(options:FlowScreenRecordPageOptions):SetFilter[]|null{
   const out:SetFilter[]=[];
+  // A sorted page has its own order: never served from (or stored as) an unordered set.
+  if(options.sortField)return null;
   if(options.filter){
     if(!options.filter.related)return null;
     out.push({field:options.filter.field,operator:'eq',value:options.filter.value});

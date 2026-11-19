@@ -85,7 +85,7 @@ export type PageAppearanceTarget =
   | 'layout' | 'tabs' | 'conversation' | 'cart' | 'form' | 'overlay';
 const specificPageTargets: Record<string, PageAppearanceTarget> = {
   smartbutton:'button',smarttoggle:'toggle',smartlookup:'input',
-  smarttabs:'tabs',smarttext:'input',smartcardgrid:'collection',
+  smarttabs:'tabs',smarttext:'input',smartcardgrid:'collection',smartidcard:'collection',
   smartimage:'image',smartcalendar:'calendar',smartnavigation:'button',
   smartcontainer:'layout',
   oneitemgrid:'collection', unerepeater:'collection', unerecordlist:'collection',

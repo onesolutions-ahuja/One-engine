@@ -1,5 +1,6 @@
 import {convertedFormula} from '../../../component-libraries/shared/formulaCodeLookup.js';
 import {isSelectedSqlFormula} from '../../../component-libraries/shared/formulaKinds.js';
+import {ID_CARD_ROW_PROPERTIES} from '../../../component-libraries/smart_id_card/idCardFields.mjs';
 
 /** Configuration and data, not scalar display formulas. Keep the original bindings. */
 const nonDisplayProperties=new Set([
@@ -15,6 +16,7 @@ const nonDisplayProperties=new Set([
 const rowDisplayProperties:Readonly<Record<string,ReadonlySet<string>>>={
  smart_card_grid:new Set(['textSource','imageSource','badgeText','cardDescription','cardValue',
   'cardButtonText','customButton1Label','customButton2Label']),
+ smart_id_card:new Set(['textSource','imageSource','badgeText',...ID_CARD_ROW_PROPERTIES]),
  smart_cart:new Set(['textSource','imageSource','rowSupportingSource','column2Source',
   'column3Source','column4Source','column5Source','customButton1Label','customButton2Label']),
  smart_tabs:new Set(['textSource']),

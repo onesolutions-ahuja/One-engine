@@ -221,7 +221,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    .sort((a,b)=>a[1]-b[1]).map(([area])=>area);
  // Keep the shared area declaration stable; Card Body is an additional
  // selectable card-shell area, not a replacement for Body.
- if(api==='smart_card_grid'&&design2Areas.includes('Body')&&!design2Areas.includes('Card Body')){
+ if(['smart_card_grid','smart_id_card'].includes(api)&&design2Areas.includes('Body')&&!design2Areas.includes('Card Body')){
    design2Areas.splice(design2Areas.indexOf('Body')+1,0,'Card Body');
  }
  // Focused/Others/Extras are not places on the canvas; they live in Others.
@@ -255,11 +255,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
   const areaSlots=design2Slots.filter(slot=>slot.area===area);
   return design2TemplateSlots.map(template=>{
    const actual=areaSlots.find(slot=>slot.slotKey===template.slotKey);
-   const cardBodyKey=area==='Card Body'&&api==='smart_card_grid'
+   const cardBodyKey=area==='Card Body'&&['smart_card_grid','smart_id_card'].includes(api)
      ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow'} as Record<string,string>)[template.slotKey]
      :undefined;
    const bodyImagePlacement=area==='Body'&&template.slotKey==='placement'&&
-    ['smart_card_grid','smart_image','smart_cart'].includes(api);
+    ['smart_card_grid','smart_id_card','smart_image','smart_cart'].includes(api);
    return {...template,area,
     propertyKey:cardBodyKey??(area==='Card Body'?null:bodyImagePlacement?'imagePlacement':actual?.propertyKey??null),
     fallbackKey:actual?.fallbackKey??template.fallbackKey};
@@ -271,14 +271,14 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        rule.componentApi===api&&rule.area===slot.area&&rule.slotKey===slot.slotKey);
      // In specified areas ONLY the explicit Yes cells may be enabled.
      // A missing Yes rule leaves an inert glyph occupying the SAME R/C position.
-     const imageApi=['smart_card_grid','smart_image','smart_cart'].includes(api);
+     const imageApi=['smart_card_grid','smart_id_card','smart_image','smart_cart'].includes(api);
      const migratedBodyKey=slot.area==='Body'&&api==='smart_tabs'&&
        (slot.slotKey==='width'||slot.slotKey==='height')
          ?(slot.slotKey==='width'?'tabWidth':'tabHeight'):
        slot.area==='Body'&&slot.slotKey==='placement'&&imageApi?'imagePlacement':
        slot.area==='Image'&&imageApi&&slot.slotKey==='height'?'imageHeight':
        slot.area==='Image'&&imageApi&&slot.slotKey==='placement'?'imagePlacement':
-       slot.area==='Image'&&['smart_card_grid','smart_image','smart_cart','smart_navigation'].includes(api)&&
+       slot.area==='Image'&&['smart_card_grid','smart_id_card','smart_image','smart_cart','smart_navigation'].includes(api)&&
          slot.slotKey==='imageFill'?'imageFill':
        slot.area==='Header'&&imageApi&&slot.slotKey==='height'?'headerBoxHeight':
        slot.area==='Header Supporting'&&api==='smart_cart'&&slot.slotKey==='height'?'supportingBoxHeight':null;
@@ -706,6 +706,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             // Select existing persisted property keys; no duplicate count state.
             const options=api==='smart_card_grid'
             ?[{key:'cardsPerRow',label:'Columns'},{key:'cardsPerColumn',label:'Rows'}]:
+            api==='smart_id_card'
+            ?[{key:'cardsPerRow',label:'Columns'},{key:'cardsPerColumn',label:'Rows'},
+              {key:'idCardFieldCount',label:'Fields'},{key:'idCardFieldColumns',label:'Field columns'}]:
             api==='smart_tabs'
             ?[{key:'tabCount',label:'Count'},{key:'tabIndex',label:'Default tab'}]:
             api==='smart_cart'?[{key:'cardsPerRow',label:'Count'}]:
@@ -776,7 +779,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
             // Same Padding editor, choosing the original component-specific saved key.
             const basePaddingKey=api==='smart_card_grid'?'cardPadding':'numpadPadding';
             // Cart: Padding is the item table's left/right inset (header and rows).
-            const paddingKey=api==='smart_cart'?'tableSidePadding':basePaddingKey;
+            // ID Card reuses the Card Grid's Card Padding.
+            const paddingKey=api==='smart_cart'?'tableSidePadding':basePaddingKey==='numpadPadding'&&api==='smart_id_card'?'cardPadding':basePaddingKey;
             const property=definitions.find(p=>p.id===paddingKey);
             const enabled=Boolean(property?.components.includes(api))&&
             (!sharedPropertyIds||sharedPropertyIds.includes(paddingKey));

@@ -656,17 +656,17 @@
  * settings. In particular, never let page tokens override card metadata.
  * Only opt-in authored page styles are painted. */
 [data-page-appearance="collection"][data-page-style~="background"]
-.registered-component.metadrive-component-smart_card_grid > section {
+.registered-component:is(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) > section {
   background-color: var(--md-page-background) !important;
 }
 [data-page-appearance="collection"][data-page-style~="stroke"]
-.registered-component.metadrive-component-smart_card_grid > section {
+.registered-component:is(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) > section {
   border-style: solid !important;
   border-width: var(--md-page-border-width, 1px) !important;
   border-color: var(--md-page-border-color) !important;
 }
 [data-page-appearance="collection"][data-page-style~="border"]
-.registered-component.metadrive-component-smart_card_grid > section {
+.registered-component:is(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) > section {
   border-style: solid !important;
   border-width: var(--md-page-border-width) !important;
 }
@@ -690,11 +690,11 @@
    Surface radius/padding affect the collection section, while cardRadius and
    cardPadding remain on individual cards. Never override per-card inline style. */
 [data-page-appearance="collection"][data-page-style~="radius"]
-.registered-component.metadrive-component-smart_card_grid > section {
+.registered-component:is(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) > section {
   border-radius:var(--md-page-radius)!important;
 }
 [data-page-appearance="collection"][data-page-style~="padding"]
-.registered-component.metadrive-component-smart_card_grid > section {
+.registered-component:is(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) > section {
   padding:var(--md-page-padding)!important;
 }
 

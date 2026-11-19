@@ -215,10 +215,14 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    'Custom Button 1','Custom Button 2','Calendar']);
  // Keep the shared slot inventory intact for existing components. The
  // Numpad declares exactly its seven editable areas through SQL mapping rows.
- const design2Areas=[...new Map(design2Slots
+ const declaredDesign2Areas=[...new Map(design2Slots
    .filter(slot=>!retiredDesign2Areas.has(slot.area))
    .map(slot=>[slot.area,slot.areaOrder] as const)).entries()]
    .sort((a,b)=>a[1]-b[1]).map(([area])=>area);
+ // Card Body uses the shared card-shell style properties of Card Grid.
+ const design2Areas=api==='smart_card_grid'&&declaredDesign2Areas.includes('Body')
+   ?declaredDesign2Areas.flatMap(area=>area==='Body'?['Body','Card Body']:[area])
+   :declaredDesign2Areas;
  // Focused/Others/Extras are not places on the canvas; they live in Others.
  const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
  const canvasDesign2Areas=design2Areas.filter(area=>!nonCanvasDesign2Areas.has(area));
@@ -250,10 +254,13 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
   const areaSlots=design2Slots.filter(slot=>slot.area===area);
   return design2TemplateSlots.map(template=>{
    const actual=areaSlots.find(slot=>slot.slotKey===template.slotKey);
+   const cardBodyKey=area==='Card Body'&&api==='smart_card_grid'
+     ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow'} as Record<string,string>)[template.slotKey]
+     :undefined;
    const bodyImagePlacement=area==='Body'&&template.slotKey==='placement'&&
     ['smart_card_grid','smart_image','smart_cart'].includes(api);
    return {...template,area,
-    propertyKey:bodyImagePlacement?'imagePlacement':actual?.propertyKey??null,
+    propertyKey:cardBodyKey??(area==='Card Body'?null:bodyImagePlacement?'imagePlacement':actual?.propertyKey??null),
     fallbackKey:actual?.fallbackKey??template.fallbackKey};
   });
  });
@@ -274,7 +281,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
          slot.slotKey==='imageFill'?'imageFill':
        slot.area==='Header'&&imageApi&&slot.slotKey==='height'?'headerBoxHeight':
        slot.area==='Header Supporting'&&api==='smart_cart'&&slot.slotKey==='height'?'supportingBoxHeight':null;
-     const propertyKey=migratedBodyKey??(approvedMatrixAreas.has(slot.area)
+     const propertyKey=slot.area==='Card Body'?slot.propertyKey:migratedBodyKey??(approvedMatrixAreas.has(slot.area)
        ?approved?.propertyKey:slot.propertyKey);
      const assigned=propertyKey?definitions.find(p=>p.id===propertyKey):undefined;
      const fallbackDefinition=definitions.find(p=>p.id===slot.fallbackKey);

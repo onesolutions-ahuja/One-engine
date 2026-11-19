@@ -78,6 +78,8 @@ export type CompiledDataSource={
   * Otherwise rows load 50 at a time as the user scrolls. */
  complete:boolean;
  filters:unknown;filterLogic:'AND'|'OR';filterFormula?:string;
+ /** Optional record order (component properties sortField / sortDirection), e.g. tabs by SortOrder. */
+ sortField?:string;sortDirection?:'asc'|'desc';
  /** Page state keys the filter reads: the source reloads only when one changes. */
  stateInputs:string[];
 };
@@ -330,7 +332,11 @@ export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],
    const filterLogic=properties.filterLogic==='OR'?'OR':'AND';
    const filterFormula=typeof active.formula==='string'&&active.formula.trim()?active.formula.trim():undefined;
    const scope=recordScope(component.type,properties);
-   const key=JSON.stringify([objectApiName,active.filters??null,filterLogic,filterFormula??'',scope]);
+   const sortField=typeof properties.sortField==='string'&&/^[A-Za-z][A-Za-z0-9_]*$/.test(properties.sortField.trim())
+    ?properties.sortField.trim():undefined;
+   const sortDirection:'asc'|'desc'=properties.sortDirection==='desc'?'desc':'asc';
+   const key=JSON.stringify([objectApiName,active.filters??null,filterLogic,filterFormula??'',scope,
+    ...(sortField?[sortField,sortDirection]:[])]);
    const id=objectApiName+'#'+stableHash(key);
    dataSourceId=id;
    const existing=sources.get(id);
@@ -340,7 +346,7 @@ export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],
     const fields=objects.find(object=>object.apiName===objectApiName)?.fields??[];
     const scopeInputs=scope.kind==='key'?[scope.key]:scope.kind==='auto'?implicitPageStateKeys(fields):[];
     sources.set(id,{id,objectApiName,components:[component.id],scope,complete,filters:active.filters??null,
-     filterLogic,...(filterFormula?{filterFormula}:{}),
+     filterLogic,...(filterFormula?{filterFormula}:{}),...(sortField?{sortField,sortDirection}:{}),
      stateInputs:unique([...filterStateInputs(active.filters,filterFormula),...scopeInputs])});
    }
   }

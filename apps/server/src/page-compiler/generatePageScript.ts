@@ -147,7 +147,7 @@ export function generatePageScript(compiled:CompiledPage,language:ScriptLanguage
  })+',\n').join('');
  const sources=compiled.dataSources.map(source=>'  '+q({id:source.id,object:source.objectApiName,
   usedBy:source.components,loads:source.complete?'all rows (collection)':'50 rows, next 50 on scroll',filters:source.filters,filterLogic:source.filterLogic,
-  filterFormula:source.filterFormula,reloadWhenStateChanges:source.stateInputs})+',\n').join('');
+  filterFormula:source.filterFormula,...(source.sortField?{sortField:source.sortField,sortDirection:source.sortDirection}:{}),reloadWhenStateChanges:source.stateInputs})+',\n').join('');
  const s=compiled.stats;
  const types=ts?`
 /* ---------- Host contract (implemented by the Une page runtime) ---------- */

@@ -19,3 +19,11 @@ test('CASHMOVE compiles to a server step that writes CashLedger',()=>{
  const c=compileActionFormula('=ACTIONS(CASHMOVE("OUT", @ThisPage.amt.Value, @ThisPage.why.Value, @ThisPage.sess.Value, AS(m)), @ThisPage.msg.Value = "Done")','cash_count__c');
  assert.match(JSON.stringify(c),/CASHMOVE/);
 });
+test('CASHMOVE and RECORDPAYMENT report their ledger row so open lists and totals refresh',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const source=await readFile(new URL('../../server/src/system-support/page-code-runtime.ts',import.meta.url),'utf8');
+ const branch=(name:string)=>source.slice(source.indexOf(`if(name==='${name}')`),source.indexOf('return result;',source.indexOf(`if(name==='${name}')`)));
+ assert.match(branch('CASHMOVE'),/this\.saved\('CashLedger',result\.ledgerId,'create'\)/);
+ assert.match(branch('RECORDPAYMENT'),/this\.saved\('CashLedger',paid\.ledgerId,'create'\)/);
+ assert.match(branch('RECORDPAYMENT'),/this\.saved\('Invoice',paid\.invoiceId,'update'\)/);
+});

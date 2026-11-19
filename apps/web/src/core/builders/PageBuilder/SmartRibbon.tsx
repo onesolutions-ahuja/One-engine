@@ -1115,6 +1115,20 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
          onLogicChange={filterLogic=>scopedFilterId?updateFieldFilter(scopedFilterId,{filterLogic}):onChange({...properties,filterLogic},['filterLogic'])}
          onChange={filters=>scopedFilterId?updateFieldFilter(scopedFilterId,{filters}):onChange({...properties,filters},['filters'])}/>:
          <p>Choose an Object or bind a named Collection to configure filters.</p>}
+       {object&&!scopedFilterId?<div className="smart-record-sort" role="group" aria-label="Record order">
+         <label>Sort records by
+          <select className="form-control" value={typeof properties.sortField==='string'?properties.sortField:''}
+            onChange={e=>onChange({...properties,sortField:e.target.value||undefined},['sortField'])}>
+           <option value="">Default (oldest first)</option>
+           {(object.fields??[]).map(field=><option key={field.apiName} value={field.apiName}>{field.label||field.apiName}</option>)}
+          </select></label>
+         <label>Direction
+          <select className="form-control" value={properties.sortDirection==='desc'?'desc':'asc'}
+            disabled={typeof properties.sortField!=='string'||!properties.sortField}
+            onChange={e=>onChange({...properties,sortDirection:e.target.value},['sortDirection'])}>
+           <option value="asc">Ascending</option><option value="desc">Descending</option>
+          </select></label>
+       </div>:null}
      </div>
     </section></div>,document.body)}
  </div>;

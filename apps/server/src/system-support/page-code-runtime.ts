@@ -316,6 +316,10 @@ class ServerScope{
    // Same service as before (Invoice edit + CashLedger create permissions), inside this transaction.
    const result=await recordInvoicePayment({db,records:this.records as RecordEngine,query:new FlowRecordQuery(db,rbac)},
     this.actor.tenant_id,this.actor.user_id,{invoiceId,amount,method,note:note??'',reference:'pay-'+randomUUID()});
+   // Reported like CREATERECORD/UPDATERECORD so open lists and totals refresh.
+   const paid=result as {ledgerId?:unknown;invoiceId?:unknown};
+   if(typeof paid.ledgerId==='string'&&paid.ledgerId)await this.saved('CashLedger',paid.ledgerId,'create');
+   if(typeof paid.invoiceId==='string'&&paid.invoiceId)await this.saved('Invoice',paid.invoiceId,'update');
    for(const object of ['Invoice','CashLedger']){this.written.add(object);this.forget(object);}
    return result;
   }
@@ -325,6 +329,8 @@ class ServerScope{
    const [direction,amount,reason,session]=args;
    const result=await recordCashMovement({db,records:this.records as RecordEngine},this.actor.tenant_id,this.actor.user_id,
     {direction,amount,reason,session,reference:'cash-'+randomUUID()});
+   // Reported like CREATERECORD so the till's cash list and totals refresh.
+   if(result.ledgerId)await this.saved('CashLedger',result.ledgerId,'create');
    this.written.add('CashLedger');this.forget('CashLedger');
    return result;
   }

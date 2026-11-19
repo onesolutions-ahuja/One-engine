@@ -66,7 +66,7 @@
 [data-page-appearance="badge"][data-page-style~="radius"] .registered-component .smart-badge,
 [data-page-appearance="text"][data-page-style~="radius"] .registered-component .smart-text,
 [data-page-appearance="surface"][data-page-style~="radius"] .registered-component .smart-container,
-[data-page-appearance="collection"][data-page-style~="radius"] .registered-component .smart-grid,
+[data-page-appearance="collection"][data-page-style~="radius"] .registered-component:not(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) .smart-grid,
 [data-page-appearance="table"][data-page-style~="radius"] .registered-component .smart-table,
 [data-page-appearance="calendar"][data-page-style~="radius"] .registered-component .smart-calendar,
 [data-page-appearance="layout"][data-page-style~="radius"] .registered-component .smart-container,
@@ -156,7 +156,7 @@
 [data-page-appearance="badge"][data-page-style~="border"] .registered-component .smart-badge,
 [data-page-appearance="text"][data-page-style~="border"] .registered-component .smart-text,
 [data-page-appearance="surface"][data-page-style~="border"] .registered-component .smart-container,
-[data-page-appearance="collection"][data-page-style~="border"] .registered-component .smart-grid,
+[data-page-appearance="collection"][data-page-style~="border"] .registered-component:not(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) .smart-grid,
 [data-page-appearance="table"][data-page-style~="border"] .registered-component .smart-table,
 [data-page-appearance="calendar"][data-page-style~="border"] .registered-component .smart-calendar,
 [data-page-appearance="layout"][data-page-style~="border"] .registered-component .smart-container,
@@ -202,7 +202,7 @@
 [data-page-appearance="badge"][data-page-style~="stroke"] .registered-component .smart-badge,
 [data-page-appearance="text"][data-page-style~="stroke"] .registered-component .smart-text,
 [data-page-appearance="surface"][data-page-style~="stroke"] .registered-component .smart-container,
-[data-page-appearance="collection"][data-page-style~="stroke"] .registered-component .smart-grid,
+[data-page-appearance="collection"][data-page-style~="stroke"] .registered-component:not(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) .smart-grid,
 [data-page-appearance="table"][data-page-style~="stroke"] .registered-component .smart-table,
 [data-page-appearance="calendar"][data-page-style~="stroke"] .registered-component .smart-calendar,
 [data-page-appearance="layout"][data-page-style~="stroke"] .registered-component .smart-container,
@@ -247,7 +247,7 @@
 [data-page-appearance="badge"][data-page-style~="background"] .registered-component .smart-badge,
 [data-page-appearance="text"][data-page-style~="background"] .registered-component .smart-text,
 [data-page-appearance="surface"][data-page-style~="background"] .registered-component .smart-container,
-[data-page-appearance="collection"][data-page-style~="background"] .registered-component .smart-grid,
+[data-page-appearance="collection"][data-page-style~="background"] .registered-component:not(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) .smart-grid,
 [data-page-appearance="table"][data-page-style~="background"] .registered-component .smart-table,
 [data-page-appearance="calendar"][data-page-style~="background"] .registered-component .smart-calendar,
 [data-page-appearance="layout"][data-page-style~="background"] .registered-component .smart-container,
@@ -339,7 +339,7 @@
 [data-page-appearance="badge"][data-page-style~="shadow"] .registered-component .smart-badge,
 [data-page-appearance="text"][data-page-style~="shadow"] .registered-component .smart-text,
 [data-page-appearance="surface"][data-page-style~="shadow"] .registered-component .smart-container,
-[data-page-appearance="collection"][data-page-style~="shadow"] .registered-component .smart-grid,
+[data-page-appearance="collection"][data-page-style~="shadow"] .registered-component:not(.metadrive-component-smart_card_grid,.metadrive-component-smart_id_card) .smart-grid,
 [data-page-appearance="table"][data-page-style~="shadow"] .registered-component .smart-table,
 [data-page-appearance="calendar"][data-page-style~="shadow"] .registered-component .smart-calendar,
 [data-page-appearance="layout"][data-page-style~="shadow"] .registered-component .smart-container,
@@ -649,6 +649,10 @@
 [data-page-style~="font-style"] .registered-component {font-style:var(--md-page-font-style)!important}
 [data-page-style~="text-decoration"] .registered-component {text-decoration:var(--md-page-text-decoration)!important}
 
+/* Smart Card Grid has two different background/border layers. Its Card Body fill, border,
+ * radius and shadow (backgroundColor, borderColor, radius, shadow) style each card only; the
+ * space between the cards is the Grid background (gridBackgroundColor), set by the component.
+ * So the generic collection rules above never paint .smart-grid for these two components. */
 /* Smart Card Grid has two different background/border layers:
  * the collection surface and its individual item cards.
  * Page-level Background / Fill and Border paint the outer component surface;

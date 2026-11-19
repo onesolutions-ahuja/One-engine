@@ -1,15 +1,12 @@
 import * as React from 'react';
-/** The print preview prints only the document: no Close/Print buttons, no scrollbars
- * (a list scrolls on screen but never on paper), and no layout jump while it loads. */
+/** PRINT() renders its Print Template here, invisibly, at the exact size it was designed:
+ * printTemplate.ts then sends it to the receipt printer or opens the browser's print window.
+ * There is no second preview of our own: the browser's print window already shows one. */
 const printPreviewStyles=`
-.formula-print-toolbar{display:flex;gap:8px;margin-bottom:8px}
+dialog.formula-print-preview{position:fixed;left:0;top:0;margin:0;padding:0;border:0;max-width:none;max-height:none;
+ overflow:visible;opacity:0;pointer-events:none;z-index:-1;background:#fff}
 .formula-print-preview *{scrollbar-width:none}
-.formula-print-preview *::-webkit-scrollbar{display:none}
-@media print{
- .formula-print-toolbar{display:none!important}
- dialog.formula-print-preview{max-height:none!important;overflow:visible!important;padding:0!important;box-shadow:none!important}
- dialog.formula-print-preview::backdrop{background:none}
-}`;
+.formula-print-preview *::-webkit-scrollbar{display:none}`;
 import type {PopupScreen} from './screenFormula';
 
 const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:12px;overflow:auto;scrollbar-gutter:stable;
@@ -34,6 +31,12 @@ dialog.formula-screen-modal.formula-screen-page::backdrop{background:#fff;backdr
  border-radius:12px;background:#fff;box-shadow:0 24px 64px rgba(0,0,0,.35)}
 .formula-screen-card>.formula-screen-close{position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;
  border:0;border-radius:50%;background:rgba(15,23,42,.08);font-size:20px;line-height:36px;cursor:pointer}`;
+
+/** A Print Template renders at its own canvas width (CSS pixels), never scaled. */
+export function printWidth(canvas?:{canvasWidth?:number}){
+ const width=Number(canvas?.canvasWidth);
+ return Number.isFinite(width)&&width>0?Math.round(width)+'px':'auto';
+}
 
 /** Phones show a SCREEN(...,popup) page as a full-screen page with Back, not a popup. */
 const phoneWidth=()=>typeof window!=='undefined'&&typeof window.matchMedia==='function'
@@ -108,9 +111,9 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
  React.useEffect(()=>{if(!fullPage&&!screen.print)genie(popupBox(),false);},[]);
  React.useEffect(()=>{
   const dialog=ref.current;
-  // A print preview opened from a popup (Reprint receipt) must sit above that popup,
-  // so it is also shown as a modal (top layer) rather than a plain open dialog.
   if(!dialog||inFrame)return;
+  // An invisible print render is a plain open dialog (never modal: it must not block the till).
+  if(screen.print){if(!dialog.open)dialog.setAttribute('open','');return ()=>{try{dialog.close();}catch{/* closed */}};}
   try{if(!dialog.open)dialog.showModal();}catch{dialog.setAttribute('open','');}
   return ()=>{try{dialog.close();}catch{/* already closed */}};
  },[inFrame]);
@@ -138,14 +141,14 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
   window.addEventListener('metadrive:close-formula-screen',closeRequest);
   return ()=>window.removeEventListener('metadrive:close-formula-screen',closeRequest);
  },[screen.instance]);
- if(screen.print)return <dialog ref={inFrame?undefined:ref} open={inFrame||undefined} className="formula-print-preview" aria-label={screen.page}
-  onCancel={event=>{event.preventDefault();screen.failed?.(Error('Preview closed'));onClose();}}
-  style={{width:formulaScreenWidth(canvas),maxHeight:'90vh',overflowY:'auto',scrollbarGutter:'stable',padding:16,border:0,borderRadius:12,background:'#fff'}}>
+ if(screen.print)return <dialog ref={inFrame?undefined:ref} open={inFrame||undefined} className="formula-print-preview"
+  aria-label={screen.page} aria-hidden="true" data-print-render=""
+  onCancel={event=>{event.preventDefault();screen.failed?.(Error('Print cancelled'));onClose();}}
+  // Exactly the designed width, so the template is never scaled to fit.
+  style={{width:printWidth(canvas)}}>
   <style>{printPreviewStyles}</style>
-  <div className="formula-print-toolbar">
-   <button type="button" onClick={()=>{screen.failed?.(Error('Preview closed'));onClose();}}>Close</button>
-   <button type="button" onClick={()=>window.print()}>Print / Save PDF</button>
-  </div>
+  {/* Hidden: printTemplate.ts / createTemplatePdf close the render with this button. */}
+  <button type="button" hidden data-print-close="" onClick={()=>{screen.failed?.(Error('Print cancelled'));onClose();}}>Close</button>
   {children}
  </dialog>;
  const back=<div className="formula-screen-bar">

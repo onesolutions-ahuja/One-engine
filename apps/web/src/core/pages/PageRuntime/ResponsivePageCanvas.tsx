@@ -78,7 +78,10 @@ export default function ResponsivePageCanvas({
     overflow:'hidden'
   }}>
     <div ref={canvasRef} className="free-canvas-runtime" data-layout-mode="free-canvas"
-     data-print-template={printTemplate?'true':undefined} style={canvasStyle}>
+     data-print-template={printTemplate?'true':undefined}
+     // The designed paper size: PRINT() prints at exactly this size (see printPaper.ts).
+     data-print-width={printTemplate?page.canvasWidth:undefined}
+     data-print-height={printTemplate?page.canvasHeight:undefined} style={canvasStyle}>
       {children}
     </div>
   </div>;

@@ -87,6 +87,7 @@ export function usePagePalette(
       case 'Custom:smart_chart':return <BarChart3 size={15}/>;
       case 'Custom:smart_qr':return <QrCode size={15}/>;
       case 'Custom:smart_video':return <Film size={15}/>;
+      case 'Custom:smart_line_items':return <List size={15}/>;
     }
     const name = `${component.label} ${component.type}`.toLowerCase();
     if (/\b(text|heading|paragraph|rich text|label)\b/.test(name)) return <Type size={15} />;

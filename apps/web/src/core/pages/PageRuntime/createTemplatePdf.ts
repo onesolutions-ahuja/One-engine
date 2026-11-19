@@ -1,8 +1,9 @@
 import {renderTemplatePages} from './renderTemplatePages';
+import {printPageSize} from './printPaper';
 
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 const afterPaint=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
-async function waitForReadyPrint(dialog:HTMLDialogElement){
+export async function waitForReadyPrint(dialog:HTMLDialogElement){
  await afterPaint();
  const started=Date.now();let lastChange=Date.now();
  const observer=new MutationObserver(()=>{lastChange=Date.now();});
@@ -68,26 +69,44 @@ const toBase64=(bytes:Uint8Array)=>new Promise<string>((resolve,reject)=>{
  reader.onload=()=>resolve(String(reader.result).split(',')[1]??'');
  reader.readAsDataURL(new Blob([bytes as BlobPart],{type:'application/pdf'}));
 });
-/** Same Print Template used by PRINT() and CREATEPDF(); FileId is a reusable
- * tenant-scoped file reference, not a URL or an unauthorised data payload. */
-export async function createTemplatePdf(template:string,id:string,request:Request,
- openPreview:()=>Promise<void>,pageSize:{width:number;height:number}):Promise<{FileId:string;AssetRef:string}>{
+/** Open a Print Template render (invisible, at its designed size) and wait for its data. */
+export async function openTemplateRender(template:string,openPreview:()=>Promise<unknown>){
  const before=new Set(document.querySelectorAll('dialog.formula-print-preview'));
- await openPreview();
- const dialog=[...document.querySelectorAll<HTMLDialogElement>('dialog.formula-print-preview')]
-  .find(item=>!before.has(item))??[...document.querySelectorAll<HTMLDialogElement>('dialog.formula-print-preview')].at(-1);
+ const opened=()=>[...document.querySelectorAll<HTMLDialogElement>('dialog.formula-print-preview')].find(item=>!before.has(item));
+ try{await openPreview();}
+ catch(error){
+  // The render is invisible: never leave a failed one behind.
+  opened()?.querySelector<HTMLButtonElement>('button[data-print-close]')?.click();
+  throw error;
+ }
+ const dialog=opened()??[...document.querySelectorAll<HTMLDialogElement>('dialog.formula-print-preview')].at(-1);
  if(!dialog||dialog.getAttribute('aria-label')!==template)
   throw Error('Print Template did not render');
+ const close=()=>dialog.querySelector<HTMLButtonElement>('button[data-print-close]')?.click();
  try{
   await waitForReadyPrint(dialog);
-  const root=dialog.querySelector('.free-canvas-runtime')??dialog.querySelector('main')??dialog;
-  const images=await renderTemplatePages(root,Math.round(pageSize.width),Math.round(pageSize.height));
-  const contentBase64=await toBase64(imagesToPdf(images,Math.round(pageSize.width),Math.round(pageSize.height)));
+ }catch(error){close();throw error;}
+ const root=dialog.querySelector<HTMLElement>('.free-canvas-runtime')??dialog.querySelector<HTMLElement>('main')??dialog;
+ return {dialog,root,close};
+}
+/** Same Print Template used by PRINT() and CREATEPDF(); FileId is a reusable
+ * tenant-scoped file reference, not a URL or an unauthorised data payload.
+ * Without a page size the PDF uses the template's own designed size: one long page for a
+ * receipt roll, pages of the designed height for A4-style templates. */
+export async function createTemplatePdf(template:string,id:string,request:Request,
+ openPreview:()=>Promise<unknown>,pageSize?:{width:number;height:number}):Promise<{FileId:string;AssetRef:string}>{
+ const {root,close}=await openTemplateRender(template,openPreview);
+ try{
+  const rect=root.getBoundingClientRect();
+  const size=pageSize??printPageSize(Number(root.dataset.printWidth)||rect.width,rect.height,Number(root.dataset.printHeight));
+  const width=Math.max(100,Math.round(size.width)),height=Math.max(100,Math.round(size.height));
+  const images=await renderTemplatePages(root,width,height);
+  const contentBase64=await toBase64(imagesToPdf(images,width,height));
   const saved=await request<{id:string}>('/media-assets',{method:'POST',
    body:JSON.stringify({name:template+'-'+id+'.pdf',contentType:'application/pdf',contentBase64})});
   if(!saved.id)throw Error('PDF storage did not return a file ID');
   return {FileId:'asset:'+saved.id,AssetRef:'asset:'+saved.id};
  }finally{
-  dialog.querySelector<HTMLButtonElement>('button')?.click();
+  close();
  }
 }

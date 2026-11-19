@@ -219,6 +219,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    .filter(slot=>!retiredDesign2Areas.has(slot.area))
    .map(slot=>[slot.area,slot.areaOrder] as const)).entries()]
    .sort((a,b)=>a[1]-b[1]).map(([area])=>area);
+ // Keep the shared area declaration stable; Card Body is an additional
+ // selectable card-shell area, not a replacement for Body.
+ if(api==='smart_card_grid'&&design2Areas.includes('Body')&&!design2Areas.includes('Card Body')){
+   design2Areas.splice(design2Areas.indexOf('Body')+1,0,'Card Body');
+ }
  // Focused/Others/Extras are not places on the canvas; they live in Others.
  const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
  const canvasDesign2Areas=design2Areas.filter(area=>!nonCanvasDesign2Areas.has(area));
@@ -250,10 +255,13 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
   const areaSlots=design2Slots.filter(slot=>slot.area===area);
   return design2TemplateSlots.map(template=>{
    const actual=areaSlots.find(slot=>slot.slotKey===template.slotKey);
+   const cardBodyKey=area==='Card Body'&&api==='smart_card_grid'
+     ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow'} as Record<string,string>)[template.slotKey]
+     :undefined;
    const bodyImagePlacement=area==='Body'&&template.slotKey==='placement'&&
     ['smart_card_grid','smart_image','smart_cart'].includes(api);
    return {...template,area,
-    propertyKey:bodyImagePlacement?'imagePlacement':actual?.propertyKey??null,
+    propertyKey:cardBodyKey??(area==='Card Body'?null:bodyImagePlacement?'imagePlacement':actual?.propertyKey??null),
     fallbackKey:actual?.fallbackKey??template.fallbackKey};
   });
  });
@@ -274,7 +282,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
          slot.slotKey==='imageFill'?'imageFill':
        slot.area==='Header'&&imageApi&&slot.slotKey==='height'?'headerBoxHeight':
        slot.area==='Header Supporting'&&api==='smart_cart'&&slot.slotKey==='height'?'supportingBoxHeight':null;
-     const propertyKey=migratedBodyKey??(approvedMatrixAreas.has(slot.area)
+     const propertyKey=slot.area==='Card Body'?slot.propertyKey:migratedBodyKey??(approvedMatrixAreas.has(slot.area)
        ?approved?.propertyKey:slot.propertyKey);
      const assigned=propertyKey?definitions.find(p=>p.id===propertyKey):undefined;
      const fallbackDefinition=definitions.find(p=>p.id===slot.fallbackKey);

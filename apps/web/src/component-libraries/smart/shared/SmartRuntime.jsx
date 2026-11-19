@@ -210,7 +210,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const cardBorder=single?"none":strokeWidth===0?"none":
   (strokeWidth+"px solid "+(p.borderColor||"#e2e8f0"));
  return <article className="smart-card"
-  data-design-area={p.builderPreview&&grid?"Body":undefined}
+  data-design-area={p.builderPreview&&grid?"Card Body":undefined}
   onClick={onSelect?event=>{if(event.target.closest("button"))return;onSelect();}:undefined}
   onKeyDown={onSelect?event=>{
    if(event.target!==event.currentTarget)return;

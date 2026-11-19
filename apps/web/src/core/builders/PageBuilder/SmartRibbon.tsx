@@ -215,14 +215,15 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    'Custom Button 1','Custom Button 2','Calendar']);
  // Keep the shared slot inventory intact for existing components. The
  // Numpad declares exactly its seven editable areas through SQL mapping rows.
- const declaredDesign2Areas=[...new Map(design2Slots
+ const design2Areas=[...new Map(design2Slots
    .filter(slot=>!retiredDesign2Areas.has(slot.area))
    .map(slot=>[slot.area,slot.areaOrder] as const)).entries()]
    .sort((a,b)=>a[1]-b[1]).map(([area])=>area);
- // Card Body uses the shared card-shell style properties of Card Grid.
- const design2Areas=api==='smart_card_grid'&&declaredDesign2Areas.includes('Body')
-   ?declaredDesign2Areas.flatMap(area=>area==='Body'?['Body','Card Body']:[area])
-   :declaredDesign2Areas;
+ // Keep the shared area declaration stable; Card Body is an additional
+ // selectable card-shell area, not a replacement for Body.
+ if(api==='smart_card_grid'&&design2Areas.includes('Body')&&!design2Areas.includes('Card Body')){
+   design2Areas.splice(design2Areas.indexOf('Body')+1,0,'Card Body');
+ }
  // Focused/Others/Extras are not places on the canvas; they live in Others.
  const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
  const canvasDesign2Areas=design2Areas.filter(area=>!nonCanvasDesign2Areas.has(area));

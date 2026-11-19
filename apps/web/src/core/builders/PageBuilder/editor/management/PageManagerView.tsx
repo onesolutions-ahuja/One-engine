@@ -115,7 +115,7 @@ export default function PageManagerView({ props, editorState, management, layout
               <button className="page-manager-sort-button" type="button" onClick={()=>changePageListSort(key)}>{label} {pageListSort===key&&<span className="md-sort-indicator" aria-hidden="true">{pageListSortDescending?'↓':'↑'}</span>}</button>
             </th>)}
           <th scope="col">Application</th><th scope="col">Version</th>
-          {showRelatedObjectColumn&&<th scope="col">Related object</th>}<th scope="col">Layout</th>
+          {showRelatedObjectColumn&&<th scope="col">Related object</th>}<th scope="col">Layout</th><th scope="col">Size</th>
           <th scope="col" aria-sort={pageListSort==='updatedAt'?(pageListSortDescending?'descending':'ascending'):undefined}>
             <button className="page-manager-sort-button" type="button" onClick={()=>changePageListSort('updatedAt')}>Last modified {pageListSort==='updatedAt'&&<span className="md-sort-indicator" aria-hidden="true">{pageListSortDescending?'↓':'↑'}</span>}</button>
           </th>
@@ -156,8 +156,9 @@ export default function PageManagerView({ props, editorState, management, layout
           {showRelatedObjectColumn&&<td>{item.targetObject ? objects.find(object=>object.apiName===item.targetObject)?.label ?? item.targetObject : '—'}</td>}
           <td title={item.pageType+' · '+pageDeviceLabel(item)+' · '+item.canvasWidth+' × '+item.canvasHeight+' · '+canvasOrientation(item.canvasWidth,item.canvasHeight)}>
             <strong>{pageDeviceLabel(item)}{layoutBadges(item)}</strong>
-            <small className="page-manager-layout-metadata">{item.pageType} · {item.canvasWidth} × {item.canvasHeight}</small>
+            
           </td>
+          <td className="page-manager-size">{item.canvasWidth} × {item.canvasHeight}</td>
           <td>{modifiedDate(item)}</td>
           <td><span className={item.status === 'Active' ? 'page-status-badge active' : 'page-status-badge'}>{item.status}</span></td>
 

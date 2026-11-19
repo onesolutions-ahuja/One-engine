@@ -159,16 +159,23 @@ export async function applySmartIdCard(client:Query){
 
  // 5) Others rows for the shared caption settings (one slot per property).
  await client.query(`
-  WITH specs(property_key,ordinal) AS (VALUES ${values(OTHERS_EXTRAS.map((key,i)=>[key,i+1]))})
+  -- Other components already own fixed Others positions (chart 300s, table 400s):
+  -- missing rows go after the last used position, so no (area,row,order) clash.
+  WITH specs(property_key,ordinal) AS (VALUES ${values(OTHERS_EXTRAS.map((key,i)=>[key,i+1]))}),
+  missing AS (SELECT spec.* FROM specs spec WHERE NOT EXISTS(SELECT 1 FROM md_builder_design2_slots d
+   WHERE d.area='Others' AND d.slot_key='extra_'||spec.property_key)),
+  last_slot AS (SELECT GREATEST(500,COALESCE(MAX(order_no),0)) AS n FROM md_builder_design2_slots
+   WHERE area='Others' AND row_no=3)
   INSERT INTO md_builder_design2_slots
    (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
   SELECT 'Others',
    COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area='Others'),
             (SELECT COALESCE(MAX(area_order),0)+1 FROM md_builder_design2_slots)),
-   'extra_'||spec.property_key,3,400+spec.ordinal::integer,
+   'extra_'||spec.property_key,3,last_slot.n+ROW_NUMBER() OVER(ORDER BY spec.ordinal::integer),
    CASE WHEN property.control_kind='choice' THEN 110 WHEN property.control_kind='number' THEN 58 ELSE 40 END,
    26,spec.property_key,spec.property_key
-  FROM specs spec JOIN md_builder_shared_properties property ON property.property_key=spec.property_key
+  FROM missing spec CROSS JOIN last_slot
+  JOIN md_builder_shared_properties property ON property.property_key=spec.property_key
   ON CONFLICT(area,slot_key) DO NOTHING`);
 
  // 6) Icon cells: the Card Grid's cells in the areas an ID card draws, then

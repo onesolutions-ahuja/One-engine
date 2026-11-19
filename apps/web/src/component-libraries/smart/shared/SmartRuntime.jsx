@@ -12,7 +12,11 @@ import {smartPartOffsetStyle,smartPartOrderStyle} from "./SmartPartPlacement.js"
 import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../shared/FieldExpression.js";
 import {isSelectedSqlFormula} from "../../shared/formulaKinds.js";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
+import SmartIdCardFields from "../../smart_id_card/SmartIdCardFields.jsx";
 import {getTenantBrand,subscribeTenantBrand} from "../../shared/TenantBrand.js";
+// Smart ID Card is a Card Grid whose cards carry up to ten metadata fields: it reuses
+// the same grid, records, selection, image, title, badge and events (no second engine).
+const isGridKind=kind=>kind==="smart_card_grid"||kind==="smart_id_card";
 const number=(v,f,min=0,max=2000)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
 const text=(v)=>v===null||v===undefined?"":String(v);
 const formulaSourceFields=objects=>Array.isArray(objects)?Object.fromEntries(objects
@@ -71,7 +75,7 @@ const scopedExpression=(p,key,source,record)=>fieldAllows(p,key,record)
  ?(key==="textSource"&&p.dataCollection&&record&&
     (/(?:^|[=(,])\s*COLLECTION\s*\(/i.test(String(source??""))
      ||/^\s*=?\s*@[A-Za-z][A-Za-z0-9_]*\s*$/i.test(String(source??"")))
-    ?text(p.kind==="smart_card_grid"&&record.__collectionManual===false
+    ?text(isGridKind(p.kind)&&record.__collectionManual===false
       ?record.Name??"":record.__collectionLabel??record.Name??"")
     :expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true)):"";
 const scopedDisplayExpression=(p,key,source,record)=>{
@@ -95,7 +99,7 @@ const editorCardRows=(count)=>Array.from({length:Math.min(36,Math.max(1,count))}
 }));
 const recordsOf=p=>{
  const records=Array.isArray(p.records)?p.records:Array.isArray(p.items)?p.items:[];
- return p.kind==="smart_card_grid"&&p.builderPreview===true&&!p.loading&&!records.length
+ return isGridKind(p.kind)&&p.builderPreview===true&&!p.loading&&!records.length
   ?editorCardRows(number(p.cardsPerRow,3)*number(p.cardsPerColumn,3)):records;
 };
 const isBuilderEmpty=p=>p.builderPreview===true&&!p.loading&&recordsOf(p).length===0;
@@ -108,7 +112,7 @@ const boundImage=(p,record)=>{
  if(key && record && Object.prototype.hasOwnProperty.call(record,key))return text(record[key]);
  return expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
 };
-const gridText=(p,key,record)=>p.kind==="smart_card_grid"
+const gridText=(p,key,record)=>isGridKind(p.kind)
  ?scopedExpression(p,key,p[key]??"",record):"";
 // A card's selection follows its authored Page State action (or named Collection).
 // This shares the existing session binding: no separate Card Grid selection store.
@@ -153,7 +157,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const preview=p.previewOnly===true||p.builderPreview===true||p.preview===true;
  const sample=Boolean(p.builderPreview===true&&record?.__builderSample===true);
  const headerResult=scopedDisplayExpression(p,"textSource",p.textSource??p.title??p.label??"",record);
- const header=text(headerResult.value)||(sample?"Product Name":p.kind==="smart_card_grid"&&preview?"Text here":"");
+ const header=text(headerResult.value)||(sample?"Product Name":isGridKind(p.kind)&&preview?"Text here":"");
  const badgeResult=scopedDisplayExpression(p,"badgeText",p.badgeText??"",record);
  const badge=text(badgeResult.value);
  // Card Grid uses the same record-scoped, permission-aware formula evaluation as other Data fields.
@@ -166,9 +170,12 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const customButtons=["customButton1","customButton2"].filter(key=>
   p[key+"Visible"]!==false&&Boolean(p.actionFlows?.[key]||
    typeof p[key+"Label"]==="string"&&p[key+"Label"].trim()));
- const horizontal=["left","right"].includes(p.imagePlacement);
  const single=p.kind==="smart_image";
- const grid=p.kind==="smart_card_grid";
+ const grid=isGridKind(p.kind);
+ const idCard=p.kind==="smart_id_card";
+ // An ID card shows its photo beside the details unless a placement is authored.
+ const imagePlacement=p.imagePlacement||(idCard?"left":p.imagePlacement);
+ const horizontal=["left","right"].includes(imagePlacement);
  const imageHeight=number(p.imageHeight,220,0,1200);
  // Keep the historical automatic image fill/50-50 split until a dimension is
  // authored. The image area uses height for top/bottom, width for left/right.
@@ -209,6 +216,35 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ?p.focusedCardShadow:p.shadow;
  const cardBorder=single?"none":strokeWidth===0?"none":
   (strokeWidth+"px solid "+(p.borderColor||"#e2e8f0"));
+ const headerNode=header&&headerHeight>0&&<div data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Card title":undefined} className="smart-card-content" style={{
+     ...smartPartOffsetStyle(p,"header"),order:1,flex:horizontal&&!idCard?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
+     display:"flex",alignItems:fixedGridHeader?"safe center":"center",
+     // Explicit Card Grid heights bound the title box; excess text is scrollable.
+     // Standalone Image captions retain intrinsic growth for large typography.
+     height:headerHeight,minHeight:fixedGridHeader?0:"max-content",
+     maxHeight:fixedGridHeader?headerHeight:undefined,
+     alignSelf:horizontal&&!idCard?"safe center":undefined,flexShrink:0,
+     fontWeight:focusedWeight??(p.headerBold===false?400:700),
+     // Standalone Image's visible caption is edited by the shared Typography
+     // Label Alignment control; Card Grid retains its prior Header precedence.
+     textAlign:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)||"left",
+     justifyContent:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="right"?"flex-end":
+       (single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="center"?"center":"flex-start",
+     fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
+       ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
+     border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,
+     backgroundColor:p.headerBodyColor||undefined,
+     color:headerResult.error?formulaDisplayErrorColor:
+      focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
+     // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
+     whiteSpace:p.wrapText===false?"nowrap":"pre-line",
+     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
+     // A caption can still scroll by wheel/touch, but never shows native scroll arrows.
+     scrollbarWidth:fixedGridHeader||p.wrapText===false?"none":undefined,
+     padding:fixedGridHeader
+       ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
+       :cardPadding===null?"4px 10px":cardPadding+"px"
+   }} data-design-area={p.builderPreview?"Header":undefined}>{header}</div>;
  return <article className="smart-card"
   data-design-area={p.builderPreview&&grid?"Card Body":undefined}
   onClick={onSelect?event=>{if(event.target.closest("button"))return;onSelect();}:undefined}
@@ -236,8 +272,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ...(focused&&focusedHeight>0?{height:"min(100%, "+focusedHeight+"px)"}:{}),
   ...(focused&&(focusedWidth>0||focusedHeight>0)?{margin:"auto"}:{})
  }} data-selected={selected?"true":undefined}>
-  {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{...smartPartOffsetStyle(p,"image"),order:["right","bottom"].includes(p.imagePlacement)?2:0,
-    flex:horizontal?(imageWidth!==null?"0 0 "+imageWidth+"px":"1 1 50%"):
+  {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{...smartPartOffsetStyle(p,"image"),order:["right","bottom"].includes(imagePlacement)?2:0,
+    flex:horizontal?(imageWidth!==null?"0 0 "+imageWidth+"px":idCard?"0 0 34%":"1 1 50%"):
       single?(hasImageHeight?"0 1 "+imageHeight+"px":"1 1 auto"):
       grid?"1 1 "+imageHeight+"px":undefined,
     // A user-defined side image cannot squeeze adjacent text to zero. A
@@ -269,36 +305,15 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        boxSizing:"border-box",borderRadius:single?number(p.radius,12):undefined,
        border:nativeImageBorder}}/>}
   </div>}
-  {header&&headerHeight>0&&<div data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Card title":undefined} className="smart-card-content" style={{
-    ...smartPartOffsetStyle(p,"header"),order:1,flex:horizontal?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
-    display:"flex",alignItems:fixedGridHeader?"safe center":"center",
-    // Explicit Card Grid heights bound the title box; excess text is scrollable.
-    // Standalone Image captions retain intrinsic growth for large typography.
-    height:headerHeight,minHeight:fixedGridHeader?0:"max-content",
-    maxHeight:fixedGridHeader?headerHeight:undefined,
-    alignSelf:horizontal?"safe center":undefined,flexShrink:0,
-    fontWeight:focusedWeight??(p.headerBold===false?400:700),
-    // Standalone Image's visible caption is edited by the shared Typography
-    // Label Alignment control; Card Grid retains its prior Header precedence.
-    textAlign:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)||"left",
-    justifyContent:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="right"?"flex-end":
-      (single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="center"?"center":"flex-start",
-    fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
-      ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
-    border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,
-    backgroundColor:p.headerBodyColor||undefined,
-    color:headerResult.error?formulaDisplayErrorColor:
-     focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
-    // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
-    whiteSpace:p.wrapText===false?"nowrap":"pre-line",
-    overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
-    // A caption can still scroll by wheel/touch, but never shows native scroll arrows.
-    scrollbarWidth:fixedGridHeader||p.wrapText===false?"none":undefined,
-    padding:fixedGridHeader
-      ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
-      :cardPadding===null?"4px 10px":cardPadding+"px"
-  }} data-design-area={p.builderPreview?"Header":undefined}>{header}</div>}
-  {grid&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
+  {idCard?<div className="smart-id-card-body" style={{order:1,flex:"1 1 auto",minWidth:0,minHeight:0,
+    display:"flex",flexDirection:"column",overflow:"auto",scrollbarWidth:"thin"}}>
+   {headerNode}
+   <SmartIdCardFields p={p} record={record} sample={sample}
+    resolve={(key,source)=>scopedDisplayExpression(p,key,source,record)}
+    offsetStyle={key=>smartPartOffsetStyle(p,key)}
+    padding={cardPadding} focusedText={focusedText} errorColor={formulaDisplayErrorColor}/>
+  </div>:headerNode}
+  {grid&&!idCard&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
    style={cardPadding===null?undefined:{padding:cardPadding+"px"}}>
    {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
      style={{...smartPartOffsetStyle(p,"supporting"),color:description==='FORMULAERROR'?formulaDisplayErrorColor:
@@ -807,7 +822,7 @@ export default function SmartRuntime(p){
  const gridViewportRef=React.useRef(null);
  const [gridViewportHeight,setGridViewportHeight]=React.useState(0);
  React.useEffect(()=>{
-  if(name!=="smart_card_grid")return;
+  if(!isGridKind(name))return;
   const grid=gridViewportRef.current;
   if(!grid)return;
   const measureGridViewport=()=>{
@@ -992,7 +1007,7 @@ export default function SmartRuntime(p){
    (p.imageSourceMode==="field"||typeof p.imageSource==="string"&&p.imageSource.startsWith("@"))&&Array.isArray(p.records)
    ?(p.records.find(r=>boundImage(p,r))??record):record
  }/>;
- else if(name==="smart_card_grid"){
+ else if(isGridKind(name)){
   const rows=Math.max(1,Math.floor(number(p.cardsPerColumn,3,1,40)));
   const columns=Math.max(1,Math.floor(number(p.cardsPerRow,3,1,12)));
   const gap=number(p.gap,12,0,160);
@@ -1011,7 +1026,7 @@ export default function SmartRuntime(p){
   const previewRows=(p.previewOnly===true||p.builderPreview===true||p.preview===true)&&boundRows.length===0
     ?Array.from({length:columns*rows},(_,i)=>({Id:"card-preview-"+i,Name:"Sample item "+(i+1)}))
     :boundRows;
-  content=<div ref={gridViewportRef} data-design-area={p.builderPreview?"Grid":undefined} data-md-bind={p.builderPreview&&p.collectionFormula?"collectionFormula":undefined} className="smart-grid" role="region" aria-label="Product cards" tabIndex={0}
+  content=<div ref={gridViewportRef} data-design-area={p.builderPreview?"Grid":undefined} data-md-bind={p.builderPreview&&p.collectionFormula?"collectionFormula":undefined} className="smart-grid" role="region" aria-label={name==="smart_id_card"?"Record cards":"Product cards"} tabIndex={0}
    onKeyDown={event=>{
      // The inner grid is an independent keyboard scroller. Never steal
      // arrow/action keys from a focused card or from the Page Builder.
@@ -1146,7 +1161,8 @@ export default function SmartRuntime(p){
    return <span data-smart-hidden="true" hidden/>;
  }
  // Geometry-only technical host; the native Smart surface owns all visible styling.
- return <div className={"smart-runtime "+name+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}
+ // An ID card is a Card Grid surface too: it shares the grid sizing/scroll CSS.
+ return <div className={"smart-runtime "+name+(name==="smart_id_card"?" smart_card_grid":"")+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}
   data-builder-preview={p.builderPreview?"true":undefined} style={{
    display:"flex",flexDirection:"column",boxSizing:"border-box",border:0,
    background:"transparent",boxShadow:"none",padding:0,margin:0,

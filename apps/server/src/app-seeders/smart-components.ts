@@ -1,6 +1,6 @@
 import type {PoolClient} from 'pg';
 /** Independent, upgrade-safe Smart component registrations; no app data is altered. */
-export const SMART_COMPONENTS=["smart_numpad","smart_button","smart_toggle","smart_lookup","smart_search","smart_selector","smart_tabs","smart_text","smart_textbox","smart_label","smart_card_grid","smart_image","smart_calendar","smart_navigation","smart_container","smart_cart","smart_icon","smart_table","smart_keyboard","smart_dock","smart_chart","smart_qr","smart_video","smart_line_items"] as const;
+export const SMART_COMPONENTS=["smart_numpad","smart_button","smart_toggle","smart_lookup","smart_search","smart_selector","smart_tabs","smart_text","smart_textbox","smart_label","smart_card_grid","smart_image","smart_calendar","smart_navigation","smart_container","smart_cart","smart_icon","smart_table","smart_keyboard","smart_dock","smart_chart","smart_qr","smart_video","smart_line_items","smart_id_card"] as const;
 export async function seedFreshSmartComponents(client:Pick<PoolClient,'query'>,tenantId:string){
  // Re-enable a current Smart component that only the system switched off: an
  // older API's cleanup disables bundled renderers missing from ITS list, so a

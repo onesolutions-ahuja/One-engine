@@ -56,7 +56,7 @@ test('Smart Line Items is registered like every Smart component',()=>{
  assert.equal(descriptor.apiName,'smart_line_items');
  assert.deepEqual(descriptor.propertyDefinitions,[]);
  assert.match(read('../../server/src/app-seeders/smart-components.ts'),/"smart_line_items"/);
- assert.match(read('../../server/src/app-seeders/core-objects.ts'),/core-objects-unified-v14/);
+ assert.match(read('../../server/src/app-seeders/core-objects.ts'),/core-objects-unified-v(?:1[4-9]|[2-9][0-9])/);
  assert.match(read('../../server/src/system-support/system-migrations.ts'),/await applySmartLineItems\(client\)/);
  const sql=read('../../server/src/system-support/smart-line-items.ts');
  for(const key of ['lineItemsSeparator','lineItemsFont','textSource','column2Source','column3Source','column4Source','column5Source'])

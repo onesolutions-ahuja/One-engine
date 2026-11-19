@@ -69,8 +69,8 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v13: one global catalogue (ProductCategory, ProductOptionGroup, ProductOption, CartLineOption,
 // Choice, Product.Category and channel flags); Appointment check-in fields and ServiceProduct; Till becomes NamedDevice type POS Terminal (records
 // migrated once, TillId repointed); Order, ProductLine, Account, Lead and Case retired from Core;
-// System Objects (never deletable) and Standard Objects marked. v14: smart_line_items.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v14';
+// System Objects (never deletable) and Standard Objects marked. v14: smart_line_items. v15: smart_id_card.
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v15';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,

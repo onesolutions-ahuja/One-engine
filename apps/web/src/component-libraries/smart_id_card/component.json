@@ -1,0 +1,32 @@
+{
+  "apiName": "smart_id_card",
+  "label": "Smart ID Card",
+  "category": "Data",
+  "description": "Repeating detail cards for customers, users, products or any Object: one card per record with a movable image, a title, a badge and up to 10 metadata-driven fields (caption + value formula each). Drag the image or a field on the canvas to set its X/Y once for every card.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_id_card/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_id_card/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 720,
+    "defaultHeight": 420,
+    "minWidth": 160,
+    "minHeight": 80
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    },
+    {
+      "apiName": "click",
+      "label": "When a card is selected"
+    }
+  ]
+}

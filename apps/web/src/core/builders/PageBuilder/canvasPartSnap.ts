@@ -22,6 +22,15 @@ export const PART_SNAP_RULES:Readonly<Record<string,Readonly<Record<string,PartS
   'Button 2':rule('customButton2Placement','sides','customButton2'),
   'Button 3':rule('cardButtonPlacement','sides','cardButton')
  },
+ // ID Card: drag the photo, title, badge or any of the ten fields. The X/Y is a
+ // component property, so every repeated card moves together.
+ smart_id_card:{
+  Badge:rule('badgeAlignment','badge','badge'),
+  Image:rule('imagePlacement','edges','image'),
+  Header:rule('headerAlignment','align','header'),
+  ...Object.fromEntries(Array.from({length:10},(_,i)=>
+   ['Field '+(i+1),rule('field'+(i+1)+'Alignment','align','field'+(i+1))]))
+ },
  smart_image:{
   Badge:rule('badgeAlignment','badge','badge'),
   Image:rule('imagePlacement','edges','image'),

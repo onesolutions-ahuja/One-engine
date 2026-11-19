@@ -73,6 +73,9 @@ const bindingLabels:Record<string,Record<string,string>>={
   calendarEndSource:'Appointment end',calendarTitleSource:'Appointment caption',
   calendarStatusSource:'Appointment status'},
  smart_card_grid:{collectionFormula:'Product items source',textSource:'Product title'},
+ smart_id_card:{collectionFormula:'Card records source',textSource:'Card title',imageSource:'Card image',
+  badgeText:'Badge text',...Object.fromEntries(Array.from({length:10},(_,i)=>[
+   ['field'+(i+1)+'Label','Field '+(i+1)+' caption'],['field'+(i+1)+'Source','Field '+(i+1)+' value']]).flat())},
  smart_table:{textSource:'Table data source'},
  smart_navigation:{collectionFormula:'Navigation items source',textSource:'Item caption'}
 };

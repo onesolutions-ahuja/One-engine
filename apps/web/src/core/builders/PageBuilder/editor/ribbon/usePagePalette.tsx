@@ -57,7 +57,7 @@ export function usePagePalette(
       &&component.status!=='Draft').map(component=>({
       id:'Custom:'+component.apiName,
       type:'Custom:'+component.apiName,
-      label:component.apiName==='smart_textbox'?'Smart Textbox':component.apiName==='smart_card_grid'?'Card Grid':component.apiName==='smart_lookup'?'Lookup Record':
+      label:component.apiName==='smart_textbox'?'Smart Textbox':component.apiName==='smart_card_grid'?'Card Grid':component.apiName==='smart_id_card'?'ID Card':component.apiName==='smart_lookup'?'Lookup Record':
         component.apiName==='smart_text'?'Input Box':component.apiName==='smart_navigation'?'Navigation Bar':
         component.apiName.startsWith('smart_')?component.apiName.slice(6).split('_').map(word=>word[0].toUpperCase()+word.slice(1)).join(' '):component.label,
       description:component.description,
@@ -88,6 +88,7 @@ export function usePagePalette(
       case 'Custom:smart_qr':return <QrCode size={15}/>;
       case 'Custom:smart_video':return <Film size={15}/>;
       case 'Custom:smart_line_items':return <List size={15}/>;
+      case 'Custom:smart_id_card':return <Grid2X2 size={15}/>;
     }
     const name = `${component.label} ${component.type}`.toLowerCase();
     if (/\b(text|heading|paragraph|rich text|label)\b/.test(name)) return <Type size={15} />;

@@ -91,3 +91,22 @@
     overflow-wrap:anywhere;
   }
 }
+
+/* One row: Page type tabs, then Related Record / Object, Search pages and Layout to their right.
+   The header buttons stay on one line. Both keep the page list higher on the screen. */
+.lightning .page-manager-view .page-manager-type-level{flex-wrap:wrap;align-items:flex-end;column-gap:12px;row-gap:10px}
+.lightning .page-manager-view .page-manager-type-level>.page-manager-filter-label{align-self:center}
+.lightning .page-manager-view .page-manager-type-level>.page-manager-filters{flex:1 1 560px;flex-wrap:nowrap;justify-content:flex-end;min-width:0;margin:0}
+.lightning .page-manager-view .page-manager-type-level>.page-manager-filters>.form-label{min-width:0}
+.lightning .page-manager-view .page-manager-filters>.page-manager-object-filter{flex:0 1 220px}
+.lightning .page-manager-view .page-manager-filters>.page-manager-search-filter{flex:1 1 260px;max-width:420px}
+.lightning .page-manager-view .page-manager-type-level>.page-manager-filters>.page-manager-layout-filter{flex:0 1 180px;margin-left:0}
+@media(min-width:1200px){
+  .lightning .page-manager-view .page-manager-header-actions{flex-wrap:nowrap}
+  .lightning .page-manager-view .page-manager-header-actions>*{flex:0 0 auto}
+}
+@media(max-width:1100px){
+  .lightning .page-manager-view .page-manager-type-level>.page-manager-filters{flex-basis:100%;flex-wrap:wrap;justify-content:flex-start}
+  .lightning .page-manager-view .page-manager-filters>.page-manager-search-filter{max-width:none}
+}
+.lightning .page-manager-view .page-manager-header>div:first-child{min-width:0}

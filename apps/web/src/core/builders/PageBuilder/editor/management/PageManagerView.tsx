@@ -56,19 +56,20 @@ export default function PageManagerView({ props, editorState, management, layout
               {(['Desktop','Tablet','Mobile','Custom'] as const).map(device=><option key={device} value={device}>CSV: {device}</option>)}
             </select>
           </div></header>
-        {!recordPageContext && <PageManagerTabs
-          type={pageListTypeTab} app={pageListAppTab} apps={pageAppTabs}
-          onTypeChange={value=>{setPageListTypeTab(value);setPageListPage(1);}}
-          onAppChange={value=>{setPageListAppTab(value);setPageListPage(1);}}/>}
-        <div className="page-manager-filters">
-          <label className="form-label">Related Record / Object<select className="form-control" value={pageListObject} aria-label="Related Record or Object" onChange={event=>setPageListObject(event.target.value)}><option value="">All objects</option>{objects.map(item=><option key={item.apiName} value={item.apiName}>{item.label}</option>)}</select></label>
-          <label className="form-label">Search pages<input className="form-control" type="search" value={pageListSearch} onChange={event=>setPageListSearch(event.target.value)} placeholder="Search page name…"/></label>
+        {/* Filters sit on the Page type row (or alone for Record Page Editor), so the list starts higher. */}
+        {(()=>{const filters=<div className="page-manager-filters">
+          <label className="form-label page-manager-object-filter">Related Record / Object<select className="form-control" value={pageListObject} aria-label="Related Record or Object" onChange={event=>setPageListObject(event.target.value)}><option value="">All objects</option>{objects.map(item=><option key={item.apiName} value={item.apiName}>{item.label}</option>)}</select></label>
+          <label className="form-label page-manager-search-filter">Search pages<input className="form-control" type="search" value={pageListSearch} onChange={event=>setPageListSearch(event.target.value)} placeholder="Search page name…"/></label>
           {!recordPageContext && <label className="form-label page-manager-layout-filter">Layout
             <select className="form-control" aria-label="Layout" value={pageListDeviceTab} onChange={event=>setPageListDeviceTab(event.target.value)}>
               <option value="all">All devices</option>{['Desktop','Tablet','Mobile','Custom'].map(device=><option key={device} value={device}>{device}</option>)}
             </select>
           </label>}
-        </div>
+        </div>;
+         return recordPageContext?filters:<PageManagerTabs
+          type={pageListTypeTab} app={pageListAppTab} apps={pageAppTabs}
+          onTypeChange={value=>{setPageListTypeTab(value);setPageListPage(1);}}
+          onAppChange={value=>{setPageListAppTab(value);setPageListPage(1);}}>{filters}</PageManagerTabs>;})()}
         <div className="page-manager-mobile-sort"><label htmlFor="page-manager-card-sort">Sort pages</label>
           <select className="form-control" id="page-manager-card-sort" value={pageListSort} onChange={event=>{setPageListSort(event.target.value as typeof pageListSort);setPageListSortDescending(event.target.value==='updatedAt');setPageListPage(1);}}>
            <option value="updatedAt">Last modified</option><option value="label">Page name</option>

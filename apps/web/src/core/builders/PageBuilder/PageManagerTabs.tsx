@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import './PageManagerTabs.css';
 
 type Tab = { value: string; label: string };
@@ -38,12 +38,14 @@ function TabBar({ label, className, tabs, selected, onSelect }: {
 }
 
 /** Application first (In-Screen popups belong to the apps that open them), then page type. */
-export default function PageManagerTabs({ type, app, apps, onTypeChange, onAppChange }: {
+export default function PageManagerTabs({ type, app, apps, onTypeChange, onAppChange, children }: {
   type: string;
   app: string;
   apps: ReadonlyArray<AppTab>;
   onTypeChange: (type: string) => void;
   onAppChange: (app: string) => void;
+  /** Filters shown on the Page type row (to its right), so the page list starts higher. */
+  children?: ReactNode;
 }) {
   const appTabs: Tab[] = [
     { value: 'all', label: 'All Apps' },
@@ -56,10 +58,11 @@ export default function PageManagerTabs({ type, app, apps, onTypeChange, onAppCh
       <TabBar label="Pages by application" className="page-manager-app-tabs"
         tabs={appTabs} selected={app} onSelect={onAppChange} />
     </div>
-    <div className="page-manager-tab-level">
+    <div className="page-manager-tab-level page-manager-type-level">
       <span className="page-manager-filter-label">Page type</span>
       <TabBar label="Page types" className="page-manager-main-tabs" tabs={pageTypes}
         selected={type} onSelect={onTypeChange} />
+      {children}
     </div>
   </div>;
 }

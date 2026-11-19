@@ -21,19 +21,20 @@
   background: var(--md-surface-2, #f6f8fb);
 }
 
-/* A non-frozen first column with room to separate the Archive action. */
+/* Compact, vertically centred page rows with all six actions on one line. */
 .lightning .page-manager-table :is(th.page-manager-actions-heading, td.page-manager-actions) {
   box-sizing: border-box;
-  width: 230px;
-  min-width: 230px;
-  max-width: 230px;
-  padding: 8px;
+  width: 264px;
+  min-width: 264px;
+  max-width: 264px;
+  padding: 4px 6px;
 }
 .lightning .page-manager-table .page-manager-action-icons {
   display: flex;
   align-items: center;
   gap: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 .lightning .page-manager-table td.page-manager-actions .page-manager-icon-action {
   box-sizing: border-box;
@@ -70,7 +71,7 @@
   color: var(--md-success, #15803d);
 }
 .lightning .page-manager-table td.page-manager-actions .page-manager-delete {
-  margin-inline-start: 6px;
+  margin-inline-start: 0;
   color: var(--md-danger, #b42318);
 }
 .lightning .page-manager-table td.page-manager-actions .page-manager-delete:hover:not(:disabled) {
@@ -167,3 +168,13 @@
 .page-manager-design-layout-option:focus-visible {
   box-shadow: inset 0 0 0 2px #176ce5;
 }
+
+/* Keep the inventory rows near half their former height without shrinking touch targets. */
+.lightning .page-manager-table tbody td {
+  vertical-align: middle;
+  padding-block: 4px;
+  line-height: 1.25;
+}
+.lightning .page-manager-table tbody tr { height: 42px; }
+.lightning .page-manager-table .page-manager-size { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lightning .page-manager-table .page-manager-action-icons { min-height: 32px; }

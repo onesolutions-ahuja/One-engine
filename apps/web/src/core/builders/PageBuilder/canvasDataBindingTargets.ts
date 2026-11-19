@@ -50,6 +50,8 @@ export function writeCanvasBinding(properties:Props,target:Pick<CanvasBindingTar
 const bindingLabels:Record<string,Record<string,string>>={
  smart_qr:{textSource:'QR value',label:'Caption',collectionFormula:'Record source'},
  smart_video:{imageSource:'Video URL or field',collectionFormula:'Record source'},
+ smart_line_items:{collectionFormula:'Line items source',textSource:'Item text',column2Source:'Amount (right)',
+  column3Source:'Second line',column4Source:'Extra line text',column5Source:'Extra line amount',label:'Heading'},
  smart_chart:{collectionFormula:'Chart data source',textSource:'Label (category)',column2Source:'Value',
   chartValuePrefix:'Value prefix',label:'Chart title'},
  smart_dock:Object.fromEntries([1,2,3,4,5,6].flatMap(n=>[

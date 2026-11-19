@@ -23,6 +23,7 @@ const rowDisplayProperties:Readonly<Record<string,ReadonlySet<string>>>={
  smart_calendar:new Set(['calendarStartSource','calendarEndSource','calendarTitleSource','calendarStatusSource']),
  smart_table:new Set(['column2Source','column3Source','column4Source','column5Source']),
  smart_chart:new Set(['textSource','column2Source']),
+ smart_line_items:new Set(['textSource','column2Source','column3Source','column4Source','column5Source']),
  // A standalone image can pick the first record whose own image source is nonblank.
  smart_image:new Set(['textSource','imageSource','badgeText'])
 };

@@ -3,7 +3,7 @@
  * permission given once in Setup → Named Devices). Network printers use Star CloudPRNT: the job
  * is queued on our server and the printer collects it. Commands: Print, Open (cash drawer), Cut. */
 type Request=<T>(path:string,init?:{method:string;body?:string})=>Promise<T>;
-type Device={Name?:string;DeviceType?:string;Connection?:string;DeviceId?:string;Address?:string;IsDefault?:boolean;Active?:boolean};
+export type Device={Name?:string;DeviceType?:string;Connection?:string;DeviceId?:string;Address?:string;IsDefault?:boolean;Active?:boolean};
 const ESC=0x1b,GS=0x1d;
 const COMMANDS=['PRINT','OPEN','CUT'];
 
@@ -23,15 +23,53 @@ export function escPos(command:string,text=''):Uint8Array{
  return new Uint8Array(out);
 }
 
+/** Most 80 mm receipt printers are 203 dpi and print 72 mm: 576 dots across. */
+export const PRINTER_DPI=203;
+export const MAX_RECEIPT_DOTS=576;
+/** Printer dots for a width designed in CSS pixels (96 per inch), printed at the designed size. */
+export function designedWidthToDots(cssPixels:number):number{
+ const dots=Math.round(Math.max(8,cssPixels)*PRINTER_DPI/96);
+ return Math.min(MAX_RECEIPT_DOTS,Math.ceil(dots/8)*8);
+}
+/** Black-and-white printer bits (1 = black) from RGBA pixels; dark pixels print. */
+export function rasterBits(rgba:ArrayLike<number>,width:number,height:number,threshold=160):Uint8Array{
+ const bytesPerRow=Math.ceil(width/8);
+ const bits=new Uint8Array(bytesPerRow*height);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const i=(y*width+x)*4,alpha=rgba[i+3]/255;
+  // Transparent pixels are paper (white).
+  const light=(0.299*rgba[i]+0.587*rgba[i+1]+0.114*rgba[i+2])*alpha+255*(1-alpha);
+  if(light<threshold)bits[y*bytesPerRow+(x>>3)]|=0x80>>(x&7);
+ }
+ return bits;
+}
+/** ESC/POS raster image (GS v 0) in bands of rows, so small printer buffers keep up; then feed and cut. */
+export function escPosRaster(bits:Uint8Array,bytesPerRow:number,height:number,band=128):Uint8Array{
+ if(bytesPerRow<1||height<1||bits.length<bytesPerRow*height)throw Error('Invalid receipt image');
+ const out:number[]=[ESC,0x40];
+ for(let top=0;top<height;top+=band){
+  const rows=Math.min(band,height-top);
+  out.push(GS,0x76,0x30,0x00,bytesPerRow&255,bytesPerRow>>8,rows&255,rows>>8);
+  const slice=bits.subarray(top*bytesPerRow,(top+rows)*bytesPerRow);
+  for(const byte of slice)out.push(byte);
+ }
+ out.push(0x0a,0x0a,0x0a,0x0a,GS,0x56,0x01);
+ return new Uint8Array(out);
+}
+
+async function listDevices(request:Request,kind:string):Promise<Device|undefined>{
+ const filters=[{field:'DeviceType',operator:'eq',value:kind},{field:'Active',operator:'eq',value:'true'}];
+ const result=await request<{records?:Device[]}>('/records/NamedDevice?limit=20&filters='+encodeURIComponent(JSON.stringify(filters)));
+ const devices=result.records??[];
+ return devices.find(item=>item.IsDefault===true)??(devices.length===1?devices[0]:undefined);
+}
+/** The default active Named Device of a type, or undefined when there is none. */
+export async function findDefaultDevice(request:Request,type:string):Promise<Device|undefined>{
+ return listDevices(request,type);
+}
 async function findDevice(request:Request,type:string):Promise<Device>{
- const list=async(kind:string)=>{
-  const filters=[{field:'DeviceType',operator:'eq',value:kind},{field:'Active',operator:'eq',value:'true'}];
-  const result=await request<{records?:Device[]}>('/records/NamedDevice?limit=20&filters='+encodeURIComponent(JSON.stringify(filters)));
-  const devices=result.records??[];
-  return devices.find(item=>item.IsDefault===true)??(devices.length===1?devices[0]:undefined);
- };
  // A cash drawer normally hangs off the receipt printer (RJ11 kick port).
- const device=await list(type)??(type==='Cash Drawer'?await list('Receipt Printer'):undefined);
+ const device=await listDevices(request,type)??(type==='Cash Drawer'?await listDevices(request,'Receipt Printer'):undefined);
  if(!device)throw Error('Add a default '+type+' in Setup → Named Devices');
  return device;
 }
@@ -57,7 +95,9 @@ async function sendUsb(address:string,bytes:Uint8Array){
  if(!iface)throw Error('This USB device has no printer output');
  await device.claimInterface(iface.interfaceNumber).catch(()=>undefined);
  const endpoint=iface.alternate.endpoints.find(e=>e.direction==='out'&&e.type==='bulk')!;
- await device.transferOut(endpoint.endpointNumber,bytes);
+ // Receipt images are large: send them in pieces the printer's USB buffer accepts.
+ for(let i=0;i<bytes.length;i+=16384)
+  await device.transferOut(endpoint.endpointNumber,bytes.subarray(i,i+16384));
 }
 async function sendSerial(address:string,bytes:Uint8Array){
  const serial=nav()?.serial;
@@ -110,4 +150,24 @@ export async function runDeviceCommand(request:Request,type:unknown,command:unkn
   else throw Error(String(device.Name??type)+' is a '+connection+' device; DEVICE works with USB, Serial, Bluetooth or Network devices');
  }
  return {Device:String(device.Name??''),Connection:connection};
+}
+
+/** Connections a Print Template can be sent to without the browser's print window. */
+export const DIRECT_PRINT_CONNECTIONS=['USB','Serial','Bluetooth','Network'];
+/** Print a rendered Print Template image on a Named Device: ESC/POS raster for USB, Serial and
+ * Bluetooth; a PNG job for Network (Star CloudPRNT) printers. */
+export async function printImageOnDevice(request:Request,device:Device,image:{
+ bits:Uint8Array;bytesPerRow:number;height:number;png:()=>Promise<string>}){
+ const connection=String(device.Connection??'');
+ const address=String(device.Address??'');
+ if(connection==='Network'){
+  await request('/action-formulas/device-job',{method:'POST',
+   body:JSON.stringify({key:device.DeviceId,command:'PRINT',image:await image.png()})});
+  return;
+ }
+ const bytes=escPosRaster(image.bits,image.bytesPerRow,image.height);
+ if(connection==='USB')await sendUsb(address,bytes);
+ else if(connection==='Serial')await sendSerial(address,bytes);
+ else if(connection==='Bluetooth')await sendBluetooth(address,bytes);
+ else throw Error(String(device.Name??'Printer')+' is a '+connection+' device and cannot print templates');
 }

@@ -11,10 +11,10 @@
  * they live in the existing Design 2 "Others" section so builders edit them
  * from the property bar like every other Smart component.
  */
-type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>};
+export type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>};
 
 /** [property_key,label,tab,group,kind,default json|null,choices json,min,max] */
-type Spec=[string,string,'Design2'|'Data',string,string,string|null,string,number|null,number|null];
+export type Spec=[string,string,'Design2'|'Data',string,string,string|null,string,number|null,number|null];
 const json=(value:unknown)=>JSON.stringify(value);
 const CHART_COLOURS=['#007aff','#34c759','#ff9500','#af52de','#ff3b30','#5ac8fa'];
 
@@ -58,19 +58,12 @@ const CHART_DESIGN:Array<[string,string,string]>=[
 const values=(rows:unknown[][])=>rows.map(row=>'('+row.map(value=>value===null?'NULL'
  :typeof value==='number'?String(value):"'"+String(value).replaceAll("'","''")+"'").join(',')+')').join(',\n');
 
-export async function applySmartChart(client:Query){
- // 1) Register the component for the ribbon and for every existing tenant.
- //    Fresh tenants get it from SMART_COMPONENTS in the Smart seeder.
- await client.query(`INSERT INTO md_builder_ribbon_components(component_api)
-  VALUES ('smart_chart') ON CONFLICT(component_api) DO NOTHING`);
- await client.query(`INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled)
-  SELECT t.id,'smart_chart','smart-bundled:smart_chart',true FROM md_tenants t
-  ON CONFLICT(tenant_id,api_name) DO NOTHING`);
-
- // 2) New shared properties, appended after the current sort order.
+/** Add new shared properties (Design 2 or Data), appended after the current sort order.
+ * Shared by Smart components that bring their own settings (Smart Chart, Smart Line Items). */
+export async function addSharedProperties(client:Query,specs:Spec[]){
  await client.query(`
   WITH specs(property_key,label,tab_name,group_name,kind,default_json,choices,min_value,max_value,ordinal) AS (VALUES
-  ${values(SMART_CHART_PROPERTY_SPECS.map((spec,i)=>[...spec,i+1]))}
+  ${values(specs.map((spec,i)=>[...spec,i+1]))}
   ), typed AS (
    SELECT property_key,label,tab_name,group_name,kind,default_json::jsonb AS default_json,
     choices::jsonb AS choices,min_value::integer AS min_value,max_value::integer AS max_value,ordinal::integer AS ordinal
@@ -90,6 +83,36 @@ export async function applySmartChart(client:Query){
    26,0,'buttons'
   FROM missing m CROSS JOIN last_order
   ON CONFLICT(property_key) DO NOTHING`);
+}
+/** One row per Design 2 setting in the existing Others section. `first` keeps each component's
+ * slot numbers apart: Others row 3 is unique per (row, order). */
+export async function addOthersSlots(client:Query,specs:Spec[],first:number){
+ const extras=specs.filter(spec=>spec[2]==='Design2').map((spec,i)=>[spec[0],i+1]);
+ await client.query(`
+  WITH specs(property_key,ordinal) AS (VALUES ${values(extras)})
+  INSERT INTO md_builder_design2_slots
+   (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+  SELECT 'Others',
+   COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area='Others'),
+            (SELECT COALESCE(MAX(area_order),0)+1 FROM md_builder_design2_slots)),
+   'extra_'||spec.property_key,3,${first}+spec.ordinal::integer,
+   CASE WHEN property.control_kind='choice' THEN 110 WHEN property.control_kind='number' THEN 58 ELSE 40 END,
+   26,spec.property_key,spec.property_key
+  FROM specs spec JOIN md_builder_shared_properties property ON property.property_key=spec.property_key
+  ON CONFLICT(area,slot_key) DO NOTHING`);
+}
+
+export async function applySmartChart(client:Query){
+ // 1) Register the component for the ribbon and for every existing tenant.
+ //    Fresh tenants get it from SMART_COMPONENTS in the Smart seeder.
+ await client.query(`INSERT INTO md_builder_ribbon_components(component_api)
+  VALUES ('smart_chart') ON CONFLICT(component_api) DO NOTHING`);
+ await client.query(`INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled)
+  SELECT t.id,'smart_chart','smart-bundled:smart_chart',true FROM md_tenants t
+  ON CONFLICT(tenant_id,api_name) DO NOTHING`);
+
+ // 2) New shared properties, appended after the current sort order.
+ await addSharedProperties(client,SMART_CHART_PROPERTY_SPECS);
 
  // 3) Which properties the chart uses. Defaults apply to new inserts only.
  await client.query(`
@@ -102,19 +125,7 @@ export async function applySmartChart(client:Query){
   ON CONFLICT(component_api,property_key) DO NOTHING`);
 
  // 4) Supplemental rows in the existing Others section (one slot per property).
- const extras=SMART_CHART_PROPERTY_SPECS.filter(spec=>spec[2]==='Design2').map((spec,i)=>[spec[0],i+1]);
- await client.query(`
-  WITH specs(property_key,ordinal) AS (VALUES ${values(extras)})
-  INSERT INTO md_builder_design2_slots
-   (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
-  SELECT 'Others',
-   COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area='Others'),
-            (SELECT COALESCE(MAX(area_order),0)+1 FROM md_builder_design2_slots)),
-   'extra_'||spec.property_key,3,300+spec.ordinal::integer,
-   CASE WHEN property.control_kind='choice' THEN 110 WHEN property.control_kind='number' THEN 58 ELSE 40 END,
-   26,spec.property_key,spec.property_key
-  FROM specs spec JOIN md_builder_shared_properties property ON property.property_key=spec.property_key
-  ON CONFLICT(area,slot_key) DO NOTHING`);
+ await addOthersSlots(client,SMART_CHART_PROPERTY_SPECS,300);
 
  // 5) Icon cells for the chart, plus its Others rows and the shared Style row.
  await client.query(`

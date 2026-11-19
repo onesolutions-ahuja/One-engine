@@ -658,7 +658,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();
-     else if(effect.name==='PRINT')await previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId);
+     // Printing code loads only when something is printed.
+     else if(effect.name==='PRINT')await (await import('../PageRuntime/printTemplate')).printTemplate(first,runtime.request as never,
+      ()=>previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId));
      else if(effect.name==='FLOW')await runSequenceFlow(first,availableFlows,runtime.request,onLaunchFlow);
      else if(effect.name==='NAVIGATE')await navigateTo(first,effect.args[1]);
      else if(effect.name==='FILTER')await selectFilter(first,second,second);
@@ -678,7 +680,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      const [template,id]=step.args.map(value=>value===null||value===undefined?'':String(value));
      if(!template||!id)throw Error('CREATEPDF needs a Print Template and a record Id');
      return createTemplatePdf(template,id,runtime.request as never,
-      ()=>previewPrintTemplate(template,id,runtime.pageSessionKey,session,currentAppId),{width:794,height:1123});
+      ()=>previewPrintTemplate(template,id,runtime.pageSessionKey,session,currentAppId));
     }
     throw Error(step.name+' is not a device step');
    };

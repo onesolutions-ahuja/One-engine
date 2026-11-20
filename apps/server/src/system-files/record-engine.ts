@@ -44,7 +44,7 @@ import {evaluateResolvedFormulaSql} from '../system-support/formula-sql-runtime.
 import {sanitizeRichText} from './rich-text.js';
 import {formulaFieldReferences,compileRecordFilters,type QueryField,type RecordCursor,type RecordFilter} from '../object-engine/QueryBuilder.js';
 import {computeFilteredNumericAggregate} from '../object-engine/FilteredNumericAggregate.js';
-type FieldDefinition=NativeQueryField&{api_name:string;data_type:string;related_object:string|null;relationship_type:string|null;allow_reparenting:boolean;required:boolean;max_length:number|null;precision:number|null;scale:number|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;default_value:string|null;auto_number_format:string|null;rollup_child_object?:string|null;rollup_relationship_field?:string|null;rollup_operation?:string|null;rollup_source_field?:string|null;rollup_source_data_type?:string|null;formula_expression?:string|null;formula_return_type?:string|null;picklist_restricted?:boolean;controller_field_api_name?:string|null;global_value_set_api?:string|null};
+type FieldDefinition=NativeQueryField&{api_name:string;label?:string|null;data_type:string;related_object:string|null;relationship_type:string|null;allow_reparenting:boolean;required:boolean;max_length:number|null;precision:number|null;scale:number|null;is_unique:boolean;external_id:boolean;case_sensitive:boolean;default_value:string|null;auto_number_format:string|null;rollup_child_object?:string|null;rollup_relationship_field?:string|null;rollup_operation?:string|null;rollup_source_field?:string|null;rollup_source_data_type?:string|null;formula_expression?:string|null;formula_return_type?:string|null;picklist_restricted?:boolean;controller_field_api_name?:string|null;global_value_set_api?:string|null};
 type EncryptedValueVault={
   encryptOpaque(value:string):{ciphertext:Buffer;keyId:string};
   decryptOpaque(ciphertext:Buffer,keyId:string):string;
@@ -124,7 +124,7 @@ export class RecordEngine {
   private async loadFields(tenantId:string,objectApi:string,client?:PoolClient):Promise<FieldDefinition[]> {
     const executor=client??this.db;
     const {rows}=await executor.query<FieldDefinition&{package_object_retained?:boolean}>(
-      `SELECT md_field_definitions.api_name,md_field_definitions.data_type,related_object,relationship_type,allow_reparenting,required,max_length,precision,scale,is_unique,external_id,
+      `SELECT md_field_definitions.api_name,md_field_definitions.label,md_field_definitions.data_type,related_object,relationship_type,allow_reparenting,required,max_length,precision,scale,is_unique,external_id,
        nf.column_name AS native_column,nf.sql_type AS native_type,no.table_name AS native_table,
        formula_expression,formula_return_type,g.value_set_api AS global_value_set_api,
        EXISTS(SELECT 1 FROM md_metadata_package_components c
@@ -671,7 +671,7 @@ export class RecordEngine {
     if(creating&&!deferRequired) for(const field of definitions)
       if(field.required&&!['formula','autonumber'].includes(field.data_type)
         &&field.api_name!=='OwnerId'&&(inputValues[field.api_name]===undefined||inputValues[field.api_name]===null))
-        throw new Error('Required field missing: '+field.api_name);
+        throw new Error((field.label||field.api_name)+' is required (Required field missing: '+field.api_name+')');
     const prepared=new Map<string,Storable>();
     // Field write permissions for every written field in ONE decision query.
     const writable=Object.keys(inputValues).filter(key=>key!=='OwnerId'&&key!=='RecordTypeId'&&fields.has(key));
@@ -704,10 +704,12 @@ export class RecordEngine {
       if(!field) throw new Error('Unknown field: '+key);
       if(field.data_type==='formula'||field.data_type==='autonumber'||field.data_type==='rollup')
         throw new Error('Field is read-only: '+key);
-      if(!writeDecisions[writeAllowed.get(key)!])throw Error('Permission denied');
+      // Name the field: "Permission denied" alone leaves the user guessing what to fix.
+      if(!writeDecisions[writeAllowed.get(key)!])
+        throw Error("You don't have permission to "+(creating?'set ':'edit ')+(field.label||key)+' (Permission denied)');
       const metadata={is_unique:requiresUniqueValue(field),case_sensitive:field.case_sensitive};
       if(value===null) {
-        if(field.required&&!deferRequired)throw new Error('Required field cannot be null: '+key);
+        if(field.required&&!deferRequired)throw new Error((field.label||key)+' is required (Required field cannot be null: '+key+')');
         prepared.set(key,{value_text:null,reference_record_id:null,
           ...(field.data_type==='multipicklist'?{multi_values:[]}:{}),...metadata});
         continue;

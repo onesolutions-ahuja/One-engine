@@ -68,3 +68,28 @@ export async function applySmartTextKeypad(client:Query){
   WHERE c.component_api='smart_text'
   ON CONFLICT(component_api,property_key) DO NOTHING`);
 }
+
+/** Input box "Field" + "Required". Field links the box to an Object field (Customer.Email):
+ * the Object Manager's Required always applies and cannot be switched off here, and the
+ * user's field access decides hidden / locked. "Required" can only make a box stricter. */
+export const FIELD_RULE_COMPONENTS=['smart_text'] as const;
+export async function applySmartInputFieldRules(client:Query){
+ for(const [key,label,kind,def,row,order,width] of [
+  ['boundField','Field','choice','""',4,1,190],
+  ['mandatory','Required','boolean','false',4,2,28]] as const){
+  await client.query(`
+   WITH last_order AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
+   INSERT INTO md_builder_shared_properties
+    (property_key,label,tab,section_group,control_kind,sort_order,default_value,choices,scope,
+     min_value,max_value,field_select,design_row,design_order,design_width,design_height,
+     design_caption_width,design_display)
+   SELECT $1,$2,'Data','Values',$3,last_order.n+1,$4::jsonb,'[]'::jsonb,'component',NULL,NULL,false,$5,$6,$7,26,0,'buttons'
+   FROM last_order
+   ON CONFLICT(property_key) DO NOTHING`,[key,label,kind,def,row,order,width]);
+  await client.query(`
+   INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,default_value_override)
+   SELECT c.component_api,$1,true,NULL FROM md_builder_ribbon_components c
+   WHERE c.component_api=ANY($2::text[])
+   ON CONFLICT(component_api,property_key) DO NOTHING`,[key,[...FIELD_RULE_COMPONENTS]]);
+ }
+}

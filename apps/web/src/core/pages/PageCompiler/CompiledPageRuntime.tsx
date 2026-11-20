@@ -14,7 +14,7 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {askWhichTill} from '../PageRuntime/tillPickerScreen';
-import {showScreenPairing} from '../PageRuntime/displayPairingScreen';
+import {showScreenPairing,installPairedScreensBridge} from '../PageRuntime/displayPairingScreen';
 import {ensureTenantBrand} from '../../branding/tenantBrandLoader';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
@@ -33,8 +33,8 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
-import {startMirrorLiveRefresh} from './mirrorLiveRefresh';
-import {subscribeDeviceTill} from '../../authentication/TillDevice/deviceTill';
+import {startMirrorLiveRefresh,setFollowingSale} from './mirrorLiveRefresh';
+import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import {isCompiledStateReference,declarativeSource,COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import type {LoadedPageScript} from './serverPageScript';
@@ -227,6 +227,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
   if(runtime.code?.asksTill)void askWhichTill(runtime.request);
+  // Smart Paired Screens components on this page list and pair screens through Core.
+  installPairedScreensBridge(runtime.request);
   // @ThisTenant.Company.Logo / Name: compiled pages load the brand themselves.
   void ensureTenantBrand();
   // Rows for instant taps and totals: one request with the first data.
@@ -273,14 +275,30 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   window.addEventListener('metadrive:page-local-state',onState);
   window.addEventListener('metadrive:page-flow-mutated',onSaved);
   window.addEventListener('metadrive:page-collection-selected',onSelected);
+  // A selling page (a session-scoped cart) tells the server which sale this device is on,
+  // so its paired screens show that sale only (held and old sales drop off).
+  const sells=runtime.compiled.dataSources.some(source=>source.scope.kind==='auto');
+  const reportSale=()=>{if(sells)void runtime.request('/screens/session',{method:'POST',
+   body:JSON.stringify({deviceKey:tillDeviceKey(),sessionId:runtime.sessionId()})}).catch(()=>undefined);};
+  reportSale();
+  const unsubscribeSale=runtime.subscribeSession(reportSale);
   // A customer display follows the Till's sale live: nobody taps the display itself.
   const stopMirror=startMirrorLiveRefresh(runtime.compiled.dataSources,Boolean(runtime.code?.readsMirror),{
    reload:(id,fresh)=>runtime.data.reload(id,fresh),
+   // The display shows the sale the till is on now: it takes the till's page session.
+   followSale:async()=>{
+    const mirrorKey=mirrorDeviceKey();
+    if(!mirrorKey||mirrorKey===tillDeviceKey())return;
+    const {sessionId}=await runtime.request<{sessionId:string}>('/screens/current-session',
+     {method:'POST',body:JSON.stringify({mirrorKey})});
+    setFollowingSale(Boolean(sessionId));
+    if(sessionId&&sessionId!==runtime.sessionId())runtime.resetSession(sessionId);
+   },
    loadSets:runtime.code?()=>runtime.code!.loadSets():undefined,
    refreshTotals:runtime.code?()=>runtime.code!.refreshTotals():undefined,
    subscribeDevice:subscribeDeviceTill});
   return ()=>{
-   stopMirror();
+   stopMirror();unsubscribeSale();
    unsubscribeState?.();
    window.removeEventListener('metadrive:page-local-state',onState);
    window.removeEventListener('metadrive:page-component-interaction',onInteraction);

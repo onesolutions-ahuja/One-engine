@@ -6,3 +6,6 @@
 .paired-screen-start .paired-screen-code{margin:8px 0;color:var(--md-text,#1d1d1f);
  font:600 clamp(64px,18vw,140px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em}
 .paired-screen-start .paired-screen-note{font-size:14px}
+.paired-screen-corner{position:fixed;right:10px;bottom:8px;z-index:2147483000;padding:2px 8px;border-radius:6px;
+ background:rgba(255,255,255,.7);color:#8e8e93;font:500 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+ pointer-events:none;user-select:none}

@@ -3,6 +3,8 @@ import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import {holdScreenPage,onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
+// The corner code on a paired screen (loaded only there).
+const ScreenCornerCode=React.lazy(()=>import('../../authentication/PairedScreen/ScreenCornerCode'));
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
 import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLanding, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, bootPageEndpoint, rememberBootPage, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
@@ -329,7 +331,10 @@ function App() {
   };
   if(needsLandingRedirect)return <div className="auth-loading" role="status">Opening assigned application…</div>;
   if(isMailboxAdminRoute)return <MailboxAdminAccessGate onLogout={onLogout}/>;
-  return <SetupApp entryTiming={entryTiming} onLogout={onLogout} />;
+  return <>
+    <SetupApp entryTiming={entryTiming} onLogout={onLogout} />
+    {onPairedScreenPage()?<React.Suspense fallback={null}><ScreenCornerCode/></React.Suspense>:null}
+  </>;
 }
 
 const uneSolutionsLogoUrl = `${import.meta.env.BASE_URL}une-solutions-logo.webp`;

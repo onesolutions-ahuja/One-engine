@@ -71,7 +71,10 @@ export type CompiledRecordScope=
  /** Parent id from a page state key (Related list: relatedFilterKey). */
  |{kind:'key';key:string;field:string}
  /** Active parent from page state (activeCartId…), else the parent owned by this page session. */
- |{kind:'auto'};
+ |{kind:'auto'}
+ /** A cart picked by @ThisPage.Device.MirrorKey (a customer display): while the screen follows
+  * the mirrored device's current sale it is scoped like `auto` to that sale; otherwise unscoped. */
+ |{kind:'mirror'};
 export type CompiledDataSource={
  id:string;objectApiName:string;components:string[];scope:CompiledRecordScope;
  /** Load every row (bounded): a COLLECTION/TABLE over these rows needs all of them.
@@ -242,7 +245,7 @@ export function recordScope(type:string,properties:Readonly<Record<string,unknow
  if(key&&identifier.test(key))return {kind:'key',key,field:String(properties.relatedFieldApiName??'')};
  if(properties.autoRecordScope===true)return {kind:'auto'};
  const cart=properties.autoRecordScope!==false&&['smart_cart','Custom:smart_cart'].includes(type);
- return cart&&!filtersByDevice(filters)?{kind:'auto'}:{kind:'none'};
+ return !cart?{kind:'none'}:filtersByDevice(filters)?{kind:'mirror'}:{kind:'auto'};
 }
 /** True when a record filter picks rows by the device this screen mirrors
  * (@ThisPage.Device.MirrorKey). A till's own cart (@ThisPage.Device.Key) keeps its session scope. */

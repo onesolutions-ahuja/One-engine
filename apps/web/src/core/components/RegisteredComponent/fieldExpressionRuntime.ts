@@ -26,7 +26,9 @@ export function setAuthenticatedFormulaBindingContext(user:unknown):void {
     currencyIsoCode:typeof session.currencyIsoCode==='string'?session.currencyIsoCode:null,
     user:Object.freeze({
       Id:session.id,Name:session.displayName,Email:session.email,TimeZone:session.timeZone,
-      Locale:session.locale,CurrencyIsoCode:session.currencyIsoCode??null
+      Locale:session.locale,CurrencyIsoCode:session.currencyIsoCode??null,
+      Manager:typeof session.managerId==='string'?session.managerId:'',
+      ManagerName:typeof session.managerName==='string'?session.managerName:''
     }),
     profile:Object.freeze({
       Id:session.profileId??null,Name:session.profileName??null,

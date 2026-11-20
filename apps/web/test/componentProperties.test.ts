@@ -88,3 +88,12 @@ test('SUBSTITUTE is allowed in page formulas and actions (refund picks count uni
  const code=page('=@ThisPage.Picked.Value = SUBSTITUTE("[a][b]", "[a]", "")');
  assert.deepEqual(code.issues,[]);
 });
+
+import {parsePageReference} from '../../server/src/expression-engine/PageReferences';
+test('@ThisTenant.User.Manager / ManagerName read the user hierarchy (Reports To)',()=>{
+ assert.deepEqual(parsePageReference('@ThisTenant.User.Manager'),{kind:'user',field:'Manager'});
+ assert.deepEqual(parsePageReference('@ThisTenant.User.ManagerName'),{kind:'user',field:'ManagerName'});
+ const code=page('=IF(VERIFYPIN(@ThisTenant.User.Manager, "1234"), @ThisPage.Ok.Value = @ThisTenant.User.ManagerName, "")');
+ assert.deepEqual(code.issues,[]);
+ assert.match(code.actions[0].js,/\$\.session\("user\.managerId"\)/);
+});

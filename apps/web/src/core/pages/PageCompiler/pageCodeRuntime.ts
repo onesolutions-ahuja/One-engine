@@ -40,7 +40,8 @@ const notHeld=(why:string):never=>{throw new NotHeld(why);};
 const identityKey=Symbol.for('une.authenticatedFormulaIdentity');
 const identity=()=>(globalThis as Record<symbol,unknown>)[identityKey] as undefined|{
  user?:Record<string,unknown>;organization?:Record<string,unknown>;connections?:unknown};
-const sessionUser:Record<string,string>={id:'Id',name:'Name',email:'Email',timeZone:'TimeZone',locale:'Locale',currencyIsoCode:'CurrencyIsoCode'};
+const sessionUser:Record<string,string>={id:'Id',name:'Name',email:'Email',timeZone:'TimeZone',locale:'Locale',currencyIsoCode:'CurrencyIsoCode',
+ managerId:'Manager',managerName:'ManagerName'};
 /** @ThisPage.Session / user / cart and @ThisTenant values, as page code reads them
  * (shared with list filters, which run before a page code scope exists). */
 export function signedInValue(page:PageReference,state:Readonly<Record<string,unknown>>,sessionId:string):unknown{

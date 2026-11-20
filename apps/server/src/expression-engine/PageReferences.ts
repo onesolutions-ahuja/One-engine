@@ -21,7 +21,9 @@ export const RESERVED_ROOT_NAMES=[THIS_PAGE,THIS_TENANT] as const;
 export const RESERVED_COMPONENT_NAMES=['Session','Input','Selected',THIS_PAGE,THIS_TENANT] as const;
 
 export const USER_FIELDS={
- Id:'id',Email:'email',Name:'name',Locale:'locale',TimeZone:'timeZone',CurrencyIsoCode:'currencyIsoCode'
+ Id:'id',Email:'email',Name:'name',Locale:'locale',TimeZone:'timeZone',CurrencyIsoCode:'currencyIsoCode',
+ // The user's manager in the user hierarchy (Reports To): approvals such as a refund PIN.
+ Manager:'managerId',ManagerName:'managerName'
 } as const;
 export type UserField=keyof typeof USER_FIELDS;
 export const COMPANY_FIELDS=['Id','Name','Logo'] as const;

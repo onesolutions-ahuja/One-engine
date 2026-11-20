@@ -246,3 +246,12 @@
 .smart-runtime :is(input,textarea)::placeholder{color:var(--smart-placeholder-color,#64748b);opacity:1}
 .smart-selector-control[data-empty="true"]{color:var(--smart-placeholder-color,#64748b)}
 .smart-selector-control[data-empty="true"] option{color:#263b56}
+
+/* Tabs: no scrollbar; faded arrows show where more tabs are (see SmartTabs). */
+.smart-runtime.smart_tabs{position:relative}
+.smart-runtime.smart_tabs>.smart-tabs-shell{scrollbar-width:none}
+.smart-runtime.smart_tabs>.smart-tabs-shell::-webkit-scrollbar{display:none}
+.smart-tabs-arrow{position:absolute;top:0;bottom:0;z-index:2;width:48px;border:0;padding:0;cursor:pointer;
+ display:flex;align-items:center;color:#1d1d1f;font-size:28px;line-height:1}
+.smart-tabs-arrow.is-left{left:0;justify-content:flex-start;padding-left:6px}
+.smart-tabs-arrow.is-right{right:0;justify-content:flex-end;padding-right:6px}

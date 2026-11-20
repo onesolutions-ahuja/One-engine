@@ -335,7 +335,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     padding={cardPadding} focusedText={focusedText} errorColor={formulaDisplayErrorColor}/>
   </div>:headerNode}
   {grid&&!idCard&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
-   style={cardPadding===null?undefined:{padding:cardPadding+"px"}}>
+   // After the title (order 1): name first, then price / description / buttons.
+   style={{order:2,...(cardPadding===null?{}:{padding:cardPadding+"px"})}}>
    {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
      style={{...smartPartOffsetStyle(p,"supporting"),color:description==='FORMULAERROR'?formulaDisplayErrorColor:
       focusedText||p.supportingTextColor||undefined,
@@ -732,7 +733,35 @@ function SmartTabs({p,record,fire}){
  React.useEffect(()=>{
   if(tabs.length&&active>=tabs.length)setActive(defaultTabIndex);
  },[active,tabs.length,defaultTabIndex]);
- return <div data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,
+ // Horizontal tabs that do not fit: no scrollbar; a faded arrow at each side that
+ // has more tabs (tap to scroll, swiping still works).
+ const tabsScroller=React.useRef(null);
+ const [tabEdges,setTabEdges]=React.useState({left:false,right:false});
+ React.useEffect(()=>{
+  const el=tabsScroller.current;
+  if(!el||vertical)return;
+  const update=()=>{
+   const left=el.scrollLeft>2,right=el.scrollLeft+el.clientWidth<el.scrollWidth-2;
+   setTabEdges(prev=>prev.left===left&&prev.right===right?prev:{left,right});
+  };
+  update();
+  el.addEventListener("scroll",update,{passive:true});
+  const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(update):null;
+  observer?.observe(el);
+  return ()=>{el.removeEventListener("scroll",update);observer?.disconnect();};
+ },[vertical,tabs.length]);
+ const scrollTabs=direction=>{
+  const el=tabsScroller.current;
+  if(el)el.scrollBy({left:direction*Math.max(120,el.clientWidth*0.7),behavior:"smooth"});
+ };
+ const fade=p.backgroundColor&&p.backgroundColor!=="transparent"?p.backgroundColor:"#F2F2F7";
+ const arrow=side=><button type="button" className={"smart-tabs-arrow is-"+side} aria-label={side==="left"?"More tabs left":"More tabs right"}
+  tabIndex={-1} onClick={()=>scrollTabs(side==="left"?-1:1)}
+  style={{background:"linear-gradient(to "+(side==="left"?"right":"left")+", "+fade+" 55%, transparent)"}}>
+  <span aria-hidden="true">{side==="left"?"‹":"›"}</span></button>;
+ return <>{!vertical&&!p.builderPreview&&tabEdges.left&&arrow("left")}
+ {!vertical&&!p.builderPreview&&tabEdges.right&&arrow("right")}
+ <div ref={tabsScroller} data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,
    display:"flex",flexDirection:"column",height:"100%",minHeight:0,width:"100%"}}>
   <nav className={"smart-tabs"+(p.backgroundColor?"":" is-segmented")} role="tablist" aria-label="Tabs"
    aria-orientation={vertical?"vertical":"horizontal"} style={{
@@ -756,7 +785,7 @@ function SmartTabs({p,record,fire}){
     onClick={()=>selectTab(index)}>{text(tab?.label??tab)}</button>)}
    {(dynamic||hasCollection)&&tabs.length===0&&<span className="smart-tabs-empty">No matching records</span>}
   </nav>
- </div>;
+ </div></>;
 }
 function SmartToggle({p,fire}){
  const asBoolean=v=>v===true||v==="true"||v==="True";

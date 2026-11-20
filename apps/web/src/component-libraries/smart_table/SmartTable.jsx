@@ -103,7 +103,10 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
  const sortColumn=sortKey?columns.find(col=>col.key===sortKey):null;
  const sortedRows=sortColumn&&!preview?[...rows].map(row=>({row,shown:value(row,sortColumn)}))
   .sort((a,b)=>{
-   const x=Number(a.shown),y=Number(b.shown);
+   // UK dates (DD/MM/YYYY HH:mm or DD/MM HH:mm) sort by date, not as text.
+   const when=text=>{const m=/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?(?:\s+(\d{1,2}):(\d{2}))?$/.exec(text.trim());
+    return m?Number(m[3]||2000)*1e8+Number(m[2])*1e6+Number(m[1])*1e4+Number(m[4]||0)*100+Number(m[5]||0):NaN;};
+   const x=Number.isFinite(when(a.shown))?when(a.shown):Number(a.shown),y=Number.isFinite(when(b.shown))?when(b.shown):Number(b.shown);
    const both=a.shown!==""&&b.shown!==""&&Number.isFinite(x)&&Number.isFinite(y);
    const order=both?x-y:a.shown.localeCompare(b.shown,undefined,{numeric:true,sensitivity:"base"});
    return sortDir==="desc"?-order:order;

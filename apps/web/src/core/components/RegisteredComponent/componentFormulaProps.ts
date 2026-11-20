@@ -36,8 +36,10 @@ function readsNoRow(source:string):boolean{
  return Boolean(refs?.length)&&refs!.every(ref=>/^@This(?:Page|Tenant)$/i.test(ref));
 }
 
+// Smart Table Columns: any column's Source and Color formula is read per row.
+const tableRowProperty=(apiName:string,key:string)=>apiName==='smart_table'&&/^column(?:[1-9]|1[0-2])(?:Source|Color)$/.test(key);
 export function isRowDisplayProperty(apiName:string,key:string,props:Readonly<Record<string,unknown>>):boolean {
- return Boolean(rowDisplayProperties[apiName]?.has(key)
+ return Boolean((rowDisplayProperties[apiName]?.has(key)||tableRowProperty(apiName,key))
   &&(Array.isArray(props.records)||Array.isArray(props.items)||props.dataCollection));
 }
 

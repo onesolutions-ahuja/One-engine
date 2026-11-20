@@ -17,7 +17,11 @@ test('a customer display mirrors the Till (POS Terminal) it is chosen for; any o
  assert.equal(await findMirrorKey(records(tills),actor,display),till);
  assert.equal(await findMirrorKey(records(tills),actor,till),till);
  assert.equal(await findMirrorKey(records([]),actor,display),display,'not chosen yet: its own key (second monitor)');
- assert.equal(await findMirrorKey(records(tills),actor,'other-display-key-0000001'),'other-display-key-0000001');
+ // One active Till: an unlinked display follows it with no setup.
+ assert.equal(await findMirrorKey(records(tills),actor,'other-display-key-0000001'),till);
+ // Two Tills: an unlinked screen cannot guess, it shows its own key.
+ const two=[...tills,{Id:'3',DeviceType:'POS Terminal',DeviceId:'till-device-key-000000000002',Active:true}];
+ assert.equal(await findMirrorKey(records(two),actor,'other-display-key-0000001'),'other-display-key-0000001');
  assert.equal(await findMirrorKey(records(tills),actor,'bad key'),'');
 });
 

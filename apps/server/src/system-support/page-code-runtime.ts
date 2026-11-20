@@ -470,8 +470,8 @@ export const TILL_DEVICE_TYPE='POS Terminal';
 export const tillFilters=(...more:RecordFilter[]):RecordFilter[]=>[
  {field:'DeviceType',operator:'eq',value:TILL_DEVICE_TYPE},{field:'Active',operator:'eq',value:'true'},...more];
 /** @ThisPage.Device.MirrorKey: the device whose sale this screen shows. A Till shows its own;
- * a customer display shows the Till whose CustomerDisplayKey is this device's key; any other
- * device (e.g. the second monitor of the till computer) shows its own key. */
+ * a customer display shows the Till whose CustomerDisplayKey is this device's key; with only one
+ * active Till, an unlinked display follows that Till; any other device shows its own key. */
 export async function findMirrorKey(records:Pick<Records,'list'|'get'>,actor:Actor,deviceKey:unknown):Promise<string>{
  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))return '';
  try{
@@ -479,6 +479,10 @@ export async function findMirrorKey(records:Pick<Records,'list'|'get'>,actor:Act
    {field:'CustomerDisplayKey',operator:'eq',value:deviceKey})}) as {records:Row[]};
   const till=page.records[0];
   if(till&&typeof till.DeviceId==='string'&&deviceKeyPattern.test(till.DeviceId))return till.DeviceId;
+  // Not linked to a Till: a shop with ONE active Till needs no setup, the display follows it.
+  const tills=await records.list(actor.tenant_id,actor.user_id,TILL_DEVICE_OBJECT,2,0,{filters:tillFilters()}) as {records:Row[]};
+  const only=tills.records.length===1?tills.records[0]:null;
+  if(only&&typeof only.DeviceId==='string'&&deviceKeyPattern.test(only.DeviceId))return only.DeviceId;
  }catch{/* no Named Device access: the screen shows its own device */}
  return deviceKey;
 }

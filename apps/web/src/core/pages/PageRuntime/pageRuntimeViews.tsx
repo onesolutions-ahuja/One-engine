@@ -1092,6 +1092,8 @@ function usePageLayoutDevice(): LayoutDevice {
 // A host redraw (page-state or layout change) must not redraw every component:
 // each one redraws only when its own inputs or its own state change.
 const MemoizedMetadataBoundPageComponent=React.memo(MetadataBoundPageComponent);
+/** Page values the page frame itself reads (payment record, basket overlay). */
+const layoutStateKeys=new Set(['recordId','basketOpen']);
 function LightningAppRuntime({
   appId,
   pageApiName,
@@ -1201,6 +1203,7 @@ function LightningAppRuntime({
   const loading=previewPage?false:routePending?!cached:pageLoad.loading;
   const [activeTabs, setActiveTabs] = useState<Record<string,string>>({});
   const [layoutState,setLayoutState]=useState<Record<string,unknown>>(inScreenPage?inScreenContext?.values??{}:{});
+  const allLayoutState=useRef<Record<string,unknown>>(layoutState);
   const overriddenComponents=useRef(new WeakMap<PageComponentMetadata,{overrides:unknown;component:PageComponentMetadata}>());
   const [interactionOverrides,setInteractionOverrides]=useState<Record<string,Record<string,unknown>>>({});
   useEffect(()=>setInteractionOverrides({}),[appId,page?.apiName]);
@@ -1218,7 +1221,7 @@ function LightningAppRuntime({
       if(detail?.pageSessionKey!==session||typeof detail.componentId!=='string'||typeof detail.event!=='string')return;
       const source=page.components.find(item=>item.id===detail.componentId);
       if(!source)return;
-      const updates=behaviorInteractions(source.properties,detail.event,detail.value,layoutState,targets,
+      const updates=behaviorInteractions(source.properties,detail.event,detail.value,allLayoutState.current,targets,
         requestedLayout,source.type.startsWith('Custom:')
           ?findRegisteredComponent(libraryComponents,source.type.slice('Custom:'.length),'page')?.eventDefinitions:undefined);
       if(!updates.length)return;
@@ -1230,14 +1233,27 @@ function LightningAppRuntime({
     };
     window.addEventListener('metadrive:page-component-interaction',onInteraction);
     return()=>window.removeEventListener('metadrive:page-component-interaction',onInteraction);
-  },[page,appId,runtimeSessionKey,libraryComponents,layoutState,requestedLayout]);
+  },[page,appId,runtimeSessionKey,libraryComponents,requestedLayout]);
+  // Every page value is kept here, but the page itself redraws only for values
+  // it shows: layout keys and keys named by plain (non-runtime) components.
+  // Bound/compiled components read their own store, so a keypad tap no longer
+  // redraws every component on the page.
+  const plainStateText=useMemo(()=>page?JSON.stringify(page.components
+    .filter(item=>!needsMetadataComponentRuntime(item.properties)).map(item=>item.properties)):'',[page]);
+  const plainStateTextRef=useRef(plainStateText);
+  plainStateTextRef.current=plainStateText;
   useEffect(()=>{
-    setLayoutState(inScreenPage?inScreenContext?.values??{}:{});
+    const initial=inScreenPage?inScreenContext?.values??{}:{};
+    allLayoutState.current=initial;
+    setLayoutState(initial);
     const listener=(event:Event)=>{
       const detail=(event as CustomEvent<{pageSessionKey:string;key:string;value:unknown}>).detail;
       if(!runtimeSessionKey||detail?.pageSessionKey!==runtimeSessionKey)return;
       if(!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(detail.key))return;
-      setLayoutState(prev=>({...prev,[detail.key]:detail.value}));
+      if(Object.is(allLayoutState.current[detail.key],detail.value))return;
+      allLayoutState.current={...allLayoutState.current,[detail.key]:detail.value};
+      if(layoutStateKeys.has(detail.key)||new RegExp('\\b'+detail.key+'\\b').test(plainStateTextRef.current))
+        setLayoutState(allLayoutState.current);
     };
     window.addEventListener('metadrive:page-local-state',listener);
     return()=>window.removeEventListener('metadrive:page-local-state',listener);

@@ -13,7 +13,7 @@ import {formulaShape} from '../../../component-libraries/shared/formulaCodeLooku
  * There is no formula interpreter here: every formula is already JavaScript.
  */
 import {F,O,aggregateRows,fieldValue,rowMatches} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
-import {readComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
+import {readComponentState,readComponentProperty,uiProperty,uiPropertyValue,withComponentProperties,COMPONENT_PROPERTIES} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {isConnected} from '../../../../../server/src/expression-engine/FormulaConnections.js';
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
@@ -161,6 +161,24 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    const set=this.stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined;
    if(set&&Object.prototype.hasOwnProperty.call(set,name)&&(field==='Value'||field==='Text'))return set[name]??'';
    return readComponentState(host.state().collectionSelections,name,field as never);
+  }
+  /** @ThisPage.Button1.Disabled / Caption / Visible: set by this action, else what the page shows now. */
+  property(name:string,property:string){
+   const prop=uiProperty(property);
+   if(!prop)throw Error('Unknown component property '+property);
+   const mine=this.stateChanges[COMPONENT_PROPERTIES] as Record<string,{set?:Record<string,unknown>}>|undefined;
+   const own=mine?.[name.toLowerCase()]?.set;
+   if(own&&Object.prototype.hasOwnProperty.call(own,prop))return readComponentProperty({[COMPONENT_PROPERTIES]:mine},name,prop);
+   return readComponentProperty(host.state(),name,prop);
+  }
+  /** `@ThisPage.Button2.Caption = …`: the page shows it at once (no server call for screen-only actions). */
+  setProperty(name:string,property:string,value:unknown){
+   if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))throw Error('Invalid component name');
+   const prop=uiProperty(property);
+   if(!prop)throw Error('Unknown component property '+property);
+   const next=withComponentProperties({[COMPONENT_PROPERTIES]:this.stateChanges[COMPONENT_PROPERTIES]},name,'set',
+    {[prop]:uiPropertyValue(prop,value)});
+   this.stateChanges[COMPONENT_PROPERTIES]=next[COMPONENT_PROPERTIES];
   }
   /** @ThisPage.Cart1.CartTotal: the component's own property, else the value its action saved. */
   pageValue(name:string,key:string){

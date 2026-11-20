@@ -18,7 +18,8 @@
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
 import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
-import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,type PageReference} from '../../expression-engine/PageReferences.js';
+import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
+import {uiProperty} from '../../expression-engine/FormulaComponentState.js';
 import {formulaEntry} from './formulaDictionary.js';
 import {parseActionFormulaAssignment} from '../pageCompilerSupport.js';
 
@@ -98,6 +99,8 @@ function pageValueCode(page:PageReference):string{
    // value / recordId / text: the component's live value (browser only).
    if(isBrowserOnlyReference(page))return '$.component('+q(page.name)+', '+q(page.key)+')';
    if(!key.test(page.key))fail('Invalid page value @ThisPage.'+page.name+'.'+page.key);
+   // @ThisPage.Button1.Disabled / .Caption / .Visible: what the component shows now.
+   if(uiProperty(page.key))return '$.property('+q(page.name)+', '+q(uiProperty(page.key)!)+')';
    // A value the component's action saved (or one of its own properties).
    return '$.pageValue('+q(page.name)+', '+q(page.key)+')';
  }
@@ -257,6 +260,9 @@ function takeAlias(node:Expression|undefined,scope:ActionScope,label:string):str
 }
 function stepCode(node:Expression,scope:ActionScope):string[]{
  if(node.kind==='literal'&&(node.value===''||node.value===null))return [];
+ const property=node.kind==='binary'?assignedProperty(node as never):null;
+ if(property&&node.kind==='binary')
+  return ['$.setProperty('+q(property.name)+', '+q(property.property)+', '+expression(node.right,scope)+');'];
  const assigned=assignedComponent(node,scope.aliases);
  if(assigned&&node.kind==='binary'){
   return ['$.setValue('+q(assigned)+', '+expression(node.right,scope)+');'];

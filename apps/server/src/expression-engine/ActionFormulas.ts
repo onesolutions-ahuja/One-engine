@@ -1,6 +1,7 @@
 import {Parser,formulaTruth,type Expression} from './FormulaParser.js';
 import {tokenize} from './FormulaTokenizer.js';
-import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey,assignedComponent,COMPONENT_VALUES} from './PageReferences.js';
+import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey,assignedComponent,assignedProperty,COMPONENT_VALUES} from './PageReferences.js';
+import {COMPONENT_PROPERTIES,uiPropertyValue,withComponentProperties} from './FormulaComponentState.js';
 import {validateFormulaFunctions} from './FormulaFunctionRegistry.js';
 import {runDeviceCommand} from './ActionDevices.js';
 import {actionFormulaFunctions} from './FormulaCategories.js';
@@ -129,6 +130,13 @@ export function compileActionPlan(source:string):ActionStep[] {
    validateFormulaFunctions(node.args[0],'ribbon_binding');
    add(steps,node.args[1],[...(guards??[]),{condition:node.args[0],expected:true}],loop);
    add(steps,node.args[2],[...(guards??[]),{condition:node.args[0],expected:false}],loop);
+   return;
+  }
+  // `@ThisPage.Button2.Caption = …` / `.Disabled = …` / `.Visible = …`.
+  const property=node.kind==='binary'?assignedProperty(node as never):null;
+  if(property&&node.kind==='binary'){
+   validateFormulaFunctions(node.right,'ribbon_binding');
+   steps.push({name:'PROPERTY',object:property.name+'.'+property.property,values:[node.right],fields:new Map(),guards});
    return;
   }
   // `@ThisPage.CashBox.Value = …`: the component is given a new value.
@@ -769,6 +777,15 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
      const nodes=stepNodes(step);
      if(nodes.length>1&&nodes.every(parallelSafe))await Promise.all(nodes.map(resolveServer));
      else for(const node of nodes)await resolveServer(node);
+     if(step.name==='PROPERTY'){
+      const [name,property]=step.object.split('.') as [string,'Caption'|'Disabled'|'Visible'];
+      const next=withComponentProperties({[COMPONENT_PROPERTIES]:stateChanges[COMPONENT_PROPERTIES]},name,'set',
+       {[property]:uiPropertyValue(property,evaluate(step.values![0]))});
+      stateChanges[COMPONENT_PROPERTIES]=next[COMPONENT_PROPERTIES];
+      changes.push({key:COMPONENT_PROPERTIES,value:next[COMPONENT_PROPERTIES]});
+      completed++;
+      continue;
+     }
      if(step.name==='VALUE'){
       const value=evaluate(step.values![0]);
       if(value!==null&&!['string','number','boolean'].includes(typeof value))

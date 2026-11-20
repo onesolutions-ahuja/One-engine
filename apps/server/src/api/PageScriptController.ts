@@ -205,13 +205,19 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const body=(req.body??{}) as Record<string,unknown>;
   const device=await pairingDevice(deps.records,actor,body.deviceKey);
   const mfa=await screens().sessionMfa(String(req.get('authorization')??'').slice(7));
-  res.json(await screens().approve(actor,mfa,body.code,device,body.appId,body.pageApiName));
+  res.json(await screens().approve(actor,mfa,body.code,device,body.appId,body.pageApiName,body.name));
  }));
  app.post('/api/screens/list',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   const device=await pairingDevice(deps.records,actor,(req.body??{}).deviceKey);
   res.json({screens:await screens().list(actor,device.id),device:device.name});
+ }));
+ app.post('/api/screens/rename',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  const body=(req.body??{}) as Record<string,unknown>;
+  res.json(await screens().rename(actor,body.id,body.name));
  }));
  app.post('/api/screens/revoke',wrap(async(req,res)=>{
   const actor=authenticated(req);

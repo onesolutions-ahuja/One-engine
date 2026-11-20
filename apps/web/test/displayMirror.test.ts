@@ -137,3 +137,27 @@ test('a customer display\'s totals count the till\'s rows (MirrorKey in SUMIFS),
  assert.equal(rt.formulasFor('total').get(formula)!({}),9.74);
  resetDeviceTillForTests();
 });
+
+test('Smart Paired Screens draws its list in the builder and talks to Core through the bridge',async()=>{
+ const React=(await import('react')).default;
+ const {renderToStaticMarkup}=await import('react-dom/server');
+ (globalThis as {React?:unknown}).React=React;
+ const {default:SmartPairedScreens}=await import('../src/component-libraries/smart_paired_screens/SmartComponent.jsx');
+ const html=renderToStaticMarkup(React.createElement(SmartPairedScreens,{builderPreview:true,label:'Customer displays'}));
+ assert.match(html,/Customer displays/);assert.match(html,/\+ Add display/);assert.match(html,/Counter/);assert.match(html,/Online/);
+ // Core side: the bridge answers the component's events with the API.
+ const target=new EventTarget();
+ (globalThis as {window?:unknown}).window=Object.assign(target,{location:{pathname:'/une/apps/KIOSK/pages/kiosk_settings',host:'x'},
+  localStorage:{getItem:()=>'kiosk-device-key-0000001',setItem:()=>undefined}});
+ const calls:Array<[string,Record<string,unknown>]>=[];
+ const {installPairedScreensBridge,PAIRED_SCREENS_EVENT}=await import('../src/core/pages/PageRuntime/displayPairingScreen.ts');
+ installPairedScreensBridge((async(path:string,init?:RequestInit)=>{calls.push([path,JSON.parse(String(init?.body))]);
+  return path==='/screens/list'?{screens:[{id:'1',name:'Order board'}]}:{ok:true};}) as never);
+ const ask=(detail:Record<string,unknown>)=>new Promise(resolve=>target.dispatchEvent(new CustomEvent(PAIRED_SCREENS_EVENT,{detail:{...detail,reply:resolve}})));
+ assert.deepEqual(await ask({action:'list'}),{ok:true,value:[{id:'1',name:'Order board'}]});
+ await ask({action:'add',code:'4827',name:'Order board',page:'kiosk_order_status'});
+ assert.deepEqual(calls.at(-1),['/screens/approve',{deviceKey:'kiosk-device-key-0000001',code:'4827',name:'Order board',
+  appId:'KIOSK',pageApiName:'kiosk_order_status'}],'any app: the app comes from the open page, not the till');
+ assert.deepEqual(await ask({action:'nope'}),{ok:false,error:'Unknown screen action'});
+ delete (globalThis as {window?:unknown}).window;
+});

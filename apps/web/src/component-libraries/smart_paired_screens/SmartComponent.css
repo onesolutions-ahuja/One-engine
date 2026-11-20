@@ -1,0 +1,19 @@
+.smart-paired-screens{width:100%;height:100%;box-sizing:border-box;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.smart-paired-screens header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.smart-paired-screens h3{margin:0;font-size:15px;font-weight:600}
+.smart-paired-screens button{min-height:32px;padding:0 10px;border:1px solid rgba(60,60,67,.2);border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.smart-paired-screens button:disabled{opacity:.5;cursor:default}
+.smart-paired-screens .sps-add,.smart-paired-screens .sps-primary{background:#007aff;border-color:#007aff;color:#fff;font-weight:600}
+.smart-paired-screens .sps-danger{color:#b42318}
+.smart-paired-screens ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.smart-paired-screens li{display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 0;border-top:1px solid rgba(60,60,67,.12)}
+.smart-paired-screens .sps-dot{width:9px;height:9px;border-radius:50%;background:#aeaeb2;flex:none}
+.smart-paired-screens .sps-dot.sps-online{background:#34c759}
+.smart-paired-screens .sps-name-text{flex:1 1 auto;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smart-paired-screens .sps-status{color:#6e6e73;font-size:12px;white-space:nowrap}
+.smart-paired-screens .sps-form{display:flex;flex-direction:column;gap:8px}
+.smart-paired-screens .sps-help,.smart-paired-screens .sps-empty,.smart-paired-screens .sps-message{margin:0;color:#6e6e73;font-size:13px}
+.smart-paired-screens input{min-height:36px;padding:0 10px;border:1px solid rgba(60,60,67,.3);border-radius:8px;font:inherit;background:#fff;color:#1d1d1f;box-sizing:border-box}
+.smart-paired-screens li input{flex:1 1 auto}
+.smart-paired-screens .sps-code{font:600 24px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.3em;text-align:center;max-width:180px}
+.smart-paired-screens .sps-actions{display:flex;gap:8px;justify-content:flex-end}

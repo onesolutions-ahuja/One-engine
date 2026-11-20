@@ -1,0 +1,21 @@
+{
+  "apiName": "smart_paired_screens",
+  "label": "Smart Paired Screens",
+  "category": "Display",
+  "description": "Screens paired with this device (customer displays, kitchen or order-status screens) for any app's settings page: + Add display with the 4-digit code from /display, rename, online status, unpair. Text Source = the page those screens show.",
+  "surfaces": [
+    "page"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_paired_screens/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_paired_screens/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 420,
+    "defaultHeight": 260,
+    "minWidth": 260,
+    "minHeight": 140
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": []
+}

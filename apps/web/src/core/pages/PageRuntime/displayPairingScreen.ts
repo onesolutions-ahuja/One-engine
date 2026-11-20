@@ -8,7 +8,7 @@ import {ensureTillDialogStyles} from './tillPickerScreen';
  * screens paired with this device, each with Unpair.
  */
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
-type Screen={id:string;name:string;pageApiName:string;pairedAt:string;lastSeenAt:string|null};
+type Screen={id:string;name:string;pageApiName:string;pairedAt:string;lastSeenAt:string|null;online:boolean};
 
 const post=<T>(request:Request,path:string,body:Record<string,unknown>)=>
  request<T>(path,{method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey(),...body})});
@@ -46,7 +46,7 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
    for(const screen of answer.screens){
     const item=document.createElement('li');
     const unpair=document.createElement('button');unpair.type='button';
-    unpair.textContent='Unpair screen paired '+new Date(screen.pairedAt).toLocaleDateString()+' ('+when(screen.lastSeenAt)+')';
+    unpair.textContent='Unpair '+screen.name+' ('+(screen.online?'online':when(screen.lastSeenAt))+')';
     unpair.addEventListener('click',async()=>{
      unpair.disabled=true;
      try{await post(request,'/screens/revoke',{id:screen.id});say('Screen unpaired. It shows a new code now.');void refresh();}
@@ -74,4 +74,37 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
  dialog.showModal();
  input.focus();
  void refresh();
+}
+
+/**
+ * The Smart Paired Screens component (component libraries never call the API themselves)
+ * asks Core through one window event: list, add, rename or unpair the screens of this
+ * device, for the app whose page is open. Installed once per browser tab.
+ */
+export const PAIRED_SCREENS_EVENT='metadrive:paired-screens';
+type BridgeDetail={action?:unknown;code?:unknown;name?:unknown;page?:unknown;id?:unknown;
+ reply?:(result:{ok:true;value:unknown}|{ok:false;error:string})=>void};
+let bridged=false;
+const currentAppId=()=>{
+ const match=/^\/une\/apps\/([^/]+)\//.exec(window.location.pathname);
+ return match?decodeURIComponent(match[1]):'';
+};
+export function installPairedScreensBridge(request:Request):void{
+ if(bridged||typeof window==='undefined')return;
+ bridged=true;
+ window.addEventListener(PAIRED_SCREENS_EVENT,event=>{
+  const detail=(event as CustomEvent<BridgeDetail>).detail;
+  if(!detail||typeof detail.reply!=='function')return;
+  const reply=detail.reply;
+  const run=async():Promise<unknown>=>{
+   switch(detail.action){
+    case 'list':return (await post<{screens:Screen[]}>(request,'/screens/list',{})).screens;
+    case 'add':return post(request,'/screens/approve',{code:detail.code,name:detail.name,appId:currentAppId(),pageApiName:detail.page});
+    case 'rename':return post(request,'/screens/rename',{id:detail.id,name:detail.name});
+    case 'revoke':return post(request,'/screens/revoke',{id:detail.id});
+    default:throw Error('Unknown screen action');
+   }
+  };
+  run().then(value=>reply({ok:true,value}),error=>reply({ok:false,error:reason(error,'Screens are unavailable')}));
+ });
 }

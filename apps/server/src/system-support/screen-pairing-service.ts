@@ -29,7 +29,7 @@ export const SCREEN_GONE='This screen is no longer paired. Pair it again from th
 
 export type ScreenSession={accessToken:string;refreshToken:string;expiresIn:number};
 export type ScreenTarget={appId:string;pageApiName:string;deviceName:string;mirrorKey:string};
-export type PairedScreen={id:string;name:string;appId:string;pageApiName:string;pairedAt:string;lastSeenAt:string|null};
+export type PairedScreen={id:string;name:string;appId:string;pageApiName:string;pairedAt:string;lastSeenAt:string|null;online:boolean};
 type Actor={tenant_id:string;user_id:string};
 type Row={id:string;tenant_id:string|null;user_id:string|null;mfa_verified:boolean;device_record_id:string|null;
  device_name:string|null;mirror_key:string|null;app_id:string|null;page_api_name:string|null;approved_at:Date|null;key_hash:string|null};
@@ -97,7 +97,8 @@ export class ScreenPairingService{
  }
 
  /** On the till (signed in): the code shown on the screen pairs it with this device and page. */
- async approve(actor:Actor,mfaVerified:boolean,code:unknown,device:PairingDevice,appId:unknown,pageApiName:unknown):Promise<PairedScreen>{
+ async approve(actor:Actor,mfaVerified:boolean,code:unknown,device:PairingDevice,appId:unknown,pageApiName:unknown,name?:unknown):Promise<PairedScreen>{
+  const label=screenName(name);
   if(typeof code!=='string'||!/^\d{4}$/.test(code.trim()))throw Error('Type the 4-digit code shown on the screen');
   if(typeof appId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(appId))throw Error('Choose the app this screen belongs to');
   if(typeof pageApiName!=='string'||!apiName.test(pageApiName))throw Error('Choose the page this screen shows');
@@ -105,15 +106,15 @@ export class ScreenPairingService{
   if(!this.allowTry(actor.tenant_id+'\u0000'+actor.user_id))throw Error('Too many tries. Wait a minute and try again');
   const {rows}=await this.db.query<{id:string;screen_key:string;approved_at:Date}>(`UPDATE md_screen_pairings
     SET tenant_id=$2,user_id=$3,mfa_verified=$4,device_record_id=$5,device_name=$6,mirror_key=$7,app_id=$8,page_api_name=$9,
-        approved_at=now(),code=NULL
+        approved_at=now(),code=NULL,screen_name=$10
     WHERE id=(SELECT id FROM md_screen_pairings WHERE code=$1 AND approved_at IS NULL AND revoked_at IS NULL
       AND code_expires_at>now() ORDER BY created_at DESC LIMIT 1)
     RETURNING id,screen_key,approved_at`,
-  [code.trim(),actor.tenant_id,actor.user_id,mfaVerified,device.id,device.name.slice(0,120),device.deviceKey,appId,pageApiName]);
+  [code.trim(),actor.tenant_id,actor.user_id,mfaVerified,device.id,device.name.slice(0,120),device.deviceKey,appId,pageApiName,label||null]);
   const row=rows[0];
   if(!row)throw Error('That code is wrong or has expired. Check the code on the screen');
   if(row.screen_key===device.deviceKey){await this.revokeRow(row.id);throw Error('Open /display on the other screen, not on this device');}
-  return {id:row.id,name:device.name,appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null};
+  return {id:row.id,name:label||'Display',appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
  }
 
  /** Whether the till's own sign-in passed MFA: the screen gets no more than that. */
@@ -122,15 +123,33 @@ export class ScreenPairingService{
   const {rows}=await this.db.query<{mfa_verified:boolean}>('SELECT mfa_verified FROM md_sessions WHERE token_hash=$1 AND revoked_at IS NULL',[hash(bearer)]);
   return rows[0]?.mfa_verified===true;
  }
- /** The screens paired with one device (till settings). */
+ /** The screens paired with one device (its settings). Online: the screen used its sign-in
+  * in the last minute (a display re-reads every couple of seconds while it is on). */
  async list(actor:Actor,deviceRecordId:string):Promise<PairedScreen[]>{
   if(!uuid.test(deviceRecordId))return [];
-  const {rows}=await this.db.query<{id:string;device_name:string;app_id:string;page_api_name:string;approved_at:Date;last_seen_at:Date|null}>(`
-   SELECT id,device_name,app_id,page_api_name,approved_at,last_seen_at FROM md_screen_pairings
-   WHERE tenant_id=$1 AND device_record_id=$2 AND approved_at IS NOT NULL AND revoked_at IS NULL ORDER BY approved_at`,
+  const {rows}=await this.db.query<{id:string;screen_name:string|null;app_id:string;page_api_name:string;approved_at:string;seen:string|null}>(`
+   SELECT p.id,p.screen_name,p.app_id,p.page_api_name,p.approved_at,
+    GREATEST(p.last_seen_at,(SELECT max(s.last_seen_at) FROM md_sessions s
+     WHERE s.tenant_id=p.tenant_id AND s.family_id=ANY(p.session_families) AND s.revoked_at IS NULL)) AS seen
+   FROM md_screen_pairings p
+   WHERE p.tenant_id=$1 AND p.device_record_id=$2 AND p.approved_at IS NOT NULL AND p.revoked_at IS NULL ORDER BY p.approved_at`,
   [actor.tenant_id,deviceRecordId]);
-  return rows.map(row=>({id:row.id,name:row.device_name,appId:row.app_id,pageApiName:row.page_api_name,
-   pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:row.last_seen_at?new Date(row.last_seen_at).toISOString():null}));
+  const now=this.now();
+  return rows.map((row,index)=>{
+   const seen=row.seen?new Date(row.seen).toISOString():null;
+   return {id:row.id,name:row.screen_name||'Display '+(index+1),appId:row.app_id,pageApiName:row.page_api_name,
+    pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:seen,online:Boolean(seen&&now-Date.parse(seen)<60_000)};
+  });
+ }
+
+ /** Give a paired screen a name people recognise ("Counter", "Kitchen"). */
+ async rename(actor:Actor,id:unknown,name:unknown):Promise<{renamed:boolean}>{
+  if(typeof id!=='string'||!uuid.test(id))throw Error('Choose a screen');
+  const label=screenName(name);
+  if(!label)throw Error('Type a name for the screen');
+  const {rows}=await this.db.query<{id:string}>(`UPDATE md_screen_pairings SET screen_name=$3
+   WHERE id=$1 AND tenant_id=$2 AND revoked_at IS NULL RETURNING id`,[id,actor.tenant_id,label]);
+  return {renamed:Boolean(rows[0])};
  }
 
  /** Unpair: the screen key and every session it was given stop at once. */
@@ -172,6 +191,8 @@ export class ScreenPairingService{
  }
 }
 
+/** A screen's name: plain text, at most 60 characters ('' = none given). */
+const screenName=(name:unknown):string=>typeof name==='string'?name.replace(/[\u0000-\u001f]/g,'').trim().slice(0,60):'';
 const target=(row:Row):ScreenTarget=>({appId:row.app_id??'',pageApiName:row.page_api_name??'',
  deviceName:row.device_name??'',mirrorKey:row.mirror_key??''});
 
@@ -198,6 +219,7 @@ CREATE TABLE IF NOT EXISTS md_screen_pairings (
  expires_at timestamptz,
  revoked_at timestamptz
 );
+ALTER TABLE md_screen_pairings ADD COLUMN IF NOT EXISTS screen_name text;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_code ON md_screen_pairings(code) WHERE approved_at IS NULL AND revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_device ON md_screen_pairings(tenant_id,device_record_id) WHERE revoked_at IS NULL;
 `;

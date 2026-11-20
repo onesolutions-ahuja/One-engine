@@ -22,6 +22,7 @@ import {applySmartSelectorMulti} from './smart-selector-multi.js';
 import {applySmartVisibleFormula} from './smart-visible-formula.js';
 import {applySmartDisabledFormula,applySmartNumpadDateMode,applySmartCartSummaryVisible,applySmartTextKeypad,applySmartInputFieldRules,applySmartTableColumns,applySmartChartDays,applySmartTableFooterVisible,applySmartTableShowWhen} from './smart-disabled-formula.js';
 import {applySmartIdCard} from './smart-id-card.js';
+import {applySmartPairedScreens} from './smart-paired-screens.js';
 
 /** Recover original migration files from the immutable SQL baseline.
  * The old runner accepted any subset of known versions and ran missing files
@@ -831,6 +832,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await applySmartTableShowWhen(client);
   // Smart ID Card reuses the Card Grid rules, so it runs after every Card Grid step.
   await applySmartIdCard(client);
+  await applySmartPairedScreens(client);
   // Retire the duplicate Key Gap control. Existing page JSON keeps numpadGap
   // until authored again; all three renderers and the ribbon read that legacy
   // value only when the new shared gap property has not been set.

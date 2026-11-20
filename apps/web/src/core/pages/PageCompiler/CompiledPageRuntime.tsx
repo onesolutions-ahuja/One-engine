@@ -14,7 +14,7 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {askWhichTill} from '../PageRuntime/tillPickerScreen';
-import {showScreenPairing} from '../PageRuntime/displayPairingScreen';
+import {showScreenPairing,installPairedScreensBridge} from '../PageRuntime/displayPairingScreen';
 import {ensureTenantBrand} from '../../branding/tenantBrandLoader';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
@@ -227,6 +227,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
   if(runtime.code?.asksTill)void askWhichTill(runtime.request);
+  // Smart Paired Screens components on this page list and pair screens through Core.
+  installPairedScreensBridge(runtime.request);
   // @ThisTenant.Company.Logo / Name: compiled pages load the brand themselves.
   void ensureTenantBrand();
   // Rows for instant taps and totals: one request with the first data.

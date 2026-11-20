@@ -178,7 +178,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    return notHeld('This device\'s Till is loading');
   }
   /** @ThisPage.Device.Ip / Agent are seen by the server: blank in the prediction. */
-  device(field:string){return field==='Key'?tillDeviceKey():'';}
+  // MirrorKey too: a customer display's totals (SUMIFS over the till's rows) read it here.
+  device(field:string){return field==='Key'?tillDeviceKey():field==='MirrorKey'?mirrorDeviceKey():'';}
   component(id:string,property:string){
    if(!host.readComponent)throw Error('Select a component and property on this page');
    return host.readComponent(id,property);

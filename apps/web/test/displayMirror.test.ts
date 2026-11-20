@@ -116,3 +116,24 @@ test('a till cart filtered by its OWN device key keeps its session cart',async()
  const {recordScope}=await import('../../server/src/page-compiler/compilePage.ts');
  assert.deepEqual(recordScope('Custom:smart_cart',{},[null,'@CartLine.DeviceKey = @ThisPage.Device.Key']),{kind:'auto'});
 });
+
+test('a customer display\'s totals count the till\'s rows (MirrorKey in SUMIFS), not zero',async()=>{
+ const {buildPageCode,pageCodeModule}=await import('../../server/src/page-compiler/code/pageCode.ts');
+ const {F,O}=await import('../../server/src/page-compiler/code/formulaLibrary.ts');
+ const {createPageCodeRuntime}=await import('../src/core/pages/PageCompiler/pageCodeRuntime.ts');
+ const {resetDeviceTillForTests}=await import('../src/core/authentication/TillDevice/deviceTill.ts');
+ const till='till-device-key-000000000001';
+ const formula='=SUMIFS(Cart, Total, DeviceKey, @ThisPage.Device.MirrorKey, Status, "Open")';
+ const page={apiName:'display',components:[{id:'total',objectApiName:'Cart',formulas:[{property:'textSource',source:formula}],actions:[]}]};
+ const module=pageCodeModule(buildPageCode(page as never));
+ const code=new Function('F','O',module.replace(/export /g,'')+'\nreturn createCode(F, O);')(F,O);
+ const sets:Record<string,{rows:unknown[];complete:boolean}>={};
+ for(const set of code.recordSets)sets[set.key]={rows:[{Id:'1',DeviceKey:till,Status:'Open',Total:9.74},
+  {Id:'2',DeviceKey:'another-till-key-00000001',Status:'Open',Total:5}],complete:true};
+ resetDeviceTillForTests({status:'unset',till:null,tills:[],mirrorKey:till});
+ const rt=createPageCodeRuntime(code,{endpoint:'/apps/X',build:{buildId:'b'},sessionId:()=>'s',state:()=>({}),
+  request:(async(path:string)=>path.endsWith('/sets')?{ok:true,sets}:{ok:true,values:[]}) as never});
+ await rt.loadSets();
+ assert.equal(rt.formulasFor('total').get(formula)!({}),9.74);
+ resetDeviceTillForTests();
+});

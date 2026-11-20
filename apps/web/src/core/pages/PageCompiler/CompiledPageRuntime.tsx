@@ -277,7 +277,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   window.addEventListener('metadrive:page-collection-selected',onSelected);
   // A selling page (a session-scoped cart) tells the server which sale this device is on,
   // so its paired screens show that sale only (held and old sales drop off).
-  const sells=sellsBySession(runtime.compiled.dataSources);
+  const sells=sellsBySession(runtime.compiled.dataSources,Boolean(runtime.code?.readsMirror));
   const reportSale=()=>{if(sells)void runtime.request('/screens/session',{method:'POST',
    body:JSON.stringify({deviceKey:tillDeviceKey(),sessionId:runtime.sessionId()})}).catch(()=>undefined);};
   reportSale();

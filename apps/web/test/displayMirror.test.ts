@@ -256,3 +256,26 @@ test('a till page that filters its cart by @ThisPage.Session.Id counts as sellin
  assert.equal(sellsBySession([src('auto','')]),true);
  assert.equal(sellsBySession([src('none','@Product.Active = TRUE'),src('mirror','@CartLine.DeviceKey = @ThisPage.Device.MirrorKey')]),false,'a display or a product list does not');
 });
+
+test('a display cart with the till\'s own filter (page session) follows the till live and never reports a sale',async()=>{
+ const {startMirrorLiveRefresh,mirrorSources,sellsBySession}=await import('../src/core/pages/PageCompiler/mirrorLiveRefresh.ts');
+ const src=(id:string,filterFormula:string)=>({id,objectApiName:'CartLine',components:[],scope:{kind:'none'},complete:false,
+  filters:null,filterLogic:'AND',filterFormula,stateInputs:[]}) as never;
+ const lines=src('CartLine#d','AND(@CartLine.session_key__c = @ThisPage.Session.Id, @CartLine.Status = "Open")');
+ const products=src('Product#p','@Product.Active = TRUE');
+ // Same filter as the till: on the till it sells; on a display (reads MirrorKey) it follows.
+ assert.equal(sellsBySession([lines]),true,'till');
+ assert.equal(sellsBySession([lines],true),false,'display: its session is the till\'s sale, not its own');
+ assert.deepEqual(mirrorSources([lines,products]).map(s=>(s as {id:string}).id),[]);
+ assert.deepEqual(mirrorSources([lines,products],true).map(s=>(s as {id:string}).id),['CartLine#d']);
+ let tick:()=>void=()=>{};
+ const clock={setInterval:(run:()=>void)=>{tick=run;return 1;},clearInterval:()=>{},visible:()=>true,listen:()=>()=>undefined};
+ const calls:string[]=[];
+ startMirrorLiveRefresh([lines,products],true,{reload:async(id)=>{calls.push(id);}},clock);
+ tick();await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual(calls,['CartLine#d'],'the display re-reads the till\'s current sale rows');
+ // The till itself (reads no MirrorKey) starts no display refresh.
+ let started=false;
+ startMirrorLiveRefresh([lines],false,{reload:async()=>{}},{...clock,setInterval:()=>{started=true;return 1;}});
+ assert.equal(started,false);
+});

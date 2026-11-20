@@ -66,6 +66,12 @@ const hexRgb=c=>{const m=/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c||"").tri
 const luminance=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;})
  .reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
 const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+// A selected tab on a strong colour (iOS blue) reads white, not the dark label colour.
+export function selectedTabText(fill,explicit){
+ if(typeof explicit==="string"&&explicit)return explicit;
+ const bg=hexRgb(fill);
+ return bg&&luminance(bg)>0.45?"#1d1d1f":"#fff";
+}
 export function readableText(fill,preferred){
  const bg=hexRgb(fill);
  if(!bg)return preferred||undefined;
@@ -785,7 +791,7 @@ function SmartTabs({p,record,fire}){
      // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
      maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
      borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||SMART_BLUE):"transparent"):undefined,
-     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:readableText(selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",p.labelColor),
+     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
      background:selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",
     borderColor:p.borderColor||undefined}}
     tabIndex={selectedTabIndex===index||selectedTabIndex<0&&index===0?0:-1}

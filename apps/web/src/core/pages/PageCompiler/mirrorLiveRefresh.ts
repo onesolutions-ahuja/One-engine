@@ -15,6 +15,13 @@ export const followsMirroredSale=():boolean=>followingSale;
 export function setFollowingSale(value:boolean){followingSale=value;}
 const MIRROR=/@ThisPage\.Device\.MirrorKey/i;
 
+/** A selling page: its rows belong to its own page session (a session-scoped cart, or a
+ * filter on @ThisPage.Session.Id such as `session_key__c = @ThisPage.Session.Id`). It tells
+ * the server which sale this device is on, so paired screens show that sale only. */
+export function sellsBySession(sources:readonly CompiledDataSource[]):boolean{
+ return sources.some(source=>source.scope.kind==='auto'||
+  /@ThisPage\.Session\.Id\b/i.test((source.filterFormula??'')+' '+(source.filters==null?'':JSON.stringify(source.filters))));
+}
 /** Data sources that show another device's rows (their filter reads MirrorKey). */
 export function mirrorSources(sources:readonly CompiledDataSource[]):CompiledDataSource[]{
  return sources.filter(source=>{

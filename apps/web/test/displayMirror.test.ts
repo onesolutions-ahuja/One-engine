@@ -192,3 +192,13 @@ test('a display moves to the till\'s current sale before reading rows; only the 
  assert.match(JSON.stringify(asked.find(a=>a.object==='CartLine')),/cart-2/,'and reads only its lines');
  setFollowingSale(false);resetDeviceTillForTests();
 });
+
+test('a till page that filters its cart by @ThisPage.Session.Id counts as selling (reports its sale)',async()=>{
+ const {sellsBySession}=await import('../src/core/pages/PageCompiler/mirrorLiveRefresh.ts');
+ const src=(scope:string,filterFormula:string)=>({id:'x',objectApiName:'CartLine',components:[],scope:{kind:scope},complete:false,
+  filters:null,filterLogic:'AND',filterFormula,stateInputs:[]}) as never;
+ // Live Smart Till billing page (20 Nov): scope none, filter on the page session.
+ assert.equal(sellsBySession([src('none','AND(@CartLine.session_key__c = @ThisPage.Session.Id, @CartLine.Status = "Open")')]),true);
+ assert.equal(sellsBySession([src('auto','')]),true);
+ assert.equal(sellsBySession([src('none','@Product.Active = TRUE'),src('mirror','@CartLine.DeviceKey = @ThisPage.Device.MirrorKey')]),false,'a display or a product list does not');
+});

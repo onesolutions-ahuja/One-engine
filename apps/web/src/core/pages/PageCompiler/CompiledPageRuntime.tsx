@@ -33,7 +33,7 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
-import {startMirrorLiveRefresh,setFollowingSale} from './mirrorLiveRefresh';
+import {startMirrorLiveRefresh,setFollowingSale,sellsBySession} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import {isCompiledStateReference,declarativeSource,COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
@@ -277,7 +277,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   window.addEventListener('metadrive:page-collection-selected',onSelected);
   // A selling page (a session-scoped cart) tells the server which sale this device is on,
   // so its paired screens show that sale only (held and old sales drop off).
-  const sells=runtime.compiled.dataSources.some(source=>source.scope.kind==='auto');
+  const sells=sellsBySession(runtime.compiled.dataSources);
   const reportSale=()=>{if(sells)void runtime.request('/screens/session',{method:'POST',
    body:JSON.stringify({deviceKey:tillDeviceKey(),sessionId:runtime.sessionId()})}).catch(()=>undefined);};
   reportSale();

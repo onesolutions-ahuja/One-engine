@@ -9,7 +9,8 @@ import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
-import {deviceTill,setDeviceTill,startDisplayPairing,claimDisplayPairing,unpairDisplay} from '../system-support/till-assignment-service.js';
+import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
+import type {ScreenPairingService} from '../system-support/screen-pairing-service.js';
 
 /**
  * Compiled page scripts (Page Builder Preview).
@@ -23,7 +24,7 @@ import {deviceTill,setDeviceTill,startDisplayPairing,claimDisplayPairing,unpairD
  */
 import {stampDeviceCarts,validDeviceKey,DEVICE_OFFLINE_AT} from '../system-support/device-presence-service.js';
 export type PageScriptDeps={db:SqlPersistence;rbac:RbacEngine;records:RecordEngine;pages:PageRuntime;
- definitions:ObjectDefinitionService;scripts:PageScriptService;
+ definitions:ObjectDefinitionService;scripts:PageScriptService;screens?:ScreenPairingService;
  verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>};
 
 const scopeKey=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
@@ -196,22 +197,26 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   res.json({till:await setDeviceTill(deps,actor,body.deviceKey,body.tillId,
    {ip:req.ip,agent:req.get('user-agent')})});
  }));
- // Customer display pairing: the till asks for a 6-digit code, the display types it.
- app.post('/api/till-device/display-code',wrap(async(req,res)=>{
-  const actor=authenticated(req);
-  res.setHeader('Cache-Control','private, no-store');
-  res.json(await startDisplayPairing(deps,actor,(req.body??{}).deviceKey));
- }));
- app.post('/api/till-device/display-pair',wrap(async(req,res)=>{
+ // Paired screens (/display) for any app: this signed-in device pairs a screen by its code.
+ const screens=()=>{if(!deps.screens)throw Error('Paired screens are unavailable');return deps.screens;};
+ app.post('/api/screens/approve',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   const body=(req.body??{}) as Record<string,unknown>;
-  res.json(await claimDisplayPairing(deps,actor,body.deviceKey,body.code));
+  const device=await pairingDevice(deps.records,actor,body.deviceKey);
+  const mfa=await screens().sessionMfa(String(req.get('authorization')??'').slice(7));
+  res.json(await screens().approve(actor,mfa,body.code,device,body.appId,body.pageApiName));
  }));
- app.post('/api/till-device/display-unpair',wrap(async(req,res)=>{
+ app.post('/api/screens/list',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
-  res.json(await unpairDisplay(deps,actor,(req.body??{}).deviceKey));
+  const device=await pairingDevice(deps.records,actor,(req.body??{}).deviceKey);
+  res.json({screens:await screens().list(actor,device.id),device:device.name});
+ }));
+ app.post('/api/screens/revoke',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(await screens().revoke(actor,(req.body??{}).id));
  }));
  codeRoutes('/api/apps/:appId',true);
  codeRoutes('/api/pages/:apiName',false);

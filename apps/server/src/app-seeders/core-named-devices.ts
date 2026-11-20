@@ -25,10 +25,7 @@ export const NAMED_DEVICE_OBJECTS=[
   {api:'DeviceSetUpBy',label:'Device Set Up By',type:'reference',related:'User'},
   {api:'DeviceIp',label:'Device IP Address',type:'text'},
   {api:'DeviceAgent',label:'Device Browser / App',type:'text'},
-  {api:'CustomerDisplayKey',label:'Customer Display (device key)',type:'text'},
-  // Pairing a customer display by a 6-digit code: only its hash is kept, for 5 minutes.
-  {api:'DisplayPairCode',label:'Display Pairing Code (hash)',type:'text'},
-  {api:'DisplayPairExpiresAt',label:'Display Pairing Code Expires At',type:'datetime'}
+  {api:'CustomerDisplayKey',label:'Customer Display (device key)',type:'text'}
  ]},
  // Payment hand-off between the till and the customer screen (card prompt, PayPal QR).
  {object:'Cart',label:'Cart',fields:[

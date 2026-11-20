@@ -153,7 +153,12 @@ export function compileActionPlan(source:string):ActionStep[] {
    args.forEach(arg=>add(steps,arg,guards,loop));
    return;
   }
-  if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'||node.name==='PAIRDISPLAY'){
+  if(node.name==='PAIRDISPLAY'){
+  if(args.length!==1)throw Error('PAIRDISPLAY needs the page the screen shows');
+  steps.push({name:node.name,object:nameOf(args[0],'PAIRDISPLAY page'),fields:new Map(),guards});
+  return;
+ }
+ if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'){
    // CLOSESCREEN("second") closes the second-monitor screen; otherwise no arguments.
    const second=node.name==='CLOSESCREEN'&&args.length===1&&nameOf(args[0],'CLOSESCREEN target').toLowerCase()==='second';
    if(args.length&&!second)throw Error(node.name+' takes no arguments (CLOSESCREEN also accepts "second")');

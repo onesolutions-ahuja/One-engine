@@ -69,57 +69,37 @@ test('a customer display re-reads the Till\'s sale on its own, fresh, while visi
  assert.equal(started,false);
 });
 
-test('a customer display pairs with a Till by a 6-digit code: once, before it expires, hashed',async()=>{
- const {startDisplayPairing,claimDisplayPairing,unpairDisplay,deviceTill,DISPLAY_CODE_TTL_MS}=
-  await import('../../server/src/system-support/till-assignment-service.ts');
- const tillKey='till-device-key-000000000001',tablet='tablet-display-key-00000001',ipad='ipad-display-key-000000001';
- const rows:Array<Record<string,unknown>>=[
-  {Id:'1',Name:'Till 1',DeviceType:'POS Terminal',DeviceId:tillKey,Active:true},
-  {Id:'2',Name:'Till 2',DeviceType:'POS Terminal',DeviceId:'till-device-key-000000000002',Active:true,CustomerDisplayKey:tablet}];
- const match=(row:Record<string,unknown>,filters:Array<{field:string;value:unknown}>)=>
-  filters.every(f=>f.field==='Active'?row.Active===true:String(row[f.field]??'')===String(f.value));
- const deps={db:{transaction:(run:()=>Promise<unknown>)=>run()},records:{
-  list:async(_t:string,_u:string,_o:string,limit:number,_off:number,options:{filters?:Array<{field:string;value:unknown}>}={})=>
-   ({records:rows.filter(row=>match(row,options.filters??[])).slice(0,limit).map(row=>({...row}))}),
-  get:async()=>({}),
-  update:async(_t:string,_u:string,_o:string,id:string,values:Record<string,unknown>)=>{Object.assign(rows.find(row=>row.Id===id)!,values);}}} as never;
- const actor={tenant_id:'t',user_id:'u'};
- const now=Date.parse('2026-11-20T15:00:00Z');
-
- await assert.rejects(startDisplayPairing(deps,actor,tablet,now),/set this device up as a till/i,'only a Till hands out codes');
- const {code,till}=await startDisplayPairing(deps,actor,tillKey,now);
- assert.match(code,/^\d{6}$/);assert.equal(till,'Till 1');
- assert.notEqual(rows[0].DisplayPairCode,code,'only a hash is stored');
- await assert.rejects(claimDisplayPairing(deps,actor,tillKey,code,now),/other screen/,'the till cannot pair with itself');
- await assert.rejects(claimDisplayPairing(deps,actor,tablet,code==='000000'?'000001':'000000',now),/wrong or has expired/);
- await assert.rejects(claimDisplayPairing(deps,actor,tablet,code,now+DISPLAY_CODE_TTL_MS+1),/expired/);
- // The tablet was Till 2's display; pairing with Till 1 moves it.
- assert.deepEqual(await claimDisplayPairing(deps,actor,tablet,code,now),{till:'Till 1',mirrorKey:tillKey});
- assert.equal(rows[0].CustomerDisplayKey,tablet);
- assert.equal(rows[1].CustomerDisplayKey,null,'a display follows one Till');
- assert.equal(rows[0].DisplayPairCode,null);
- await assert.rejects(claimDisplayPairing(deps,actor,ipad,code,now),/wrong or has expired/,'a code works once');
- const state=await deviceTill(deps,actor,tablet);
- assert.equal(state.displayFor,'Till 1');assert.equal(state.mirrorKey,tillKey);
- await unpairDisplay(deps,actor,tillKey);
- assert.equal(rows[0].CustomerDisplayKey,null);
- assert.equal((await deviceTill(deps,actor,tablet)).displayFor,'');
- // Six digits: a person gets only a few guesses a minute.
- const guess={tenant_id:'t',user_id:'guesser'};
- for(let i=0;i<10;i++)await assert.rejects(claimDisplayPairing(deps,guess,ipad,'12345'+(i%10),now),/wrong or has expired/);
- await assert.rejects(claimDisplayPairing(deps,guess,ipad,'999999',now),/Too many tries/);
-});
-
-test('PAIRDISPLAY() is a till button action: it shows the code and saves nothing',async()=>{
+test('PAIRDISPLAY(Page) is a button action: it opens the pairing box and saves nothing',async()=>{
  const {compileActionFormula}=await import('../../server/src/page-compiler/code/generateCode.ts');
  const {isActionPlan}=await import('../../server/src/expression-engine/ActionFormulas.ts');
  const {ACTION_FORMULA_FUNCTIONS}=await import('../../server/src/expression-engine/FormulaActions.ts');
  assert.ok(ACTION_FORMULA_FUNCTIONS.has('PAIRDISPLAY'));
- assert.ok(isActionPlan('=PAIRDISPLAY()'));
- const code=compileActionFormula('=PAIRDISPLAY()','Cart').js;
- assert.match(code,/\$\.ui\("PAIRDISPLAY"\)/);
+ assert.ok(isActionPlan('=PAIRDISPLAY(smart_till_customer_display)'));
+ const code=compileActionFormula('=PAIRDISPLAY(smart_till_customer_display)','Cart').js;
+ assert.match(code,/\$\.ui\("PAIRDISPLAY", "smart_till_customer_display"\)/);
  assert.doesNotMatch(code,/\$\.(?:create|update|remove)\(/);
- assert.throws(()=>compileActionFormula('=PAIRDISPLAY("x")','Cart'),/argument/);
+ assert.throws(()=>compileActionFormula('=PAIRDISPLAY()','Cart'),/argument|page/i,'the page the screen shows is required');
+});
+
+test('a paired screen remembers its page and till, and only its own page goes back to /display',async()=>{
+ const store=new Map<string,string>();
+ (globalThis as {window?:unknown}).window={localStorage:{getItem:(k:string)=>store.get(k)??null,
+  setItem:(k:string,v:string)=>{store.set(k,v);},removeItem:(k:string)=>{store.delete(k);}},location:{pathname:'/'}};
+ const screen=await import('../src/core/authentication/PairedScreen/pairedScreen.ts');
+ const {openerMirrorKey}=await import('../src/core/authentication/TillDevice/deviceTill.ts');
+ assert.equal(screen.onPairedScreenPage('/une/apps/SMARTTILL/pages/smart_till_customer_display'),false);
+ const path=screen.rememberScreen({access_token:'a',appId:'SMARTTILL',pageApiName:'smart_till_customer_display',
+  deviceName:'Till 1',mirrorKey:'till-device-key-000000000001',key:'k'.repeat(43)});
+ assert.equal(path,'/une/apps/SMARTTILL/pages/smart_till_customer_display');
+ assert.equal(screen.onPairedScreenPage(path),true);
+ assert.equal(screen.onPairedScreenPage('/une/apps/SMARTTILL/pages/smart_till_billing'),false,'the till page in the same browser is not the screen');
+ (globalThis as {window:{location:{search:string}}}).window.location.search='';
+ (globalThis as {window:{sessionStorage?:unknown}}).window.sessionStorage={getItem:()=>null,setItem:()=>undefined};
+ assert.equal(openerMirrorKey(),'till-device-key-000000000001','the screen follows the device it was paired with');
+ assert.throws(()=>screen.rememberScreen({access_token:'a',appId:'X',pageApiName:'bad page',deviceName:'',mirrorKey:''}),/page/);
+ screen.forgetScreen();
+ assert.equal(screen.onPairedScreenPage(path),false);assert.equal(openerMirrorKey(),'');
+ delete (globalThis as {window?:unknown}).window;
 });
 
 test('the display link keeps the till it follows when the app tidies its address',async()=>{

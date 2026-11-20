@@ -4,6 +4,7 @@ import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
 import {TillDeviceService,TILL_DEVICE_EXPIRED} from './till-device-service.js';
+import {ScreenPairingService,SCREEN_GONE} from './screen-pairing-service.js';
 import {withAuditContext,auditContext,setAuditActor} from './audit-context.js';
 import {ConnectedAppService} from './connected-app-service.js';
 import {SecurityMonitorService} from './security-monitor-service.js';
@@ -304,6 +305,7 @@ export function createSystemServer(db:SqlPersistence) {
   const mfa=new MfaService(db,rbac,auth,namedCredentials);
   const tillPins=new TillPinService(db);
   const tillDevices=new TillDeviceService(db,auth);
+  const screens=new ScreenPairingService(db,auth);
   const federation=new FederationService(db,rbac,namedCredentials,integrationActivityWriter);
   const passkeys=new WebAuthnService(db,auth);
   const backups=new MfaBackupService(db,auth,mfa,rbac);
@@ -570,6 +572,37 @@ export function createSystemServer(db:SqlPersistence) {
       else throw error;
     }
   }));
+  // Paired screens (/display): no sign-in until a till pairs them; then the screen signs in
+  // as the person who paired it, with its own session family (signing out on the till leaves it).
+  const screenStarts=new Map<string,number[]>();
+  app.post('/api/auth/screen/start',route(async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    const ip=normalizedLoginIp(req.ip)??'unknown',now=Date.now();
+    const recent=(screenStarts.get(ip)??[]).filter(at=>now-at<60_000);
+    if(screenStarts.size>5000)screenStarts.clear();
+    recent.push(now);screenStarts.set(ip,recent);
+    if(recent.length>30){res.status(429).json({error:'Too many screens asked for a code. Wait a minute.'});return;}
+    res.json(await screens.start(req.body?.screenKey));
+  }));
+  const sendScreenSession=(req:Request,res:Response,body:{session:{accessToken:string;refreshToken:string;expiresIn:number}}&Record<string,unknown>)=>{
+    const {session,...rest}=body;
+    res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
+    res.json({...rest,access_token:session.accessToken,expires_in:session.expiresIn});
+  };
+  app.post('/api/auth/screen/poll',route(async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    const answer=await screens.poll(req.body?.poll,{ip:req.ip});
+    if(answer.status!=='paired'){res.json(answer);return;}
+    sendScreenSession(req,res,answer);
+  }));
+  app.post('/api/auth/screen/resume',route(async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    try{sendScreenSession(req,res,await screens.resume(req.body?.key,{ip:req.ip}));}
+    catch(error){
+      if(error instanceof Error&&error.message===SCREEN_GONE){res.status(410).json({error:SCREEN_GONE});return;}
+      throw error;
+    }
+  }));
   app.post('/api/auth/till-device/remove',route(async(req,res)=>{
     await tillDevices.revoke(req.body?.key);
     res.status(204).end();
@@ -618,7 +651,7 @@ export function createSystemServer(db:SqlPersistence) {
   // Star CloudPRNT network printers poll here for receipts queued by DEVICE(...).
   registerCloudPrntPublicRoutes(app,db);
   // Compiled page scripts: the script fetch carries a one-time ticket instead of a bearer token.
-  const pageScriptDeps={db,rbac,records,pages,definitions,namedCredentials,scripts:new PageScriptService(),
+  const pageScriptDeps={db,rbac,records,pages,definitions,namedCredentials,scripts:new PageScriptService(),screens,
     verifyPin:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>tillPins.verify(actor.tenant_id,
       typeof userId==='string'&&/^[0-9a-f-]{36}$/i.test(userId)?userId:actor.user_id,pin,actor.user_id)};
   registerPageScriptPublicRoute(app,pageScriptDeps);

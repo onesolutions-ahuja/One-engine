@@ -14,7 +14,7 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {askWhichTill} from '../PageRuntime/tillPickerScreen';
-import {askToPairDisplay,showDisplayPairingCode} from '../PageRuntime/displayPairingScreen';
+import {showScreenPairing} from '../PageRuntime/displayPairingScreen';
 import {ensureTenantBrand} from '../../branding/tenantBrandLoader';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
@@ -227,8 +227,6 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
   if(runtime.code?.asksTill)void askWhichTill(runtime.request);
-  // A customer display that cannot tell which till to follow asks for the till's 6-digit code.
-  else if(runtime.code?.readsMirror)void askToPairDisplay(runtime.request);
   // @ThisTenant.Company.Logo / Name: compiled pages load the brand themselves.
   void ensureTenantBrand();
   // Rows for instant taps and totals: one request with the first data.
@@ -736,7 +734,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();
-     else if(effect.name==='PAIRDISPLAY')await showDisplayPairingCode(runtime.request);
+     // PAIRDISPLAY(Page): pair a /display screen to show Page of this app.
+     else if(effect.name==='PAIRDISPLAY')await showScreenPairing(runtime.request,currentAppId,first);
      // Printing code loads only when something is printed.
      else if(effect.name==='PRINT')await (await import('../PageRuntime/printTemplate')).printTemplate(first,runtime.request as never,
       ()=>previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId));

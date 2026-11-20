@@ -1,86 +1,77 @@
-import {deviceTillState,loadDeviceTill,openerMirrorKey,pairDisplayWithCode,requestDisplayCode,unpairTillDisplay} from '../../authentication/TillDevice/deviceTill';
+import {tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {ensureTillDialogStyles} from './tillPickerScreen';
 
 /**
- * Pairing a customer display with a Till by a 6-digit code: works the same on any browser,
- * Android or iOS tablet, because it is only the display page signed in on that device.
- *  - On the till: PAIRDISPLAY() (a button the page builder adds) shows a code for 5 minutes.
- *  - On the display: when it cannot tell which till to follow (more than one till, not
- *    paired, not opened by a till), it asks for that code once.
- * A shop with one till needs none of this: its displays follow that till already.
+ * PAIRDISPLAY(Page) on a till, kiosk or any app device: pair a screen that shows /display.
+ * The person types the 4-digit code from that screen; the screen then shows Page of this
+ * app, signed in as this person and following this device's sale. The same box lists the
+ * screens paired with this device, each with Unpair.
  */
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
+type Screen={id:string;name:string;pageApiName:string;pairedAt:string;lastSeenAt:string|null};
 
-function dialogShell(titleText:string,helpText:string){
+const post=<T>(request:Request,path:string,body:Record<string,unknown>)=>
+ request<T>(path,{method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey(),...body})});
+const reason=(error:unknown,fallback:string)=>error instanceof Error&&error.message?error.message:fallback;
+const when=(iso:string|null)=>{
+ if(!iso)return 'not opened yet';
+ const minutes=Math.round((Date.now()-Date.parse(iso))/60000);
+ return minutes<2?'online':minutes<60?minutes+' min ago':new Date(iso).toLocaleString([],{dateStyle:'short',timeStyle:'short'});
+};
+
+export async function showScreenPairing(request:Request,appId:string,pageApiName:string):Promise<void>{
+ if(typeof document==='undefined')return;
  ensureTillDialogStyles();
  const dialog=document.createElement('dialog');
  dialog.className='une-till-picker';
  dialog.setAttribute('aria-modal','true');
- const title=document.createElement('h2');
- title.id='une-pair-title-'+Math.random().toString(36).slice(2);
- title.textContent=titleText;
- dialog.setAttribute('aria-labelledby',title.id);
- const help=document.createElement('p');help.textContent=helpText;
- const footer=document.createElement('footer');
- const close=()=>{dialog.close();dialog.remove();};
- const button=(label:string,run:()=>void)=>{
-  const item=document.createElement('button');item.type='button';item.textContent=label;
-  item.addEventListener('click',run);footer.appendChild(item);return item;
- };
- return {dialog,title,help,footer,close,button,
-  show(...body:HTMLElement[]){dialog.append(title,help,...body,footer);document.body.appendChild(dialog);dialog.showModal();}};
-}
-const fail=(help:HTMLElement,error:unknown,fallback:string)=>{
- help.className='une-till-error';
- help.textContent=error instanceof Error&&error.message?error.message:fallback;
-};
-
-/** PAIRDISPLAY() on the till. */
-export async function showDisplayPairingCode(request:Request):Promise<void>{
- if(typeof document==='undefined')return;
- const box=dialogShell('Pair a customer display','Getting a code…');
- const code=document.createElement('div');code.className='une-pair-code';code.setAttribute('aria-live','polite');
- box.button('Unpair display',async()=>{
-  try{await unpairTillDisplay(request);box.help.className='';box.help.textContent='This till has no customer display now.';code.textContent='';}
-  catch(error){fail(box.help,error,'The display could not be unpaired');}
- });
- box.button('Done',box.close);
- box.show(code);
- try{
-  const answer=await requestDisplayCode(request);
-  code.textContent=answer.code;
-  const until=new Date(answer.expiresAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  box.help.textContent='On the customer display (tablet, phone or browser), open the display page and type this code. It works once, until '+until+'.';
- }catch(error){fail(box.help,error,'No code: this device is not set up as a till');}
-}
-
-let asked=false;
-/** True when a display cannot tell which till it shows, so it should ask for a code. */
-export function displayNeedsPairing():boolean{
- const state=deviceTillState();
- return state.status==='unset'&&!state.displayFor&&!openerMirrorKey()&&state.tills.length>1;
-}
-/** On a customer display page: ask for the till's code when it cannot tell which till to follow. */
-export async function askToPairDisplay(request:Request,force=false):Promise<void>{
- if((asked&&!force)||typeof document==='undefined')return;
- await loadDeviceTill(request);
- if(!force&&(!displayNeedsPairing()||asked))return;
- asked=true;
- const box=dialogShell('Which till is this display for?','On the till, tap Pair display, then type the 6-digit code here.');
+ dialog.setAttribute('aria-labelledby','une-pair-screen-title');
+ const title=document.createElement('h2');title.id='une-pair-screen-title';title.textContent='Pair a screen';
+ const help=document.createElement('p');
+ help.textContent='On the other screen open '+window.location.host+'/display, then type the code it shows.';
  const input=document.createElement('input');
- input.className='une-pair-input';input.inputMode='numeric';input.autocomplete='one-time-code';
- input.maxLength=6;input.pattern='[0-9]{6}';input.setAttribute('aria-label','6-digit code from the till');
- box.button('Not now',box.close);
- const pair=box.button('Pair',async()=>{
-  if(!/^\d{6}$/.test(input.value.trim())){fail(box.help,null,'Type the 6 digits shown on the till');input.focus();return;}
+ input.className='une-pair-input';input.inputMode='numeric';input.maxLength=4;input.autocomplete='off';
+ input.setAttribute('aria-label','4-digit code from the screen');
+ const list=document.createElement('ul');
+ const footer=document.createElement('footer');
+ const close=document.createElement('button');close.type='button';close.textContent='Close';
+ const pair=document.createElement('button');pair.type='button';pair.textContent='Pair';
+ footer.append(close,pair);
+ const say=(text:string,error=false)=>{help.className=error?'une-till-error':'';help.textContent=text;};
+
+ const refresh=async()=>{
+  list.replaceChildren();
+  try{
+   const answer=await post<{screens:Screen[]}>(request,'/screens/list',{});
+   for(const screen of answer.screens){
+    const item=document.createElement('li');
+    const unpair=document.createElement('button');unpair.type='button';
+    unpair.textContent='Unpair screen paired '+new Date(screen.pairedAt).toLocaleDateString()+' ('+when(screen.lastSeenAt)+')';
+    unpair.addEventListener('click',async()=>{
+     unpair.disabled=true;
+     try{await post(request,'/screens/revoke',{id:screen.id});say('Screen unpaired. It shows a new code now.');void refresh();}
+     catch(error){say(reason(error,'The screen could not be unpaired'),true);unpair.disabled=false;}
+    });
+    item.appendChild(unpair);list.appendChild(item);
+   }
+  }catch(error){say(reason(error,'Set this device up first'),true);}
+ };
+ pair.addEventListener('click',async()=>{
+  const code=input.value.trim();
+  if(!/^\d{4}$/.test(code)){say('Type the 4 digits shown on the screen',true);input.focus();return;}
   pair.disabled=true;
   try{
-   await pairDisplayWithCode(request,input.value);
-   box.close();
-  }catch(error){fail(box.help,error,'That code did not work. Get a new code on the till');pair.disabled=false;input.select();}
+   await post(request,'/screens/approve',{code,appId,pageApiName});
+   input.value='';say('Paired. The screen opens in a moment.');void refresh();
+  }catch(error){say(reason(error,'That code did not work'),true);input.select();}
+  finally{pair.disabled=false;}
  });
- input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,6);});
+ input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,4);});
  input.addEventListener('keydown',event=>{if(event.key==='Enter')pair.click();});
- box.show(input);
+ close.addEventListener('click',()=>{dialog.close();dialog.remove();});
+ dialog.append(title,help,input,list,footer);
+ document.body.appendChild(dialog);
+ dialog.showModal();
  input.focus();
+ void refresh();
 }

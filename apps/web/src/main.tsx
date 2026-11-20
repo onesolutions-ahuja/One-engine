@@ -25,6 +25,8 @@ window.addEventListener('vite:preloadError', (event: Event) => {
 // Keep the authenticated workspace, including its large builder code and CSS,
 // out of the initial public marketing bundle.
 const MailWebmail = lazy(() => import('./core/mail/MailWebmail'));
+// /display: a paired screen (customer display...) with no sign-in until a till pairs it.
+const PairedScreenStart = lazy(() => import('./core/authentication/PairedScreen/PairedScreenStart'));
 
 const Workspace = lazy(async () => {
   // Start every stylesheet and the app chunk downloading at the same time. The imports are
@@ -142,12 +144,15 @@ const pathname = basePath && window.location.pathname.startsWith(basePath + '/')
 const workspaceDevelopmentRoot = import.meta.env.DEV && Boolean(import.meta.env.VITE_API_BASE_URL);
 const isMarketingHome = !workspaceDevelopmentRoot && (pathname === '/' || pathname === '/index.html' || (Boolean(basePath) && window.location.pathname === basePath));
 const isPrivacyRoute = pathname === '/privacy' || pathname === '/privacy/' || pathname === '/privacy-policy' || pathname === '/privacy-policy/';
+const isDisplayRoute = pathname === '/display' || pathname === '/display/';
 const isTermsRoute = pathname === '/terms' || pathname === '/terms/' || pathname === '/terms-of-service' || pathname === '/terms-of-service/';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     {isMailRoute
       ? <Suspense fallback={<WorkspaceLoadingFallback />}><MailWebmail /></Suspense>
+      : isDisplayRoute
+        ? <Suspense fallback={<WorkspaceLoadingFallback />}><PairedScreenStart /></Suspense>
       : isPrivacyRoute
         ? <PrivacyPolicyPage />
         : isTermsRoute

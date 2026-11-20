@@ -166,3 +166,24 @@ export async function applySmartTableFooterVisible(client:Query){
   WHERE c.component_api='smart_table'
   ON CONFLICT(component_api,property_key) DO NOTHING`);
 }
+
+/** Smart Table "Show only" (Column=Value|Value) and the empty-list text. */
+export async function applySmartTableShowWhen(client:Query){
+ await client.query(`
+  WITH last_order AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
+  INSERT INTO md_builder_shared_properties
+   (property_key,label,tab,section_group,control_kind,sort_order,default_value,choices,scope,
+    min_value,max_value,field_select,design_row,design_order,design_width,design_height,
+    design_caption_width,design_display)
+  SELECT 'tableShowWhen','Show only','Data','Values','expression',last_order.n+1,
+   NULL,'[]'::jsonb,'component',NULL,NULL,false,4,4,200,26,0,'buttons'
+  FROM last_order
+  ON CONFLICT(property_key) DO NOTHING`);
+ await client.query(`
+  INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,default_value_override)
+  SELECT c.component_api,k.key,true,NULL FROM md_builder_ribbon_components c
+  CROSS JOIN (VALUES ('tableShowWhen'),('emptyText')) AS k(key)
+  WHERE c.component_api='smart_table'
+   AND EXISTS(SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=k.key)
+  ON CONFLICT(component_api,property_key) DO NOTHING`);
+}

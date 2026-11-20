@@ -56,3 +56,12 @@ test('Show record count off hides the table footer',()=>{
  assert.match(render({}),/smart-table-footer/);
  assert.doesNotMatch(render({footerVisible:false}),/smart-table-footer/);
 });
+
+test('Show only keeps rows whose column shows one of the values; blank shows all',()=>{
+ const html=render({tableColumns:'Name, Status',column2Source:'=STATUS',tableShowWhen:'Status=Out of stock'});
+ assert.ok(html.includes('>Cola<')&&!html.includes('>Tea<'));
+ const none=render({tableColumns:'Name, Status',column2Source:'=STATUS',tableShowWhen:'Status=Low',emptyText:'Nothing low'});
+ assert.ok(none.includes('Nothing low')&&!none.includes('>Cola<'));
+ const all=render({tableColumns:'Name, Status',column2Source:'=STATUS',tableShowWhen:''});
+ assert.ok(all.includes('>Cola<')&&all.includes('>Tea<'));
+});

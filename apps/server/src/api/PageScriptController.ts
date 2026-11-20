@@ -242,7 +242,8 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  app.post('/api/screens/corner',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
-  res.json(await screens().cornerCode(actor,String(req.get('authorization')??'').slice(7),(req.body??{}).mirrorKey));
+  const body=(req.body??{}) as Record<string,unknown>;
+  res.json(await screens().cornerCode(actor,body.screenKey,body.mirrorKey));
  }));
  app.post('/api/screens/revoke',wrap(async(req,res)=>{
   const actor=authenticated(req);

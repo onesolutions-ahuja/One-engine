@@ -238,6 +238,15 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    const changed=runtime.store.select('state',detail.key,detail.value);
    if(changed.length)void runtime.data.stateChanged(changed);
   };
+  // A plain component (no formulas of its own, e.g. a Numpad or Text box) changed: its
+  // value is @ThisPage.<Name>.Value for every formula on the page, like a compiled one.
+  const onInteraction=(event:Event)=>{
+   const detail=(event as CustomEvent<{pageSessionKey?:string;componentId?:string;event?:string;value?:unknown}>).detail;
+   if(detail?.pageSessionKey!==runtime.pageSessionKey||typeof detail.componentId!=='string')return;
+   if(detail.event!=='change'&&detail.event!=='select')return;
+   runtime.publishState(detail.componentId,detail.value);
+  };
+  window.addEventListener('metadrive:page-component-interaction',onInteraction);
   const onSaved=(event:Event)=>{
    const detail=(event as CustomEvent<PageMutationDetail&{origin?:string}>).detail;
    if(detail?.origin===compiledOrigin||detail?.pageSessionKey!==runtime.pageSessionKey)return;
@@ -260,6 +269,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   return ()=>{
    unsubscribeState?.();
    window.removeEventListener('metadrive:page-local-state',onState);
+   window.removeEventListener('metadrive:page-component-interaction',onInteraction);
    window.removeEventListener('metadrive:page-flow-mutated',onSaved);
    window.removeEventListener('metadrive:page-collection-selected',onSelected);
   };

@@ -19,7 +19,7 @@ import {applySmartLineItems} from './smart-line-items.js';
 import {applySmartTableRowButtons} from './smart-table-row-buttons.js';
 import {applySmartSelectorMulti} from './smart-selector-multi.js';
 import {applySmartVisibleFormula} from './smart-visible-formula.js';
-import {applySmartDisabledFormula} from './smart-disabled-formula.js';
+import {applySmartDisabledFormula,applySmartNumpadDateMode,applySmartCartSummaryVisible} from './smart-disabled-formula.js';
 import {applySmartIdCard} from './smart-id-card.js';
 
 /** Recover original migration files from the immutable SQL baseline.
@@ -818,6 +818,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await applySmartSelectorMulti(client);
   await applySmartVisibleFormula(client);
   await applySmartDisabledFormula(client);
+  await applySmartNumpadDateMode(client);
+  await applySmartCartSummaryVisible(client);
   // Smart ID Card reuses the Card Grid rules, so it runs after every Card Grid step.
   await applySmartIdCard(client);
   // Retire the duplicate Key Gap control. Existing page JSON keeps numpadGap

@@ -86,3 +86,6 @@
 /* No always-reserved scrollbar strip: it added an empty band right of the last
    column that the header did not have. */
 .smart-cart-table.has-side-padding .smart-cart-rows{scrollbar-gutter:auto;scrollbar-width:thin}
+
+/* Empty list: one grey line instead of a blank box. */
+.smart-cart-empty{margin:0;padding:24px 12px;text-align:center;color:#8e8e93;font-size:14px}

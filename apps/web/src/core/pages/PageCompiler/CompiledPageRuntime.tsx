@@ -148,13 +148,19 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    },
    giveValue(name:string,value:unknown){
     const id=idsByName.get(name.toLowerCase());
-    const stateName=id?stateNames.get(id):null;
-    if(!stateName)throw Error('There is no component named '+name+' on this page');
     const plain=value===null||value===undefined?'':value;
     const next=componentStateFromEvent(plain);
+    // No component of that name: a page variable (@ThisPage.Picked.Value = …), no
+    // hidden component needed. Formulas read it the same way; nothing is drawn.
+    if(!id){
+     if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))throw Error('Invalid page value name '+name);
+     return next?store.select('collection',name,next):[];
+    }
+    const stateName=stateNames.get(id);
+    if(!stateName)throw Error('There is no component named '+name+' on this page');
     store.set(givenKey(stateName),{value:plain});
     const changed=next?store.select('collection',stateName,next):[];
-    store.redraw([id!]);
+    store.redraw([id]);
     return changed;
    },
    givenValue(componentId:string){
@@ -859,7 +865,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    ...(toggleBinding?{toggleFieldBound:true,toggleFieldReady:toggleCanWrite,toggleFieldError:toggleBinding.error??'',
     value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{}),
    // `@ThisPage.Name.Value = …`: shown until the user types or picks again.
-   ...(given?{textSource:'',defaultValue:'',value:given.value===null||given.value===undefined?'':String(given.value)}:{}),
+   ...(given?{textSource:'',defaultValue:'',givenValue:given,value:given.value===null||given.value===undefined?'':String(given.value)}:{}),
    ...(heldProps.Caption!==undefined?{label:heldProps.Caption}:{})
   }}/>
   {source.loadingMore&&<div className="records-loading" role="status">Loading more…</div>}
@@ -881,7 +887,7 @@ export function PageCodeFormulas({componentId,children}:{componentId:string;
  const props=runtime?.heldProperties(componentId)??{};
  const onFormulaState=useCallback((values:Record<string,unknown>)=>runtime?.reportProperties(componentId,values),[runtime,componentId]);
  const given:Record<string,unknown>={
-  ...(held?{textSource:'',defaultValue:'',value:held.value===null||held.value===undefined?'':String(held.value)}:{}),
+  ...(held?{textSource:'',defaultValue:'',givenValue:held,value:held.value===null||held.value===undefined?'':String(held.value)}:{}),
   ...(props.Caption!==undefined?{label:props.Caption}:{}),
   ...(props.Disabled!==undefined?{disabled:props.Disabled,disabledFormula:''}:{}),
   ...(props.Visible!==undefined?{visibleFormula:props.Visible}:{}),

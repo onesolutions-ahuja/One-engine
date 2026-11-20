@@ -255,6 +255,8 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
      })}
     </div>
     <div ref={rowsRef} className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows">
+     {rows.length===0&&!demo&&!p.builderPreview&&<p className="smart-cart-empty">
+      {String(displayFormula('emptyText',p.emptyText,'No items yet')||'No items yet')}</p>}
      {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
       const src=p.imageSource?fieldExpression('imageSource',p.imageSource,record):"";
@@ -352,7 +354,8 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     </div>
    </>}
   </div>
-  <section data-design-area={p.builderPreview?"Summary":undefined} className="smart-cart-summary" aria-label="Cart summary" style={{...smartPartOffsetStyle(p,"summary"),
+  {/* A cart used as a list (sales, purchase history, held sales) hides its totals. */}
+  {p.summaryVisible!==false&&<section data-design-area={p.builderPreview?"Summary":undefined} className="smart-cart-summary" aria-label="Cart summary" style={{...smartPartOffsetStyle(p,"summary"),
    backgroundColor:p.summaryBackgroundColor||"#f7f9fc",
    border:border(p.summaryBorderColor),borderRadius:n(p.summaryRadius,8),
    boxShadow:shadow(p.summaryShadow),minHeight:n(p.summaryHeight,148,40),
@@ -385,6 +388,6 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
    }}>
     <span data-md-bind={p.builderPreview?"totalLabel":undefined} data-md-bind-titles={p.builderPreview?"Total summary heading":undefined}>{summaryLabels.Total}</span><span data-md-bind={p.builderPreview?"totalValue":undefined} data-md-bind-titles={p.builderPreview?"Total amount":undefined} aria-label={summaryAmounts.Total===null?summaryLabels.Total+" not bound":undefined}>{summaryAmounts.Total??"—"}</span>
    </div>
-  </section>
+  </section>}
  </section>;
 }

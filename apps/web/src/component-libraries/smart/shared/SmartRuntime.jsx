@@ -860,15 +860,25 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=
    setDraft(ref);onValueChange(ref);setUpload({busy:false,error:""});
   }catch(error){setUpload({busy:false,error:error instanceof Error?error.message:"Upload failed"});}
  };
+ // An uploaded photo is stored as asset:<id>; people see "Photo added", never the code.
+ const uploaded=typeof draft==="string"&&/^asset:/i.test(draft.trim());
+ const shown=uploaded
+  ?<div className={field.props.className} role="status" aria-label={(props["aria-label"]||"Photo")+": photo added"}
+    style={{...field.props.style,paddingRight:96,display:"flex",alignItems:"center",color:"#1D1D1F"}}>Photo added</div>
+  :React.cloneElement(field,{style:{...field.props.style,paddingRight:52}});
  return <div className="smart-input-upload" style={{position:"relative",width:"100%",height:"100%"}}>
-  {React.cloneElement(field,{style:{...field.props.style,paddingRight:52}})}
+  {shown}
+  {uploaded&&!props.readOnly?<button type="button" aria-label="Remove photo" title="Remove photo"
+   onClick={()=>{ownEditAt.current=Date.now();setDraft("");onValueChange("");}}
+   style={{position:"absolute",right:50,top:"50%",transform:"translateY(-50%)",width:40,height:40,maxHeight:"calc(100% - 8px)",
+    border:0,borderRadius:10,cursor:"pointer",background:"#FFEBEA",color:"#FF3B30",fontSize:16,lineHeight:1}}>✕</button>:null}
   <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={pick}/>
-  <button type="button" aria-label="Upload image" title={upload.error||"Upload image"} disabled={upload.busy}
+  <button type="button" aria-label={uploaded?"Change photo":"Upload image"} title={upload.error||(uploaded?"Change photo":"Upload image")} disabled={upload.busy}
    onClick={()=>fileRef.current?.click()}
    style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",width:40,height:40,maxHeight:"calc(100% - 8px)",
     border:0,borderRadius:10,cursor:"pointer",background:upload.error?"#FFEBEA":"#E5F0FF",
     color:upload.error?"#FF3B30":"#007AFF",fontSize:18,lineHeight:1,opacity:upload.busy?.6:1}}>
-   {upload.busy?"…":"⇪"}
+   {upload.busy?"…":uploaded?"↻":"⇪"}
   </button>
  </div>;
 }

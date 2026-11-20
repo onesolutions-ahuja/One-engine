@@ -191,14 +191,15 @@ export class ScreenPairingService{
    'SELECT session_key FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',[actor.tenant_id,mirrorKey]);
   return {sessionId:rows[0]?.session_key??''};
  }
- /** The small code in the corner of a paired screen: changes every minute. Only a screen
-  * paired with that device (by its own sign-in) may read it. */
- async cornerCode(actor:Actor,bearer:string,mirrorKey:unknown):Promise<{code:string;device:string;secondsLeft:number}>{
+ /** The small code in the corner of a paired screen: changes every minute. Only the screen
+  * device paired with that till (its own device key, in this tenant) may read it; its sign-in
+  * may change (e.g. a browser shared with the till for testing), its device key does not. */
+ async cornerCode(actor:Actor,screenKey:unknown,mirrorKey:unknown):Promise<{code:string;device:string;secondsLeft:number}>{
   if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))fail('This screen follows no device');
+  if(typeof screenKey!=='string'||!deviceKeyPattern.test(screenKey))fail('This screen has no valid device key');
   const {rows}=await this.db.query<{device_name:string}>(`SELECT p.device_name FROM md_screen_pairings p
-   WHERE p.tenant_id=$1 AND p.mirror_key=$2 AND p.revoked_at IS NULL AND p.approved_at IS NOT NULL
-    AND (SELECT family_id FROM md_sessions WHERE token_hash=$3 AND revoked_at IS NULL)=ANY(p.session_families) LIMIT 1`,
-  [actor.tenant_id,mirrorKey,hash(bearer)]);
+   WHERE p.tenant_id=$1 AND p.mirror_key=$2 AND p.screen_key=$3 AND p.revoked_at IS NULL AND p.approved_at IS NOT NULL LIMIT 1`,
+  [actor.tenant_id,mirrorKey,screenKey]);
   if(!rows[0])fail('Only a paired screen shows its code',403);
   const secret=await this.cornerSecret(actor.tenant_id,mirrorKey as string);
   const minute=Math.floor(this.now()/60_000);

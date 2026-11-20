@@ -111,4 +111,20 @@ export async function applySmartTableColumns(client:Query){
   SELECT c.component_api,'tableColumns',true,NULL FROM md_builder_ribbon_components c
   WHERE c.component_api='smart_table'
   ON CONFLICT(component_api,property_key) DO NOTHING`);
+ // "Sort": a column name and asc/desc ("InStock asc"); formula columns sort too.
+ await client.query(`
+  WITH last_order AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
+  INSERT INTO md_builder_shared_properties
+   (property_key,label,tab,section_group,control_kind,sort_order,default_value,choices,scope,
+    min_value,max_value,field_select,design_row,design_order,design_width,design_height,
+    design_caption_width,design_display)
+  SELECT 'tableSort','Sort','Data','Values','expression',last_order.n+1,
+   NULL,'[]'::jsonb,'component',NULL,NULL,false,4,2,160,26,0,'buttons'
+  FROM last_order
+  ON CONFLICT(property_key) DO NOTHING`);
+ await client.query(`
+  INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,default_value_override)
+  SELECT c.component_api,'tableSort',true,NULL FROM md_builder_ribbon_components c
+  WHERE c.component_api='smart_table'
+  ON CONFLICT(component_api,property_key) DO NOTHING`);
 }

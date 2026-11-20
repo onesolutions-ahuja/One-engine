@@ -97,6 +97,17 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    return "";
   return plain(expression(column.override,row));
  };
+ // Sort (optional): "InStock asc" orders the loaded rows by that column's shown value
+ // (numbers as numbers). Works for formula columns, which the server cannot sort by.
+ const [sortKey,sortDir]=plain(p.tableSort).trim().split(/\s+/);
+ const sortColumn=sortKey?columns.find(col=>col.key===sortKey):null;
+ const sortedRows=sortColumn&&!preview?[...rows].map(row=>({row,shown:value(row,sortColumn)}))
+  .sort((a,b)=>{
+   const x=Number(a.shown),y=Number(b.shown);
+   const both=a.shown!==""&&b.shown!==""&&Number.isFinite(x)&&Number.isFinite(y);
+   const order=both?x-y:a.shown.localeCompare(b.shown,undefined,{numeric:true,sensitivity:"base"});
+   return sortDir==="desc"?-order:order;
+  }).map(item=>item.row):rows;
  const pick=row=>{
   const id=row.Id??row.id;
   if(id===undefined||id===null||preview)return;
@@ -166,7 +177,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
       style={col.align?{...headingStyle,textAlign:col.align}:headingStyle}>{col.label}</th>)}
       {endActions.length>0&&<th scope="col" style={headingStyle}><span className="smart-table-sr">Actions</span></th>}
     </tr></thead>
-    <tbody>{rows.map((row,index)=>{
+    <tbody>{sortedRows.map((row,index)=>{
      const id=String(row?.Id??row?.id??index);
      const active=selected===id;
      // Selected Row Border is retired: a selected row keeps its normal border.

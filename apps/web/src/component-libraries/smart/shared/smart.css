@@ -261,3 +261,8 @@
 .smart-field-rule.is-missing input,.smart-field-rule.is-missing textarea{border-color:#FF3B30!important;border-width:2px!important;background:#FFF5F5!important}
 .smart-field-rule.is-locked input,.smart-field-rule.is-locked textarea{background:#F2F2F2!important;color:#6E6E73!important;cursor:not-allowed}
 .smart-field-rule .smart-locked-mark{position:absolute;top:50%;right:10px;transform:translateY(-50%);font-size:13px;opacity:.7;pointer-events:none}
+
+/* ID card with no photo: initials in a circle instead of an empty striped box. */
+.smart-image-initials{background:transparent}
+.smart-image-initials>span{width:min(72px,80%);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
+ background:#E5F0FF;color:#007AFF;font-weight:700;font-size:clamp(16px,2.2vw,26px);letter-spacing:.02em}

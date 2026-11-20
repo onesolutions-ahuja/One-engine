@@ -6,7 +6,9 @@ const size=(value,defaultValue,min=0,max=2000)=>{
 };
 const shadow=value=>value==="large"?"0 8px 20px #0003":value==="medium"?"0 3px 9px #0003":"none";
 const labels=["7","8","9","4","5","6","1","2","3","C","0","backspace"];
-export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
+// Decimal mode (money, weights): "." takes the place of C; hold ⌫ to clear.
+const decimalLabels=["7","8","9","4","5","6","1","2","3",".","0","backspace"];
+export default function SmartNumpad({p,fire,sourceValue,buttonLabels,given}){
  const settings=numpadSettings(p);
  const serial=JSON.stringify(settings);
  const [value,setValue]=React.useState(()=>normalizeNumpadValue(sourceValue,settings));
@@ -15,17 +17,21 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
  const sourceRef=React.useRef(String(sourceValue??""));
  const [focusedKey,setFocusedKey]=React.useState("");
  const inputRef=React.useRef(null);
+ const holdTimer=React.useRef(null);
+ const heldClear=React.useRef(false);
+ React.useEffect(()=>()=>clearTimeout(holdTimer.current),[]);
  React.useEffect(()=>{
   const incoming=normalizeNumpadValue(sourceValue,settings);
   const prior=sourceRef.current;
-  // A newly evaluated formula must not silently replace an actively edited value.
-  if(!dirty.current||valueRef.current===prior){
+  // A newly evaluated formula must not silently replace an actively edited value,
+  // but a value an action gives (e.g. clear after "Cash in") always does.
+  if(given||!dirty.current||valueRef.current===prior){
    valueRef.current=incoming;
    setValue(incoming);
    dirty.current=false;
   }
   sourceRef.current=incoming;
- },[sourceValue,serial]);
+ },[sourceValue,serial,given]);
  const update=(next,event)=>{
   if(p.disabled||p.readonly===true||p.previewOnly===true)return;
   valueRef.current=next;dirty.current=true;setValue(next);
@@ -71,13 +77,18 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
  const sharedButton=(key,label,style,onClick,custom=false)=><button
   key={key} type="button" className="smart-numpad-key"
   disabled={p.disabled===true||p.readonly===true||p.previewOnly===true}
-  aria-label={key==="backspace"?"Backspace":key==="C"?"Clear":custom?label:key}
+  aria-label={key==="backspace"?"Backspace (hold to clear)":key==="C"?"Clear":key==="."?"Decimal point":custom?label:key}
   data-numpad-key={key} data-numpad-custom={custom?"true":undefined}
   data-design-area={p.builderPreview?(custom?"Button "+(Number(String(key).slice(-1))+1):"Button"):undefined}
   data-md-bind={p.builderPreview&&custom?key+"Label":undefined}
   data-md-bind-titles={p.builderPreview&&custom?"Custom button label":undefined}
   onFocus={()=>setFocusedKey(key)} onBlur={()=>setFocusedKey(previous=>previous===key?"":previous)}
-  onPointerDown={()=>setFocusedKey(key)} onPointerLeave={()=>setFocusedKey(previous=>previous===key?"":previous)}
+  onPointerDown={()=>{setFocusedKey(key);
+   // Hold ⌫ for a moment to clear everything (decimal keypads have no C key).
+   if(key==="backspace"){clearTimeout(holdTimer.current);
+    holdTimer.current=setTimeout(()=>{heldClear.current=true;press("C");},600);}}}
+  onPointerUp={()=>clearTimeout(holdTimer.current)}
+  onPointerLeave={()=>{clearTimeout(holdTimer.current);setFocusedKey(previous=>previous===key?"":previous);}}
   onClick={onClick}
   style={{...style,...(focusedKey===key?focusStyle:{})}}>{label}</button>;
  // Prefer the shared Gap setting; keep old saved Numpad Gap values readable.
@@ -113,7 +124,7 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
     data-md-bind-titles={p.builderPreview?"Initial input value":undefined}
     inputMode={settings.mode==="decimal"?"decimal":"numeric"} autoComplete="off"
     aria-label={isPin?"PIN input":"Numpad input"}
-    placeholder={String(p.numpadPlaceholder||"Enter number")}
+    placeholder={String(p.numpadPlaceholder||(settings.mode==="date"?"DD/MM/YYYY":"Enter number"))}
     value={value}
     disabled={p.disabled===true||p.readonly===true||p.previewOnly===true}
     onChange={event=>update(normalizeNumpadValue(event.target.value,settings))}
@@ -122,7 +133,10 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels}){
    {p.numpadSuffix&&!isPin&&<span className="smart-numpad-suffix" aria-hidden="true">{p.numpadSuffix}</span>}
   </div>
   <div className="smart-numpad-grid" style={{gap:gap}}>
-   {labels.map(key=>sharedButton(key,key==="backspace"?"⌫":key,baseKey,()=>press(key)))}
+   {(settings.mode==="decimal"?decimalLabels:labels).map(key=>sharedButton(key,key==="backspace"?"⌫":key,baseKey,()=>{
+    if(heldClear.current){heldClear.current=false;return;}
+    press(key);
+   }))}
   </div>
   <div className="smart-numpad-custom-row" style={{gap:gap}}>
    {[1,2,3].filter(index=>p["customButton"+index+"Visible"]!==false).map(index=>sharedButton("customButton"+index,

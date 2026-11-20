@@ -871,31 +871,9 @@ export default function SmartRuntime(p){
  const buttonIcon=name==="smart_button"?icons.find(icon=>icon.id===p.shapeId):null;
  // Preserve selections when a data-driven category filter temporarily hides records.
  const [gridSelectedIds,setGridSelectedIds]=React.useState([]);
- // Measure the actual inner viewport, not the configured canvas height. Percentage
- // grid tracks can resolve to their min-content size inside an overflow scroller,
- // exposing part of a second row even when the author selects one visible row.
+ // The grid's scroll viewport (keyboard scrolling). Cards size themselves: nothing
+ // is measured, so resizing the grid never redraws or reshapes the cards.
  const gridViewportRef=React.useRef(null);
- const [gridViewportHeight,setGridViewportHeight]=React.useState(0);
- React.useEffect(()=>{
-  if(!isGridKind(name))return;
-  const grid=gridViewportRef.current;
-  if(!grid)return;
-  const measureGridViewport=()=>{
-   // Reserve the Card Grid's 4px inset on both edges so authored card
-   // borders, rounded corners and shadows are not clipped by the scroller.
-   const height=Math.max(0,grid.clientHeight-8);
-   setGridViewportHeight(previous=>previous===height?previous:height);
-  };
-  measureGridViewport();
-  if(typeof ResizeObserver!=="undefined"){
-   const observer=new ResizeObserver(measureGridViewport);
-   observer.observe(grid);
-   return ()=>observer.disconnect();
-  }
-  // Older browsers still update when their window changes size.
-  window.addEventListener("resize",measureGridViewport);
-  return ()=>window.removeEventListener("resize",measureGridViewport);
- },[name]);
  const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",borderRadius:number(p.radius,12)};
  const fire=(event,value)=>{if(p.previewOnly||p.builderPreview)return;
   if(isDisabled&&name==="smart_button")return;
@@ -931,7 +909,10 @@ export default function SmartRuntime(p){
      numpadPrefix:scopedExpression(p,"numpadPrefix",p.numpadPrefix??"",record),
      numpadSuffix:scopedExpression(p,"numpadSuffix",p.numpadSuffix??"",record)}}
    fire={fire}
-   sourceValue={scopedExpression(p,"textSource",p.textSource??p.defaultValue??"",record)}
+   // A value an action gave it (@ThisPage.amt.Value = "") wins over its own source.
+   sourceValue={p.givenValue?p.value
+    :scopedExpression(p,"textSource",p.textSource??p.defaultValue??"",record)}
+   given={p.givenValue}
    buttonLabels={[1,2,3].map(index=>scopedExpression(p,
      "customButton"+index+"Label",p["customButton"+index+"Label"]??
        (index===3?"Submit":"Custom "+index),record))}/>;
@@ -1076,6 +1057,9 @@ export default function SmartRuntime(p){
   // The requested column count remains exact, but cards never collapse below
   // a usable minimum width. Excess columns scroll horizontally in this grid.
   const minimumCardWidth=number(p.cardMinWidth??p.cardWidth,180,96,1200);
+  // Card Width / Card Height (px) fix the card size exactly when set.
+  const fixedCardWidth=p.cardWidth!==undefined&&p.cardWidth!==null&&p.cardWidth!==""?number(p.cardWidth,0,96,1200):0;
+  const fixedCardHeight=p.cardHeight!==undefined&&p.cardHeight!==null&&p.cardHeight!==""?number(p.cardHeight,0,24,1200):0;
   const boundRows=recordsOf(p);
   const selection=p.selectedCardColor||p.focusedCardWidth||p.focusedCardHeight||p.focusedCardBorderColor||p.focusedCardShadow||
    p.focusedTextColor||p.focusedTextBold!==undefined||p.focusedTextSize
@@ -1105,14 +1089,22 @@ export default function SmartRuntime(p){
    // published pages and the Page Builder (all Cards/Rows settings).
    padding:4,scrollPadding:4,
    gap,
-   gridTemplateColumns:"repeat("+columns+",minmax("+minimumCardWidth+"px,1fr))",
-   // Keep every authorised record; 'Rows' controls the *visible* viewport only.
-   // A measured pixel row height avoids percentage tracks shrinking to their
-   // min-content size and painting a second row within a one-row viewport.
-   gridAutoRows:"max("+minimumCardHeight+"px, calc((100% - 8px - "+(rows-1)*gap+"px) / "+rows+"))",
-   ...(gridViewportHeight>0?{
-    gridAutoRows:Math.max(minimumCardHeight,(gridViewportHeight-(rows-1)*gap)/rows)+"px"
-   }:{}),
+   // A card keeps its own size: resizing the grid never squashes or stretches
+   // cards, it shows more or fewer of them and scrolls the rest.
+   //  - One row: a strip of fixed-width cards that scrolls sideways.
+   //  - Several rows: 'Cards per row' columns; card height comes from the card's
+   //    content (image + text) or Card Height, and extra rows scroll down.
+   ...(rows===1?{
+    gridAutoFlow:"column",
+    gridAutoColumns:fixedCardWidth?fixedCardWidth+"px"
+     :"minmax("+minimumCardWidth+"px, calc((100% - 8px - "+(columns-1)*gap+"px) / "+columns+"))",
+    gridTemplateRows:"minmax("+minimumCardHeight+"px, 100%)",
+    overflowY:"hidden"
+   }:{
+    gridTemplateColumns:fixedCardWidth?"repeat(auto-fill,"+fixedCardWidth+"px)"
+     :"repeat("+columns+",minmax("+minimumCardWidth+"px,1fr))",
+    gridAutoRows:fixedCardHeight?fixedCardHeight+"px":"minmax("+minimumCardHeight+"px, auto)"
+   }),
    alignContent:"start",backgroundColor:p.gridBackgroundColor||undefined
   }}>
    {previewRows.map((r,i)=>{

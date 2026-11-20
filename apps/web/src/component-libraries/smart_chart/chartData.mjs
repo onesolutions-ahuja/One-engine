@@ -22,6 +22,9 @@ export function chartSettings(p={}){
   type,
   sort:CHART_SORTS.includes(p.chartSort)?p.chartSort:'none',
   maxItems:bounded(p.chartMaxItems,12,1,50),
+  // Last N days (0 = off): one bar per day ending today, in date order, £0 on days
+  // with no rows. The label formula must give "DD MMM" (13 Nov), as FORMAT does.
+  days:bounded(p.chartDays,0,0,60),
   decimals:bounded(p.chartDecimals,0,0,4),
   showValues:flag(p.chartShowValues,true),
   showGrid:flag(p.chartShowGrid,type!=='donut'),
@@ -41,12 +44,24 @@ export function chartNumber(value){
 }
 
 /** Group rows by label (summing values), then sort and limit. */
-export function chartPoints(rows,labelOf,valueOf,settings){
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+export function dayLabels(days,today=new Date()){
+ return Array.from({length:days},(_,i)=>{
+  const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-(days-1-i));
+  return String(d.getDate()).padStart(2,'0')+' '+MONTHS[d.getMonth()];
+ });
+}
+export function chartPoints(rows,labelOf,valueOf,settings,today){
  const groups=new Map();
  for(const row of Array.isArray(rows)?rows:[]){
   const raw=labelOf(row);
   const label=raw===undefined||raw===null||raw===''?'(blank)':String(raw);
   groups.set(label,(groups.get(label)??0)+chartNumber(valueOf(row)));
+ }
+ if(settings.days>0){
+  const key=label=>label.trim().toLowerCase();
+  const byDay=new Map([...groups].map(([label,value])=>[key(label),value]));
+  return dayLabels(settings.days,today).map(label=>({label,value:byDay.get(key(label))??0,colour:settings.colours[0]}));
  }
  let points=[...groups].map(([label,value])=>({label,value}));
  if(settings.sort==='desc')points.sort((a,b)=>b.value-a.value);

@@ -29,3 +29,25 @@ test('a name that is neither a field nor a formula column is dropped; no Columns
  const all=render({});
  assert.ok(all.includes('Secret')&&all.includes('SKU'));
 });
+
+test('Sort orders the shown rows by a column, numbers as numbers, including formula columns',()=>{
+ const many=[{Id:'a',Name:'B',StockLevel:10},{Id:'b',Name:'a',StockLevel:2},{Id:'c',Name:'C',StockLevel:0}];
+ const html=(sort:string)=>renderToStaticMarkup(React.createElement(SmartTable as never,{p:{objectApiName:'Product',objects,
+  tableColumns:'Name, Level',column2Source:'=LEVEL',tableSort:sort},records:many,
+  expression:(f:string,row:Record<string,unknown>)=>f==='=LEVEL'?String(row.StockLevel):''}));
+ const names=(markup:string)=>[...markup.matchAll(/<tr[^>]*><td[^>]*>([^<]*)<\/td>/g)].map(m=>m[1]);
+ assert.deepEqual(names(html('Level asc')),['C','a','B']);
+ assert.deepEqual(names(html('Level desc')),['B','a','C']);
+ assert.deepEqual(names(html('Name asc')),['a','B','C']);
+});
+
+test('Sort reads UK dates as dates, and every column formula is read per row',async()=>{
+ const rows=[{Id:'a',Name:'A',When:'19/11/2026 09:05'},{Id:'b',Name:'B',When:'18/11/2026 20:34'},{Id:'c',Name:'C',When:'02/12/2026 08:00'}];
+ const html=renderToStaticMarkup(React.createElement(SmartTable as never,{p:{objectApiName:'Product',objects,
+  tableColumns:'Name, When',column2Source:'=W',tableSort:'When desc'},records:rows,
+  expression:(f:string,row:Record<string,unknown>)=>String(row.When)}));
+ assert.deepEqual([...html.matchAll(/<tr[^>]*><td[^>]*>([^<]*)<\/td>/g)].map(m=>m[1]),['C','A','B']);
+ const {isRowDisplayProperty}=await import('../src/core/components/RegisteredComponent/componentFormulaProps');
+ for(const key of ['column1Source','column6Source','column4Color'])assert.equal(isRowDisplayProperty('smart_table',key,{records:[]}),true);
+ assert.equal(isRowDisplayProperty('smart_table','tableSort',{records:[]}),false);
+});

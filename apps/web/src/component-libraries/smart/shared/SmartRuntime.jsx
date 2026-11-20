@@ -73,13 +73,20 @@ export function readableText(fill,preferred){
  if(own&&contrast(bg,own)>=3)return preferred;
  return contrast(bg,[255,255,255])>=contrast(bg,[29,29,31])?"#fff":"#1d1d1f";
 }
-function SmartPicture({src,alt,loadAsset,style}){
+// Initials for a person/record card with no photo ("Jane Smith" → "JS").
+const initialsOf=name=>String(name??"").trim().split(/\s+/).filter(Boolean).slice(0,2)
+ .map(word=>word[0].toUpperCase()).join("");
+function SmartPicture({src,alt,loadAsset,style,initials=false}){
  const source=useTenantImageSource(src,loadAsset);
  const [failed,setFailed]=React.useState(false);
  React.useEffect(()=>setFailed(false),[src]);
  // No picture (none set, or it failed to load): the same grey stripes the Page Builder
  // shows, so an empty image area reads as "no image" instead of a blank box.
  return source&&!failed?<img src={source} alt={alt} style={style} onError={()=>setFailed(true)}/>
+  :initials&&initialsOf(alt)
+   ?<div className="smart-image-initials" role="img" aria-label={alt}
+     style={{...style,objectFit:undefined,display:"grid",placeItems:"center"}}>
+     <span>{initialsOf(alt)}</span></div>
   :<div className="smart-image-none" role="img" aria-label={alt?alt+": no image":"No image"}
     style={{...style,objectFit:undefined,minHeight:style?.height===undefined?48:undefined}}/>;
 }
@@ -319,7 +326,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        height:"100%",minHeight:0,display:"grid",placeItems:"center",
        background:"var(--md-card-placeholder,#edf2f7)",color:"#526276",fontSize:12
      }}>Image Here</div>
-    :<SmartPicture src={image} alt={header} loadAsset={p.loadAsset}
+    :<SmartPicture src={image} alt={header} loadAsset={p.loadAsset} initials={idCard}
       style={{height:single||grid?"100%":imageHeight,width:"100%",display:"block",
        maxHeight:grid?"100%":undefined,
        objectFit:p.imageFill==="fit"?"contain":p.imageFill==="stretch"?"fill":"cover",

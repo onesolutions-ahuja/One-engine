@@ -25,13 +25,29 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
  const projected=Array.isArray(p.dataCollection?.columns)?p.dataCollection.columns:null;
  const sourceColumns=projected??(fields.length?fields.map(field=>field.apiName):
   Object.keys(rows[0]||{}).filter(key=>/^[A-Za-z][A-Za-z0-9_]*$/.test(key)));
- const keys=[...new Set(sourceColumns)].filter(key=>typeof key==="string"
+ // Columns (optional): "Name, SKU, StockLevel, Status" — fields in this order; a name that
+ // is not a field is a formula column (its Column N Source). Header N / Color N / Align N
+ // then apply to any column. Without it the table keeps showing every field.
+ const listed=typeof p.tableColumns==="string"&&p.tableColumns.trim()
+  ?p.tableColumns.split(",").map(item=>item.trim()).filter(item=>/^[A-Za-z][A-Za-z0-9_]*$/.test(item)).slice(0,12):null;
+ const slot=(index,part)=>p["column"+(index+1)+part];
+ const keys=listed?listed.filter((key,index)=>!["Id","id"].includes(key)
+   &&(!fields.length||allowed.has(key)||Boolean(slot(index,"Source"))))
+  :[...new Set(sourceColumns)].filter(key=>typeof key==="string"
   &&/^[A-Za-z][A-Za-z0-9_]*$/.test(key)&&!["Id","id"].includes(key)
   &&(!fields.length||allowed.has(key))&&(!key.startsWith("__"))).slice(0,128);
  const columns=keys.map((key,index)=>({
-  key,index,label:fields.find(item=>item.apiName===key)?.label||key,
-  override:index>0&&index<5?p["column"+(index+1)+"Source"]:null
+  key,index,
+  label:(listed&&plain(slot(index,"Header")))||fields.find(item=>item.apiName===key)?.label||key,
+  override:listed?slot(index,"Source")||null:index>0&&index<5?p["column"+(index+1)+"Source"]:null,
+  color:listed?slot(index,"Color")||null:null,
+  align:listed&&["left","center","right"].includes(slot(index,"Align"))?slot(index,"Align"):null
  }));
+ const cellColor=(row,column)=>{
+  if(!column.color)return undefined;
+  const result=plain(/^\s*=|@/.test(column.color)?expression(column.color,row):column.color).trim();
+  return /^#[0-9a-f]{3,8}$|^rgba?\([0-9., %]+\)$|^[a-z]{3,20}$/i.test(result)?result:undefined;
+ };
  // Up to four row buttons, hidden by default: a button shows when made visible
  // (eye on), or — for tables saved before this — when it already has an action.
  const actions=[1,2,3,4].map(n=>{
@@ -145,9 +161,9 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
     <thead><tr data-design-area={p.builderPreview?"Header":undefined} >
       {startActions.length>0&&<th scope="col" style={headingStyle}><span className="smart-table-sr">Actions</span></th>}
       {columns.map(col=><th scope="col" key={col.key}
-      data-md-bind={p.builderPreview&&col.index>0&&col.index<5?"column"+(col.index+1)+"Source":undefined}
+      data-md-bind={p.builderPreview&&(listed||col.index>0&&col.index<5)?"column"+(col.index+1)+"Source":undefined}
       data-md-bind-titles={p.builderPreview?(col.label+" column value"):undefined}
-      style={headingStyle}>{col.label}</th>)}
+      style={col.align?{...headingStyle,textAlign:col.align}:headingStyle}>{col.label}</th>)}
       {endActions.length>0&&<th scope="col" style={headingStyle}><span className="smart-table-sr">Actions</span></th>}
     </tr></thead>
     <tbody>{rows.map((row,index)=>{
@@ -168,7 +184,9 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
           borderBottomLeftRadius:i===0?finite(p.rowRadius,0,0,100):undefined,
           borderTopRightRadius:i===columns.length-1&&!endActions.length?finite(p.rowRadius,0,0,100):undefined,
           borderBottomRightRadius:i===columns.length-1&&!endActions.length?finite(p.rowRadius,0,0,100):undefined,
-          textAlign:p.rowAlignment||"left",height:rowHeight}}>
+          textAlign:col.align||p.rowAlignment||"left",height:rowHeight,
+          ...(cellColor(row,col)?{color:cellColor(row,col),fontWeight:600}:{}),
+          ...(col.align==="right"?{fontVariantNumeric:"tabular-nums"}:{})}}>
          {value(row,col)}</td>)}
        {endActions.length>0&&buttonCell(endActions,row,id,"end")}
       </tr>;

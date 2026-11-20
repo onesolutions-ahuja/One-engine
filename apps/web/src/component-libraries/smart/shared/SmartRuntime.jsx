@@ -818,20 +818,29 @@ function SmartToggle({p,fire}){
 function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=null,keypad="",...props}){
  const [draft,setDraft]=React.useState(value);
  const draftRef=React.useRef(value);
+ const ownEditAt=React.useRef(0);
  draftRef.current=draft;
  // Keypad (number / decimal / date): tapping the box opens on-screen keys, no OS keyboard.
  const usesKeypad=["number","decimal","date"].includes(keypad)&&rows<=1&&!props.readOnly&&!props.disabled;
  React.useEffect(()=>usesKeypad?()=>closeKeypad():undefined,[usesKeypad]);
  const keypadProps=usesKeypad?{inputMode:"none",
   onFocus:event=>openKeypad(event.currentTarget,keypad,()=>draftRef.current,next=>{
-   draftRef.current=next;setDraft(next);onValueChange(next);}),
+   draftRef.current=next;ownEditAt.current=Date.now();setDraft(next);onValueChange(next);}),
   onClick:event=>openKeypad(event.currentTarget,keypad,()=>draftRef.current,next=>{
-   draftRef.current=next;setDraft(next);onValueChange(next);})}:{};
+   draftRef.current=next;ownEditAt.current=Date.now();setDraft(next);onValueChange(next);})}:{};
  const [upload,setUpload]=React.useState({busy:false,error:""});
  const fileRef=React.useRef(null);
- React.useEffect(()=>{setDraft(value);},[value]);
+ // The user's own edit can change the value handed back (e.g. a value an action gave
+ // is dropped once the user types over it): that must not wipe what was just typed.
+ // Only a change arriving right after the user's own key counts as theirs; a later
+ // value from an action (a quick-amount button, a clear) still shows.
+ React.useEffect(()=>{
+  if(Date.now()-ownEditAt.current<400){ownEditAt.current=0;return;}
+  setDraft(value);
+ },[value]);
  const change=event=>{
   const next=event.target.value;
+  ownEditAt.current=Date.now();
   setDraft(next);
   onValueChange(next);
  };

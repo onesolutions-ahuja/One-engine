@@ -17,11 +17,17 @@ const MIRROR=/@ThisPage\.Device\.MirrorKey/i;
 
 /** A selling page: its rows belong to its own page session (a session-scoped cart, or a
  * filter on @ThisPage.Session.Id such as `session_key__c = @ThisPage.Session.Id`). It tells
- * the server which sale this device is on, so paired screens show that sale only. */
-export function sellsBySession(sources:readonly CompiledDataSource[]):boolean{
- return sources.some(source=>source.scope.kind==='auto'||
-  /@ThisPage\.Session\.Id\b/i.test((source.filterFormula??'')+' '+(source.filters==null?'':JSON.stringify(source.filters))));
+ * the server which sale this device is on, so paired screens show that sale only.
+ * A display (it reads @ThisPage.Device.MirrorKey anywhere) never sells: its session is the
+ * till's sale it follows, so it must not report it as its own. */
+export function sellsBySession(sources:readonly CompiledDataSource[],readsMirror=false):boolean{
+ if(readsMirror||mirrorSources(sources).length)return false;
+ return sources.some(source=>source.scope.kind==='auto'||readsSession(source));
 }
+const SESSION=/@ThisPage\.Session\.Id\b/i;
+const sourceText=(source:CompiledDataSource)=>
+ (source.filterFormula??'')+' '+(source.filters==null?'':JSON.stringify(source.filters));
+const readsSession=(source:CompiledDataSource)=>SESSION.test(sourceText(source));
 /** True when this window was opened by its till with ?screenSession= (SCREEN(page,"second")):
  * it already shares the till's sale. */
 export function openedWithScreenSession():boolean{
@@ -39,12 +45,11 @@ export async function followMirroredSale(deps:{mirrorKey:string;openedWithSessio
  setFollowingSale(Boolean(sessionId)||deps.openedWithSession);
  if(sessionId&&sessionId!==deps.sessionId())deps.resetSession(sessionId);
 }
-/** Data sources that show another device's rows (their filter reads MirrorKey). */
-export function mirrorSources(sources:readonly CompiledDataSource[]):CompiledDataSource[]{
- return sources.filter(source=>{
-  const text=(source.filterFormula??'')+' '+(source.filters==null?'':JSON.stringify(source.filters));
-  return MIRROR.test(text);
- });
+/** Data sources that show another device's rows: their filter reads MirrorKey, or, on a
+ * display (followsSale), the page session, which is the till's current sale. A display cart
+ * can then use the till's own filter (`session_key__c = @ThisPage.Session.Id`). */
+export function mirrorSources(sources:readonly CompiledDataSource[],followsSale=false):CompiledDataSource[]{
+ return sources.filter(source=>MIRROR.test(sourceText(source))||followsSale&&readsSession(source));
 }
 
 type Target={
@@ -72,8 +77,9 @@ const browserClock=():Clock=>({
 /** Start the display's refresh loop; returns stop. Does nothing for a page that mirrors nothing. */
 export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],codeMirrors:boolean,target:Target,
  clock:Clock=browserClock(),intervalMs=MIRROR_REFRESH_MS):()=>void{
- const mirrored=mirrorSources(sources);
- if(!mirrored.length&&!codeMirrors)return ()=>undefined;
+ const display=codeMirrors||mirrorSources(sources).length>0;
+ if(!display)return ()=>undefined;
+ const mirrored=mirrorSources(sources,true);
  let busy=false,stopped=false;
  const refresh=async()=>{
   // One read at a time: a slow network never piles requests up behind each other.

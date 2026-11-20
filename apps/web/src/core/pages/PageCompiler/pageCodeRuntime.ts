@@ -335,6 +335,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   code,
   /** The page reads @ThisPage.Till: this device must be set up as a Till. */
   usesTill,
+  /** The page needs THIS device's Till (@ThisPage.Till.*), not only the Till it mirrors (a customer display). */
+  asksTill:Object.values(code.sources).some(source=>/@ThisPage\.Till\./i.test(String(source)))
+   ||Object.values(code.actions).some(action=>String(action.run).includes('$.till(')),
   /** Lookups the held rows could not answer (shown by the till speed test). */
   misses:[] as string[],
   subscribe(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};},

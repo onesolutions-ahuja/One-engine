@@ -3,6 +3,7 @@ import {parseScreenAction} from '../../../../../server/src/expression-engine/Act
 import {resolvePageActionRoute,type PageActionRoutingContext,type PageActionRoute} from './pageActionRouting';
 import {appRoutePath} from '../../workspace/Navigation/appRouting';
 import {tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
+import {LAYER_EVENT,rememberRequestedLayer,showPageLayer} from './pageLayers';
 
 export type PopupScreen={page:string;sessionId:string;recordId:string;instance:string;inScreen:boolean;
  /** Page session that opened the popup: refreshed when the popup closes. */
@@ -27,6 +28,7 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   const value=resolveRecord(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$/.test(record)?'@'+record:record);
   recordId=value===null||value===undefined?'':String(value);
  }
+ if(parsed.layer!==undefined)return openPageLayer(page,parsed.layer,context,onNavigate);
  const inScreen=mode==='popup'&&context.pages.some(item=>
   item.apiName===page&&item.pageType==='In-Screen Page'&&item.status==='Active');
  const route=inScreen?null:resolvePageActionRoute({navigationTargetType:'App Page',navigationPageApiName:page},context);
@@ -41,6 +43,34 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   else if(mode==='second')void openSecondScreen(appRoutePath(route),sessionId);
   else window.open(appRoutePath(route),'_blank','noopener');
  }
+ return {navigated:true};
+}
+
+/** SCREEN(Page, n): show layer n of Page. Where Page is already showing (this window, the
+ * second screen, or paired screens that follow this device) it switches there; only when
+ * it shows nowhere does this window open Page on layer n. */
+async function openPageLayer(page:string,layer:number,context:PageActionRoutingContext,
+ onNavigate:(route:PageActionRoute)=>void):Promise<{navigated:true}>{
+ if(showPageLayer(page,layer))return {navigated:true};
+ let second=false;
+ try{
+  if(secondWindow&&!secondWindow.closed){
+   second=new URL(secondWindow.location.href).pathname.toLowerCase().endsWith('/pages/'+page.toLowerCase());
+   secondWindow.postMessage({type:LAYER_EVENT,page,layer},window.location.origin);
+  }
+ }catch{/* another site is open in it */}
+ const device=tillDeviceKey();
+ // Loaded here only: the sign-in client is not needed to open ordinary screens.
+ const {apiRequest}=await import('../../authentication/Client/authClient');
+ const {screens}=/^[A-Za-z0-9_-]{16,128}$/.test(device)
+  ?await apiRequest<{screens:number}>('/screens/layer',{method:'POST',body:JSON.stringify({deviceKey:device,page,layer})})
+   .catch(()=>({screens:0}))
+  :{screens:0};
+ if(second||screens>0)return {navigated:true};
+ const route=resolvePageActionRoute({navigationTargetType:'App Page',navigationPageApiName:page},context);
+ if(!route)throw Error('Page '+page+' is not in this app');
+ rememberRequestedLayer(page,layer);
+ onNavigate(route);
  return {navigated:true};
 }
 

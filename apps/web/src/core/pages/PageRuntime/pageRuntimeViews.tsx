@@ -1,4 +1,5 @@
 import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
+import {componentLayer,layerShows,usePageLayer} from './pageLayers';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {runtimeComponentLabel} from './smartComponentLabel';
 import {notConvertedAction} from '../PageRuntime/formulaAction';
@@ -1292,6 +1293,8 @@ function LightningAppRuntime({
   useEffect(() => {
     setActiveTabs({});
   }, [page?.apiName]);
+  // Page layers: layer 0 always, plus the one layer the page is on now (?layer=, SCREEN(page, n)).
+  const currentLayer=usePageLayer(page?.apiName);
   // Once this page runs, get the pages it can open ready in the background.
   const pageReady=Boolean(page)&&appScript.status!=='loading';
   useEffect(()=>{
@@ -1326,6 +1329,7 @@ function LightningAppRuntime({
   const regions: Array<'header' | 'main' | 'sidebar'> = ['header', 'main', 'sidebar'];
   const appVisibilityContext = { formFactor,profileId } as const;
   const isAppComponentVisible = (component: PageComponentMetadata) =>
+    layerShows(componentLayer(component, page.components), currentLayer) &&
     isComponentVisible(component, appVisibilityContext, false);
   // Same object for a component until its own overrides change. A fresh copy on
   // every host render (each page-state change) redrew all components and made

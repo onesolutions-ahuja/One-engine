@@ -17,6 +17,7 @@
  */
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
 import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
+import {screenLayerArg} from '../../expression-engine/screenLayer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
 import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
 import {uiProperty} from '../../expression-engine/FormulaComponentState.js';
@@ -345,8 +346,10 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   }
   case 'SCREEN':{
    const page=literalName(args[0],'SCREEN page');
-   const mode=args[1]?literalName(args[1],'SCREEN mode').toLowerCase():'current';
-   if(!['current','popup','newwindow','second'].includes(mode))fail('SCREEN mode must be current, popup, newwindow or second');
+   // SCREEN(Page, 3): a layer number in place of the mode (see parseScreenAction).
+   const layer=screenLayerArg(args[1]);
+   const mode=layer!==null?String(layer):args[1]?literalName(args[1],'SCREEN mode').toLowerCase():'current';
+   if(layer===null&&!['current','popup','newwindow','second'].includes(mode))fail('SCREEN mode must be current, popup, newwindow or second, or a layer number 0-9');
    scope.ui.add('SCREEN');
    return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(args[2]?', '+value(args[2]):'')+');'];
   }

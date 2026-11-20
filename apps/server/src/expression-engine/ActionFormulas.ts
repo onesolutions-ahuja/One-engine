@@ -1,4 +1,6 @@
 import {Parser,formulaTruth,type Expression} from './FormulaParser.js';
+import {screenLayerArg} from './screenLayer.js';
+export {screenLayerArg};
 import {tokenize} from './FormulaTokenizer.js';
 import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey,assignedComponent,assignedProperty,COMPONENT_VALUES} from './PageReferences.js';
 import {COMPONENT_PROPERTIES,uiPropertyValue,withComponentProperties} from './FormulaComponentState.js';
@@ -311,7 +313,7 @@ export function compileActionPlan(source:string):ActionStep[] {
    const [min,max]=bounds[node.name];
    if(args.length<min||args.length>max)throw Error('Invalid '+node.name+' arguments');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
-   if(node.name==='SCREEN'&&args.length)nameOf(args[0],'screen mode');
+   if(node.name==='SCREEN'&&args.length&&screenLayerArg(args[0])===null)nameOf(args[0],'screen mode');
    steps.push({name:node.name,object,values:args,fields:new Map(),guards});
    return;
   }
@@ -403,15 +405,16 @@ export const isScreenAction=(source:string)=>/^\s*=?\s*SCREEN\s*\(/i.test(source
 export function parseScreenAction(source:string){
  const node=new Parser(tokenize(source)).parse();
  if(node.kind!=='call'||node.name!=='SCREEN'||node.args.length<1||node.args.length>3)
-  throw Error('SCREEN requires a page API name, optional mode and optional record Id');
+  throw Error('SCREEN requires a page API name, optional mode (or layer number) and optional record Id');
  const page=nameOf(node.args[0],'page API name');
- const mode=node.args[1]?nameOf(node.args[1],'window mode').toLowerCase():'current';
- if(!['current','popup','newwindow','second'].includes(mode))throw Error('Choose current, popup, newwindow or second');
+ const layer=screenLayerArg(node.args[1]);
+ const mode=layer!==null?'current':node.args[1]?nameOf(node.args[1],'window mode').toLowerCase():'current';
+ if(!['current','popup','newwindow','second'].includes(mode))throw Error('Choose current, popup, newwindow or second, or a layer number 0-9');
  // Optional 3rd argument: the record the screen opens with, e.g.
  // SCREEN(Payment,popup,@ThisPage.Cart2.recordId). The caller evaluates it.
  if(node.args[2])validateFormulaFunctions(node.args[2],'ribbon_binding');
  const record=node.args[2]?serializeFormulaSqlExpression(node.args[2]):undefined;
- return {page,mode,record};
+ return {page,mode,record,...(layer!==null?{layer}:{})};
 }
 
 function readsResultField(node:Expression,alias:string):boolean{

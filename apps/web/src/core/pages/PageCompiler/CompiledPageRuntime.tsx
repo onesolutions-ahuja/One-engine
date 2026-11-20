@@ -33,6 +33,7 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
+import {showPageLayer} from '../PageRuntime/pageLayers';
 import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
@@ -289,7 +290,10 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    reload:(id,fresh)=>runtime.data.reload(id,fresh),
    // The display shows the sale the till is on now: it takes the till's page session.
    followSale:()=>followMirroredSale({mirrorKey:mirrorDeviceKey(),request:runtime.request,
-    sessionId:runtime.sessionId,resetSession:runtime.resetSession,openedWithSession:openedWithScreenSession()}),
+    sessionId:runtime.sessionId,resetSession:runtime.resetSession,openedWithSession:openedWithScreenSession(),
+    // SCREEN(this page, n) on the till: this screen shows layer n.
+    onLayers:layers=>{const layer=layers[runtime.compiled.apiName.toLowerCase()];
+     if(typeof layer==='number')showPageLayer(runtime.compiled.apiName,layer);}}),
    loadSets:runtime.code?()=>runtime.code!.loadSets():undefined,
    refreshTotals:runtime.code?()=>runtime.code!.refreshTotals():undefined,
    subscribeDevice:subscribeDeviceTill});

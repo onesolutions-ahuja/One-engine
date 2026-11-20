@@ -12,6 +12,8 @@ import { appRoutePath, type AppRoute } from '../../../../workspace/Navigation/ap
 import { Grid2X2, Move, Plus } from 'lucide-react';
 import { childrenOf } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import PreviewDeviceFrame from '../../PreviewDeviceFrame';
+import PageLayerBar from './PageLayerBar';
+import { componentLayer } from '../../../../pages/PageRuntime/pageLayers';
 
 import type { createPageRibbon } from '../ribbon/createPageRibbon';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -40,7 +42,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     previewPageDefinitionCache, device, fitCanvas, fitScale, canvasZoom, canvasSnap,
     marqueeOverlayRef, selected, openAddBlocks, canvasGuideXRef, canvasGuideYRef, targetObject,
     previewRecordId, previewRecord, setPreviewRecordId, previewRecords, fields, previewFieldValue,
-    stringList, template,
+    stringList, template, canvasLayer, setCanvasLayer, addedLayers, setAddedLayers, updateComponent,
   } = editorState;
   const { handleDrop } = placement;
   const { page, apps, objects, pages, reports, libraryComponents, flows, onLaunchFlow } = props;
@@ -52,6 +54,24 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   const { renderPageComponent, renderRegion } = canvasRenderer;
   const { selectedGroupBounds, selectedGroupMembers } = componentProperties;
   // Preview runs the compiled page: compiled once per opened draft, not per component.
+  // Picking a component on another layer (navigator, search) opens that layer.
+  const selectedLayer = selected ? componentLayer(selected, page.components) : null;
+  useEffect(() => {
+    if (selectedLayer !== null && selectedLayer !== canvasLayer) setCanvasLayer(selectedLayer);
+  }, [selected?.id, selectedLayer]); // eslint-disable-line react-hooks/exhaustive-deps
+  const designLayers = page.layoutMode === 'free-canvas' && !previewMode;
+  const renderTopLevel = () => {
+    const top = childrenOf(page.components, null);
+    const render = (component: typeof top[number]) => renderPageComponent(component, page.components.findIndex((item) => item.id === component.id));
+    if (!designLayers) return top.map(render);
+    // Designing layer n: only its components, over layer 0 shown faded (not pickable).
+    const base = top.filter(component => componentLayer(component, page.components) === 0);
+    if (canvasLayer === 0) return base.map(render);
+    return <>
+      <div className="canvas-layer-base-faded" aria-hidden="true">{base.map(render)}</div>
+      {top.filter(component => componentLayer(component, page.components) === canvasLayer).map(render)}
+    </>;
+  };
   const compiledPreview = useMemo(() => previewMode ? compilePageCached(page, objects, {strictLegacy:true}) : null, [previewMode, page, objects]);
   // Preview: the server converts the page exactly as shown (no Save needed) and Preview runs that file.
   const layoutVariant = page.layoutVariant ?? 'Desktop';
@@ -172,7 +192,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
                 onPointerUp={!previewMode?event=>endCanvasMarquee(event):undefined}
                 onPointerCancel={!previewMode?event=>endCanvasMarquee(event,true):undefined}
               >
-                {childrenOf(page.components, null).map((component) => renderPageComponent(component, page.components.findIndex((item) => item.id === component.id)))}
+                {renderTopLevel()}
                 {!previewMode&&<div ref={marqueeOverlayRef} className="canvas-selection-marquee" aria-hidden="true"/>}
                 {!previewMode && selectedGroupBounds && selected && <div className="canvas-group-outline"
                   role="group" aria-label="Move or resize selected group" style={{
@@ -228,6 +248,16 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
               </>}
             </div>)}
           </div>
+          {designLayers && <PageLayerBar components={page.components} current={canvasLayer} added={addedLayers}
+            selected={selected}
+            onPick={layer => { setCanvasLayer(layer); if (selected && componentLayer(selected, page.components) !== layer) { setSelectedId(''); setSelectionIds([]); } }}
+            onAdd={layer => { setAddedLayers(current => [...new Set([...current, layer])]); setSelectedId(''); setSelectionIds([]); setCanvasLayer(layer); }}
+            onMove={(component, layer) => {
+              const properties = { ...component.properties };
+              if (layer === 0) delete properties.pageLayer; else properties.pageLayer = layer;
+              updateComponent(component.id, { properties });
+              setCanvasLayer(layer);
+            }} />}
         </div>
   </>;
 }

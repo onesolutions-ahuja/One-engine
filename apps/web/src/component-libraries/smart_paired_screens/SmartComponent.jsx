@@ -38,7 +38,13 @@ export default function SmartComponent(p){
  const [code,setCode]=React.useState("");const [name,setName]=React.useState("");
  const [renaming,setRenaming]=React.useState("");const [newName,setNewName]=React.useState("");
  const [message,setMessage]=React.useState("");const [busy,setBusy]=React.useState(false);
+ const [autoOpen,setAutoOpen]=React.useState(false);
  const page=pageToShow(p);
+ // "Customer display on second screen" for THIS device (Off by default).
+ React.useEffect(()=>{
+  if(preview||!page)return;
+  ask("autoOpen:get",{page}).then(value=>setAutoOpen(value===true),()=>undefined);
+ },[preview,page]);
  const refresh=React.useCallback(()=>{
   if(preview)return;
   ask("list").then(list=>setScreens(Array.isArray(list)?list:[]),error=>setMessage(error.message));
@@ -79,7 +85,13 @@ export default function SmartComponent(p){
     <button type="button" className="sps-primary" disabled={busy} onClick={pair}>Pair</button>
    </div>
   </div>}
-  {screens.length===0&&!adding&&<p className="sps-empty">No screens yet.</p>}
+  <label className="sps-auto">
+   <input type="checkbox" checked={autoOpen} disabled={preview||!page}
+    onChange={event=>{const on=event.target.checked;setAutoOpen(on);
+     ask("autoOpen:set",{page,on}).then(value=>setAutoOpen(value===true),error=>{setAutoOpen(!on);setMessage(error.message);});}}/>
+   <span>Open on this computer's second screen</span>
+  </label>
+  {screens.length===0&&!adding&&<p className="sps-empty">No other screens yet.</p>}
   <ul>
    {screens.map(screen=><li key={screen.id}>
     <span className={"sps-dot"+(screen.online?" sps-online":"")} aria-hidden="true"/>

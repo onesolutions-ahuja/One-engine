@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {apiRequest} from '../Client/authClient';
-import {mirrorDeviceKey,tillDeviceKey} from '../TillDevice/deviceTill';
+import {mirrorDeviceKey} from '../TillDevice/deviceTill';
+import {screenWindowId} from './pairedScreen';
 import './pairedScreen.css';
 
 /**
@@ -18,7 +19,7 @@ export default function ScreenCornerCode(){
    if(stopped)return;
    let wait=30_000;
    try{
-    const next=await apiRequest<Corner>('/screens/corner',{method:'POST',body:JSON.stringify({mirrorKey:mirrorDeviceKey(),screenKey:tillDeviceKey()})});
+    const next=await apiRequest<Corner>('/screens/corner',{method:'POST',body:JSON.stringify({mirrorKey:mirrorDeviceKey(),screenKey:screenWindowId()})});
     setCorner(next);
     // Read again just after the minute turns, so the code on screen is always current.
     wait=Math.max(1,next.secondsLeft)*1000+500;

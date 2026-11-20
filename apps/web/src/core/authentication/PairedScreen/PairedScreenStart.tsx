@@ -1,7 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {apiRequest,ApiRequestError} from '../Client/authClient';
-import {tillDeviceKey} from '../TillDevice/deviceTill';
-import {forgetScreen,rememberScreen,savedScreenKey,type ScreenAnswer} from './pairedScreen';
+import {adoptSavedScreen,forgetScreen,rememberScreen,savedScreenKey,screenWindowId,startNewScreen,type ScreenAnswer} from './pairedScreen';
 import './pairedScreen.css';
 
 /**
@@ -29,7 +28,7 @@ export default function PairedScreenStart(){
   const begin=async()=>{
    if(stopped.current)return;
    try{
-    const started=await apiRequest<Start>('/auth/screen/start',{method:'POST',body:JSON.stringify({screenKey:tillDeviceKey()})});
+    const started=await apiRequest<Start>('/auth/screen/start',{method:'POST',body:JSON.stringify({screenKey:screenWindowId()})});
     setCode(started.code);setMessage('');
     const ask=async()=>{
      if(stopped.current)return;
@@ -48,6 +47,9 @@ export default function PairedScreenStart(){
    }
   };
   const resume=async()=>{
+   // /display?new: this window becomes another screen (e.g. a second display in this browser).
+   if(new URLSearchParams(window.location.search).has('new'))startNewScreen();
+   else adoptSavedScreen();
    const key=savedScreenKey();
    if(!key){void begin();return;}
    setMessage('Connecting…');

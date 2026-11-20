@@ -67,6 +67,32 @@ export async function openSecondScreen(path:string,sessionId:string){
  if(secondWindow&&!secondWindow.closed){secondWindow.location.href=url.href;secondWindow.focus();return;}
  secondWindow=window.open(url.href,'une-second-screen',features);
 }
+/** Open the second-screen window unless it is already open (a till reloading must not
+ * reload its display). False when the browser blocked it (no click yet, pop-ups not allowed). */
+export async function ensureSecondScreen(path:string,sessionId:string):Promise<boolean>{
+ const url=new URL(path,window.location.origin);
+ if(/^[0-9a-f-]{36}$/i.test(sessionId))url.searchParams.set('screenSession',sessionId);
+ const own=tillDeviceKey();
+ if(/^[A-Za-z0-9_-]{16,128}$/.test(own))url.searchParams.set('mirror',own);
+ if(secondWindow&&!secondWindow.closed)return true;
+ let features='popup=yes';
+ try{
+  const details=await (window as unknown as {getScreenDetails?:()=>Promise<{
+   screens:Array<{availLeft:number;availTop:number;availWidth:number;availHeight:number}>;currentScreen:unknown}>})
+   .getScreenDetails?.();
+  const other=details?.screens.find(screen=>screen!==details.currentScreen);
+  if(other)features='popup=yes,left='+other.availLeft+',top='+other.availTop
+   +',width='+other.availWidth+',height='+other.availHeight;
+ }catch{/* no permission yet: a normal window */}
+ // An empty URL finds the window of that name if it is already open, without reloading it.
+ const found=window.open('','une-second-screen',features);
+ if(!found)return false;
+ let blank=true;
+ try{blank=found.location.href==='about:blank';}catch{blank=false;}
+ if(blank)found.location.href=url.href;
+ secondWindow=found;
+ return true;
+}
 /** CLOSESCREEN("second"). */
 export function closeSecondScreen(){
  if(secondWindow&&!secondWindow.closed)secondWindow.close();

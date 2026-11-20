@@ -1,5 +1,6 @@
 import {tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {ensureTillDialogStyles} from './tillPickerScreen';
+import {ensureSecondScreen,openSecondScreen} from './screenFormula';
 
 /**
  * PAIRDISPLAY(Page) on a till, kiosk or any app device: pair a screen that shows /display.
@@ -82,7 +83,7 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
  * device, for the app whose page is open. Installed once per browser tab.
  */
 export const PAIRED_SCREENS_EVENT='metadrive:paired-screens';
-type BridgeDetail={action?:unknown;code?:unknown;name?:unknown;page?:unknown;id?:unknown;
+type BridgeDetail={action?:unknown;code?:unknown;name?:unknown;page?:unknown;id?:unknown;on?:unknown;
  reply?:(result:{ok:true;value:unknown}|{ok:false;error:string})=>void};
 let bridged=false;
 const currentAppId=()=>{
@@ -102,9 +103,62 @@ export function installPairedScreensBridge(request:Request):void{
     case 'add':return post(request,'/screens/approve',{code:detail.code,name:detail.name,appId:currentAppId(),pageApiName:detail.page});
     case 'rename':return post(request,'/screens/rename',{id:detail.id,name:detail.name});
     case 'revoke':return post(request,'/screens/revoke',{id:detail.id});
+    case 'autoOpen:get':return autoOpenPage(currentAppId())===String(detail.page??'');
+    case 'autoOpen:set':setAutoOpen(currentAppId(),detail.on===true?String(detail.page??''):'');
+     // Turned On by a click: open it now too (a click is allowed to open a window).
+     if(detail.on===true)void openCustomerDisplay(String(detail.page??''),'');
+     return autoOpenPage(currentAppId())!=='';
     default:throw Error('Unknown screen action');
    }
   };
   run().then(value=>reply({ok:true,value}),error=>reply({ok:false,error:reason(error,'Screens are unavailable')}));
  });
+}
+
+/**
+ * "Customer display on second screen" (per device, On/Off, default Off): when On, this
+ * device's till opens the display page on its second monitor every time it loads. Off: no
+ * window, no load (single-screen tills). Kept on this device only (localStorage).
+ */
+const AUTO_OPEN='md.screen.autoOpen';
+const pagePattern=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
+function autoOpenSettings():Record<string,string>{
+ try{const value=JSON.parse(window.localStorage.getItem(AUTO_OPEN)??'{}');return value&&typeof value==='object'?value:{};}
+ catch{return {};}
+}
+export function autoOpenPage(appId:string):string{
+ const page=autoOpenSettings()[appId];
+ return typeof page==='string'&&pagePattern.test(page)?page:'';
+}
+export function setAutoOpen(appId:string,page:string){
+ if(!/^[A-Za-z0-9_-]{1,80}$/.test(appId))return;
+ const settings=autoOpenSettings();
+ if(pagePattern.test(page))settings[appId]=page;else delete settings[appId];
+ try{window.localStorage.setItem(AUTO_OPEN,JSON.stringify(settings));}catch{/* private window */}
+}
+const pagePath=(appId:string,page:string)=>'/une/apps/'+encodeURIComponent(appId)+'/pages/'+encodeURIComponent(page);
+async function openCustomerDisplay(page:string,sessionId:string):Promise<void>{
+ const appId=currentAppId();
+ if(!appId||!pagePattern.test(page))return;
+ if(await ensureSecondScreen(pagePath(appId,page),sessionId))return;
+ // The browser blocked the window (no click yet, or pop-ups not allowed): one button.
+ if(document.getElementById('une-open-display'))return;
+ const button=document.createElement('button');
+ button.id='une-open-display';button.type='button';
+ button.textContent='Open customer display';
+ button.title='Allow pop-ups for this site to open it automatically';
+ Object.assign(button.style,{position:'fixed',right:'16px',bottom:'16px',zIndex:'2147483000',padding:'10px 14px',
+  border:'0',borderRadius:'10px',background:'#007aff',color:'#fff',font:'600 14px -apple-system,Segoe UI,sans-serif',
+  boxShadow:'0 4px 16px rgba(0,0,0,.18)',cursor:'pointer'});
+ button.addEventListener('click',()=>{void openSecondScreen(pagePath(appId,page),sessionId);button.remove();});
+ document.body.appendChild(button);
+}
+let autoOpened=false;
+/** On a selling page: open this device's customer display if its setting is On. */
+export function autoOpenCustomerDisplay(sessionId:string){
+ if(autoOpened||typeof window==='undefined')return;
+ const page=autoOpenPage(currentAppId());
+ if(!page)return;
+ autoOpened=true;
+ void openCustomerDisplay(page,sessionId);
 }

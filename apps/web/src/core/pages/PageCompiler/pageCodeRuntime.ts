@@ -19,7 +19,7 @@ import {isConnected} from '../../../../../server/src/expression-engine/FormulaCo
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
-import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
+import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,openerMirrorKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
 type Row=Record<string,unknown>;
 type Criteria=Array<[string,unknown]>;
@@ -327,7 +327,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   void loadDeviceTill(host.request);
  }
  const requestFor=(ev:Row,rowObject:string)=>({sessionId:host.sessionId(),state:host.state(),rowObject,
-  ...(usesDevice?{deviceKey:tillDeviceKey()}:{}),
+  ...(usesDevice?{deviceKey:tillDeviceKey(),...(openerMirrorKey()?{mirrorKey:openerMirrorKey()}:{})}:{}),
   event:{recordId:ev.recordId,value:ev.value,index:ev.index,label:ev.label},
   timeZone:typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:undefined});
 

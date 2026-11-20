@@ -2,6 +2,7 @@ import './messageScreen';
 import {parseScreenAction} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {resolvePageActionRoute,type PageActionRoutingContext,type PageActionRoute} from './pageActionRouting';
 import {appRoutePath} from '../../workspace/Navigation/appRouting';
+import {tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
 export type PopupScreen={page:string;sessionId:string;recordId:string;instance:string;inScreen:boolean;
  /** Page session that opened the popup: refreshed when the popup closes. */
@@ -50,6 +51,9 @@ let secondWindow:Window|null=null;
 export async function openSecondScreen(path:string,sessionId:string){
  const url=new URL(path,window.location.origin);
  if(/^[0-9a-f-]{36}$/i.test(sessionId))url.searchParams.set('screenSession',sessionId);
+ // The second screen (a customer display) follows the till that opened it.
+ const own=tillDeviceKey();
+ if(/^[A-Za-z0-9_-]{16,128}$/.test(own))url.searchParams.set('mirror',own);
  let features='popup=yes';
  try{
   // Chrome/Edge: asks once to "manage windows on all displays", then places it on monitor 2.

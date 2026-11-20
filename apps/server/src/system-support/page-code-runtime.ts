@@ -50,6 +50,8 @@ export type PageCodeRequest={
  device?:Record<string,unknown>;
  /** This device's key (made on the device; the server maps it to a Till). */
  deviceKey?:string;
+ /** A customer display opened from a till: the key of the till it shows. */
+ mirrorKey?:string;
  /** Seen by the server itself, never sent by the browser: for audit. */
  deviceIp?:string;deviceAgent?:string;
 };
@@ -172,7 +174,8 @@ class ServerScope{
  /** Read once before the code runs (page values are plain, synchronous reads). */
  async loadTill(){
   this.tillRow=await findDeviceTill(this.records,this.actor,this.request.deviceKey);
-  this.mirrorKey=await findMirrorKey(this.records,this.actor,this.request.deviceKey);
+  // A display opened from a till says which till it follows; otherwise look it up.
+  this.mirrorKey=this.request.mirrorKey||await findMirrorKey(this.records,this.actor,this.request.deviceKey);
  }
  private mirrorKey='';
  /** @ThisPage.Till.*: the active POS Terminal whose DeviceId is this device's key ('' when not set up). */
@@ -514,6 +517,7 @@ export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unkno
   timeZone:typeof raw.timeZone==='string'&&/^[A-Za-z0-9_+\-/]{1,64}$/.test(raw.timeZone)?raw.timeZone:undefined,
   device:deviceAnswers(raw.device),
   ...(typeof raw.deviceKey==='string'&&deviceKeyPattern.test(raw.deviceKey)?{deviceKey:raw.deviceKey}:{}),
+  ...(typeof raw.mirrorKey==='string'&&deviceKeyPattern.test(raw.mirrorKey)?{mirrorKey:raw.mirrorKey}:{}),
   ...(typeof seen.ip==='string'&&seen.ip?{deviceIp:seen.ip.slice(0,64)}:{}),
   ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{})};
 }

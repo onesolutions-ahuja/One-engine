@@ -33,8 +33,20 @@ export function tillDeviceKey():string{
  }catch{return '';}
 }
 export const deviceTillState=()=>state;
-/** @ThisPage.Device.MirrorKey in the browser: this device's own key until the server says otherwise. */
-export function mirrorDeviceKey():string{return state.mirrorKey||tillDeviceKey();}
+/** A customer display opened from a till ("Open display", SCREEN(…, "second")) shows that
+ * till's sale: the opener passes its own key as ?mirror=, kept for reloads of this window.
+ * It wins over the server's guess, so no setup is needed for a display opened this way. */
+const MIRROR='md.device.mirror';
+export function openerMirrorKey():string{
+ try{
+  const fromUrl=new URLSearchParams(window.location.search).get('mirror');
+  if(fromUrl&&pattern.test(fromUrl)){window.sessionStorage.setItem(MIRROR,fromUrl);return fromUrl;}
+  const saved=window.sessionStorage.getItem(MIRROR);
+  return saved&&pattern.test(saved)?saved:'';
+ }catch{return '';}
+}
+/** @ThisPage.Device.MirrorKey in the browser: the opening till, else what the server says, else this device. */
+export function mirrorDeviceKey():string{return openerMirrorKey()||state.mirrorKey||tillDeviceKey();}
 export function subscribeDeviceTill(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};}
 /** @ThisPage.Till.<field> as the browser knows it ('' until known; the server decides on save). */
 export function deviceTillValue(field:string):string{

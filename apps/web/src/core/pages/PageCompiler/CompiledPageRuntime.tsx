@@ -1,3 +1,4 @@
+import {loadFieldAccess,registerRequiredBox,missingRequired,writesRecord} from '../PageRuntime/fieldRules';
 import {startDevicePresence} from '../../authentication/TillDevice/devicePresence';
 import {showMessageScreen} from '../PageRuntime/messageScreen';
 import * as React from 'react';
@@ -704,6 +705,16 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   setActionError('');
   // Page code (v2): the action's own function. The screen changes first; one request saves.
   const codeKey=component.id+':'+action.event;
+  // Required boxes on this screen (Object Manager or the box's own Required) must be
+  // filled before an action that saves a record runs.
+  if(binding.actionType==='Formula'&&writesRecord(binding.formula)){
+   const missing=missingRequired(runtime.pageSessionKey);
+   if(missing.length){
+    const message='Fill in: '+missing.join(', ');
+    setActionError(message);
+    throw Error(message);
+   }
+  }
   if(runtime.code?.hasAction(codeKey)&&binding.actionType==='Formula'){
    const runEffects=async(effects:Effect[])=>{
     for(const effect of effects){
@@ -857,6 +868,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    viewRevision:source.version,
    loadCompanySettings:()=>runtime.request('/metadata/currencies'),
    uploadImage:(file:File)=>uploadTenantImageFile(file),
+   fieldAccess:(objectApi:string)=>loadFieldAccess(runtime.request as never,objectApi),
+   registerRequired:(box:Parameters<typeof registerRequiredBox>[2])=>registerRequiredBox(runtime.pageSessionKey,component.id,box),
+   editingRecord:Boolean(runtime.recordId||runtime.store.get().recordId),
    searchRecords:(query:string)=>compiled.dataSourceId
     ?runtime.searchRecords(compiled.dataSourceId,query)
     :Promise.reject(new Error('Search Box requires an Object data source')),

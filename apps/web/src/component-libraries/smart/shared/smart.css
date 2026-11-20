@@ -255,3 +255,9 @@
  display:flex;align-items:center;color:#1d1d1f;font-size:28px;line-height:1}
 .smart-tabs-arrow.is-left{left:0;justify-content:flex-start;padding-left:6px}
 .smart-tabs-arrow.is-right{right:0;justify-content:flex-end;padding-right:6px}
+
+/* Field rules: required mark, missing (red) and locked (no edit access). */
+.smart-field-rule .smart-required-mark{position:absolute;top:2px;right:7px;color:#FF3B30;font-size:15px;font-weight:700;line-height:1;pointer-events:none}
+.smart-field-rule.is-missing input,.smart-field-rule.is-missing textarea{border-color:#FF3B30!important;border-width:2px!important;background:#FFF5F5!important}
+.smart-field-rule.is-locked input,.smart-field-rule.is-locked textarea{background:#F2F2F2!important;color:#6E6E73!important;cursor:not-allowed}
+.smart-field-rule .smart-locked-mark{position:absolute;top:50%;right:10px;transform:translateY(-50%);font-size:13px;opacity:.7;pointer-events:none}

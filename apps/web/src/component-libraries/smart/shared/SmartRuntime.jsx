@@ -872,6 +872,47 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=
   </button>
  </div>;
 }
+// Field rules (Property "Field" + "Required"): the Object Manager's Required always applies,
+// the box's own Required can only add to it; field access hides or locks the box.
+function useFieldRule(p,name){
+ const bound=name==="smart_text"&&!p.builderPreview&&typeof p.boundField==="string"?p.boundField:"";
+ const [objectApi="",fieldApi=""]=bound.split(".");
+ const [access,setAccess]=React.useState(null);
+ const [missing,setMissing]=React.useState(false);
+ const valueRef=React.useRef("");
+ const seenRef=React.useRef(undefined);
+ const boxRef=React.useRef(null);
+ React.useEffect(()=>{
+  setAccess(null);
+  if(!objectApi||!fieldApi||typeof p.fieldAccess!=="function")return;
+  let live=true;
+  p.fieldAccess(objectApi).then(fields=>{if(live)setAccess(fields?.[fieldApi]??null);}).catch(()=>{});
+  return ()=>{live=false;};
+ },[objectApi,fieldApi,p.fieldAccess]);
+ const hidden=Boolean(access)&&!access.read;
+ const locked=Boolean(access)&&!hidden&&!(p.editingRecord?access.edit:access.create);
+ const required=name==="smart_text"&&!p.builderPreview&&!hidden&&!locked&&(p.mandatory===true||Boolean(access?.required));
+ const label=String(access?.label||p.label||p.placeholder||fieldApi||"this box");
+ const labelRef=React.useRef(label);labelRef.current=label;
+ React.useEffect(()=>{
+  if(!required||typeof p.registerRequired!=="function")return;
+  return p.registerRequired({label:labelRef.current,value:()=>valueRef.current,
+   visible:()=>Boolean(boxRef.current&&boxRef.current.getClientRects().length),flag:setMissing});
+ },[required,p.registerRequired]);
+ // The value an action or formula puts in the box counts until the user types over it.
+ const seen=value=>{if(seenRef.current!==value){seenRef.current=value;valueRef.current=value;}};
+ const typed=value=>{valueRef.current=value;if(missing&&String(value??"").trim())setMissing(false);};
+ const wrap=field=>{
+  if(!required&&!locked&&!bound)return field;
+  return <div ref={boxRef} className={"smart-field-rule"+(missing?" is-missing":"")+(locked?" is-locked":"")}
+   style={{position:"relative",width:"100%",height:"100%"}}>
+   {field}
+   {required?<span className="smart-required-mark" aria-hidden="true">*</span>:null}
+   {locked?<span className="smart-locked-mark" aria-hidden="true">🔒</span>:null}
+  </div>;
+ };
+ return {hidden,locked,required,missing,label,boxRef,seen,typed,wrap};
+}
 export default function SmartRuntime(p){
  // Page code: the page converter turned this component's formulas into plain functions.
  // There is no other formula engine on a published page: rows still loading show blank.
@@ -946,6 +987,7 @@ export default function SmartRuntime(p){
   return ()=>window.removeEventListener("resize",measureGridViewport);
  },[name]);
  const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",borderRadius:number(p.radius,12)};
+ const fieldRule=useFieldRule(p,name);
  const fire=(event,value)=>{if(p.previewOnly||p.builderPreview)return;
   if(isDisabled&&name==="smart_button")return;
   if(typeof p.onAction==="function")void Promise.resolve(p.onAction({event,value})).catch(()=>{});
@@ -1084,7 +1126,8 @@ export default function SmartRuntime(p){
      borderStyle:"solid",borderWidth:p.borderWidth===undefined||p.borderWidth===null||p.borderWidth===""
        ?(p.borderColor||(p.builderPreview&&contentResult.error)?1:0):number(p.borderWidth,0,0,24),
      borderColor:contentResult.error&&p.builderPreview?formulaDisplayErrorColor:p.borderColor||"transparent"}}>{text(contentValue)||(name==="smart_label"&&p.builderPreview?"Label":"")}</div>
-   :<SmartReactiveInput value={inputContentValue} title={inputResult.error?"Formula error: "+inputResult.error:undefined} data-md-bind={p.builderPreview?inputKey:undefined} data-md-bind-titles={p.builderPreview?"Input value":undefined} className="smart-input-box" type={p.maskInput===true&&inputRows<=1?"password":"text"}
+   :fieldRule.hidden?null:(fieldRule.seen(inputContentValue),fieldRule.wrap(<SmartReactiveInput value={inputContentValue} readOnly={fieldRule.locked||undefined} aria-required={fieldRule.required||undefined} aria-invalid={fieldRule.missing||undefined}
+  title={inputResult.error?"Formula error: "+inputResult.error:fieldRule.locked?"You don't have permission to edit "+fieldRule.label:fieldRule.missing?fieldRule.label+" is required":undefined} data-md-bind={p.builderPreview?inputKey:undefined} data-md-bind-titles={p.builderPreview?"Input value":undefined} className="smart-input-box" type={p.maskInput===true&&inputRows<=1?"password":"text"}
   autoComplete={p.maskInput===true?"off":undefined} spellCheck={p.maskInput===true?false:undefined}
   aria-label={label||text(p.placeholder||"Input")}
   placeholder={p.builderPreview===true&&![p.placeholder,p.textSource,p.defaultValue,p.value].some(v=>v!==undefined&&v!==null&&v!=="")
@@ -1102,7 +1145,7 @@ export default function SmartRuntime(p){
     background:p.backgroundColor||(ios?"#f2f2f7":"#fff"),
     textAlign:p.labelAlignment||"left","--smart-placeholder-color":p.labelColor||"#64748b"}}
   rows={inputRows} uploadImage={p.allowImageUpload===true&&!p.builderPreview?p.uploadImage:null}
-  keypad={p.builderPreview?"":p.keypad} onValueChange={value=>fire("change",value)}/>;
+  keypad={p.builderPreview?"":p.keypad} onValueChange={value=>{fieldRule.typed(value);fire("change",value);}}/>));
  }
  else if(name==="smart_selector")content=<SmartSelector p={p} fire={fire}/>;
  else if(name==="smart_search")content=<SmartSearch p={p} fire={fire}

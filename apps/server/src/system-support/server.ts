@@ -1132,6 +1132,25 @@ export function createSystemServer(db:SqlPersistence) {
         pluralLabel:object.pluralLabel,canCreate:create,canEdit:edit}]:[];
     })});
   }));
+  // Field rules for page inputs bound to a field: Object Manager "required" plus the
+  // signed-in user's field access, so a box can show locked/hidden before anyone types.
+  app.get('/api/metadata/field-access/:objectApi',route(async(req,res)=>{
+    const actor=req.actor!,objectApi=req.params.objectApi;
+    if(!/^[A-Za-z][A-Za-z0-9_]{0,199}$/.test(objectApi))throw new Error('Invalid object name');
+    const object=await definitions.get(actor.tenant_id,objectApi);
+    const [read,create,edit]=await rbac.allowedMany(actor.tenant_id,actor.user_id,
+      [{resource:objectApi,action:'read'},{resource:objectApi,action:'create'},{resource:objectApi,action:'edit'}]);
+    const grants=await rbac.allowedMany(actor.tenant_id,actor.user_id,
+      object.fields.flatMap(field=>['read','create','edit'].map(action=>({resource:objectApi+'.'+field.apiName,action}))));
+    const computed=(type:string)=>/^(formula|rollup|autonumber)$/i.test(type);
+    const fields=Object.fromEntries(object.fields.map((field,index)=>{
+      const [r,c,e]=grants.slice(index*3,index*3+3);
+      return [field.apiName,{label:field.label||field.apiName,required:field.required===true&&!computed(field.dataType),
+        read:Boolean(read&&r),create:Boolean(create&&c&&!computed(field.dataType)),edit:Boolean(edit&&e&&r&&!computed(field.dataType))}];
+    }));
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({objectApi,fields});
+  }));
   app.get('/api/mobile/record-forms/:objectApi',route(async(req,res)=>{
     const actor=req.actor!,objectApi=req.params.objectApi;
     if(!/^[A-Za-z][A-Za-z0-9_]{0,199}$/.test(objectApi))throw new Error('Invalid object name');

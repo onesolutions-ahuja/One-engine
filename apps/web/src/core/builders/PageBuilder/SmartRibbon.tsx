@@ -637,6 +637,32 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        <button type="button" key={opt} disabled={!enabled} title={opt}
         aria-label={title+' '+opt} aria-pressed={value===opt} onClick={()=>write(opt)}><Icon size={15}/></button>)}
    </div>;
+   else if(property.id==='boundField'){
+     // Field: the Object field this box edits (Customer.Email). Drives Required and access.
+     const [boundObject='',boundApi='']=String(value||'').split('.');
+     const target=objects.find(o=>o.apiName===boundObject);
+     editor=<span className="smart-bound-field" style={{display:'inline-flex',gap:4}}>
+       <select className="smart-select" aria-label="Field object" disabled={!enabled} value={boundObject}
+         onChange={e=>write(e.target.value?e.target.value+'.':'')}>
+         <option value="">No field</option>
+         {objects.map(o=><option key={o.apiName} value={o.apiName}>{o.label}</option>)}
+       </select>
+       {boundObject?<select className="smart-select" aria-label={title} disabled={!enabled} value={boundApi}
+         onChange={e=>write(boundObject+'.'+e.target.value)}>
+         <option value="">Choose field</option>
+         {(target?.fields??[]).filter(field=>!/^(formula|rollup|autonumber)$/i.test(field.dataType))
+           .map(field=><option key={field.apiName} value={field.apiName}>{(field.label||field.apiName)+(field.required?' *':'')}</option>)}
+       </select>:null}
+     </span>;
+   }
+   else if(kind==='boolean'&&property.id==='mandatory'){
+     // Object Manager's Required wins: shown ticked and locked, it cannot be switched off here.
+     const [boundObject='',boundApi='']=String(properties.boundField||'').split('.');
+     const locked=Boolean(objects.find(o=>o.apiName===boundObject)?.fields?.find(f=>f.apiName===boundApi)?.required);
+     editor=<input type="checkbox" aria-label={title} disabled={!enabled||locked}
+       title={locked?'Required in Object Manager':undefined}
+       checked={locked||value===true} onChange={e=>write(e.target.checked)}/>;
+   }
    else if(kind==='boolean'){
      if(compactDesign&&property.id==='badgeVisible'){
        const Icon=value===true?Eye:EyeOff;

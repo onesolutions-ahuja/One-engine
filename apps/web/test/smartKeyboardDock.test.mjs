@@ -108,7 +108,9 @@ test('iOS Style is the only Smart style and never overrides configured values',(
  assert.match(runtime,/const ios=true;/);
  assert.match(runtime,/\(ios\?" smart-ios":""\)/);
  // Configured colours stay first in every fallback.
- assert.match(runtime,/p\.backgroundColor\|\|\(ios\?"#007aff":"#2267bc"\)/);
+ assert.match(runtime,/p\.backgroundColor\|\|SMART_BLUE/);
+ // Authored text colour wins whenever it is readable on the fill.
+ assert.match(runtime,/readableText\(p\.backgroundColor\|\|SMART_BLUE,p\.labelColor\)/);
  const css=read('../src/component-libraries/smart/shared/smart-ios.css');
  assert.doesNotMatch(css.replace(/@media \(prefers-reduced-motion[\s\S]*$/,''),/!important/,
   'iOS defaults must not beat inline (configured) styles');

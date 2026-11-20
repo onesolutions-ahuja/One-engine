@@ -56,11 +56,31 @@ const expression=(...args)=>{
  return result.error?"FORMULAERROR":text(result.value);
 };
 const formulaDisplayErrorColor="#dc2626";
+/** One Smart blue for every default fill (buttons, tabs, badges, card buttons). */
+const SMART_BLUE="#007aff";
+/** Text colour readable on a fill: the authored colour when it is readable (contrast >= 3),
+ * else white or near-black, whichever reads better. Black text on blue never appears. */
+const hexRgb=c=>{const m=/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c||"").trim());if(!m)return null;
+ const h=m[1].length===3?m[1].replace(/./g,x=>x+x):m[1];return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16));};
+const luminance=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;})
+ .reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+export function readableText(fill,preferred){
+ const bg=hexRgb(fill);
+ if(!bg)return preferred||undefined;
+ const own=hexRgb(preferred);
+ if(own&&contrast(bg,own)>=3)return preferred;
+ return contrast(bg,[255,255,255])>=contrast(bg,[29,29,31])?"#fff":"#1d1d1f";
+}
 function SmartPicture({src,alt,loadAsset,style}){
  const source=useTenantImageSource(src,loadAsset);
  const [failed,setFailed]=React.useState(false);
  React.useEffect(()=>setFailed(false),[src]);
- return source&&!failed?<img src={source} alt={alt} style={style} onError={()=>setFailed(true)}/>:null;
+ // No picture (none set, or it failed to load): the same grey stripes the Page Builder
+ // shows, so an empty image area reads as "no image" instead of a blank box.
+ return source&&!failed?<img src={source} alt={alt} style={style} onError={()=>setFailed(true)}/>
+  :<div className="smart-image-none" role="img" aria-label={alt?alt+": no image":"No image"}
+    style={{...style,objectFit:undefined,minHeight:style?.height===undefined?48:undefined}}/>;
 }
 // Reuse the normal authorised record-filter matcher for independent value
 // visibility. Global object filtering/paging remains untouched.
@@ -342,13 +362,13 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       style={{
        ...smartPartOrderStyle(p.cardButtonPlacement,"right"),
        ...smartPartOffsetStyle(p,"cardButton"),
-       backgroundColor:p.cardButtonFill||p.accentColor||"#2563eb",
-       borderColor:p.cardButtonBorderColor||p.cardButtonFill||p.accentColor||"#2563eb",
+       backgroundColor:p.cardButtonFill||p.accentColor||SMART_BLUE,
+       borderColor:p.cardButtonBorderColor||p.cardButtonFill||p.accentColor||SMART_BLUE,
        ...smartShapeAppearance(p.cardButtonShape||"shape:round-rectangle",
         p.cardButtonRadius!==undefined&&p.cardButtonRadius!==null&&p.cardButtonRadius!==""
          ?number(p.cardButtonRadius,8,0,200)
          :p.cardButtonShape==="shape:rectangle"?0:8),
-       color:p.cardButtonTextColor||"#fff",
+       color:readableText(p.cardButtonFill||p.accentColor||SMART_BLUE,p.cardButtonTextColor)||"#fff",
        fontSize:number(p.cardButtonTextSize,14,8,48),
        width:p.cardButtonWidth!==undefined&&p.cardButtonWidth!==null&&p.cardButtonWidth!==""
         ?number(p.cardButtonWidth,0,0,1200)+"px":undefined,
@@ -376,8 +396,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   </div>}
   {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{...smartPartOffsetStyle(p,"badge"),fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
-   color:badgeResult.error?formulaDisplayErrorColor:p.badgeTextColor||"#fff",
-   background:badgeResult.error?"#fff":p.badgeBodyColor||"#2563eb",
+   color:badgeResult.error?formulaDisplayErrorColor:readableText(p.badgeBodyColor||SMART_BLUE,p.badgeTextColor)||"#fff",
+   background:badgeResult.error?"#fff":p.badgeBodyColor||SMART_BLUE,
    border:p.badgeBorderColor?"1px solid "+p.badgeBorderColor:undefined,
    borderRadius:p.badgeRadius!==undefined&&p.badgeRadius!==null&&p.badgeRadius!==""
     ?number(p.badgeRadius,0,0,200):undefined,
@@ -438,7 +458,7 @@ function SmartSelector({p,fire}){
    style={{fontSize:number(p.textSize,16),color:p.labelColor||"#263b56",
     "--smart-selector-bg":p.backgroundColor||"#fff",
     "--smart-selector-fg":p.labelColor||"#263b56",
-    "--smart-selector-focus":p.defaultValueColor||"#2563eb"}}>
+    "--smart-selector-focus":p.defaultValueColor||SMART_BLUE}}>
   <select className="smart-selector-control" role="combobox"
    data-md-bind={p.builderPreview?"textSource":undefined}
    aria-label={placeholder} disabled={p.disabled===true||options.length===0}
@@ -447,7 +467,7 @@ function SmartSelector({p,fire}){
     ...smartShapeAppearance(p.shapeId,number(p.radius,12)),
     boxShadow:p.shadow==="large"?"0 8px 20px #0003":
      p.shadow==="medium"?"0 3px 9px #0003":"none"}}
-   value={selected<0?"":String(selected)}
+   value={selected<0?"":String(selected)} data-empty={selected<0?"true":undefined}
    onChange={event=>{
     const index=Number(event.target.value),item=options[index];
     if(!item)return;
@@ -489,7 +509,7 @@ function SmartMultiSelector({p,fire,options,fingerprint}){
  return <div className="smart-selector smart-multi-selector" ref={root}
    style={{fontSize:number(p.textSize,16),color:p.labelColor||"#263b56",
     "--smart-selector-bg":p.backgroundColor||"#fff","--smart-selector-fg":p.labelColor||"#263b56",
-    "--smart-selector-focus":p.defaultValueColor||"#2563eb"}}>
+    "--smart-selector-focus":p.defaultValueColor||SMART_BLUE}}>
   <button type="button" className="smart-selector-control smart-multi-selector-button" aria-haspopup="listbox"
    aria-expanded={open} disabled={p.disabled===true||options.length===0}
    style={{textAlign:p.labelAlignment||"left",
@@ -633,7 +653,15 @@ function SmartTabs({p,record,fire}){
   });
  // Default index is bounded by the filtered, permission-checked tab list.
  // An existing explicit PageState/Collection selection always has priority.
- const defaultTabIndex=tabs.length&&configuredTabIndex>=0?Math.min(configuredTabIndex,tabs.length-1):-1;
+ // Default value (formula): the tab whose caption it names, e.g. the role an employee has now.
+ // While it is still loading (blank) no tab is selected, so a saved value is never
+ // overwritten by the first tab.
+ const hasDefaultCaption=typeof p.defaultValue==="string"&&p.defaultValue.trim()!==""&&!p.builderPreview;
+ const defaultCaption=hasDefaultCaption
+  ?text(scopedExpression(p,"defaultValue",p.defaultValue,recordOf(p))).trim().toLowerCase():"";
+ const captionIndex=defaultCaption?tabs.findIndex(tab=>text(tab?.label??tab).trim().toLowerCase()===defaultCaption):-1;
+ const defaultTabIndex=hasDefaultCaption?captionIndex
+  :tabs.length&&configuredTabIndex>=0?Math.min(configuredTabIndex,tabs.length-1):-1;
  // A held value that is no tab (e.g. "*" for All) means no tab is selected.
  const heldOtherValue=!hasCollection&&Boolean(stateKey)&&selectedId!==null&&selectedId!==undefined
   &&selectedId!==""&&indexForSelection<0;
@@ -641,6 +669,7 @@ function SmartTabs({p,record,fire}){
   ?indexForSelection>=0?indexForSelection:heldOtherValue?-1:defaultTabIndex
   :tabs.length?Math.max(0,Math.min(active,tabs.length-1)):-1;
  const autoSelected=React.useRef(null);
+ const userPickedTab=React.useRef(false);
  const selectedTabRef=React.useRef(null);
  const selectTab=(index,initialisingDefault=false)=>{
   setActive(index);
@@ -664,7 +693,7 @@ function SmartTabs({p,record,fire}){
     Id:String(identifier??""),Name:text(chosen?.label??chosen??"")}});
   }
   // Programmatic default initialisation must not clear its own once-only guard.
-  if(!initialisingDefault)autoSelected.current=null;
+  if(!initialisingDefault){autoSelected.current=null;userPickedTab.current=true;}
  };
  const defaultItem=tabs[defaultTabIndex];
  const defaultItemId=defaultItem
@@ -680,7 +709,10 @@ function SmartTabs({p,record,fire}){
   // or arbitrary action during page load. State bindings are safe to initialise.
   if(changeAction&&changeAction.actionType!=="PageState"&&
     !(changeAction.actionType==="Formula"&&formulaStateKey))return;
-  if(indexForSelection>=0){autoSelected.current=null;return;}
+  // A tab the user picked stays. A tab picked automatically follows the default
+  // when it changes (e.g. the record's value arrives after the page opened).
+  if(indexForSelection>=0&&(userPickedTab.current||!hasDefaultCaption||indexForSelection===defaultTabIndex)){
+   autoSelected.current=null;return;}
   if(heldOtherValue||defaultTabIndex<0)return;
   const key=String(p.pageSessionKey??"")+"|"+String(p.componentId??"")+"|"+
    String(hasCollection?p.dataCollection.name:stateKey)+"|"+String(defaultTabIndex)+"|"+String(defaultItemId??"");
@@ -688,7 +720,7 @@ function SmartTabs({p,record,fire}){
   autoSelected.current=key;
   selectTab(defaultTabIndex,true);
  },[indexForSelection,defaultItemId,defaultTabIndex,tabs.length,p.loading,p.previewOnly,p.builderPreview,
-   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue]);
+   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue,hasDefaultCaption]);
  // Focus the actual selected initial tab only if no other control owns focus.
  React.useEffect(()=>{
   if(selectedTabIndex<0||!tabs.length||p.loading||
@@ -715,9 +747,9 @@ function SmartTabs({p,record,fire}){
      minWidth:vertical?0:number(p.tabWidth,120),
      // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
      maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
-     borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||"#2563eb"):"transparent"):undefined,
-     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:p.labelColor||undefined,
-     background:selectedTabIndex===index?p.selectedTabColor||"#eaf2ff":p.tabColor||"#fff",
+     borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||SMART_BLUE):"transparent"):undefined,
+     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:readableText(selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",p.labelColor),
+     background:selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",
     borderColor:p.borderColor||undefined}}
     tabIndex={selectedTabIndex===index||selectedTabIndex<0&&index===0?0:-1}
     onClick={()=>selectTab(index)}>{text(tab?.label??tab)}</button>)}
@@ -883,7 +915,7 @@ export default function SmartRuntime(p){
     justifyContent:label?(p.labelAlignment==="right"?"flex-end":p.labelAlignment==="center"?"center":"flex-start"):"center",
     ...(p.wrapText===true?{textAlign:p.labelAlignment==="right"?"right":p.labelAlignment==="center"?"center":"left"}:{}),
     fontWeight:typeof p.headerBold==="boolean"?(p.headerBold?700:400):undefined,
-    background:p.backgroundColor||(ios?"#007aff":"#2267bc"),color:p.labelColor||"#fff",borderColor:p.borderColor,
+    background:p.backgroundColor||SMART_BLUE,color:readableText(p.backgroundColor||SMART_BLUE,p.labelColor)||"#fff",borderColor:p.borderColor,
     ...(isDisabled?{opacity:.4,filter:"grayscale(.7)",cursor:"not-allowed"}:{})}}>
    {buttonIcon&&<span className="smart-button-glyph" aria-hidden="true" style={{
      backgroundColor:p.iconFillColor||p.labelColor||"#fff",

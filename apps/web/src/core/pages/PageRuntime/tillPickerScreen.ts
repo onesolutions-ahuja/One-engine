@@ -17,9 +17,12 @@ dialog.une-till-picker::backdrop{background:rgba(15,23,42,.35)}
 .une-till-picker footer{display:flex;border-top:1px solid rgba(60,60,67,.18)}
 .une-till-picker footer button{flex:1;min-height:44px;border:0;background:transparent;color:#007aff;font:inherit;font-size:15px;cursor:pointer}`;
 let asked=false;
+/** "Not now" is remembered on this device: the question is asked once, not on every page. */
+const NOT_NOW='une.tillPicker.notNow';
+const declined=()=>{try{return window.localStorage.getItem(NOT_NOW)==='1';}catch{return false;}};
 
 export async function askWhichTill(request:Request):Promise<void>{
- if(asked||typeof document==='undefined')return;
+ if(asked||typeof document==='undefined'||declined())return;
  const state=await loadDeviceTill(request);
  if(state.status!=='unset'||asked)return;
  asked=true;
@@ -59,7 +62,10 @@ export async function askWhichTill(request:Request):Promise<void>{
  const footer=document.createElement('footer');
  const later=document.createElement('button');
  later.type='button';later.textContent='Not now';
- later.addEventListener('click',()=>{dialog.close();dialog.remove();});
+ later.addEventListener('click',()=>{
+  try{window.localStorage.setItem(NOT_NOW,'1');}catch{/* private window: asked again next visit */}
+  dialog.close();dialog.remove();
+ });
  footer.appendChild(later);
  dialog.append(title,help,list,footer);
  document.body.appendChild(dialog);

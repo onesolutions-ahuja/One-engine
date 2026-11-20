@@ -215,7 +215,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   // While the app is open in this tab, the server knows this device's open sale is live.
   startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
-  if(runtime.code?.usesTill)void askWhichTill(runtime.request);
+  if(runtime.code?.asksTill)void askWhichTill(runtime.request);
   // Rows for instant taps and totals: one request with the first data.
   void runtime.code?.loadSets().catch(error=>console.warn('[PageCode] record sets:',error instanceof Error?error.message:error));
   // A state value the held rows depend on ($state.x in their criteria) reloads them.

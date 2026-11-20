@@ -669,6 +669,7 @@ function SmartTabs({p,record,fire}){
   ?indexForSelection>=0?indexForSelection:heldOtherValue?-1:defaultTabIndex
   :tabs.length?Math.max(0,Math.min(active,tabs.length-1)):-1;
  const autoSelected=React.useRef(null);
+ const userPickedTab=React.useRef(false);
  const selectedTabRef=React.useRef(null);
  const selectTab=(index,initialisingDefault=false)=>{
   setActive(index);
@@ -692,7 +693,7 @@ function SmartTabs({p,record,fire}){
     Id:String(identifier??""),Name:text(chosen?.label??chosen??"")}});
   }
   // Programmatic default initialisation must not clear its own once-only guard.
-  if(!initialisingDefault)autoSelected.current=null;
+  if(!initialisingDefault){autoSelected.current=null;userPickedTab.current=true;}
  };
  const defaultItem=tabs[defaultTabIndex];
  const defaultItemId=defaultItem
@@ -708,7 +709,10 @@ function SmartTabs({p,record,fire}){
   // or arbitrary action during page load. State bindings are safe to initialise.
   if(changeAction&&changeAction.actionType!=="PageState"&&
     !(changeAction.actionType==="Formula"&&formulaStateKey))return;
-  if(indexForSelection>=0){autoSelected.current=null;return;}
+  // A tab the user picked stays. A tab picked automatically follows the default
+  // when it changes (e.g. the record's value arrives after the page opened).
+  if(indexForSelection>=0&&(userPickedTab.current||!hasDefaultCaption||indexForSelection===defaultTabIndex)){
+   autoSelected.current=null;return;}
   if(heldOtherValue||defaultTabIndex<0)return;
   const key=String(p.pageSessionKey??"")+"|"+String(p.componentId??"")+"|"+
    String(hasCollection?p.dataCollection.name:stateKey)+"|"+String(defaultTabIndex)+"|"+String(defaultItemId??"");
@@ -716,7 +720,7 @@ function SmartTabs({p,record,fire}){
   autoSelected.current=key;
   selectTab(defaultTabIndex,true);
  },[indexForSelection,defaultItemId,defaultTabIndex,tabs.length,p.loading,p.previewOnly,p.builderPreview,
-   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue]);
+   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue,hasDefaultCaption]);
  // Focus the actual selected initial tab only if no other control owns focus.
  React.useEffect(()=>{
   if(selectedTabIndex<0||!tabs.length||p.loading||

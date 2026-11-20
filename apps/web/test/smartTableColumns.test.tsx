@@ -51,3 +51,8 @@ test('Sort reads UK dates as dates, and every column formula is read per row',as
  for(const key of ['column1Source','column6Source','column4Color'])assert.equal(isRowDisplayProperty('smart_table',key,{records:[]}),true);
  assert.equal(isRowDisplayProperty('smart_table','tableSort',{records:[]}),false);
 });
+
+test('Show record count off hides the table footer',()=>{
+ assert.match(render({}),/smart-table-footer/);
+ assert.doesNotMatch(render({footerVisible:false}),/smart-table-footer/);
+});

@@ -22,6 +22,23 @@ export function sellsBySession(sources:readonly CompiledDataSource[]):boolean{
  return sources.some(source=>source.scope.kind==='auto'||
   /@ThisPage\.Session\.Id\b/i.test((source.filterFormula??'')+' '+(source.filters==null?'':JSON.stringify(source.filters))));
 }
+/** True when this window was opened by its till with ?screenSession= (SCREEN(page,"second")):
+ * it already shares the till's sale. */
+export function openedWithScreenSession():boolean{
+ try{return /^[0-9a-f-]{36}$/i.test(new URLSearchParams(window.location.search).get('screenSession')??'');}
+ catch{return false;}
+}
+/** One step of following: ask the server which sale the mirrored till is on and move to it.
+ * The till may be THIS device (a second monitor on the same computer): it still follows. */
+export async function followMirroredSale(deps:{mirrorKey:string;openedWithSession:boolean;
+ request:<T>(path:string,init?:RequestInit)=>Promise<T>;sessionId():string;resetSession(next?:string):void}):Promise<void>{
+ if(!deps.mirrorKey){setFollowingSale(deps.openedWithSession);return;}
+ const {sessionId}=await deps.request<{sessionId:string}>('/screens/current-session',
+  {method:'POST',body:JSON.stringify({mirrorKey:deps.mirrorKey})});
+ // No sale reported yet: a window opened by the till already shares its sale.
+ setFollowingSale(Boolean(sessionId)||deps.openedWithSession);
+ if(sessionId&&sessionId!==deps.sessionId())deps.resetSession(sessionId);
+}
 /** Data sources that show another device's rows (their filter reads MirrorKey). */
 export function mirrorSources(sources:readonly CompiledDataSource[]):CompiledDataSource[]{
  return sources.filter(source=>{

@@ -81,25 +81,79 @@ test('PAIRDISPLAY(Page) is a button action: it opens the pairing box and saves n
  assert.throws(()=>compileActionFormula('=PAIRDISPLAY()','Cart'),/argument|page/i,'the page the screen shows is required');
 });
 
-test('a paired screen remembers its page and till, and only its own page goes back to /display',async()=>{
- const store=new Map<string,string>();
- (globalThis as {window?:unknown}).window={localStorage:{getItem:(k:string)=>store.get(k)??null,
-  setItem:(k:string,v:string)=>{store.set(k,v);},removeItem:(k:string)=>{store.delete(k);}},location:{pathname:'/'}};
+test('each display window is its own screen; the till\'s pages never take the paired till; a restart reconnects',async()=>{
+ const local=new Map<string,string>(),session=new Map<string,string>();
+ const store=(m:Map<string,string>)=>({getItem:(k:string)=>m.get(k)??null,setItem:(k:string,v:string)=>{m.set(k,v);},removeItem:(k:string)=>{m.delete(k);}});
+ (globalThis as {window?:unknown}).window={localStorage:store(local),sessionStorage:store(session),location:{pathname:'/display',search:''}};
  const screen=await import('../src/core/authentication/PairedScreen/pairedScreen.ts');
  const {openerMirrorKey}=await import('../src/core/authentication/TillDevice/deviceTill.ts');
- assert.equal(screen.onPairedScreenPage('/une/apps/SMARTTILL/pages/smart_till_customer_display'),false);
- const path=screen.rememberScreen({access_token:'a',appId:'SMARTTILL',pageApiName:'smart_till_customer_display',
+ const loc=(globalThis as {window:{location:{pathname:string;search:string}}}).window.location;
+ // Window A: its own screen id, never the browser's device key.
+ const a=screen.screenWindowId();
+ assert.match(a,/^scr_[0-9a-f]{48}$/);assert.equal(screen.screenWindowId(),a,'stable for the window');
+ const path=screen.rememberScreen({access_token:'t',appId:'SMARTTILL',pageApiName:'smart_till_customer_display',
   deviceName:'Till 1',mirrorKey:'till-device-key-000000000001',key:'k'.repeat(43)});
  assert.equal(path,'/une/apps/SMARTTILL/pages/smart_till_customer_display');
+ loc.pathname=path;
  assert.equal(screen.onPairedScreenPage(path),true);
- assert.equal(screen.onPairedScreenPage('/une/apps/SMARTTILL/pages/smart_till_billing'),false,'the till page in the same browser is not the screen');
- (globalThis as {window:{location:{search:string}}}).window.location.search='';
- (globalThis as {window:{sessionStorage?:unknown}}).window.sessionStorage={getItem:()=>null,setItem:()=>undefined};
- assert.equal(openerMirrorKey(),'till-device-key-000000000001','the screen follows the device it was paired with');
+ assert.equal(openerMirrorKey(),'till-device-key-000000000001','the screen follows its till');
+ // Window B in the SAME browser (its own sessionStorage): a different, new screen.
+ session.clear();
+ loc.pathname='/une/apps/SMARTTILL/pages/smart_till_billing';
+ assert.equal(openerMirrorKey(),'','the till page in this browser does not take the paired till');
+ assert.equal(screen.onPairedScreenPage(loc.pathname),false);
+ screen.startNewScreen();
+ assert.notEqual(screen.screenWindowId(),a,'/display?new: another screen in the same browser');
+ // Restart of a dedicated display: no sessionStorage; it adopts the last paired screen, same id.
+ session.clear();
+ screen.adoptSavedScreen();
+ assert.equal(screen.screenWindowId(),a);assert.equal(screen.savedScreenKey(),'k'.repeat(43));
+ loc.pathname=path;assert.equal(openerMirrorKey(),'till-device-key-000000000001');
  assert.throws(()=>screen.rememberScreen({access_token:'a',appId:'X',pageApiName:'bad page',deviceName:'',mirrorKey:''}),/page/);
  screen.forgetScreen();
- assert.equal(screen.onPairedScreenPage(path),false);assert.equal(openerMirrorKey(),'');
+ assert.equal(screen.onPairedScreenPage(path),false);assert.equal(screen.savedScreenKey(),'');
  delete (globalThis as {window?:unknown}).window;
+});
+
+test('a display on the SAME computer as its till follows the till\'s sale too',async()=>{
+ const {followMirroredSale,followsMirroredSale,setFollowingSale}=await import('../src/core/pages/PageCompiler/mirrorLiveRefresh.ts');
+ let session='opened-session-0000-0000-000000000000',asked='';
+ const deps=(sale:string,openedWithSession:boolean)=>({mirrorKey:'till-device-key-000000000001',openedWithSession,
+  request:(async(_p:string,init?:RequestInit)=>{asked=String(init?.body);return {sessionId:sale};}) as never,
+  sessionId:()=>session,resetSession:(next?:string)=>{session=next??'';}});
+ await followMirroredSale(deps('8a7b6c5d-1111-4222-8333-944455556666',true));
+ assert.match(asked,/till-device-key-000000000001/,'asks even though the till is this device');
+ assert.equal(session,'8a7b6c5d-1111-4222-8333-944455556666');assert.equal(followsMirroredSale(),true);
+ // Till not reported yet, but the window was opened by the till (?screenSession=): it shares its sale.
+ setFollowingSale(false);
+ await followMirroredSale(deps('',true));
+ assert.equal(followsMirroredSale(),true);
+ await followMirroredSale(deps('',false));
+ assert.equal(followsMirroredSale(),false,'otherwise: the till\'s open rows, as before');
+});
+
+test('"Customer display on second screen" is per device, Off by default, and opens only when On',async()=>{
+ const local=new Map<string,string>();
+ const opened:string[]=[];
+ const fakeWindow={location:{href:'about:blank'},closed:false};
+ (globalThis as {window?:unknown}).window={localStorage:{getItem:(k:string)=>local.get(k)??null,setItem:(k:string,v:string)=>{local.set(k,v);},removeItem:(k:string)=>{local.delete(k);}},
+  location:{pathname:'/une/apps/SMARTTILL/pages/smart_till_billing',origin:'https://x.test',search:''},
+  open:(url:string,name:string)=>{opened.push(name+' '+url);return fakeWindow;},addEventListener:()=>undefined};
+ (globalThis as {document?:unknown}).document={getElementById:()=>null};
+ const m=await import('../src/core/pages/PageRuntime/displayPairingScreen.ts');
+ assert.equal(m.autoOpenPage('SMARTTILL'),'','Off by default');
+ m.autoOpenCustomerDisplay('5f0c9a7e-1d2b-4c3d-9e8f-123456789abc');
+ await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual(opened,[],'Off: no window, no load');
+ m.setAutoOpen('SMARTTILL','smart_till_customer_display');
+ assert.equal(m.autoOpenPage('SMARTTILL'),'smart_till_customer_display');
+ assert.equal(m.autoOpenPage('KIOSK'),'','per app');
+ m.autoOpenCustomerDisplay('5f0c9a7e-1d2b-4c3d-9e8f-123456789abc');
+ await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+ assert.equal(opened[0],'une-second-screen ','looks for the open display first, without reloading it');
+ assert.match(fakeWindow.location.href,/\/une\/apps\/SMARTTILL\/pages\/smart_till_customer_display\?screenSession=5f0c9a7e/);
+ m.setAutoOpen('SMARTTILL','');assert.equal(m.autoOpenPage('SMARTTILL'),'');
+ delete (globalThis as {window?:unknown}).window;delete (globalThis as {document?:unknown}).document;
 });
 
 test('the display link keeps the till it follows when the app tidies its address',async()=>{

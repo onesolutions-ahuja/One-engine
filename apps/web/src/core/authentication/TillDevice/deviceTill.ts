@@ -43,13 +43,18 @@ export function openerMirrorKey():string{
   if(fromUrl&&pattern.test(fromUrl)){window.sessionStorage.setItem(MIRROR,fromUrl);return fromUrl;}
   const saved=window.sessionStorage.getItem(MIRROR);
   if(saved&&pattern.test(saved))return saved;
-  // A screen paired at /display follows the device it was paired with, across restarts.
+  // A window paired at /display follows the till it was paired with (its own pairing).
+  const own=JSON.parse(window.sessionStorage.getItem('md.screen.window')??'null') as {key?:string;mirror?:string}|null;
+  if(own?.key&&own.mirror&&pattern.test(own.mirror))return own.mirror;
+  // After a restart: only on the last paired screen's own page, never on the till's pages.
+  const path=window.localStorage.getItem(PAIRED_PATH);
   const paired=window.localStorage.getItem(PAIRED_MIRROR);
-  return paired&&pattern.test(paired)?paired:'';
+  return path&&window.location.pathname.replace(/\/$/,'')===path&&paired&&pattern.test(paired)?paired:'';
  }catch{return '';}
 }
-/** Set by /display when a till pairs this screen (see pairedScreen.ts). */
+/** Set by /display when a till pairs a screen (see pairedScreen.ts). */
 export const PAIRED_MIRROR='md.screen.mirror';
+export const PAIRED_PATH='md.screen.path';
 /** @ThisPage.Device.MirrorKey in the browser: the opening till, else what the server says, else this device. */
 export function mirrorDeviceKey():string{return openerMirrorKey()||state.mirrorKey||tillDeviceKey();}
 export function subscribeDeviceTill(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};}

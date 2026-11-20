@@ -17,3 +17,5 @@
 .smart-paired-screens li input{flex:1 1 auto}
 .smart-paired-screens .sps-code{font:600 24px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.3em;text-align:center;max-width:180px}
 .smart-paired-screens .sps-actions{display:flex;gap:8px;justify-content:flex-end}
+.smart-paired-screens .sps-auto{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.smart-paired-screens .sps-auto input{width:18px;height:18px;min-height:0;margin:0}

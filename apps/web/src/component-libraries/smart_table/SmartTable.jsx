@@ -208,6 +208,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    </table>:<p className="smart-table-empty">Select a table source to display fields.</p>}
    {!rows.length&&!p.loading&&<p className="smart-table-empty">No records</p>}
   </div>
-  <footer data-design-area={p.builderPreview?"Footer":undefined} className="smart-table-footer" style={footerStyle}>{footerText}</footer>
+  {/* Show record count: off for receipts and lists where "3 records" is noise. */}
+  {p.footerVisible===false?null:<footer data-design-area={p.builderPreview?"Footer":undefined} className="smart-table-footer" style={footerStyle}>{footerText}</footer>}
  </section>;
 }

@@ -522,12 +522,17 @@ export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unkno
   ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{})};
 }
 
+/** True when an action reads the signed-in user or the company (formula text or generated code). */
+export const needsIdentity=(source:string)=>/@ThisTenant\.(?:User|Company)\.|\$\.session\(\s*["'](?:user|tenant)\.|\$\.tenant\(/i.test(source);
+
 /** Run one page action: ONE transaction; all steps or none. */
 export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPageCode,actionKey:string,
  request:PageCodeRequest,source:string):Promise<PageCodeResult>{
  const action=code.actions[actionKey];
  if(!action)return {ok:false,error:'This action is not part of the published page',changes:[],state:{},effects:[],sets:{}};
- const scope=await scopeFor(deps,actor,request,{identity:/@ThisTenant\.(?:User|Company)\./i.test(source),
+ // The source is the generated action code: user/company values appear as $.session("user.…"),
+ // $.session("tenant.id") or $.tenant(…), not as @ThisTenant mentions.
+ const scope=await scopeFor(deps,actor,request,{identity:needsIdentity(source),
   connections:/\bCONNECTED\s*\(/i.test(source)});
  try{
   const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{

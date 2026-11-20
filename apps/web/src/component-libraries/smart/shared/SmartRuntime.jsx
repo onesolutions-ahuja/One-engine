@@ -14,6 +14,7 @@ import {isSelectedSqlFormula} from "../../shared/formulaKinds.js";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
 import SmartIdCardFields from "../../smart_id_card/SmartIdCardFields.jsx";
 import {getTenantBrand,subscribeTenantBrand} from "../../shared/TenantBrand.js";
+import {openKeypad,closeKeypad} from "./smartKeypadPopover.js";
 // Smart ID Card is a Card Grid whose cards carry up to ten metadata fields: it reuses
 // the same grid, records, selection, image, title, badge and events (no second engine).
 const isGridKind=kind=>kind==="smart_card_grid"||kind==="smart_id_card";
@@ -785,8 +786,18 @@ function SmartToggle({p,fire}){
 }
 // An editable Smart Input stays focused while its authorised formula/default
 // value changes asynchronously. Do not key/remount the native input on changes.
-function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=null,...props}){
+function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=null,keypad="",...props}){
  const [draft,setDraft]=React.useState(value);
+ const draftRef=React.useRef(value);
+ draftRef.current=draft;
+ // Keypad (number / decimal / date): tapping the box opens on-screen keys, no OS keyboard.
+ const usesKeypad=["number","decimal","date"].includes(keypad)&&rows<=1&&!props.readOnly&&!props.disabled;
+ React.useEffect(()=>usesKeypad?()=>closeKeypad():undefined,[usesKeypad]);
+ const keypadProps=usesKeypad?{inputMode:"none",
+  onFocus:event=>openKeypad(event.currentTarget,keypad,()=>draftRef.current,next=>{
+   draftRef.current=next;setDraft(next);onValueChange(next);}),
+  onClick:event=>openKeypad(event.currentTarget,keypad,()=>draftRef.current,next=>{
+   draftRef.current=next;setDraft(next);onValueChange(next);})}:{};
  const [upload,setUpload]=React.useState({busy:false,error:""});
  const fileRef=React.useRef(null);
  React.useEffect(()=>{setDraft(value);},[value]);
@@ -797,7 +808,7 @@ function SmartReactiveInput({value,onValueChange,rows=1,type="text",uploadImage=
  };
  const field=rows>1
   ?<textarea {...props} rows={rows} value={draft} onChange={change}/>
-  :<input {...props} type={type} value={draft} onChange={change}/>;
+  :<input {...props} {...keypadProps} type={type} value={draft} onChange={change}/>;
  if(typeof uploadImage!=="function")return field;
  // The field keeps holding a URL. Uploading stores the file as a tenant media
  // asset and puts its asset: URL in the field, so typing a URL still works.
@@ -1030,7 +1041,8 @@ export default function SmartRuntime(p){
     resize:inputRows>1?"none":undefined,overflowY:inputRows>1?"auto":undefined,
     background:p.backgroundColor||(ios?"#f2f2f7":"#fff"),
     textAlign:p.labelAlignment||"left","--smart-placeholder-color":p.labelColor||"#64748b"}}
-  rows={inputRows} uploadImage={p.allowImageUpload===true&&!p.builderPreview?p.uploadImage:null} onValueChange={value=>fire("change",value)}/>;
+  rows={inputRows} uploadImage={p.allowImageUpload===true&&!p.builderPreview?p.uploadImage:null}
+  keypad={p.builderPreview?"":p.keypad} onValueChange={value=>fire("change",value)}/>;
  }
  else if(name==="smart_selector")content=<SmartSelector p={p} fire={fire}/>;
  else if(name==="smart_search")content=<SmartSearch p={p} fire={fire}

@@ -48,3 +48,23 @@ export async function applySmartCartSummaryVisible(client:Query){
   WHERE c.component_api='smart_cart'
   ON CONFLICT(component_api,property_key) DO NOTHING`);
 }
+
+/** Smart Text "Keypad": none / number / decimal / date. A till has no keyboard, so
+ * tapping the box opens on-screen keys under it (date types DD/MM/YYYY). */
+export async function applySmartTextKeypad(client:Query){
+ await client.query(`
+  WITH last_order AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
+  INSERT INTO md_builder_shared_properties
+   (property_key,label,tab,section_group,control_kind,sort_order,default_value,choices,scope,
+    min_value,max_value,field_select,design_row,design_order,design_width,design_height,
+    design_caption_width,design_display)
+  SELECT 'keypad','Keypad','Data','Values','choice',last_order.n+1,
+   '"none"'::jsonb,'["none","number","decimal","date"]'::jsonb,'component',NULL,NULL,false,3,1,150,26,0,'buttons'
+  FROM last_order
+  ON CONFLICT(property_key) DO NOTHING`);
+ await client.query(`
+  INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,default_value_override)
+  SELECT c.component_api,'keypad',true,NULL FROM md_builder_ribbon_components c
+  WHERE c.component_api='smart_text'
+  ON CONFLICT(component_api,property_key) DO NOTHING`);
+}

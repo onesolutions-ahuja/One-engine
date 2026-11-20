@@ -26,7 +26,7 @@ const ribbonFunctions=new Set([
   'ROUNDUP','ROUNDDOWN','MIN','MAX','DATE','DATEVALUE','TODAY','NOW',
   'DAY','MONTH','YEAR','HOUR','MINUTE','SECOND','WEEKDAY','ADDDAYS',
   'ADDMONTHS','TIMEVALUE','TIMENOW','GEOLOCATION','DISTANCE','COLLECTION','SUM','TABLE',
-  'COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS','VERIFYPIN','CONNECTED'
+  'COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS','VERIFYPIN','CONNECTED','SUBSTITUTE'
 ]);
 const numberFunctions=new Set([
   'VALUE','LEN','COUNTIFS','SUMIFS','AVERAGEIFS','MINIFS','MAXIFS','SUM',
@@ -34,7 +34,7 @@ const numberFunctions=new Set([
   'HOUR','MINUTE','SECOND','WEEKDAY','DISTANCE'
 ]);
 const textFunctions=new Set([
-  'TEXT','FORMAT','LEFT','RIGHT','LOWER','UPPER','PROPER','CHAR'
+  'TEXT','FORMAT','LEFT','RIGHT','LOWER','UPPER','PROPER','CHAR','SUBSTITUTE'
 ]);
 const checkboxFunctions=new Set([
   'AND','OR','NOT','ISBLANK','ISNULL','ISNUMBER','CONTAINS','BEGINS',
@@ -45,6 +45,7 @@ const explicitParameters=new Map<string,FormulaValueKind[]>([
   ['AND',['Checkbox']],['OR',['Checkbox']],['VALUE',['Text']],
   ['FORMAT',['Any','Text']],['LEN',['Text']],['CHAR',['Number']],['LEFT',['Text','Number']],['RIGHT',['Text','Number']],
   ['FIND',['Text','Text','Number']],
+  ['SUBSTITUTE',['Text','Text','Text']],
   
   ['CONTAINS',['Text','Text']],['BEGINS',['Text','Text']],['ISPICKVAL',['Picklist','Text']],
   ['INCLUDES',['MultiPicklist','Text']],
@@ -74,6 +75,8 @@ const inputs:DefinitionInput[]=[
   ['TABLE',1,129,['ribbon_binding']],['SUM',1,1],
   ['LOWER',1,1],['UPPER',1,1],['PROPER',1,1],['LEFT',1,2],['RIGHT',1,2],
   ['FIND',2,3],
+  // Page formulas and actions (compiled page code has it): SUBSTITUTE(text, old, new).
+  ['SUBSTITUTE',3,3,['ribbon_binding']],
   ['CONTAINS',2,2],['BEGINS',2,2],['ISPICKVAL',2,2],['INCLUDES',2,2],
 
   ['ROUND',1,2],['ROUNDUP',1,2],['ROUNDDOWN',1,2],

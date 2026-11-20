@@ -25,6 +25,8 @@ export default function SmartIdCardFields({p,record,sample,resolve,offsetStyle,p
    // Builder placeholders keep empty slots visible and clickable; never published.
    const placeholderLabel=builder&&!configured?"Field "+n:"";
    const placeholderValue=builder&&!shown&&(sample||!configured||!record)?"Value":"";
+   // A field with no value is left out on a published card (no "Phone: -" lines).
+   if(!builder&&!shown.trim())return null;
    return <div key={n} className="smart-id-card-field" data-field={n}
     data-design-area={builder?keys.area:undefined}
     style={{...offsetStyle(keys.offset),...idCardFieldStyle(p,n),

@@ -350,7 +350,7 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    scope.ui.add('SCREEN');
    return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(args[2]?', '+value(args[2]):'')+');'];
   }
-  case 'CLOSESCREEN':case 'LOCKSCREEN':{
+  case 'CLOSESCREEN':case 'LOCKSCREEN':case 'PAIRDISPLAY':{
    scope.ui.add(node.name);
    // CLOSESCREEN("second"): close the page shown on the second monitor.
    if(node.name==='CLOSESCREEN'&&args.length){

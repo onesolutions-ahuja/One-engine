@@ -92,7 +92,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|CONFIRMSCREEN|INFOSCREEN|LOCKSCREEN|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|CONFIRMSCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source)).parse();
@@ -153,7 +153,7 @@ export function compileActionPlan(source:string):ActionStep[] {
    args.forEach(arg=>add(steps,arg,guards,loop));
    return;
   }
-  if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'){
+  if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'||node.name==='PAIRDISPLAY'){
    // CLOSESCREEN("second") closes the second-monitor screen; otherwise no arguments.
    const second=node.name==='CLOSESCREEN'&&args.length===1&&nameOf(args[0],'CLOSESCREEN target').toLowerCase()==='second';
    if(args.length&&!second)throw Error(node.name+' takes no arguments (CLOSESCREEN also accepts "second")');
@@ -908,7 +908,7 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
       if(next.length&&!(await run(next,variables,top)))return false;
       continue;
      }
-     if(step.name==='CLOSESCREEN'||step.name==='LOCKSCREEN'){
+     if(step.name==='CLOSESCREEN'||step.name==='LOCKSCREEN'||step.name==='PAIRDISPLAY'){
       if(!runPageAction)throw Error('Page runtime unavailable');
       await runPageAction(step.name,step.object);
       completed++;

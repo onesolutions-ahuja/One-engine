@@ -48,7 +48,7 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
    parents:fields.filter(field=>field.relationship).map(field=>field.relationship!.targetObject)});
   return result;
  };
- const load=async(source:CompiledDataSource,state:State,window:{offset:number;limit:number})=>{
+ const load=async(source:CompiledDataSource,state:State,window:{offset:number;limit:number;fresh?:boolean})=>{
   const {sessionId,recordId}=context();
   const fields=objects.find(object=>object.apiName===source.objectApiName)?.fields??[];
   const query=pageComponentRecordQuery(source.filters,fields,{pageState:state,sessionId,recordId},
@@ -65,7 +65,7 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   const paged=Boolean(query.filters)||!source.filters||(Array.isArray(source.filters)&&source.filters.length===0);
   const page=await loadPage(source.objectApiName,{limit:paged?window.limit:100,offset:paged?window.offset:0,
    filter:related.filter??(query.serverFilterable?query.filter:undefined),
-   filters:query.filters,filterLogic:query.filterLogic,
+   filters:query.filters,filterLogic:query.filterLogic,...(window.fresh?{forceRefresh:true}:{}),
    ...(source.sortField?{sortField:source.sortField,sortDirection:source.sortDirection??'asc'}:{})});
   const filtered=paged?page.records:filterPageComponentRecords(page.records,source.filters,fields,
    {pageState:state,recordId,sessionId},source.filterLogic);

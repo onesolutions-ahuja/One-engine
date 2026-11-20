@@ -9,7 +9,7 @@ import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
-import {deviceTill,setDeviceTill} from '../system-support/till-assignment-service.js';
+import {deviceTill,setDeviceTill,startDisplayPairing,claimDisplayPairing,unpairDisplay} from '../system-support/till-assignment-service.js';
 
 /**
  * Compiled page scripts (Page Builder Preview).
@@ -195,6 +195,23 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const body=(req.body??{}) as Record<string,unknown>;
   res.json({till:await setDeviceTill(deps,actor,body.deviceKey,body.tillId,
    {ip:req.ip,agent:req.get('user-agent')})});
+ }));
+ // Customer display pairing: the till asks for a 6-digit code, the display types it.
+ app.post('/api/till-device/display-code',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(await startDisplayPairing(deps,actor,(req.body??{}).deviceKey));
+ }));
+ app.post('/api/till-device/display-pair',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  const body=(req.body??{}) as Record<string,unknown>;
+  res.json(await claimDisplayPairing(deps,actor,body.deviceKey,body.code));
+ }));
+ app.post('/api/till-device/display-unpair',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(await unpairDisplay(deps,actor,(req.body??{}).deviceKey));
  }));
  codeRoutes('/api/apps/:appId',true);
  codeRoutes('/api/pages/:apiName',false);

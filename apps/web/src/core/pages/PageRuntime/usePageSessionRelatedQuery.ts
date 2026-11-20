@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import type {FieldMetadata,ObjectMetadata} from '../../metadata/Definitions/metadata';
+import {filtersByDevice} from '../PageCompiler/compilePage';
 import {pageComponentSessionRelatedQuery,pageComponentRelatedQuery,
  pageComponentActiveRecordQuery,hasPageActiveRecordSelection,
  type PageQueryFilter} from './pageComponentBindings';
@@ -53,8 +54,11 @@ export function usePageComponentRelatedScope(
  load:RecordLoader,manualParentId:unknown,disableActions:boolean
 ):{relatedQuery:RelatedScope;relatedField:string;parentId:unknown}{
  const relatedKey=String(properties.relatedFilterKey??'');
+ // Same rule as the compiler: a cart filtered by device (a customer display) shows another
+ // screen's sale and is never narrowed to this page's own session cart.
  const auto=properties.autoRecordScope===true||
-  (properties.autoRecordScope!==false && ['smart_cart','Custom:smart_cart'].includes(componentType));
+  (properties.autoRecordScope!==false && ['smart_cart','Custom:smart_cart'].includes(componentType)
+   && !filtersByDevice([properties.filters??null,properties.filterFormula??'']));
  const selected=hasPageActiveRecordSelection(fields,pageState);
  const direct=pageComponentActiveRecordQuery(fields,pageState);
  const session=usePageSessionRelatedQuery(auto&&!relatedKey&&!selected&&!disableActions,

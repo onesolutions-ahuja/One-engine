@@ -26,6 +26,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'CONFIRMSCREEN',parameters:['Message','ActionsOnYes','ActionsOnNo','YesLabel','NoLabel']},
  {name:'INFOSCREEN',parameters:['Message','ActionsAfterOk']},
  {name:'LOCKSCREEN',parameters:[]},
+ {name:'PAIRDISPLAY',parameters:[]},
  {name:'AS',parameters:['variable']}
 ] as const;
 export const ACTION_FORMULA_FUNCTIONS:ReadonlySet<string>=

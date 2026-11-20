@@ -94,7 +94,7 @@ export class ScheduledActionService {
   // Browser actions cannot execute after the initiating user closes their tab.
   // Reject at scheduling time rather than silently failing many hours later.
   const interactive=steps.slice(options.nextStep).find(step=>
-   ['SCREEN','PRINT','STATE','GETRECORD','FOREACH','CLOSESCREEN','CONFIRMSCREEN','INFOSCREEN','LOCKSCREEN','LOCATION','RECORDPAYMENT','CASHMOVE'].includes(step.name));
+   ['SCREEN','PRINT','STATE','GETRECORD','FOREACH','CLOSESCREEN','CONFIRMSCREEN','INFOSCREEN','LOCKSCREEN','PAIRDISPLAY','LOCATION','RECORDPAYMENT','CASHMOVE'].includes(step.name));
   if(interactive)throw Error(interactive.name+
    ' must run before WAIT; delayed actions require server execution');
   const counted=steps.slice(options.nextStep).find(step=>
@@ -256,7 +256,7 @@ export function registerScheduledActionWorker(worker:DurableJobWorker,db:SqlPers
      await service.progress(row,i+1,variables,step.name);
      break;
     }
-    if(['SCREEN','PRINT','STATE','GETRECORD','FOREACH','CLOSESCREEN','CONFIRMSCREEN','INFOSCREEN','LOCKSCREEN','LOCATION','RECORDPAYMENT','CASHMOVE'].includes(step.name))
+    if(['SCREEN','PRINT','STATE','GETRECORD','FOREACH','CLOSESCREEN','CONFIRMSCREEN','INFOSCREEN','LOCKSCREEN','PAIRDISPLAY','LOCATION','RECORDPAYMENT','CASHMOVE'].includes(step.name))
      throw Error('Interactive navigation, printing, Page State and record lookups are unavailable after WAIT');
     if(step.name==='CREATEPDF'){
      const recordId=savedId(evalNode(step.id!));

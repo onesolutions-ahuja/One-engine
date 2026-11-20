@@ -233,12 +233,23 @@ export function compileComponentAction(event:string,raw:unknown):CompiledAction|
 }
 
 /** Same rule as the previous runtime: an explicit related key wins; carts (or
- * autoRecordScope) follow the active/session parent; everything else is unscoped. */
-export function recordScope(type:string,properties:Readonly<Record<string,unknown>>):CompiledRecordScope{
+ * autoRecordScope) follow the active/session parent; everything else is unscoped.
+ * A cart whose own filter already picks its rows by device (a customer display:
+ * `DeviceKey = @ThisPage.Device.MirrorKey`) shows ANOTHER screen's sale, so it must not
+ * also be narrowed to this page's own session cart, which a display never has. */
+export function recordScope(type:string,properties:Readonly<Record<string,unknown>>,filters?:unknown):CompiledRecordScope{
  const key=typeof properties.relatedFilterKey==='string'?properties.relatedFilterKey:'';
  if(key&&identifier.test(key))return {kind:'key',key,field:String(properties.relatedFieldApiName??'')};
- const auto=properties.autoRecordScope===true||(properties.autoRecordScope!==false&&['smart_cart','Custom:smart_cart'].includes(type));
- return auto?{kind:'auto'}:{kind:'none'};
+ if(properties.autoRecordScope===true)return {kind:'auto'};
+ const cart=properties.autoRecordScope!==false&&['smart_cart','Custom:smart_cart'].includes(type);
+ return cart&&!filtersByDevice(filters)?{kind:'auto'}:{kind:'none'};
+}
+/** True when a record filter picks rows by the device this screen mirrors
+ * (@ThisPage.Device.MirrorKey). A till's own cart (@ThisPage.Device.Key) keeps its session scope. */
+export function filtersByDevice(filters:unknown):boolean{
+ if(filters===undefined||filters===null)return false;
+ const text=typeof filters==='string'?filters:JSON.stringify(filters);
+ return /@ThisPage\.Device\.MirrorKey\b/i.test(text);
 }
 export function usesCollections(properties:Readonly<Record<string,unknown>>,formulas:readonly CompiledFormula[]):boolean{
  return Boolean(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim()
@@ -331,7 +342,7 @@ export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],
    const active=activePageRecordFilters(properties);
    const filterLogic=properties.filterLogic==='OR'?'OR':'AND';
    const filterFormula=typeof active.formula==='string'&&active.formula.trim()?active.formula.trim():undefined;
-   const scope=recordScope(component.type,properties);
+   const scope=recordScope(component.type,properties,[active.filters??null,filterFormula??'']);
    const sortField=typeof properties.sortField==='string'&&/^[A-Za-z][A-Za-z0-9_]*$/.test(properties.sortField.trim())
     ?properties.sortField.trim():undefined;
    const sortDirection:'asc'|'desc'=properties.sortDirection==='desc'?'desc':'asc';

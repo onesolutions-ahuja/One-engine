@@ -10,7 +10,7 @@ import {workspaceShortcut,isTypingShortcutTarget} from '../Navigation/workspaceS
 import { relatedLookupFilterOperators } from '../../records/RecordWorkspace/recordMetadataUtils';
 
 
-import { objectSettings, parseAppRoute, appRoutePath, type AppRoute } from '../Navigation/appRouting';
+import { objectSettings, parseAppRoute, appRoutePath, keepScreenParams, type AppRoute } from '../Navigation/appRouting';
 import {standaloneEntryForAppId} from '../Standalone/standaloneEntries';
 import { NavigationLoadTime, resolveCurrentAppNavigation } from '../Navigation/appNavigationView';
 import { isStandalonePagePresentation } from '../../pages/PageRuntime/pageRuntimePresentation';
@@ -89,6 +89,7 @@ type LandingBootstrap = {
   };
 };
 type EntryTiming = { kind: 'login' | 'restore'; startedAt: number; authenticatedAt: number; landing?: LandingBootstrap };
+
 export function createSetupApp(deps: {
 apiRequest: <T>(path: string, init?: RequestInit) => Promise<T>;
 ApiRequestError: new (...args: any[]) => Error & {status:number;responseBody:unknown};
@@ -581,7 +582,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
   }, [route, objects, object.apiName, flows, flow.apiName, pages, page.apiName]);
 
   useEffect(() => {
-    const canonicalPath = appRoutePath(route);
+    const canonicalPath = keepScreenParams(appRoutePath(route), window.location.search);
     if (`${window.location.pathname}${window.location.search}` !== canonicalPath) {
       window.history.replaceState({}, '', canonicalPath);
     }

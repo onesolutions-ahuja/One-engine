@@ -14,6 +14,7 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {askWhichTill} from '../PageRuntime/tillPickerScreen';
+import {askToPairDisplay,showDisplayPairingCode} from '../PageRuntime/displayPairingScreen';
 import {ensureTenantBrand} from '../../branding/tenantBrandLoader';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
@@ -32,6 +33,8 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
+import {startMirrorLiveRefresh} from './mirrorLiveRefresh';
+import {subscribeDeviceTill} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import {isCompiledStateReference,declarativeSource,COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import type {LoadedPageScript} from './serverPageScript';
@@ -224,6 +227,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
   if(runtime.code?.asksTill)void askWhichTill(runtime.request);
+  // A customer display that cannot tell which till to follow asks for the till's 6-digit code.
+  else if(runtime.code?.readsMirror)void askToPairDisplay(runtime.request);
   // @ThisTenant.Company.Logo / Name: compiled pages load the brand themselves.
   void ensureTenantBrand();
   // Rows for instant taps and totals: one request with the first data.
@@ -270,7 +275,14 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   window.addEventListener('metadrive:page-local-state',onState);
   window.addEventListener('metadrive:page-flow-mutated',onSaved);
   window.addEventListener('metadrive:page-collection-selected',onSelected);
+  // A customer display follows the Till's sale live: nobody taps the display itself.
+  const stopMirror=startMirrorLiveRefresh(runtime.compiled.dataSources,Boolean(runtime.code?.readsMirror),{
+   reload:(id,fresh)=>runtime.data.reload(id,fresh),
+   loadSets:runtime.code?()=>runtime.code!.loadSets():undefined,
+   refreshTotals:runtime.code?()=>runtime.code!.refreshTotals():undefined,
+   subscribeDevice:subscribeDeviceTill});
   return ()=>{
+   stopMirror();
    unsubscribeState?.();
    window.removeEventListener('metadrive:page-local-state',onState);
    window.removeEventListener('metadrive:page-component-interaction',onInteraction);
@@ -724,6 +736,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();
+     else if(effect.name==='PAIRDISPLAY')await showDisplayPairingCode(runtime.request);
      // Printing code loads only when something is printed.
      else if(effect.name==='PRINT')await (await import('../PageRuntime/printTemplate')).printTemplate(first,runtime.request as never,
       ()=>previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId));
@@ -800,7 +813,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  useEffect(()=>{
   if(properties.liveRefreshEnabled!==true||!compiled.dataSourceId)return;
   const id=compiled.dataSourceId;
-  const refresh=()=>{if(document.visibilityState==='visible')void runtime.data.reload(id);};
+  // Fresh reads: another device's changes must not wait out the 30 s read cache.
+  const refresh=()=>{if(document.visibilityState==='visible')void runtime.data.reload(id,true);};
   window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
   const timer=window.setInterval(refresh,5000);
   return ()=>{window.clearInterval(timer);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};

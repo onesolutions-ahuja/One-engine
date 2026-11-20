@@ -11,7 +11,9 @@ export type DeviceTillChoice={Id:string;Name:string;Code:string;Location:string}
 export type DeviceTillState={status:'unknown'|'loading'|'set'|'unset'|'error';till:DeviceTill|null;
  tills:DeviceTillChoice[];error?:string;
  /** The device whose sale this screen shows (a customer display: its Till's key). */
- mirrorKey?:string};
+ mirrorKey?:string;
+ /** The Till this device is paired with as its customer display ('' = not paired). */
+ displayFor?:string};
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 
 const KEY='md.device.key';
@@ -60,10 +62,11 @@ export function loadDeviceTill(request:Request,force=false):Promise<DeviceTillSt
  if(!force&&(state.status==='set'||state.status==='unset'))return Promise.resolve(state);
  const deviceKey=tillDeviceKey();
  publish({...state,status:'loading'});
- loading=request<{till:DeviceTill|null;tills?:DeviceTillChoice[];mirrorKey?:string}>('/till-device/current',
+ loading=request<{till:DeviceTill|null;tills?:DeviceTillChoice[];mirrorKey?:string;displayFor?:string}>('/till-device/current',
   {method:'POST',body:JSON.stringify({deviceKey})})
   .then(answer=>{publish({status:answer.till?'set':'unset',till:answer.till,tills:answer.tills??[],
-   mirrorKey:typeof answer.mirrorKey==='string'&&pattern.test(answer.mirrorKey)?answer.mirrorKey:undefined});return state;})
+   mirrorKey:typeof answer.mirrorKey==='string'&&pattern.test(answer.mirrorKey)?answer.mirrorKey:undefined,
+   displayFor:typeof answer.displayFor==='string'?answer.displayFor:''});return state;})
   .catch(error=>{publish({status:'error',till:null,tills:[],error:error instanceof Error?error.message:'Till unavailable'});return state;})
   .finally(()=>{loading=null;});
  return loading;
@@ -75,6 +78,25 @@ export async function assignDeviceTill(request:Request,tillId:string):Promise<De
   {method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey(),tillId})});
  publish({status:'set',till:answer.till,tills:[]});
  return answer.till;
+}
+
+/** PAIRDISPLAY() on the till: a 6-digit code (5 minutes) for a customer display to type. */
+export function requestDisplayCode(request:Request):Promise<{code:string;expiresAt:string;till:string}>{
+ return request('/till-device/display-code',{method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey()})});
+}
+/** On the customer display: pair with the till that shows this code, then follow its sale. */
+export async function pairDisplayWithCode(request:Request,code:string):Promise<string>{
+ const answer=await request<{till:string;mirrorKey:string}>('/till-device/display-pair',
+  {method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey(),code:code.trim()})});
+ // A display opened from another till earlier (?mirror=) now follows the paired one.
+ try{window.sessionStorage.removeItem(MIRROR);}catch{/* private window */}
+ publish({...state,status:'unset',displayFor:answer.till,
+  mirrorKey:pattern.test(answer.mirrorKey)?answer.mirrorKey:state.mirrorKey});
+ return answer.till;
+}
+/** On the till: forget its customer display. */
+export async function unpairTillDisplay(request:Request):Promise<void>{
+ await request('/till-device/display-unpair',{method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey()})});
 }
 
 /** Tests only. */

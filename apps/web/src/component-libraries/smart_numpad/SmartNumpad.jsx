@@ -37,8 +37,10 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels,given}){
   valueRef.current=next;dirty.current=true;setValue(next);
   // The shared Page Runtime publishes the edited value and invokes any
   // configured On Change action once. Never dispatch an unconfigured Flow.
+  // The page always learns the new value (@ThisPage.amt.Value); the page only runs
+  // an On Change action when one is configured.
   if(!p.builderPreview&&typeof p.onChange==="function")p.onChange(next);
-  else if(p.actionFlows?.change)fire("change",next);
+  else fire("change",next);
   if(event&&p.actionFlows?.[event])fire(event,next);
  };
  const press=key=>{

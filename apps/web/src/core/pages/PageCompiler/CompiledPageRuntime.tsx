@@ -1,7 +1,7 @@
 import {startDevicePresence} from '../../authentication/TillDevice/devicePresence';
 import {showMessageScreen} from '../PageRuntime/messageScreen';
 import * as React from 'react';
-import {createContext,useContext,useEffect,useMemo,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
+import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
 import RegisteredComponent from '../../components/RegisteredComponent/RegisteredComponent';
 import {readDeviceLocation} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {createTemplatePdf} from '../PageRuntime/createTemplatePdf';
@@ -36,7 +36,7 @@ import type {LoadedPageScript} from './serverPageScript';
 import {createPageCodeRuntime,type PageCodeRuntime,type Effect} from './pageCodeRuntime';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
-import {componentStateFromEvent,componentStateName,type ComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState';
+import {componentStateFromEvent,componentStateName,setComponentProperty,UI_PROPERTIES,COMPONENT_PROPERTIES,type ComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
 import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import {explicitMentionRecordId,useRelationshipMentionContext} from '../../records/RecordFormDialog/useRelationshipMentionContext';
@@ -67,6 +67,12 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  giveValue(name:string,value:unknown):string[];
  /** The component's value set by an action (shown instead of its own value until typed over). */
  givenValue(componentId:string):{value:unknown}|null;
+ /** Caption / Disabled / Visible an action set on this component (by name). */
+ setProperties(name:string,values:Record<string,unknown>):void;
+ /** Caption / Disabled / Visible an action set on this component (by id): drawn over its own. */
+ heldProperties(componentId:string):{Caption?:string;Disabled?:boolean;Visible?:boolean};
+ /** What the component worked out itself (Disable when / Show when), for formulas that read it. */
+ reportProperties(componentId:string,values:Record<string,unknown>):void;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
  /** Flow "reset session on success": a fresh page session, state and data. */
  resetSession(next?:string):void;
@@ -155,6 +161,28 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
     const name=stateNames.get(componentId);
     const held=name?store.get()[givenKey(name)]:undefined;
     return held&&typeof held==='object'?held as {value:unknown}:null;
+   },
+   setProperties(name:string,values:Record<string,unknown>){
+    const id=idsByName.get(name.toLowerCase());
+    const stateName=id?stateNames.get(id):null;
+    if(!stateName)throw Error('There is no component named '+name+' on this page');
+    store.setProperties(stateName,id,'set',values);
+   },
+   heldProperties(componentId:string){
+    const name=stateNames.get(componentId);
+    if(!name)return {};
+    const result:{Caption?:string;Disabled?:boolean;Visible?:boolean}={};
+    for(const prop of UI_PROPERTIES){
+     const value=setComponentProperty(store.get(),name,prop);
+     if(value===undefined)continue;
+     if(prop==='Caption')result.Caption=String(value??'');
+     else result[prop]=value===true;
+    }
+    return result;
+   },
+   reportProperties(componentId:string,values:Record<string,unknown>){
+    const name=stateNames.get(componentId);
+    if(name)store.setProperties(name,undefined,'auto',values);
    },compiled,script,code,byId:new Map(compiled.components.map(item=>[item.id,item])),store,data,request,objects,
    searchRecords:async(sourceId:string,query:string)=>{
     const source=compiled.dataSources.find(item=>item.id===sourceId);
@@ -335,6 +363,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const compiled=runtime.byId.get(component.id)!;
  const state=useComponentState(runtime,component.id);
  const given=runtime.givenValue(component.id);
+ // `@ThisPage.Name.Caption / .Disabled / .Visible = …` set by an action.
+ const heldProps=runtime.heldProperties(component.id);
+ const reportProperties=useCallback((values:Record<string,unknown>)=>runtime.reportProperties(component.id,values),[runtime,component.id]);
  const source=useSourceSnapshot(runtime,compiled.dataSourceId);
  const sessionId=useSyncExternalStore(runtime.subscribeSession,runtime.sessionId,runtime.sessionId);
  const [actionError,setActionError]=useState('');
@@ -458,7 +489,12 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const applyState=(all:ReadonlyArray<{key:string;value:unknown}>)=>{
   // `@ThisPage.CashBox.Value = …`: each named component holds (and shows) its new value.
   const given=all.find(change=>change.key===COMPONENT_VALUES)?.value;
-  const changes=all.filter(change=>change.key!==COMPONENT_VALUES);
+  // `@ThisPage.Button2.Caption = …` / `.Disabled` / `.Visible`: only that button (and its readers) redraw.
+  const properties=all.find(change=>change.key===COMPONENT_PROPERTIES)?.value;
+  if(properties&&typeof properties==='object'&&!Array.isArray(properties))
+   for(const [name,entry] of Object.entries(properties as Record<string,{set?:Record<string,unknown>}>))
+    if(entry?.set&&typeof entry.set==='object')runtime.setProperties(name,entry.set);
+  const changes=all.filter(change=>change.key!==COMPONENT_VALUES&&change.key!==COMPONENT_PROPERTIES);
   const valueChanges=given&&typeof given==='object'&&!Array.isArray(given)
    ?Object.entries(given as Record<string,unknown>).flatMap(([name,value])=>runtime.giveValue(name,value)):[];
   const changed=[...new Set([...valueChanges,
@@ -794,7 +830,10 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    fieldAllowed:(key:string,row:Record<string,unknown>)=>scopedFieldAllows(properties.dataFieldFilters,key,row,fields,
     {pageState:state,recordId:runtime.recordId,sessionId}),
    pageSessionKey:runtime.pageSessionKey,componentId:component.id,device:formFactor,onNavigate,onLaunchFlow,onAction,actionError,
-   disabled:behaviorAction(properties,'click',{formFactor})!=='enabled',
+   disabled:heldProps.Disabled??behaviorAction(properties,'click',{formFactor})!=='enabled',
+   ...(heldProps.Disabled!==undefined?{disabledFormula:''}:{}),
+   ...(heldProps.Visible!==undefined?{visibleFormula:heldProps.Visible}:{}),
+   onFormulaState:reportProperties,
    loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(runtime.request,id,getAccessToken()??''),
    viewRevision:source.version,
    loadCompanySettings:()=>runtime.request('/metadata/currencies'),
@@ -820,7 +859,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    ...(toggleBinding?{toggleFieldBound:true,toggleFieldReady:toggleCanWrite,toggleFieldError:toggleBinding.error??'',
     value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{}),
    // `@ThisPage.Name.Value = …`: shown until the user types or picks again.
-   ...(given?{textSource:'',defaultValue:'',value:given.value===null||given.value===undefined?'':String(given.value)}:{})
+   ...(given?{textSource:'',defaultValue:'',value:given.value===null||given.value===undefined?'':String(given.value)}:{}),
+   ...(heldProps.Caption!==undefined?{label:heldProps.Caption}:{})
   }}/>
   {source.loadingMore&&<div className="records-loading" role="status">Loading more…</div>}
  </div>;
@@ -838,7 +878,14 @@ export function PageCodeFormulas({componentId,children}:{componentId:string;
  useSyncExternalStore(listener=>runtime?runtime.store.subscribeComponent(componentId,listener):()=>{},
   ()=>runtime?.store.get(),()=>runtime?.store.get());
  const held=runtime?.givenValue(componentId);
- const given=held?{textSource:'',defaultValue:'',value:held.value===null||held.value===undefined?'':String(held.value)}:{};
+ const props=runtime?.heldProperties(componentId)??{};
+ const onFormulaState=useCallback((values:Record<string,unknown>)=>runtime?.reportProperties(componentId,values),[runtime,componentId]);
+ const given:Record<string,unknown>={
+  ...(held?{textSource:'',defaultValue:'',value:held.value===null||held.value===undefined?'':String(held.value)}:{}),
+  ...(props.Caption!==undefined?{label:props.Caption}:{}),
+  ...(props.Disabled!==undefined?{disabled:props.Disabled,disabledFormula:''}:{}),
+  ...(props.Visible!==undefined?{visibleFormula:props.Visible}:{}),
+  ...(runtime?{onFormulaState}:{})};
  const version=useSyncExternalStore(listener=>code?code.subscribe(listener):()=>{},
   ()=>code?.version()??0,()=>code?.version()??0);
  const formulaCode=useMemo(()=>{

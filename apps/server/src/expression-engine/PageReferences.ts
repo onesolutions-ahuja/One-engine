@@ -282,3 +282,13 @@ export function assignedComponent(node:AssignmentNode,aliases:ReadonlySet<string
  if(page&&!/^(?:Session|Input|Till|Device|Selected)$/i.test(page[1]))return page[1];
  return null;
 }
+
+/** `@ThisPage.Button2.Caption = …` / `.Disabled = …` / `.Visible = …`: the component and property set. */
+export function assignedProperty(node:AssignmentNode):{name:string;property:'Caption'|'Disabled'|'Visible'}|null{
+ if(node.kind!=='binary'||node.operator!=='='||node.left?.kind!=='reference'||typeof node.left.value!=='string')return null;
+ const page=/^@?ThisPage\.([A-Za-z][A-Za-z0-9_]{0,79})\.(caption|disabled|visible)$/i.exec(node.left.value);
+ if(!page||/^(?:Session|Input|Till|Device|Selected)$/i.test(page[1]))return null;
+ const property=page[2].toLowerCase()==='caption'?'Caption':page[2].toLowerCase()==='disabled'?'Disabled':'Visible';
+ return {name:page[1],property};
+}
+

@@ -1,6 +1,7 @@
 import type {CompiledPage,CompiledDataSource} from './compilePage';
 import {applySavedRecordMutations,withDependentObjects,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {applyPageSelection,changedPageStateNames,type PageStateDependencies} from '../PageRuntime/pageStateDependencies';
+import {withComponentProperties} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 
 /**
  * ONE store and ONE data layer per compiled page (not one per component).
@@ -73,6 +74,18 @@ export function createCompiledPageStore(compiled:CompiledPage,initial:State={},
    const keys=[...new Set([...Object.keys(state),...Object.keys(next)])];
    state={...next};
    notify(keys);
+  },
+  /** Disabled / Caption / Visible of one component: given by an action ('set') or worked out
+   * by the page ('auto'). Only that component and the formulas naming it redraw. */
+  setProperties(name:string,componentId:string|undefined,part:'set'|'auto',values:Readonly<Record<string,unknown>>):boolean{
+   const next=withComponentProperties(state,name,part,values);
+   if(next===state)return false;
+   state=next;
+   const ids=new Set(readersOf(name));
+   if(componentId)ids.add(componentId);
+   for(const id of ids)byComponent.get(id)?.forEach(listener=>listener());
+   for(const entry of keyListeners)if(entry.keys.has(name.toLowerCase()))entry.listener();
+   return true;
   },
   /** Redraw these components (a value given to them by an action). */
   redraw(ids:readonly string[]){for(const id of ids)byComponent.get(id)?.forEach(listener=>listener());},

@@ -1,0 +1,23 @@
+/** "Disable when" formula for Smart Buttons — upgrade-safe, additive SQL metadata.
+ * A formula such as  @ThisPage.Total.Value = 0  greys the button out and ignores taps while
+ * it is TRUE (Pay / Hold at £0). Blank keeps today's behaviour (always enabled).
+ * Actions can still set it directly: @ThisPage.PayCash.Disabled = TRUE. */
+type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>};
+export const DISABLE_WHEN_COMPONENTS=['smart_button'] as const;
+export async function applySmartDisabledFormula(client:Query){
+ await client.query(`
+  WITH last_order AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
+  INSERT INTO md_builder_shared_properties
+   (property_key,label,tab,section_group,control_kind,sort_order,default_value,choices,scope,
+    min_value,max_value,field_select,design_row,design_order,design_width,design_height,
+    design_caption_width,design_display)
+  SELECT 'disabledFormula','Disable when (formula)','Data','Values','expression',last_order.n+1,
+   NULL,'[]'::jsonb,'component',NULL,NULL,true,2,2,150,26,0,'buttons'
+  FROM last_order
+  ON CONFLICT(property_key) DO NOTHING`);
+ await client.query(`
+  INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,default_value_override)
+  SELECT c.component_api,'disabledFormula',true,NULL FROM md_builder_ribbon_components c
+  WHERE c.component_api=ANY($1::text[])
+  ON CONFLICT(component_api,property_key) DO NOTHING`,[[...DISABLE_WHEN_COMPONENTS]]);
+}

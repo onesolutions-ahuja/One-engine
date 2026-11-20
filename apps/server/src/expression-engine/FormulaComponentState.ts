@@ -71,3 +71,58 @@ export function readComponentState(selections:unknown,name:string,field:Componen
  const result=scalar(raw);
  return result===null&&raw!==null?'':result;
 }
+
+/** Component properties formulas and actions may read and set:
+ *  @ThisPage.Button1.Disabled, @ThisPage.Button2.Caption = "Pay " & …, @ThisPage.Box.Visible = FALSE.
+ * The page holds them under one state key, per component name (lower case):
+ *  {set: values an action gave, auto: values the page worked out (Disable when / Show when, caption)}.
+ * A value an action set wins; else what the page worked out; else the default. */
+export const COMPONENT_PROPERTIES='componentProperties';
+export const UI_PROPERTIES=['Caption','Disabled','Visible'] as const;
+export type UiProperty=typeof UI_PROPERTIES[number];
+export const uiProperty=(name:unknown):UiProperty|null=>typeof name==='string'
+ ?UI_PROPERTIES.find(item=>item.toLowerCase()===name.toLowerCase())??null:null;
+type Held={set?:Record<string,unknown>;auto?:Record<string,unknown>};
+const heldFor=(state:unknown,name:string):Held=>{
+ const all=state&&typeof state==='object'&&!Array.isArray(state)
+  ?(state as Record<string,unknown>)[COMPONENT_PROPERTIES]:undefined;
+ const entry=all&&typeof all==='object'&&!Array.isArray(all)?(all as Record<string,unknown>)[name.toLowerCase()]:undefined;
+ return entry&&typeof entry==='object'&&!Array.isArray(entry)?entry as Held:{};
+};
+/** A property an action set on this component (undefined when none). */
+export function setComponentProperty(state:unknown,name:string,property:UiProperty):unknown{
+ const set=heldFor(state,name).set;
+ return set&&Object.prototype.hasOwnProperty.call(set,property)?set[property]:undefined;
+}
+/** What @ThisPage.Name.Disabled / Caption / Visible reads now. */
+export function readComponentProperty(state:unknown,name:string,property:UiProperty):string|boolean{
+ const held=heldFor(state,name);
+ const pick=(from:Record<string,unknown>|undefined)=>from&&Object.prototype.hasOwnProperty.call(from,property)?from[property]:undefined;
+ const value=pick(held.set)??pick(held.auto);
+ if(property==='Caption')return value===undefined||value===null?'':String(value);
+ if(value===undefined||value===null)return property==='Visible';
+ return value===true||value===1||String(value).toUpperCase()==='TRUE';
+}
+/** Check a value given with `@ThisPage.Name.Disabled = …` before it is held. */
+export function uiPropertyValue(property:UiProperty,value:unknown):string|boolean{
+ if(property==='Caption'){
+  if(value!==null&&value!==undefined&&!['string','number','boolean'].includes(typeof value))
+   throw Error('A caption must be text');
+  return value===null||value===undefined?'':String(value);
+ }
+ if(typeof value==='boolean')return value;
+ if(typeof value==='number')return value!==0;
+ if(typeof value==='string'&&/^(true|false)$/i.test(value.trim()))return value.trim().toUpperCase()==='TRUE';
+ throw Error(property+' must be TRUE or FALSE');
+}
+/** State with one component's held properties changed (a new object only when something changed). */
+export function withComponentProperties(state:Readonly<Record<string,unknown>>,name:string,
+ part:'set'|'auto',values:Readonly<Record<string,unknown>>):Readonly<Record<string,unknown>>{
+ const key=name.toLowerCase();
+ const held=heldFor(state,key);
+ const current=held[part]??{};
+ if(Object.entries(values).every(([prop,value])=>Object.is(current[prop],value)))return state;
+ const all={...(state[COMPONENT_PROPERTIES] as Record<string,unknown>|undefined)};
+ all[key]={...held,[part]:{...current,...values}};
+ return {...state,[COMPONENT_PROPERTIES]:all};
+}

@@ -14,6 +14,7 @@ import {hasExcelWildcardCriteria} from '../expression-engine/FormulaWildcard.js'
 import {aggregateRows,fieldValue,rowMatches} from '../page-compiler/code/formulaLibrary.js';
 import {readComponentState} from '../expression-engine/FormulaComponentState.js';
 import {COMPONENT_VALUES} from '../expression-engine/PageReferences.js';
+import {COMPONENT_PROPERTIES,readComponentProperty,uiProperty,uiPropertyValue,withComponentProperties} from '../expression-engine/FormulaComponentState.js';
 import {isConnected,type ConnectionSnapshot} from '../expression-engine/FormulaConnections.js';
 import type {ServerPageCode} from '../page-compiler/code/pageCode.js';
 import {trustedFormulaSession,type TrustedFormulaSession} from './formula-data-action-runtime.js';
@@ -81,6 +82,26 @@ export function criteriaFilters(criteria:ReadonlyArray<readonly [string,unknown]
   return {field,operator:'eq',value:String(value)};
  });
 }
+/** Held component properties ({button1:{set:{Disabled:true},auto:{…}}}): names and scalar values only. */
+const componentPropertiesState=(value:unknown):Record<string,unknown>=>{
+ const out:Record<string,unknown>=Object.create(null);
+ if(!value||typeof value!=='object'||Array.isArray(value))return out;
+ for(const [name,entry] of Object.entries(value).slice(0,200)){
+  if(!/^[a-z][a-z0-9_]{0,79}$/.test(name)||!entry||typeof entry!=='object')continue;
+  const clean:Record<string,Record<string,unknown>>={};
+  for(const part of ['set','auto'] as const){
+   const values=(entry as Record<string,unknown>)[part];
+   if(!values||typeof values!=='object')continue;
+   clean[part]={};
+   for(const prop of ['Caption','Disabled','Visible']){
+    const item=(values as Record<string,unknown>)[prop];
+    if(item===null||['string','number','boolean'].includes(typeof item))clean[part][prop]=item;
+   }
+  }
+  out[name]=clean;
+ }
+ return out;
+};
 const scalarState=(state:unknown):Record<string,unknown>=>{
  const out:Record<string,unknown>=Object.create(null);
  if(!state||typeof state!=='object'||Array.isArray(state))return out;
@@ -88,6 +109,7 @@ const scalarState=(state:unknown):Record<string,unknown>=>{
   if(!key.test(name))continue;
   if(value===null||['string','number','boolean'].includes(typeof value))out[name]=value;
   else if(name==='collectionSelections'&&value&&typeof value==='object')out[name]=value;
+  else if(name===COMPONENT_PROPERTIES)out[name]=componentPropertiesState(value);
  }
  return out;
 };
@@ -168,6 +190,25 @@ class ServerScope{
   const set=this.stateChanges[COMPONENT_VALUES] as Record<string,unknown>|undefined;
   if(set&&Object.prototype.hasOwnProperty.call(set,name)&&(field==='Value'||field==='Text'))return set[name]??'';
   return readComponentState(this.request.state.collectionSelections,name,field as never);
+ }
+ /** @ThisPage.Button1.Disabled / Caption / Visible: a value this action set, else what the page holds. */
+ property(name:string,property:string){
+  const prop=uiProperty(property);
+  if(!prop)throw Error('Unknown component property '+property);
+  const mine=this.stateChanges[COMPONENT_PROPERTIES];
+  const held=withComponentProperties({[COMPONENT_PROPERTIES]:this.request.state[COMPONENT_PROPERTIES]},name,'set',{});
+  const own=(mine as Record<string,{set?:Record<string,unknown>}>|undefined)?.[name.toLowerCase()]?.set;
+  if(own&&Object.prototype.hasOwnProperty.call(own,prop))return readComponentProperty({[COMPONENT_PROPERTIES]:mine},name,prop);
+  return readComponentProperty(held,name,prop);
+ }
+ /** `@ThisPage.Button2.Caption = …`: sent back to the page, which shows it on that component. */
+ setProperty(name:string,property:string,value:unknown){
+  if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))throw Error('Invalid component name');
+  const prop=uiProperty(property);
+  if(!prop)throw Error('Unknown component property '+property);
+  const next=withComponentProperties({[COMPONENT_PROPERTIES]:this.stateChanges[COMPONENT_PROPERTIES]},name,'set',
+   {[prop]:uiPropertyValue(prop,value)});
+  this.stateChanges[COMPONENT_PROPERTIES]=next[COMPONENT_PROPERTIES];
  }
  /** `@ThisPage.CashBox.Value = …`: sent back to the page, which shows it in that component. */
  setValue(name:string,value:unknown){

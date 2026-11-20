@@ -808,6 +808,29 @@ export default function SmartRuntime(p){
  // Re-render when the tenant brand arrives so @ThisTenant.Company.Name / .Logo show without a reload.
  React.useSyncExternalStore(subscribeTenantBrand,getTenantBrand,getTenantBrand);
  const name=p.kind||"smart_text",record=recordOf(p),label=scopedExpression(p,"label",p.label||"",record);
+ // Show when / Disable when (Data): formulas such as  @ThisPage.Total.Value = 0.
+ // A formula that cannot run hides (Show when) or disables (Disable when): fail closed.
+ const live=!p.builderPreview&&!p.designMode;
+ const blankFormula=v=>v===undefined||v===null||(typeof v==="string"&&!v.trim());
+ const formulaTrue=v=>!(v===false||v===0||v===null||v===undefined||String(v).trim()===""
+  ||String(v).toUpperCase()==="FALSE"||String(v)==="0"||v==="FORMULAERROR");
+ const showWhen=p.visibleFormula;
+ const hiddenNow=live&&!blankFormula(showWhen)
+  &&!formulaTrue(typeof showWhen==="string"?scopedExpression(p,"visibleFormula",showWhen,record):showWhen);
+ const disableWhen=p.disabledFormula;
+ const disabledByFormula=live&&!blankFormula(disableWhen)&&(()=>{
+  const result=typeof disableWhen==="string"?scopedExpression(p,"disabledFormula",disableWhen,record):disableWhen;
+  return result==="FORMULAERROR"||formulaTrue(result);
+ })();
+ const isDisabled=live&&(p.disabled===true||disabledByFormula);
+ // Formulas elsewhere can read @ThisPage.<Name>.Disabled / .Visible / .Caption: the page is told
+ // only when one of them changes, and only formulas naming this component redraw.
+ const reportFormulaState=p.onFormulaState;
+ const captionNow=typeof label==="string"||typeof label==="number"?String(label):"";
+ React.useEffect(()=>{
+  if(live&&typeof reportFormulaState==="function")
+   reportFormulaState({Disabled:isDisabled,Visible:!hiddenNow,Caption:captionNow});
+ },[live,reportFormulaState,isDisabled,hiddenNow,captionNow]);
  // Style = iOS is saved on newly inserted components. Older saved components have
  // no Style value and stay Classic. Configured properties always win over either.
  // iOS is the only Smart style (the Classic/iOS switch was removed).
@@ -843,6 +866,7 @@ export default function SmartRuntime(p){
  },[name]);
  const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",borderRadius:number(p.radius,12)};
  const fire=(event,value)=>{if(p.previewOnly||p.builderPreview)return;
+  if(isDisabled&&name==="smart_button")return;
   if(typeof p.onAction==="function")void Promise.resolve(p.onAction({event,value})).catch(()=>{});
  };
  let content;
@@ -850,7 +874,8 @@ export default function SmartRuntime(p){
  // far right (e.g. "Start Order  →"), right text puts it at the far left, and
  // centred or unset text keeps the icon just before the caption.
  const iconSide=buttonIcon&&label?(p.labelAlignment==="left"?"end":p.labelAlignment==="right"?"start":"inline"):"inline";
- if(name==="smart_button")content=<button data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Button text":undefined} type="button" className={"smart-button"+(p.wrapText===true?" is-wrapped":"")}
+ if(name==="smart_button")content=<button data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Button text":undefined} type="button" className={"smart-button"+(p.wrapText===true?" is-wrapped":"")+(isDisabled?" is-disabled":"")}
+   disabled={isDisabled} aria-disabled={isDisabled||undefined}
    title={label||"Button"} aria-label={label||buttonIcon?.label||"Button"}
    onClick={()=>fire("click",record)} data-icon-side={iconSide==="inline"?undefined:iconSide}
    style={{...style,...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12)),
@@ -858,7 +883,8 @@ export default function SmartRuntime(p){
     justifyContent:label?(p.labelAlignment==="right"?"flex-end":p.labelAlignment==="center"?"center":"flex-start"):"center",
     ...(p.wrapText===true?{textAlign:p.labelAlignment==="right"?"right":p.labelAlignment==="center"?"center":"left"}:{}),
     fontWeight:typeof p.headerBold==="boolean"?(p.headerBold?700:400):undefined,
-    background:p.backgroundColor||(ios?"#007aff":"#2267bc"),color:p.labelColor||"#fff",borderColor:p.borderColor}}>
+    background:p.backgroundColor||(ios?"#007aff":"#2267bc"),color:p.labelColor||"#fff",borderColor:p.borderColor,
+    ...(isDisabled?{opacity:.4,filter:"grayscale(.7)",cursor:"not-allowed"}:{})}}>
    {buttonIcon&&<span className="smart-button-glyph" aria-hidden="true" style={{
      backgroundColor:p.iconFillColor||p.labelColor||"#fff",
      WebkitMaskImage:'url(/smart-icons/'+buttonIcon.id+'.svg)',
@@ -1151,15 +1177,8 @@ export default function SmartRuntime(p){
  // Show when (Data): a formula such as COUNTIFS(Cart, ..., PaymentStatus, "Card") > 0.
  // Blank always shows; FALSE, 0 or blank text hides at runtime. The builder always shows it.
  // Page code may already have run it (a total such as COUNTIFS): then it arrives as TRUE/FALSE/0.
- const showWhen=p.visibleFormula;
- if(showWhen!==undefined&&showWhen!==null&&!(typeof showWhen==="string"&&!showWhen.trim())&&!p.builderPreview&&!p.designMode){
-  const shown=typeof showWhen==="string"?scopedExpression(p,"visibleFormula",showWhen,record):showWhen;
-  // A formula that cannot run hides the component (fail closed), never shows it.
-  if(shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
-   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR")
-   // Marker only: the page frame around a hidden component must not catch taps meant for what is under it.
-   return <span data-smart-hidden="true" hidden/>;
- }
+ // Marker only: the page frame around a hidden component must not catch taps meant for what is under it.
+ if(hiddenNow)return <span data-smart-hidden="true" hidden/>;
  // Geometry-only technical host; the native Smart surface owns all visible styling.
  // An ID card is a Card Grid surface too: it shares the grid sizing/scroll CSS.
  return <div className={"smart-runtime "+name+(name==="smart_id_card"?" smart_card_grid":"")+(ios?" smart-ios":"")+((name==="smart_tabs"||name==="smart_navigation")&&p.wrapText===true?" smart-wrap-text":"")}

@@ -77,3 +77,14 @@ test('Fast taps 1-2-3-3 give 1233 (each tap reads the previous one)',async()=>{
  await Promise.all(['1','2','3','3'].map(digit=>rt.run('k'+digit+':click',{},'',io as never)));
  assert.equal((state.collectionSelections as Record<string,{Value:unknown}>).q.Value,'1233');
 });
+
+import {validateFormulaFunctions} from '../../server/src/expression-engine/FormulaFunctionRegistry';
+import {Parser} from '../../server/src/expression-engine/FormulaParser';
+import {tokenize} from '../../server/src/expression-engine/FormulaTokenizer';
+const parseFormula=(text:string)=>new Parser(tokenize(text)).parse();
+test('SUBSTITUTE is allowed in page formulas and actions (refund picks count units)',()=>{
+ const formula='(LEN(BLANKVALUE(@ThisPage.SdPicked.Value, "")) - LEN(SUBSTITUTE(BLANKVALUE(@ThisPage.SdPicked.Value, ""), "[" & @InvoiceLine.Id & "]", ""))) / (LEN(@InvoiceLine.Id) + 2)';
+ assert.doesNotThrow(()=>validateFormulaFunctions(parseFormula(formula),'ribbon_binding'));
+ const code=page('=@ThisPage.Picked.Value = SUBSTITUTE("[a][b]", "[a]", "")');
+ assert.deepEqual(code.issues,[]);
+});

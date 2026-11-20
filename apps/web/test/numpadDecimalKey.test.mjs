@@ -36,3 +36,11 @@ test('Date Numpad types DD/MM/YYYY and adds the slashes',()=>{
  assert.equal(applyNumpadKey('01/0','.',date),'01/0');
  assert.equal(normalizeNumpadValue('2001-05-01',date),'01/05/2001','a saved date shows as DD/MM/YYYY');
 });
+
+import SmartRuntime from '../src/component-libraries/smart/shared/SmartRuntime.jsx';
+test('A Text box with a Keypad opens on-screen keys instead of the OS keyboard',()=>{
+ const html=renderToStaticMarkup(React.createElement(SmartRuntime,{kind:'smart_text',keypad:'date',label:'Date of birth',onAction:()=>{}}));
+ assert.match(html,/inputmode="none"/i);
+ const plain=renderToStaticMarkup(React.createElement(SmartRuntime,{kind:'smart_text',label:'Name',onAction:()=>{}}));
+ assert.doesNotMatch(plain,/inputmode="none"/i);
+});

@@ -55,3 +55,25 @@ test('Setting a property redraws only that component and the formulas naming it'
  assert.equal(store.setProperties('button1','b1','set',{Disabled:true}),false,'same value: nothing redraws');
  assert.deepEqual(drawn,[]);
 });
+
+import {F,O} from '../../server/src/page-compiler/code/formulaLibrary';
+import {pageCodeModule} from '../../server/src/page-compiler/code/pageCode';
+import {createPageCodeRuntime,type PageCode} from '../src/core/pages/PageCompiler/pageCodeRuntime';
+import {componentStateFromEvent} from '../../server/src/expression-engine/FormulaComponentState';
+
+test('Fast taps 1-2-3-3 give 1233 (each tap reads the previous one)',async()=>{
+ const keys=['1','2','3'].map(digit=>({id:'k'+digit,objectApiName:'',formulas:[],
+  actions:[{event:'click',kind:'Formula',formula:'=@ThisPage.q.Value = (@ThisPage.q.Value & "'+digit+'")'}]}));
+ const module=pageCodeModule(buildPageCode({apiName:'pad',components:keys} as never));
+ const code=(new Function('F','O',module.replace(/export /g,'')+'\nreturn createCode(F, O);') as (f:typeof F,o:typeof O)=>PageCode)(F,O);
+ let state:Record<string,unknown>={};
+ const rt=createPageCodeRuntime(code,{endpoint:'/apps/X',build:{buildId:'b'},sessionId:()=>'s',state:()=>state,
+  request:(async()=>({ok:true,sets:{}})) as never});
+ const io={show:(update:{state:Record<string,unknown>})=>{
+  const given=update.state.componentValues as Record<string,unknown>|undefined;
+  for(const [name,value] of Object.entries(given??{}))
+   state={...state,collectionSelections:{...(state.collectionSelections as object),[name]:componentStateFromEvent(value)}};
+ },effects:async()=>{}};
+ await Promise.all(['1','2','3','3'].map(digit=>rt.run('k'+digit+':click',{},'',io as never)));
+ assert.equal((state.collectionSelections as Record<string,{Value:unknown}>).q.Value,'1233');
+});

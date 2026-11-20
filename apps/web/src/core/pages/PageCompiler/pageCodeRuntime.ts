@@ -60,6 +60,12 @@ export function signedInValue(page:PageReference,state:Readonly<Record<string,un
 const same=(a:unknown,b:unknown)=>String(a??'')===String(b??'');
 let batches=Math.floor(Math.random()*0x10000)*0x1000;
 
+type TapIo={
+ show(update:{changes:RecordChange[];state:Record<string,unknown>;optimistic?:string;replaces?:string;failed?:boolean}):void;
+ effects(effects:Effect[]):Promise<void>;
+ /** A device step the server asked for (LOCATION, CREATEPDF): its answer. */
+ device?(step:{name:string;args:unknown[]}):Promise<unknown>;
+};
 export type PageCodeHost={
  request:Request;
  /** '/apps/:appId' (published) or '/pages/:apiName' (Builder Preview). */
@@ -324,6 +330,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   event:{recordId:ev.recordId,value:ev.value,index:ev.index,label:ev.label},
   timeZone:typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:undefined});
 
+ let tapGate:Promise<void>=Promise.resolve();
  const api={
   code,
   /** The page reads @ThisPage.Till: this device must be set up as a Till. */
@@ -372,14 +379,23 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    * and state; `effects` runs the UI steps after the save. Throws on failure
    * after undoing the predicted change.
    */
-  async run(key:string,ev:Row,rowObject:string,io:{
-   show(update:{changes:RecordChange[];state:Record<string,unknown>;optimistic?:string;replaces?:string;failed?:boolean}):void;
-   effects(effects:Effect[]):Promise<void>;
-   /** A device step the server asked for (LOCATION, CREATEPDF): its answer. */
-   device?(step:{name:string;args:unknown[]}):Promise<unknown>;
-  }){
+  async run(key:string,ev:Row,rowObject:string,io:TapIo):Promise<void>{
    const action=code.actions[key];
    if(!action)throw Error('Unknown page action '+key);
+   // Taps run in order: each starts once the previous tap's change is on screen
+   // (never after its save), so 1-2-3-3 typed fast reads 123 and gives 1233.
+   let release!:()=>void;
+   const previous=tapGate;
+   const mine=new Promise<void>(resolve=>{release=resolve;});
+   tapGate=previous.then(()=>mine);
+   await previous;
+   try{
+    return await runTap(action,key,ev,rowObject,io,release);
+   }finally{release();}
+  },
+ };
+ async function runTap(action:PageCode['actions'][string],key:string,ev:Row,rowObject:string,io:TapIo,release:()=>void):Promise<void>{
+  {
    const batch=((++batches)%0x10000000).toString(16).padStart(8,'0');
    const record=(ev.record&&typeof ev.record==='object'?ev.record:ev) as Row;
    const event={...ev,record,recordId:ev.recordId??record.Id};
@@ -398,6 +414,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     // Screen-only action (STATE, SCREEN, LOCKSCREEN): nothing to save.
     if(!predicted)throw Error('This action needs the server');
     io.show({changes:[],state:{...tap.stateChanges}});
+    release();
     await io.effects(tap.effects);
     return;
    }
@@ -410,6 +427,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     io.show({changes:tap.changes,state:{...tap.stateChanges},optimistic:batch});
     if(early.length)void io.effects(early).catch(()=>undefined);
    }
+   release();
    let result:ServerResult;
    try{
     result=await saving;

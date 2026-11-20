@@ -1,4 +1,4 @@
-import {createHash,randomBytes,randomInt} from 'node:crypto';
+import {createHash,createHmac,randomBytes,randomInt} from 'node:crypto';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {AuthenticationService} from '../system-files/authentication.js';
 
@@ -26,6 +26,14 @@ const SCREEN_KEY_DAYS=365;
 /** Wrong codes one person may type per minute (4 digits). */
 const TRIES_PER_MINUTE=10;
 export const SCREEN_GONE='This screen is no longer paired. Pair it again from the till.';
+/** A message for the person at the screen or till (shown as is, HTTP 400/409), never an outage. */
+export class UserActionError extends Error{
+ constructor(message:string,readonly status=400){super(message);this.name='UserActionError';}
+}
+// A function declaration with `never`, so TypeScript narrows after `if(...)fail(...)`.
+function fail(message:string,status=400):never{throw new UserActionError(message,status);}
+/** A till in use elsewhere: taking it over needs the code in the corner of its screen. */
+export const TAKEOVER_CODE_NEEDED='is in use on another device. Type the code shown in the corner of its customer display';
 
 export type ScreenSession={accessToken:string;refreshToken:string;expiresIn:number};
 export type ScreenTarget={appId:string;pageApiName:string;deviceName:string;mirrorKey:string};
@@ -43,7 +51,7 @@ export class ScreenPairingService{
 
  /** /display with no sign-in: a new 4-digit code for this screen. */
  async start(screenKey:unknown):Promise<{code:string;poll:string;expiresAt:string}>{
-  if(typeof screenKey!=='string'||!deviceKeyPattern.test(screenKey))throw Error('This screen has no valid device key');
+  if(typeof screenKey!=='string'||!deviceKeyPattern.test(screenKey))fail('This screen has no valid device key');
   const poll=secret();
   for(let attempt=0;attempt<20;attempt++){
    const code=String(randomInt(0,10_000)).padStart(4,'0');
@@ -54,7 +62,7 @@ export class ScreenPairingService{
     RETURNING code_expires_at`,[code,hash(poll),screenKey,SCREEN_CODE_MINUTES]);
    if(rows[0])return {code,poll,expiresAt:new Date(rows[0].code_expires_at).toISOString()};
   }
-  throw Error('No pairing code is free right now. Try again in a minute');
+  fail('No pairing code is free right now. Try again in a minute');
  }
 
  /** The screen asks whether it was paired yet. Paired: its key and first session, once. */
@@ -99,11 +107,11 @@ export class ScreenPairingService{
  /** On the till (signed in): the code shown on the screen pairs it with this device and page. */
  async approve(actor:Actor,mfaVerified:boolean,code:unknown,device:PairingDevice,appId:unknown,pageApiName:unknown,name?:unknown):Promise<PairedScreen>{
   const label=screenName(name);
-  if(typeof code!=='string'||!/^\d{4}$/.test(code.trim()))throw Error('Type the 4-digit code shown on the screen');
-  if(typeof appId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(appId))throw Error('Choose the app this screen belongs to');
-  if(typeof pageApiName!=='string'||!apiName.test(pageApiName))throw Error('Choose the page this screen shows');
-  if(!uuid.test(device.id)||!deviceKeyPattern.test(device.deviceKey))throw Error('Set this device up first');
-  if(!this.allowTry(actor.tenant_id+'\u0000'+actor.user_id))throw Error('Too many tries. Wait a minute and try again');
+  if(typeof code!=='string'||!/^\d{4}$/.test(code.trim()))fail('Type the 4-digit code shown on the screen');
+  if(typeof appId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(appId))fail('Choose the app this screen belongs to');
+  if(typeof pageApiName!=='string'||!apiName.test(pageApiName))fail('Choose the page this screen shows');
+  if(!uuid.test(device.id)||!deviceKeyPattern.test(device.deviceKey))fail('Set this device up first');
+  if(!this.allowTry(actor.tenant_id+'\u0000'+actor.user_id))fail('Too many tries. Wait a minute and try again');
   const {rows}=await this.db.query<{id:string;screen_key:string;approved_at:Date}>(`UPDATE md_screen_pairings
     SET tenant_id=$2,user_id=$3,mfa_verified=$4,device_record_id=$5,device_name=$6,mirror_key=$7,app_id=$8,page_api_name=$9,
         approved_at=now(),code=NULL,screen_name=$10
@@ -112,8 +120,8 @@ export class ScreenPairingService{
     RETURNING id,screen_key,approved_at`,
   [code.trim(),actor.tenant_id,actor.user_id,mfaVerified,device.id,device.name.slice(0,120),device.deviceKey,appId,pageApiName,label||null]);
   const row=rows[0];
-  if(!row)throw Error('That code is wrong or has expired. Check the code on the screen');
-  if(row.screen_key===device.deviceKey){await this.revokeRow(row.id);throw Error('Open /display on the other screen, not on this device');}
+  if(!row)fail('That code is wrong or has expired. Check the code on the screen');
+  if(row.screen_key===device.deviceKey){await this.revokeRow(row.id);return fail('Open /display on the other screen, not on this device');}
   return {id:row.id,name:label||'Display',appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
  }
 
@@ -144,9 +152,9 @@ export class ScreenPairingService{
 
  /** Give a paired screen a name people recognise ("Counter", "Kitchen"). */
  async rename(actor:Actor,id:unknown,name:unknown):Promise<{renamed:boolean}>{
-  if(typeof id!=='string'||!uuid.test(id))throw Error('Choose a screen');
+  if(typeof id!=='string'||!uuid.test(id))fail('Choose a screen');
   const label=screenName(name);
-  if(!label)throw Error('Type a name for the screen');
+  if(!label)fail('Type a name for the screen');
   const {rows}=await this.db.query<{id:string}>(`UPDATE md_screen_pairings SET screen_name=$3
    WHERE id=$1 AND tenant_id=$2 AND revoked_at IS NULL RETURNING id`,[id,actor.tenant_id,label]);
   return {renamed:Boolean(rows[0])};
@@ -154,11 +162,73 @@ export class ScreenPairingService{
 
  /** Unpair: the screen key and every session it was given stop at once. */
  async revoke(actor:Actor,id:unknown):Promise<{revoked:boolean}>{
-  if(typeof id!=='string'||!uuid.test(id))throw Error('Choose a screen');
+  if(typeof id!=='string'||!uuid.test(id))fail('Choose a screen');
   const {rows}=await this.db.query<{id:string}>('SELECT id FROM md_screen_pairings WHERE id=$1 AND tenant_id=$2 AND revoked_at IS NULL',[id,actor.tenant_id]);
   if(!rows[0])return {revoked:false};
   await this.revokeRow(id);
   return {revoked:true};
+ }
+
+ /** The sale a device is on (its selling page's session): a paired screen shows that sale only. */
+ async reportSession(actor:Actor,deviceKey:unknown,sessionId:unknown):Promise<{ok:true}>{
+  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))fail('This device has no valid device key');
+  if(typeof sessionId!=='string'||!uuid.test(sessionId))fail('Invalid page session');
+  await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,session_key,session_at,seen_at,offline)
+   VALUES($1,$2,$3,now(),now(),false) ON CONFLICT(tenant_id,device_key) DO UPDATE
+   SET session_key=EXCLUDED.session_key,session_at=now(),seen_at=now(),offline=false`,[actor.tenant_id,deviceKey,sessionId]);
+  return {ok:true};
+ }
+ /** Device presence (the app open on that device, or closed). */
+ async deviceSeen(actor:Actor,deviceKey:string,online:boolean):Promise<void>{
+  if(!deviceKeyPattern.test(deviceKey))return;
+  await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,seen_at,offline) VALUES($1,$2,now(),$3)
+   ON CONFLICT(tenant_id,device_key) DO UPDATE SET seen_at=now(),offline=EXCLUDED.offline`,[actor.tenant_id,deviceKey,!online]);
+ }
+ /** The sale the mirrored device is on now ('' = none reported). */
+ async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string}>{
+  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:''};
+  const {rows}=await this.db.query<{session_key:string|null}>(
+   'SELECT session_key FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',[actor.tenant_id,mirrorKey]);
+  return {sessionId:rows[0]?.session_key??''};
+ }
+ /** The small code in the corner of a paired screen: changes every minute. Only a screen
+  * paired with that device (by its own sign-in) may read it. */
+ async cornerCode(actor:Actor,bearer:string,mirrorKey:unknown):Promise<{code:string;device:string;secondsLeft:number}>{
+  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))fail('This screen follows no device');
+  const {rows}=await this.db.query<{device_name:string}>(`SELECT p.device_name FROM md_screen_pairings p
+   WHERE p.tenant_id=$1 AND p.mirror_key=$2 AND p.revoked_at IS NULL AND p.approved_at IS NOT NULL
+    AND (SELECT family_id FROM md_sessions WHERE token_hash=$3 AND revoked_at IS NULL)=ANY(p.session_families) LIMIT 1`,
+  [actor.tenant_id,mirrorKey,hash(bearer)]);
+  if(!rows[0])fail('Only a paired screen shows its code',403);
+  const secret=await this.cornerSecret(actor.tenant_id,mirrorKey as string);
+  const minute=Math.floor(this.now()/60_000);
+  return {code:cornerCodeFor(secret,minute),device:rows[0]!.device_name??'',secondsLeft:60-Math.floor(this.now()/1000)%60};
+ }
+ /** Before a device takes over a till in use elsewhere: allowed when the till's device is
+  * closed or offline, or no screen of it is on; otherwise the corner code is needed. */
+ async checkTakeover(actor:Actor,holderKey:string,tillName:string,code:unknown):Promise<void>{
+  if(!deviceKeyPattern.test(holderKey))return;
+  const {rows}=await this.db.query<{online:boolean;screens:number;corner_secret:string|null}>(`SELECT
+    (d.offline IS NOT TRUE AND d.seen_at>now()-interval '3 minutes') AS online,
+    (SELECT count(*)::int FROM md_screen_pairings p WHERE p.tenant_id=$1 AND p.mirror_key=$2 AND p.revoked_at IS NULL
+      AND p.approved_at IS NOT NULL AND EXISTS(SELECT 1 FROM md_sessions s WHERE s.tenant_id=p.tenant_id
+       AND s.family_id=ANY(p.session_families) AND s.revoked_at IS NULL AND s.last_seen_at>now()-interval '1 minute')) AS screens,
+    d.corner_secret
+   FROM md_screen_devices d WHERE d.tenant_id=$1 AND d.device_key=$2`,[actor.tenant_id,holderKey]);
+  const holder=rows[0];
+  if(!holder?.online||!holder.screens||!holder.corner_secret)return;
+  const minute=Math.floor(this.now()/60_000);
+  const typed=typeof code==='string'?code.trim():'';
+  if(/^\d{4}$/.test(typed)&&[minute,minute-1].some(at=>cornerCodeFor(holder.corner_secret!,at)===typed))return;
+  if(!this.allowTry('takeover\u0000'+actor.tenant_id+'\u0000'+actor.user_id))fail('Too many tries. Wait a minute and try again',429);
+  fail((tillName||'This till')+' '+TAKEOVER_CODE_NEEDED,409);
+ }
+ private async cornerSecret(tenantId:string,deviceKey:string):Promise<string>{
+  const {rows}=await this.db.query<{corner_secret:string}>(`INSERT INTO md_screen_devices(tenant_id,device_key,corner_secret)
+   VALUES($1,$2,$3) ON CONFLICT(tenant_id,device_key) DO UPDATE
+   SET corner_secret=COALESCE(md_screen_devices.corner_secret,EXCLUDED.corner_secret) RETURNING corner_secret`,
+  [tenantId,deviceKey,secret()]);
+  return rows[0]!.corner_secret;
  }
 
  private async signIn(row:Row,context:{ip?:string}):Promise<ScreenSession>{
@@ -193,6 +263,9 @@ export class ScreenPairingService{
 
 /** A screen's name: plain text, at most 60 characters ('' = none given). */
 const screenName=(name:unknown):string=>typeof name==='string'?name.replace(/[\u0000-\u001f]/g,'').trim().slice(0,60):'';
+/** 4 digits from the device's secret and the minute (HMAC): nothing to store per minute. */
+export const cornerCodeFor=(secret:string,minute:number)=>
+ String(parseInt(createHmac('sha256',secret).update(String(minute)).digest('hex').slice(0,8),16)%10_000).padStart(4,'0');
 const target=(row:Row):ScreenTarget=>({appId:row.app_id??'',pageApiName:row.page_api_name??'',
  deviceName:row.device_name??'',mirrorKey:row.mirror_key??''});
 
@@ -220,6 +293,18 @@ CREATE TABLE IF NOT EXISTS md_screen_pairings (
  revoked_at timestamptz
 );
 ALTER TABLE md_screen_pairings ADD COLUMN IF NOT EXISTS screen_name text;
+-- Per device: the sale it is on (its selling page's session), presence, and the corner-code secret.
+CREATE TABLE IF NOT EXISTS md_screen_devices (
+ tenant_id uuid NOT NULL REFERENCES md_tenants(id),
+ device_key text NOT NULL,
+ session_key uuid,
+ session_at timestamptz,
+ seen_at timestamptz,
+ offline boolean NOT NULL DEFAULT false,
+ corner_secret text,
+ PRIMARY KEY(tenant_id,device_key)
+);
+CREATE INDEX IF NOT EXISTS md_screen_pairings_mirror ON md_screen_pairings(tenant_id,mirror_key) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_code ON md_screen_pairings(code) WHERE approved_at IS NULL AND revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_device ON md_screen_pairings(tenant_id,device_record_id) WHERE revoked_at IS NULL;
 `;

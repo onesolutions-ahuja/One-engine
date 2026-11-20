@@ -54,17 +54,27 @@ export async function askWhichTill(request:Request):Promise<void>{
   const button=document.createElement('button');
   button.type='button';
   button.textContent=till.Name+(till.Code?' ('+till.Code+')':'');
+  // A till in use on another open device needs the code in the corner of its display
+  // (proof the person is at that counter); no manager and no forced sign-out.
+  const code=document.createElement('input');
+  code.className='une-pair-input';code.inputMode='numeric';code.maxLength=4;code.hidden=true;
+  code.setAttribute('aria-label','Code in the corner of '+till.Name+"'s customer display");
+  code.addEventListener('input',()=>{code.value=code.value.replace(/\D/g,'').slice(0,4);});
+  code.addEventListener('keydown',event=>{if(event.key==='Enter')button.click();});
   button.addEventListener('click',async()=>{
    button.disabled=true;
-   try{await assignDeviceTill(request,String(till.Id));dialog.close();dialog.remove();}
+   try{await assignDeviceTill(request,String(till.Id),code.hidden?'':code.value.trim());dialog.close();dialog.remove();}
    catch(error){
+    const message=error instanceof Error?error.message:'This device could not be set up';
     help.className='une-till-error';
-    help.textContent=(error instanceof Error?error.message:'This device could not be set up')
-     +'. A manager can set it up on this device.';
+    if(/in use on another device/.test(message)){
+     help.textContent=message.replace(/^[^:]*: /,'')+'.';
+     code.hidden=false;code.focus();
+    }else help.textContent=message+'. A manager can set it up on this device.';
     button.disabled=false;
    }
   });
-  item.appendChild(button);list.appendChild(item);
+  item.append(button,code);list.appendChild(item);
  }
  const footer=document.createElement('footer');
  const later=document.createElement('button');

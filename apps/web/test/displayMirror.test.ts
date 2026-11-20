@@ -32,8 +32,8 @@ test('@ThisPage.Device.MirrorKey is a page value',()=>{
 test('a customer display cart is not narrowed to the display page\'s own (empty) session cart',async()=>{
  const {recordScope}=await import('../../server/src/page-compiler/compilePage.ts');
  const display='AND(@CartLine.DeviceKey = @ThisPage.Device.MirrorKey, @CartLine.Status = "Open")';
- assert.deepEqual(recordScope('Custom:smart_cart',{},[null,display]),{kind:'none'},'display: rows picked by device');
- assert.deepEqual(recordScope('Custom:smart_cart',{},[[{field:'DeviceKey',value:'@ThisPage.Device.MirrorKey'}],'']),{kind:'none'});
+ assert.deepEqual(recordScope('Custom:smart_cart',{},[null,display]),{kind:'mirror'},'display: the till\'s sale, not its own');
+ assert.deepEqual(recordScope('Custom:smart_cart',{},[[{field:'DeviceKey',value:'@ThisPage.Device.MirrorKey'}],'']),{kind:'mirror'});
  assert.deepEqual(recordScope('Custom:smart_cart',{},[null,'@CartLine.Status = "Open"']),{kind:'auto'},'till: its own session cart');
  assert.deepEqual(recordScope('smart_cart',{}),{kind:'auto'});
  assert.deepEqual(recordScope('Custom:smart_cart',{autoRecordScope:true},[null,display]),{kind:'auto'},'explicit setting wins');
@@ -160,4 +160,35 @@ test('Smart Paired Screens draws its list in the builder and talks to Core throu
   appId:'KIOSK',pageApiName:'kiosk_order_status'}],'any app: the app comes from the open page, not the till');
  assert.deepEqual(await ask({action:'nope'}),{ok:false,error:'Unknown screen action'});
  delete (globalThis as {window?:unknown}).window;
+});
+
+test('a display moves to the till\'s current sale before reading rows; only the current sale is shown',async()=>{
+ const {startMirrorLiveRefresh,followsMirroredSale,setFollowingSale}=await import('../src/core/pages/PageCompiler/mirrorLiveRefresh.ts');
+ const {compiledSourceLoader}=await import('../src/core/pages/PageCompiler/compiledSourceLoader.ts');
+ const lines={id:'CartLine#a',objectApiName:'CartLine',components:[],scope:{kind:'mirror'},complete:false,filters:null,
+  filterLogic:'AND',filterFormula:'AND(@CartLine.DeviceKey = @ThisPage.Device.MirrorKey, @CartLine.Status = "Open")',stateInputs:[]} as never;
+ const order:string[]=[];let tick:()=>void=()=>{};
+ startMirrorLiveRefresh([lines],false,{followSale:async()=>{order.push('follow');},reload:async()=>{order.push('reload');}},
+  {setInterval:(run:()=>void)=>{tick=run;return 1;},clearInterval:()=>undefined,visible:()=>true,listen:()=>()=>undefined});
+ tick();await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+ assert.deepEqual(order,['follow','reload']);
+ // Scope: not following -> unscoped (all the till's open rows); following -> that sale's cart only.
+ const objects=[{apiName:'Cart',fields:[{apiName:'SessionKey',dataType:'Text(255)'}]},
+  {apiName:'CartLine',fields:[{apiName:'Cart',dataType:'Lookup(Cart)',relationship:{targetObject:'Cart'}},{apiName:'DeviceKey',dataType:'Text(255)'},{apiName:'Status',dataType:'Text(40)'}]}] as never;
+ const {resetDeviceTillForTests}=await import('../src/core/authentication/TillDevice/deviceTill.ts');
+ resetDeviceTillForTests({status:'unset',till:null,tills:[],mirrorKey:'till-device-key-000000000001'});
+ const asked:Array<Record<string,unknown>>=[];
+ const loader=compiledSourceLoader(objects,()=>({sessionId:'sale-2'}),(async(object:string,options:Record<string,unknown>)=>{
+  asked.push({object,...options});
+  return object==='Cart'?{records:[{Id:'cart-2',SessionKey:'sale-2'}],total:1}:{records:[],total:0};}) as never);
+ setFollowingSale(false);
+ await loader(lines,{},{offset:0,limit:50});
+ assert.equal(asked.some(a=>a.object==='Cart'),false,'not following: no sale lookup');
+ assert.match(JSON.stringify(asked.find(a=>a.object==='CartLine')),/till-device-key-000000000001/,'all the till\'s open rows');
+ setFollowingSale(true);assert.equal(followsMirroredSale(),true);
+ asked.length=0;
+ await loader(lines,{},{offset:0,limit:50});
+ assert.deepEqual(asked.find(a=>a.object==='Cart')?.filter,{field:'SessionKey',value:'sale-2',related:false},'finds the cart of the till\'s sale');
+ assert.match(JSON.stringify(asked.find(a=>a.object==='CartLine')),/cart-2/,'and reads only its lines');
+ setFollowingSale(false);resetDeviceTillForTests();
 });

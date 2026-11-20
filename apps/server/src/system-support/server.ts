@@ -4,7 +4,7 @@ import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
 import {TillDeviceService,TILL_DEVICE_EXPIRED} from './till-device-service.js';
-import {ScreenPairingService,SCREEN_GONE} from './screen-pairing-service.js';
+import {ScreenPairingService,SCREEN_GONE,UserActionError} from './screen-pairing-service.js';
 import {withAuditContext,auditContext,setAuditActor} from './audit-context.js';
 import {ConnectedAppService} from './connected-app-service.js';
 import {SecurityMonitorService} from './security-monitor-service.js';
@@ -3070,7 +3070,9 @@ export function createSystemServer(db:SqlPersistence) {
   app.use('/api',(_req,res)=>{res.status(404).json({error:'API endpoint not implemented in SQL runtime'});});
   registerSecurityWebHost(app,db,process.env.METADRIVE_WEB_DIST);
   app.use((err:Error,errorReq:Request,res:Response,_next:NextFunction)=>{
-    if(err instanceof DuplicateMatchError)res.status(409).json({error:err.message,ruleApi:err.ruleApi,code:'DUPLICATE_RULE_BLOCKED'});
+    // A message for the person (wrong pairing code, device not set up...): never an outage.
+    if(err instanceof UserActionError)res.status(err.status).json({error:err.message});
+    else if(err instanceof DuplicateMatchError)res.status(409).json({error:err.message,ruleApi:err.ruleApi,code:'DUPLICATE_RULE_BLOCKED'});
     else if(err instanceof DeclarativeRuleError)res.status(400).json({
       error:err.message,ruleApi:err.ruleApi,
       errors:[{message:err.message,...(err.fieldApi?{fields:[err.fieldApi]}:{})}]

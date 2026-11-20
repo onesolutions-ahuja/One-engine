@@ -75,9 +75,9 @@ export function loadDeviceTill(request:Request,force=false):Promise<DeviceTillSt
 }
 
 /** Set this device up as one Till (needs edit access to Till, e.g. a manager). */
-export async function assignDeviceTill(request:Request,tillId:string):Promise<DeviceTill>{
+export async function assignDeviceTill(request:Request,tillId:string,takeoverCode=''):Promise<DeviceTill>{
  const answer=await request<{till:DeviceTill}>('/till-device/assign',
-  {method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey(),tillId})});
+  {method:'POST',body:JSON.stringify({deviceKey:tillDeviceKey(),tillId,...(takeoverCode?{takeoverCode}:{})})});
  publish({status:'set',till:answer.till,tills:[]});
  return answer.till;
 }

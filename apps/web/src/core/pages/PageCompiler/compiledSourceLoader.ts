@@ -6,6 +6,7 @@ import {filterRelatedRecords} from '../PageRuntime/filterRelatedRecords.mjs';
 import type {CompiledDataSource} from './compilePage';
 import type {SourceLoad} from './compiledPageStore';
 import {EMPTY_FILTER_VALUE} from '../PageRuntime/recordFilterFormula';
+import {followsMirroredSale} from './mirrorLiveRefresh';
 
 type RecordPageLoader=(objectApiName:string,options:{limit:number;offset:number;
  filter?:{field:string;value:string;related:boolean};
@@ -27,6 +28,9 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
  const scopeFor=async(source:CompiledDataSource,fields:ReadonlyArray<FieldMetadata>,state:State,sessionId:string):Promise<Scope>=>{
   const scope=source.scope;
   if(scope.kind==='none')return {blocked:false,field:'',parentId:undefined};
+  // A display follows the till's current sale (its page session) when the till reports one;
+  // before that it shows the till's open rows unscoped, as its filter says.
+  if(scope.kind==='mirror'&&!followsMirroredSale())return {blocked:false,field:'',parentId:undefined};
   if(scope.kind==='key'){
    const parentId=state[scope.key];
    const query=pageComponentRelatedQuery({relatedFilterKey:scope.key,relatedFieldApiName:scope.field},fields,parentId);

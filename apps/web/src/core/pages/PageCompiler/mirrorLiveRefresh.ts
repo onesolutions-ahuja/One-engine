@@ -9,6 +9,10 @@ import type {CompiledDataSource} from './compilePage';
  * learns which Till it follows. No page setting is needed: reading MirrorKey is the signal.
  */
 export const MIRROR_REFRESH_MS=2000;
+/** True while this screen follows the mirrored device's current sale (its page session). */
+let followingSale=false;
+export const followsMirroredSale=():boolean=>followingSale;
+export function setFollowingSale(value:boolean){followingSale=value;}
 const MIRROR=/@ThisPage\.Device\.MirrorKey/i;
 
 /** Data sources that show another device's rows (their filter reads MirrorKey). */
@@ -21,6 +25,8 @@ export function mirrorSources(sources:readonly CompiledDataSource[]):CompiledDat
 
 type Target={
  reload(id:string,fresh?:boolean):Promise<void>;
+ /** Move to the mirrored device's current sale when it changed (before the rows are read). */
+ followSale?():Promise<void>;
  loadSets?():Promise<void>;
  refreshTotals?():Promise<void>|void;
  subscribeDevice?(listener:()=>void):()=>void;
@@ -50,6 +56,7 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
   if(stopped||busy||!clock.visible())return;
   busy=true;
   try{
+   await target.followSale?.().catch(()=>undefined);
    await Promise.all([
     ...mirrored.map(source=>target.reload(source.id,true).catch(()=>undefined)),
     ...(codeMirrors&&target.loadSets?[target.loadSets().catch(()=>undefined)]:[]),

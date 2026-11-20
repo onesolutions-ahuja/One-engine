@@ -180,7 +180,9 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   res.setHeader('X-Accel-Buffering','no');
   res.flushHeaders();
   let closed=false,ticks=0;
-  const stamp=(at:string)=>stampDeviceCarts(deps.records,actor,deviceKey,at);
+  const stamp=(at:string)=>Promise.all([stampDeviceCarts(deps.records,actor,deviceKey,at),
+   // Presence also decides whether a till is "in use" when another device asks for it.
+   deps.screens?.deviceSeen(actor,deviceKey,at!==DEVICE_OFFLINE_AT).catch(()=>undefined)]);
   await stamp(new Date().toISOString());
   // A ping every 25 s keeps proxies from closing the line; the carts are stamped every minute.
   const timer=setInterval(()=>{
@@ -194,6 +196,12 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   const body=(req.body??{}) as Record<string,unknown>;
+  // A till in use on another open device: taking it over needs its screen's corner code.
+  if(deps.screens&&typeof body.tillId==='string'&&/^[0-9a-f-]{36}$/i.test(body.tillId)){
+   const till=await deps.records.get(actor.tenant_id,actor.user_id,'NamedDevice',body.tillId).catch(()=>null) as Record<string,unknown>|null;
+   const holder=typeof till?.DeviceId==='string'?till.DeviceId:'';
+   if(holder&&holder!==body.deviceKey)await deps.screens.checkTakeover(actor,holder,String(till?.Name??''),body.takeoverCode);
+  }
   res.json({till:await setDeviceTill(deps,actor,body.deviceKey,body.tillId,
    {ip:req.ip,agent:req.get('user-agent')})});
  }));
@@ -218,6 +226,23 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   res.setHeader('Cache-Control','private, no-store');
   const body=(req.body??{}) as Record<string,unknown>;
   res.json(await screens().rename(actor,body.id,body.name));
+ }));
+ // The sale a device is on: its selling page reports its session; paired screens follow it.
+ app.post('/api/screens/session',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  const body=(req.body??{}) as Record<string,unknown>;
+  res.json(await screens().reportSession(actor,body.deviceKey,body.sessionId));
+ }));
+ app.post('/api/screens/current-session',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(await screens().currentSession(actor,(req.body??{}).mirrorKey));
+ }));
+ app.post('/api/screens/corner',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.json(await screens().cornerCode(actor,String(req.get('authorization')??'').slice(7),(req.body??{}).mirrorKey));
  }));
  app.post('/api/screens/revoke',wrap(async(req,res)=>{
   const actor=authenticated(req);

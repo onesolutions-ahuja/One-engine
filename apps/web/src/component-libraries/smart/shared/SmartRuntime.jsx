@@ -653,7 +653,15 @@ function SmartTabs({p,record,fire}){
   });
  // Default index is bounded by the filtered, permission-checked tab list.
  // An existing explicit PageState/Collection selection always has priority.
- const defaultTabIndex=tabs.length&&configuredTabIndex>=0?Math.min(configuredTabIndex,tabs.length-1):-1;
+ // Default value (formula): the tab whose caption it names, e.g. the role an employee has now.
+ // While it is still loading (blank) no tab is selected, so a saved value is never
+ // overwritten by the first tab.
+ const hasDefaultCaption=typeof p.defaultValue==="string"&&p.defaultValue.trim()!==""&&!p.builderPreview;
+ const defaultCaption=hasDefaultCaption
+  ?text(scopedExpression(p,"defaultValue",p.defaultValue,recordOf(p))).trim().toLowerCase():"";
+ const captionIndex=defaultCaption?tabs.findIndex(tab=>text(tab?.label??tab).trim().toLowerCase()===defaultCaption):-1;
+ const defaultTabIndex=hasDefaultCaption?captionIndex
+  :tabs.length&&configuredTabIndex>=0?Math.min(configuredTabIndex,tabs.length-1):-1;
  // A held value that is no tab (e.g. "*" for All) means no tab is selected.
  const heldOtherValue=!hasCollection&&Boolean(stateKey)&&selectedId!==null&&selectedId!==undefined
   &&selectedId!==""&&indexForSelection<0;

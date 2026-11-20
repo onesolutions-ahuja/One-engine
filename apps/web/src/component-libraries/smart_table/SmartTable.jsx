@@ -97,11 +97,19 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    return "";
   return plain(expression(column.override,row));
  };
+ // Show only (optional): "Status=Low|Out of stock" keeps rows whose column shows one of
+ // those values. For rules the server cannot filter by (formula fields, field vs field).
+ // Blank shows every row; it can be a page formula (follow a tab).
+ const showWhen=plain(p.tableShowWhen).trim();
+ const showMatch=/^([A-Za-z][A-Za-z0-9_]*)\s*=\s*(.+)$/.exec(showWhen);
+ const showColumn=showMatch?columns.find(col=>col.key===showMatch[1]):null;
+ const allowedValues=showMatch?new Set(showMatch[2].split("|").map(v=>v.trim().toLowerCase())):null;
+ const visibleRows=showColumn&&!preview?rows.filter(row=>allowedValues.has(value(row,showColumn).trim().toLowerCase())):rows;
  // Sort (optional): "InStock asc" orders the loaded rows by that column's shown value
  // (numbers as numbers). Works for formula columns, which the server cannot sort by.
  const [sortKey,sortDir]=plain(p.tableSort).trim().split(/\s+/);
  const sortColumn=sortKey?columns.find(col=>col.key===sortKey):null;
- const sortedRows=sortColumn&&!preview?[...rows].map(row=>({row,shown:value(row,sortColumn)}))
+ const sortedRows=sortColumn&&!preview?[...visibleRows].map(row=>({row,shown:value(row,sortColumn)}))
   .sort((a,b)=>{
    // UK dates (DD/MM/YYYY HH:mm or DD/MM HH:mm) sort by date, not as text.
    const when=text=>{const m=/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?(?:\s+(\d{1,2}):(\d{2}))?$/.exec(text.trim());
@@ -110,7 +118,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
    const both=a.shown!==""&&b.shown!==""&&Number.isFinite(x)&&Number.isFinite(y);
    const order=both?x-y:a.shown.localeCompare(b.shown,undefined,{numeric:true,sensitivity:"base"});
    return sortDir==="desc"?-order:order;
-  }).map(item=>item.row):rows;
+  }).map(item=>item.row):visibleRows;
  const pick=row=>{
   const id=row.Id??row.id;
   if(id===undefined||id===null||preview)return;
@@ -135,9 +143,9 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
     </button>;
    })}
   </td>;
- const total=typeof p.recordPagination?.total==="number"
+ const total=showColumn?visibleRows.length:typeof p.recordPagination?.total==="number"
   ?p.recordPagination.total:realRows.length;
- const shown=realRows.length;
+ const shown=showColumn?visibleRows.length:realRows.length;
  const footerText=total>shown
   ?shown+" of "+total+" records":total===1?"1 record":total+" records";
  const footerStyle={
@@ -206,7 +214,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
       </tr>;
     })}</tbody>
    </table>:<p className="smart-table-empty">Select a table source to display fields.</p>}
-   {!rows.length&&!p.loading&&<p className="smart-table-empty">No records</p>}
+   {!sortedRows.length&&!p.loading&&<p className="smart-table-empty">{plain(p.emptyText)||"No records"}</p>}
   </div>
   {/* Show record count: off for receipts and lists where "3 records" is noise. */}
   {p.footerVisible===false?null:<footer data-design-area={p.builderPreview?"Footer":undefined} className="smart-table-footer" style={footerStyle}>{footerText}</footer>}

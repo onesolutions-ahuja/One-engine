@@ -197,3 +197,19 @@ export function appRoutePathWithoutBase(route: AppRoute): string {
   }
   return '/une/setup/home';
 }
+
+/** A second screen opened by SCREEN(Page,"second") carries ?mirror= (the till it follows) and
+ * ?screenSession= (the till's page session). The page reads them after the address is tidied,
+ * so tidying must keep them or the customer display opens blank. */
+export function keepScreenParams(path:string,search:string):string{
+ const from=new URLSearchParams(search);
+ const kept=new URLSearchParams();
+ for(const name of ['mirror','screenSession']){
+   const value=from.get(name);
+   if(value&&/^[A-Za-z0-9_-]{16,128}$/.test(value))kept.set(name,value);
+ }
+ if(!kept.size)return path;
+ const url=new URL(path,'https://placeholder.invalid');
+ kept.forEach((value,name)=>url.searchParams.set(name,value));
+ return url.pathname+url.search;
+}

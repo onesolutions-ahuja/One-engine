@@ -42,9 +42,14 @@ export function openerMirrorKey():string{
   const fromUrl=new URLSearchParams(window.location.search).get('mirror');
   if(fromUrl&&pattern.test(fromUrl)){window.sessionStorage.setItem(MIRROR,fromUrl);return fromUrl;}
   const saved=window.sessionStorage.getItem(MIRROR);
-  return saved&&pattern.test(saved)?saved:'';
+  if(saved&&pattern.test(saved))return saved;
+  // A screen paired at /display follows the device it was paired with, across restarts.
+  const paired=window.localStorage.getItem(PAIRED_MIRROR);
+  return paired&&pattern.test(paired)?paired:'';
  }catch{return '';}
 }
+/** Set by /display when a till pairs this screen (see pairedScreen.ts). */
+export const PAIRED_MIRROR='md.screen.mirror';
 /** @ThisPage.Device.MirrorKey in the browser: the opening till, else what the server says, else this device. */
 export function mirrorDeviceKey():string{return openerMirrorKey()||state.mirrorKey||tillDeviceKey();}
 export function subscribeDeviceTill(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};}

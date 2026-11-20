@@ -2,6 +2,7 @@ import { loadPageBuilderFactory, loadObjectManagerFactory } from '../../builders
 import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
+import {holdScreenPage,onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
 import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLanding, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, bootPageEndpoint, rememberBootPage, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
@@ -247,7 +248,9 @@ function App() {
     window.location.replace(destination);
   },[needsLandingRedirect,landingApp]);
 
-  const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillPeople().length>0;
+  // On a paired screen Back does not leave the page a customer is looking at.
+  useEffect(()=>authState==='authenticated'&&onPairedScreenPage()?holdScreenPage():undefined,[authState]);
+  const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillPeople().length>0&&!onPairedScreenPage();
   /** Lock pressed while nobody is saved for PIN sign-in here: say why the email page shows. */
   const [lockedWithoutPin,setLockedWithoutPin]=useState(false);
   // Lock (LOCKSCREEN(), the till's Lock button) or 5 idle minutes: the person's session ends,
@@ -266,7 +269,8 @@ function App() {
     };
     const restart=()=>{
       window.clearTimeout(idle);
-      if(activeTillUser())idle=window.setTimeout(lock,5*60*1000);
+      // A paired screen (customer display) is idle by nature: it never locks itself.
+      if(activeTillUser()&&!onPairedScreenPage())idle=window.setTimeout(lock,5*60*1000);
     };
     const events=['pointerdown','keydown','wheel','touchstart'] as const;
     events.forEach(name=>window.addEventListener(name,restart,{passive:true}));
@@ -281,6 +285,8 @@ function App() {
   useEffect(()=>{
     // On a shared till the sign-in opens where the till is, so the person returns to the same page.
     if(showTillLock||tillMode==='email'&&tillPeople().length>0)return;
+    // A paired screen whose sign-in ended signs in again with its screen key at /display.
+    if(authState==='anonymous'&&onPairedScreenPage()){window.location.replace('/display');return;}
     if(authState==='anonymous'&&!standaloneEntry&&window.location.pathname!=='/login'&&window.location.pathname!=='/oauth/authorize'){
       if(window.location.pathname==='/mail-admin'||window.location.pathname==='/mail-admin/'){
         try{sessionStorage.setItem('md_auth_return_to','/mail-admin');}catch{/* The normal landing route remains available if storage is disabled. */}

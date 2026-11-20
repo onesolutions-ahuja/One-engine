@@ -117,7 +117,7 @@ export type SourceLoadResult={records:Record<string,unknown>[];total:number;
  relatedFilter?:{field:string;value:string;related:boolean};
  /** The loader could not page (client-side filter): rows are all it will return. */
  paged:boolean};
-export type SourceLoad=((source:CompiledDataSource,state:State,window:{offset:number;limit:number})=>
+export type SourceLoad=((source:CompiledDataSource,state:State,window:{offset:number;limit:number;fresh?:boolean})=>
  Promise<SourceLoadResult|null>)&{invalidate?(objectApiNames?:readonly string[]):void};
 
 /** Rows per page while scrolling. */
@@ -149,12 +149,12 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   listeners.get(id)?.forEach(listener=>listener());
  };
  /** Read rows [0, count) in Record API sized pages. */
- const readRows=async(source:CompiledDataSource,count:number):Promise<SourceLoadResult|null>=>{
+ const readRows=async(source:CompiledDataSource,count:number,fresh=false):Promise<SourceLoadResult|null>=>{
   const state=getState();
   let merged:SourceLoadResult|null=null;
   for(let offset=0;offset<count;){
    loads++;
-   const page=await load(source,state,{offset,limit:Math.min(API_LIMIT,count-offset)});
+   const page=await load(source,state,{offset,limit:Math.min(API_LIMIT,count-offset),...(fresh?{fresh:true}:{})});
    if(!page)return null;
    merged=merged?{...page,records:[...merged.records,...page.records]}:page;
    if(!page.paged||page.records.length===0||merged.records.length>=page.total)break;
@@ -164,7 +164,8 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
    throw Error(source.objectApiName+' has more records than a collection can safely load; narrow its filters');
   return merged;
  };
- const reload=async(id:string):Promise<void>=>{
+ /** `fresh`: skip the short-lived read cache (rows another device may have changed). */
+ const reload=async(id:string,fresh=false):Promise<void>=>{
   const source=sources.get(id);
   if(!source)return;
   const request=(requests.get(id)??0)+1;
@@ -176,7 +177,7 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   // A refresh keeps as many rows as the user has already scrolled through.
   const count=source.complete?COMPLETE_SOURCE_LIMIT:Math.max(SOURCE_PAGE_SIZE,previous.records.length);
   try{
-   const result=await readRows(source,count);
+   const result=await readRows(source,count,fresh);
    if(requests.get(id)!==request)return;
    refreshing.delete(id);
    const next:SourceSnapshot=result
@@ -232,7 +233,7 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
    return ()=>{set.delete(listener);};
   },
   /** Load every source once, in parallel. */
-  start:():Promise<void>=>Promise.all([...sources.keys()].map(reload)).then(()=>undefined),
+  start:():Promise<void>=>Promise.all([...sources.keys()].map(id=>reload(id))).then(()=>undefined),
   reload,loadMore,
   /** Only sources whose filter reads a changed state key reload. */
   stateChanged(keys:readonly string[]):Promise<void>{

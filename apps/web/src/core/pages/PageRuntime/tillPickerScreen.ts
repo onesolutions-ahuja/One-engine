@@ -15,7 +15,18 @@ dialog.une-till-picker::backdrop{background:rgba(15,23,42,.35)}
 .une-till-picker li button:hover,.une-till-picker li button:focus-visible{background:rgba(0,122,255,.08);outline:none}
 .une-till-picker .une-till-error{color:#b42318}
 .une-till-picker footer{display:flex;border-top:1px solid rgba(60,60,67,.18)}
-.une-till-picker footer button{flex:1;min-height:44px;border:0;background:transparent;color:#007aff;font:inherit;font-size:15px;cursor:pointer}`;
+.une-till-picker footer button{flex:1;min-height:44px;border:0;background:transparent;color:#007aff;font:inherit;font-size:15px;cursor:pointer}
+.une-till-picker footer button+button{border-left:1px solid rgba(60,60,67,.18);font-weight:600}
+.une-till-picker .une-pair-code{margin:4px 20px 8px;text-align:center;font:600 44px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.18em}
+.une-till-picker input.une-pair-input{display:block;box-sizing:border-box;width:calc(100% - 40px);margin:4px 20px 14px;min-height:52px;
+ border:1px solid rgba(60,60,67,.3);border-radius:10px;text-align:center;font:600 28px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.3em}`;
+/** The till's small dialogs (which till, display pairing) share one look. */
+export function ensureTillDialogStyles(){
+ if(typeof document==='undefined'||document.getElementById('une-till-picker-styles'))return;
+ const style=document.createElement('style');
+ style.id='une-till-picker-styles';style.textContent=styles;
+ document.head.appendChild(style);
+}
 let asked=false;
 /** "Not now" is remembered on this device: the question is asked once, not on every page. */
 const NOT_NOW='une.tillPicker.notNow';
@@ -26,11 +37,7 @@ export async function askWhichTill(request:Request):Promise<void>{
  const state=await loadDeviceTill(request);
  if(state.status!=='unset'||asked)return;
  asked=true;
- if(!document.getElementById('une-till-picker-styles')){
-  const style=document.createElement('style');
-  style.id='une-till-picker-styles';style.textContent=styles;
-  document.head.appendChild(style);
- }
+ ensureTillDialogStyles();
  const dialog=document.createElement('dialog');
  dialog.className='une-till-picker';
  dialog.setAttribute('aria-modal','true');

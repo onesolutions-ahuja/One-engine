@@ -32,7 +32,7 @@ export function formulaSignatureAt(source:string,caret:number,actions=false){
    GETRECORD:['Object','Field','Value'],STATE:['Key','Value'],COUNTIFS:['Object','Field','Value'],
    SUMIFS:['Object','ValueField','Field','Value'],AVERAGEIFS:['Object','ValueField','Field','Value'],
    MINIFS:['Object','ValueField','Field','Value'],MAXIFS:['Object','ValueField','Field','Value'],
-   VERIFYPIN:['UserId','Pin'],CONNECTED:['ConnectorName'],FOREACH:['Object','Field','Value','AS(item)','Action'],LOOP:['Times','AS(item)','Action'],REPEAT:['Action','UntilCondition','EverySeconds','MaxTimes'],CALLOUT:['Connector.Operation','Field','Value','AS(variable)'],DEVICE:['DeviceType','Command','Text'],CLOSESCREEN:[],LOCKSCREEN:[],LOCATION:['AS(variable)'],RECORDPAYMENT:['InvoiceId','Amount','Method','Note','AS(variable)'],CASHMOVE:['Direction','Amount','Reason','TillSession','AS(variable)'],AS:['variable']
+   VERIFYPIN:['UserId','Pin'],CONNECTED:['ConnectorName'],FOREACH:['Object','Field','Value','AS(item)','Action'],LOOP:['Times','AS(item)','Action'],REPEAT:['Action','UntilCondition','EverySeconds','MaxTimes'],CALLOUT:['Connector.Operation','Field','Value','AS(variable)'],DEVICE:['DeviceType','Command','Text'],CLOSESCREEN:[],LOCKSCREEN:[],PAIRDISPLAY:['Page'],LOCATION:['AS(variable)'],RECORDPAYMENT:['InvoiceId','Amount','Method','Note','AS(variable)'],CASHMOVE:['Direction','Amount','Reason','TillSession','AS(variable)'],AS:['variable']
   };
   const signature=Object.prototype.hasOwnProperty.call(signatures,active.name)?signatures[active.name]:undefined;
   if(signature){

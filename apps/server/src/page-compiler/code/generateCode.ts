@@ -350,6 +350,12 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    scope.ui.add('SCREEN');
    return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(args[2]?', '+value(args[2]):'')+');'];
   }
+  case 'PAIRDISPLAY':{
+   // PAIRDISPLAY(Page): pair a /display screen with this device; it shows Page of this app.
+   if(args.length!==1)fail('PAIRDISPLAY needs the page the screen shows, e.g. PAIRDISPLAY(CustomerDisplay)');
+   scope.ui.add('PAIRDISPLAY');
+   return ['await $.ui("PAIRDISPLAY", '+q(literalName(args[0],'PAIRDISPLAY page'))+');'];
+  }
   case 'CLOSESCREEN':case 'LOCKSCREEN':{
    scope.ui.add(node.name);
    // CLOSESCREEN("second"): close the page shown on the second monitor.

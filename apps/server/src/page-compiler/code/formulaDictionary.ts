@@ -110,6 +110,7 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  CONFIRMSCREEN:action(2,5,'CONFIRMSCREEN(message, actions on Yes, [actions on No], [Yes label], [No label]): Yes/No box'),
  INFOSCREEN:action(1,2,'INFOSCREEN(message, [actions after OK]): message box with OK'),
  LOCKSCREEN:action(0,0,'LOCKSCREEN(): lock the till'),
+ PAIRDISPLAY:action(1,1,'PAIRDISPLAY(page): pair a screen showing /display (type its 4-digit code); it then shows that page of this app'),
  PRINT:action(2,2,'PRINT(template, recordId)'),CREATEPDF:action(2,3,'CREATEPDF(template, recordId, [AS(x)])'),
  FLOW:action(1,1,'FLOW(name): run a Flow'),
  EMAIL:action(4,24,'EMAIL(credential, to, subject, body, ...)'),WHATSAPP:action(3,23,'WHATSAPP(credential, to, message, ...)'),

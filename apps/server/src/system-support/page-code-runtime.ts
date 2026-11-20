@@ -69,7 +69,7 @@ export type PageCodeResult={
  changes:RecordChange[];
  /** Page state the action set (STATE steps). */
  state:Record<string,unknown>;
- /** UI steps for the browser, in order (SCREEN, PRINT, LOCKSCREEN, ...). */
+ /** UI steps for the browser, in order (SCREEN, PRINT, LOCKSCREEN, PAIRDISPLAY, ...). */
  effects:Array<{name:string;args:unknown[]}>;
  /** Fresh rows of every record set that reads a written Object. */
  sets:Record<string,{rows:Row[];complete:boolean}>;

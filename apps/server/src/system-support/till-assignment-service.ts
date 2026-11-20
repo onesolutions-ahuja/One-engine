@@ -46,3 +46,14 @@ export async function setDeviceTill(deps:Deps,actor:Actor,deviceKey:unknown,till
   return bound;
  });
 }
+
+/** The device a person pairs a screen from: this device's active Named Device of any type
+ * (a POS Terminal, a Kiosk...), found by its device key. */
+export async function pairingDevice(records:Pick<RecordEngine,'list'>,actor:Actor,deviceKey:unknown):Promise<{id:string;name:string;deviceKey:string}>{
+ if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))throw Error('This device has no valid device key');
+ const page=await records.list(actor.tenant_id,actor.user_id,TILL_DEVICE_OBJECT,2,0,{filters:[
+  {field:'DeviceId',operator:'eq',value:deviceKey},{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
+ const device=page.records[0];
+ if(!device)throw Error('Set this device up first (e.g. choose which till it is)');
+ return {id:String(device.Id),name:String(device.Name??''),deviceKey};
+}

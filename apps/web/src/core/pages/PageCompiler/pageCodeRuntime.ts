@@ -117,6 +117,26 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   changed();
   if(asked.size)void askAggregates();
  };
+ /** Read the totals already shown again, keeping the old values on screen until the new
+  * ones arrive (a customer display: the Till changes the rows, not this page). */
+ let refreshingTotals=false;
+ const refreshTotals=async()=>{
+  if(refreshingTotals||!aggregates.size)return;
+  refreshingTotals=true;
+  try{
+   const keys=[...aggregates.keys()].slice(0,100);
+   const items=keys.map(key=>{const [kind,object,field,criteria]=JSON.parse(key) as [string,string,string,Criteria];return {kind,object,field,criteria};});
+   const answer=await post<{values?:unknown[]}>('/page-code/aggregates',{...host.build,request:requestFor({},''),items});
+   let any=false;
+   keys.forEach((key,index)=>{
+    const raw=answer.values?.[index];
+    const value=raw===undefined||raw===null||raw===''?emptyTotal(items[index].kind):raw;
+    if(aggregates.has(key)&&JSON.stringify(aggregates.get(key))!==JSON.stringify(value)){aggregates.set(key,value);any=true;}
+   });
+   if(any)changed();
+  }catch{/* keep the last totals; the next refresh tries again */}
+  finally{refreshingTotals=false;}
+ };
  /** A save of these Objects: their server totals are read again. */
  const forgetAggregates=(objects:Iterable<string>)=>{
   const names=new Set(objects);
@@ -378,6 +398,10 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    changed();
   },
   setsFor:(key:string)=>sets.get(key),
+  /** Re-read the server totals on screen without blanking them (live customer display). */
+  refreshTotals:()=>refreshTotals(),
+  /** The page reads @ThisPage.Device.MirrorKey: it shows another screen's sale. */
+  readsMirror:Object.values(code.sources).some(source=>/@ThisPage\.Device\.MirrorKey/i.test(String(source))),
   /**
    * Run an action. `show` receives the predicted (then the saved) record changes
    * and state; `effects` runs the UI steps after the save. Throws on failure

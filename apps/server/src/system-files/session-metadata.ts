@@ -34,9 +34,11 @@ export async function sessionMetadata(db:SqlPersistence,tenantId:string,userId:s
     db.query<{landing_app_api:string}>('SELECT landing_app_api FROM md_users WHERE tenant_id=$1 AND id=$2',[tenantId,userId]),
     db.query<{name:string}>('SELECT name FROM md_tenants WHERE id=$1',[tenantId]),
     db.query<{id:string;email:string;display_name:string;time_zone:string;locale:string;
-      currency_iso_code:string|null}>(
-      `SELECT id,email,display_name,time_zone,locale,currency_iso_code
-       FROM md_users WHERE tenant_id=$1 AND id=$2 AND enabled=true`,[tenantId,userId])
+      currency_iso_code:string|null;manager_id:string|null;manager_name:string|null}>(
+      `SELECT u.id,u.email,u.display_name,u.time_zone,u.locale,u.currency_iso_code,
+        m.id AS manager_id,m.display_name AS manager_name
+       FROM md_users u LEFT JOIN md_users m ON m.tenant_id=u.tenant_id AND m.id=u.reports_to_user_id AND m.enabled=true
+       WHERE u.tenant_id=$1 AND u.id=$2 AND u.enabled=true`,[tenantId,userId])
   ]);
   const sessionUser=identity.rows[0];
   // Connector/callout names for CONNECTED() in page formulas. Names only, never secrets.
@@ -69,6 +71,8 @@ export async function sessionMetadata(db:SqlPersistence,tenantId:string,userId:s
     displayName:sessionUser.display_name,email:sessionUser.email,
     timeZone:sessionUser.time_zone,locale:sessionUser.locale,
     currencyIsoCode:sessionUser.currency_iso_code,
+    // @ThisTenant.User.Manager / ManagerName: the user's manager (Reports To).
+    managerId:sessionUser.manager_id??'',managerName:sessionUser.manager_name??'',
     landingAppApi:landing.rows[0]?.landing_app_api??'Setup',permissions,fieldAccess,recordTypeAccess,
     connections
   }};

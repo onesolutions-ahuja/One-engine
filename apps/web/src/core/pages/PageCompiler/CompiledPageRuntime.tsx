@@ -13,6 +13,7 @@ import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pa
 import {notConvertedAction} from '../PageRuntime/formulaAction';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {askWhichTill} from '../PageRuntime/tillPickerScreen';
+import {ensureTenantBrand} from '../../branding/tenantBrandLoader';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {executeOpenPageActionNode} from '../PageRuntime/OpenPageActionNode';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen,closeSecondScreen} from '../PageRuntime/screenFormula';
@@ -222,6 +223,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   startDevicePresence();
   // A page that reads @ThisPage.Till on a device not set up as a Till asks which one it is.
   if(runtime.code?.asksTill)void askWhichTill(runtime.request);
+  // @ThisTenant.Company.Logo / Name: compiled pages load the brand themselves.
+  void ensureTenantBrand();
   // Rows for instant taps and totals: one request with the first data.
   void runtime.code?.loadSets().catch(error=>console.warn('[PageCode] record sets:',error instanceof Error?error.message:error));
   // A state value the held rows depend on ($state.x in their criteria) reloads them.

@@ -30,7 +30,8 @@ export function setAuthenticatedFormulaSession(context){
  globalThis[SESSION_IDENTITY_KEY]=user&&organization&&typeof user.Id==='string'
   &&typeof organization.Id==='string'
   ?Object.freeze({user:Object.freeze({Id:user.Id,Name:user.Name,Email:user.Email,
-      TimeZone:user.TimeZone,Locale:user.Locale,CurrencyIsoCode:user.CurrencyIsoCode}),
+      TimeZone:user.TimeZone,Locale:user.Locale,CurrencyIsoCode:user.CurrencyIsoCode,
+      Manager:user.Manager??'',ManagerName:user.ManagerName??''}),
     organization:Object.freeze({Id:organization.Id,Name:organization.Name}),
     connections:freezeConnections(context.connections)}):null;
 }

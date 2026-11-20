@@ -16,7 +16,9 @@ function loadTenantBrand(force:boolean):Promise<void>{
     loaded=false;
     generation++;
     pending=null;
-    clearTenantBrand();
+    // Signed out: no brand. A renewed token (same session) keeps the logo on screen
+    // while it is read again, instead of blanking it until something reloads it.
+    if(!token)clearTenantBrand();
   }
   if(!force&&loaded)return Promise.resolve();
   if(!force&&pending)return pending;

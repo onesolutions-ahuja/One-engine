@@ -161,6 +161,7 @@ class ServerScope{
   const user=this.identity?.user,tenant=this.identity?.tenant;
   const map:Record<string,unknown>={'user.id':user?.id,'user.name':user?.name,'user.email':user?.email,
    'user.timeZone':user?.timeZone,'user.locale':user?.locale,'user.currencyIsoCode':user?.currencyIsoCode,
+   'user.managerId':user?.managerId,'user.managerName':user?.managerName,
    'tenant.id':tenant?.id,'tenant.name':tenant?.name,'tenant.logo':tenant?.logo};
   if(path==='cartId'){const id=this.state('activeCartId');return typeof id==='string'&&uuid.test(id)?id:'';}
   if(!Object.prototype.hasOwnProperty.call(map,path))throw Error('Unsupported tenant value: '+path);

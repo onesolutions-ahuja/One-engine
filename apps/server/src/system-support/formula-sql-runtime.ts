@@ -48,7 +48,7 @@ const hasRecordAggregate=(node:Expression):boolean=>{
  * Never kept across requests, so permission and data changes apply on the next call. */
 export type FormulaSqlShared={
  user?:Promise<{name:string;email:string;time_zone:string;locale:string;
-  currency_iso_code:string|null;tenant_name:string}>;
+  currency_iso_code:string|null;tenant_name:string;manager_id?:string|null;manager_name?:string|null}>;
  fields:Map<string,Promise<Field>>;
  rights:Map<string,ReturnType<Rights['require']>>;
  aggregates:Map<string,Promise<number>>;
@@ -143,9 +143,11 @@ export async function evaluateFormulaSql(
  const identityQuery=async()=>{
   const {rows}=await db.query<{
    name:string;email:string;time_zone:string;locale:string;currency_iso_code:string|null;
-   tenant_name:string
+   tenant_name:string;manager_id:string|null;manager_name:string|null
   }>('SELECT u.display_name AS name,u.email,u.time_zone,u.locale,u.currency_iso_code,'+
-    ' t.name AS tenant_name FROM md_users u JOIN md_tenants t ON t.id=u.tenant_id'+
+    ' t.name AS tenant_name,m.id AS manager_id,m.display_name AS manager_name'+
+    ' FROM md_users u JOIN md_tenants t ON t.id=u.tenant_id'+
+    ' LEFT JOIN md_users m ON m.tenant_id=u.tenant_id AND m.id=u.reports_to_user_id AND m.enabled=true'+
     ' WHERE u.tenant_id=$1 AND u.id=$2 AND u.enabled=true',
     [actor.tenant_id,actor.user_id]);
   return rows[0];
@@ -165,6 +167,8 @@ export async function evaluateFormulaSql(
   'user.TimeZone':user.time_zone,
   'user.Locale':user.locale,
   'user.CurrencyIsoCode':user.currency_iso_code??'',
+  'user.Manager':user.manager_id??'',
+  'user.ManagerName':user.manager_name??'',
   'company.Id':actor.tenant_id,
   'company.Name':user.tenant_name
  };

@@ -133,3 +133,11 @@ test('a COLLECTION data source lists loaded rows; its values run as page code',(
  const table=buildCollectionSource('=TABLE(@Product, @Product.Name)',{Product:rows},{Product:['Id','Name','Category']});
  assert.equal(table.value?.items.length,2);
 });
+
+test('a formula the converter rejects is that component\'s error, not a workspace crash',async()=>{
+ const {resolveFieldText,FieldExpressionEvaluationError}=await import('../src/core/components/RegisteredComponent/fieldExpressionRuntime');
+ // e.g. an empty page value left a blank argument: BLANKVALUE(, "0")
+ const compile=()=>{throw new Error('Invalid Flow formula expression');};
+ assert.throws(()=>resolveFieldText('=VALUE(BLANKVALUE(, "0"))',{},{compile} as never),
+  (error:unknown)=>error instanceof FieldExpressionEvaluationError&&/Invalid Flow formula expression/.test((error as Error).message));
+});

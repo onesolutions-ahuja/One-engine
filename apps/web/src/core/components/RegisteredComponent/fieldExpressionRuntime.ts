@@ -109,7 +109,10 @@ export function resolveFieldText(
   if(/(?:@|\{!)\$Permission\./.test(expression)&&!context?.permissions)
     throw new FieldExpressionEvaluationError('Custom permissions are unavailable in page-binding context');
   // The page's converter (page code `$`) when the page has one, else the same converter here.
-  const page=context?.compile?.(expression);
+  // A formula the converter rejects is this component's error, never the whole page's.
+  let page:ReturnType<NonNullable<FormulaBindingContext['compile']>>|undefined;
+  try{page=context?.compile?.(expression);}
+  catch(error){throw new FieldExpressionEvaluationError(error instanceof Error?error.message:'Formula failed');}
   const result=page?(()=>{
     try{return {value:page(source)};}
     catch(error){

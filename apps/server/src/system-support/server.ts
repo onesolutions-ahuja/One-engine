@@ -462,6 +462,38 @@ export function createSystemServer(db:SqlPersistence) {
       return {};
     }
   };
+  // A published app page needs far less than the Setup bootstrap: objects (field
+  // metadata), the apps, a one-line summary of each page (for SCREEN/navigation and
+  // popup sizes, no components) and the session. Same RBAC as the landing bootstrap;
+  // a dataset the user may not read is empty, exactly as its own endpoint would fail.
+  /** Drawn full screen without the app frame: a component on the page asks for it. */
+  const hasStandalonePresentation=(components:ReadonlyArray<{properties?:unknown}>)=>components.some(item=>{
+    const properties=item.properties;
+    return typeof properties==='object'&&properties!==null&&'standalonePresentation' in properties
+      &&properties.standalonePresentation===true;
+  });
+  const appRuntimeMetadata=async(tenantId:string,userId:string,appId:string)=>{
+    if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(appId))throw new Error('Invalid app');
+    await rbac.require(tenantId,userId,'App:'+appId,'read');
+    const [objectsPayload,pagesPayload,appsPayload,session]=await Promise.all([
+      (async()=>{
+        if(!await rbac.allowed(tenantId,userId,'ObjectDefinition','read'))return [];
+        const objects=await definitions.list(tenantId);
+        const configurations=await objectManagerMetadata.loadForObjects(tenantId,objects.map(item=>item.apiName));
+        return objects.map(item=>({...item,...configurations.get(item.apiName)}));
+      })(),
+      (async()=>{
+        if(!await rbac.allowed(tenantId,userId,'PageDefinition','read'))return [];
+        return (await pages.list(tenantId)).map(page=>{
+          const {components,...rest}=page;
+          return {...rest,components:[],standalonePresentation:hasStandalonePresentation(components)};
+        });
+      })(),
+      (async()=>permittedApps(rbac,tenantId,userId,await apps.listMetadata(tenantId)))(),
+      sessionMetadata(db,tenantId,userId)
+    ]);
+    return {appId,objects:objectsPayload,pages:pagesPayload,apps:appsPayload,user:session.user};
+  };
   app.post('/api/auth/login',route(async(req,res)=>{
     const {tenantSlug,email,password}=req.body??{};
     if(typeof email!=='string'||typeof password!=='string'||!email.trim()) {
@@ -515,13 +547,16 @@ export function createSystemServer(db:SqlPersistence) {
       res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
       if(req.query.landing==='1')res.setHeader('Cache-Control','no-store');
       const actor={tenant_id:session.tenant_id,user_id:session.user_id};
-      const [landingAppApi,bootPage,landing]=await Promise.all([
+      const [landingAppApi,bootPage,landing,appRuntime]=await Promise.all([
         landingPreference(session.tenant_id,session.user_id),
         req.query.page?bootPageAnswer(actor,req.query.page):undefined,
-        req.query.landing==='1'?landingBootstrap(session.tenant_id,session.user_id):undefined]);
-      if(bootPage||landing)res.setHeader('Cache-Control','no-store');
+        req.query.landing==='1'?landingBootstrap(session.tenant_id,session.user_id):undefined,
+        // A published app page opens with its app's runtime metadata in this same answer.
+        typeof req.query.app==='string'
+          ?appRuntimeMetadata(session.tenant_id,session.user_id,req.query.app).catch(()=>undefined):undefined]);
+      if(bootPage||landing||appRuntime)res.setHeader('Cache-Control','no-store');
       res.json({access_token:session.accessToken,expires_in:session.expiresIn,userId:session.user_id,landingAppApi,
-        ...(bootPage?{page:bootPage}:{}),...(landing??{})});
+        ...(bootPage?{page:bootPage}:{}),...(landing??{}),...(appRuntime?{appRuntime}:{})});
     } catch {res.status(401).json({error:'Invalid refresh session'});}
   }));
   app.get('/api/auth/password-reset/options',route(async(req,res)=>{
@@ -2446,6 +2481,12 @@ export function createSystemServer(db:SqlPersistence) {
   app.get('/api/metadata/apps',route(async(req,res)=>{
     const actor=req.actor!;
     res.json({apps:await permittedApps(rbac,actor.tenant_id,actor.user_id,await apps.listMetadata(actor.tenant_id))});
+  }));
+  app.get('/api/apps/:appId/runtime-metadata',route(async(req,res)=>{
+    const actor=req.actor!;
+    res.setHeader('Cache-Control','private, no-store');
+    res.setHeader('Vary','Authorization, Cookie');
+    res.json(await appRuntimeMetadata(actor.tenant_id,actor.user_id,req.params.appId));
   }));
   app.get('/api/metadata/landing-bootstrap',route(async(req,res)=>{
     const actor=req.actor!;

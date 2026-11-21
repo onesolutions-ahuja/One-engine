@@ -20,9 +20,24 @@ type Listener=(event:LiveEvent)=>void;
 const listeners=new Set<Listener>();
 let controller:AbortController|null=null;
 let connected=false;
-let retryMs=1000;
+/** Failed tries in a row: the next try waits RETRY_STEPS_MS[failures] (quick at first). */
+let failures=0;
+/** The stream was down since the page started listening: the next 'ready' resyncs. */
+let missed=false;
 let retryTimer:ReturnType<typeof setTimeout>|null=null;
-const MAX_RETRY_MS=15_000;
+/** A dropped stream (server restart, proxy timeout, too many streams for a moment) is
+ * opened again almost at once, then less often while the server stays unreachable. */
+export const RETRY_STEPS_MS=[250,500,1000,2000,4000,8000,15_000] as const;
+/** How the stream is opened: the signed-in API by default (tests pass a fake server). */
+type Opener=(signal:AbortSignal)=>Promise<Response>;
+let opener:Opener|null=null;
+export function setLiveStreamOpener(next:Opener|null):void{opener=next;}
+/** Wait before the next try: quick at first, with a little jitter so many screens
+ * sharing one login do not all knock at the same moment. */
+export function liveRetryDelay(failed:number,random=Math.random):number{
+ const base=RETRY_STEPS_MS[Math.min(Math.max(failed,1),RETRY_STEPS_MS.length)-1];
+ return Math.round(base*(0.8+0.4*random()));
+}
 const OWN_WRITE_MS=3_000;
 /** Records this window saved a moment ago: it already shows them, so their echo is skipped. */
 const ownWrites=new Map<string,number>();
@@ -84,16 +99,17 @@ async function connect():Promise<void>{
  controller=current;
  let wasConnected=false;
  try{
-  const {apiStream}=await import('../../authentication/Client/authClient');
-  const response=await apiStream('/live-changes',current.signal);
+  const open=opener??(async(signal:AbortSignal)=>(await import('../../authentication/Client/authClient')).apiStream('/live-changes',signal));
+  const response=await open(current.signal);
+  if(!response.ok)throw Error('Live changes unavailable (HTTP '+response.status+')');
   if(!response.body)throw Error('Live changes have no body');
   const reader=response.body.getReader(),decoder=new TextDecoder();
   const parser=new LiveFrameParser(event=>{
    if(event.kind==='ready'){
     wasConnected=true;
-    const resumed=retryMs>1000;
-    connected=true;retryMs=1000;
-    // Back after a drop: anything may have changed meanwhile.
+    const resumed=missed;
+    connected=true;failures=0;missed=false;
+    // Back after a drop or a failed try: anything may have changed meanwhile.
     if(resumed)emit({kind:'resync'});
     return;
    }
@@ -112,8 +128,11 @@ async function connect():Promise<void>{
   if(controller===current)controller=null;
   connected=false;
   if(!current.signal.aborted&&listeners.size){
-   if(!wasConnected)retryMs=Math.min(retryMs*2,MAX_RETRY_MS);else retryMs=2000;
-   retryTimer=setTimeout(()=>{retryTimer=null;void connect();},retryMs);
+   // Changes made while the stream is down are read again once it is back.
+   missed=true;
+   // A stream that was up comes back at once (first step); failed tries wait longer each time.
+   failures=wasConnected?1:failures+1;
+   retryTimer=setTimeout(()=>{retryTimer=null;void connect();},liveRetryDelay(failures));
   }
  }
 }
@@ -121,12 +140,12 @@ async function connect():Promise<void>{
 /** Listen to live changes; the stream opens with the first listener and closes after the last. */
 export function subscribeLiveChanges(listener:Listener):()=>void{
  listeners.add(listener);
- if(typeof window!=='undefined'&&typeof fetch==='function')void connect();
+ if(opener||typeof window!=='undefined'&&typeof fetch==='function')void connect();
  return ()=>{
   listeners.delete(listener);
   if(!listeners.size){
    if(retryTimer){clearTimeout(retryTimer);retryTimer=null;}
-   controller?.abort();controller=null;connected=false;
+   controller?.abort();controller=null;connected=false;failures=0;missed=false;
   }
  };
 }

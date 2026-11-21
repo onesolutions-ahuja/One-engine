@@ -28,6 +28,15 @@ function mentionsWord(text:string,word:string):boolean{
  return false;
 }
 
+/** True when a patch adds rows or changes a row's sort value (its place may move). */
+function movesInSort(before:readonly Record<string,unknown>[],after:readonly Record<string,unknown>[],field:string):boolean{
+ const was=new Map(before.map(row=>[String(row.Id),row]));
+ return after.some(row=>{
+  const old=was.get(String(row.Id));
+  return !old||JSON.stringify(old[field]??null)!==JSON.stringify(row[field]??null);
+ });
+}
+
 export function createCompiledPageStore(compiled:CompiledPage,initial:State={},
  dependencies:PageStateDependencies=new Map()){
  let state:State={...initial};
@@ -284,7 +293,8 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
    // A new or deleted parent (a cart) is rediscovered on the next read.
    if(!detail.optimistic)load.invalidate?.(written);
    // This window saved these records: their live echo needs no second read here.
-   if(!detail.optimistic&&detail.recordChanges)noteOwnWrites(detail.recordChanges.map(change=>change.record?.Id));
+   // (Not for rows another screen saved: their next change must still be drawn here.)
+   if(!detail.optimistic&&!detail.live&&detail.recordChanges)noteOwnWrites(detail.recordChanges.map(change=>change.record?.Id));
    for(const source of compiled.dataSources){
     if(written&&!readsObject(source,written))continue;
     // Reads only a roll-up parent of what was saved: re-read it after the real save.
@@ -301,6 +311,13 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
        total:current.total,offset:0,pageSize:fullyLoaded?current.total+1:0,
        readObjectApiNames:reads.some(item=>item===null)?null:[...new Set(reads.flat() as string[])],
        filters:current.serverFilters,relatedFilter:current.relatedFilter,hasUnpredictableFilter:!current.predictable}):null;
+    // A sorted list keeps the server's order: after a real save, a new row or a row whose
+    // sort value changed is placed by a fresh read (the database decides ties and collation).
+    // A prediction still shows at once; the real save that follows puts it in its place.
+    if(patched&&!detail.optimistic&&source.sortField&&movesInSort(current!.records,patched.records,source.sortField)){
+     work.push(reload(source.id,Boolean(detail.live)));
+     continue;
+    }
     if(patched){
      // Same rows after the patch: no new snapshot, no redraw.
      if(patched.total!==current!.total||!sameRows(current!.records,patched.records))

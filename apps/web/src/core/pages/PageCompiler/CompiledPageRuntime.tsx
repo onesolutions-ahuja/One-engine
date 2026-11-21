@@ -27,7 +27,7 @@ import type {PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {scopedFieldAllows} from '../PageRuntime/fieldScopedRecordFilters';
 import {loadFlowScreenRecordPage,loadFlowScreenRecords,getAccessToken,currentSessionUserId} from '../../authentication/Client/authClient';
 import {fingerprint,readLocal,writeLocal} from './localCopy';
-import {markPageOpen,noteLiveDrawn,timingNow} from './pageTimings';
+import {markPageOpen} from './pageTimings';
 import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {presentPageRecords,type ChannelGrant} from '../../records/RecordWorkspace/recordPresentationAdapters';
 import {resolveFlowOutputBindings,resolveStructuredFlowInput} from '../../automation/FlowScreen/flowInputBindings';
@@ -36,7 +36,8 @@ import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {showPageLayer} from '../PageRuntime/pageLayers';
-import {isLiveConnected,subscribeLiveChanges,type LiveChange} from './liveChanges';
+import {isLiveConnected,subscribeLiveChanges} from './liveChanges';
+import {connectPageLive} from './pageLiveWiring';
 import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
@@ -320,51 +321,10 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    })});
   // Live changes: records saved anywhere (another till, a display's till, a Flow, another
   // user) show here at once. Only the lists and totals over those Objects are read again.
-  const liveChanges=new Map<string,LiveChange>();
-  let liveTimer:ReturnType<typeof setTimeout>|null=null;
-  let liveReceived=0;
-  const flushLive=()=>{
-   liveTimer=null;
-   const changes=[...liveChanges.values()];liveChanges.clear();
-   if(!changes.length)return;
-   // Speed timing: received -> drawn (rows patched in place now; re-reads count when they land).
-   const received=liveReceived;
-   queueMicrotask(()=>noteLiveDrawn(runtime.compiled.apiName,received,changes.map(change=>change.object).join(',')));
-   for(const change of changes){
-    if(change.rows){
-     // The rows came with the change: patch what is on screen, no second request.
-     const seen=new Set(change.rows.map(row=>String(row.Id??'')));
-     const recordChanges=[...change.rows.map(record=>({objectApiName:change.object,
-      operation:(change.operation==='insert'?'create':'update') as 'create'|'update',record})),
-      ...change.ids.filter(id=>!seen.has(id)).map(id=>({objectApiName:change.object,operation:'delete' as const,record:{Id:id}}))];
-     void runtime.data.saved({pageSessionKey:runtime.pageSessionKey,objectApiNames:[change.object],recordChanges,live:true}).catch(()=>undefined);
-     runtime.code?.applyLiveRows(change.object,change.rows,change.ids.filter(id=>!seen.has(id)));
-    }else void runtime.data.live(change).catch(()=>undefined);
-   }
-   void runtime.code?.liveChanged(changes.map(change=>change.object),changes.filter(change=>!change.rows).map(change=>change.object)).catch(()=>undefined);
-  };
-  const stopLive=subscribeLiveChanges(event=>{
-   if(event.kind==='resync'){
-    for(const source of runtime.compiled.dataSources)void runtime.data.reload(source.id,true).catch(()=>undefined);
-    void runtime.code?.loadSets().catch(()=>undefined);
-    void runtime.code?.refreshTotals();
-    return;
-   }
-   if(event.kind!=='change')return;
-   // Changes to one Object within a moment are merged (one read for a line and its cart).
-   const key=event.change.object.toLowerCase();
-   const before=liveChanges.get(key);
-   const rows=before?.rows&&event.change.rows
-    ?[...new Map([...before.rows,...event.change.rows].map(row=>[String(row.Id??''),row])).values()]:undefined;
-   liveChanges.set(key,before?{object:before.object,ids:[...new Set([...before.ids,...event.change.ids])],
-    count:before.count+event.change.count,operation:before.operation===event.change.operation?before.operation:'insert',
-    ...(rows?{rows}:{})}:event.change);
-   // Several saves at once (a line and its cart) are read in one go.
-   if(!liveTimer)liveReceived=timingNow();
-   liveTimer??=setTimeout(flushLive,30);
-  });
+  const stopLive=connectPageLive({apiName:runtime.compiled.apiName,pageSessionKey:runtime.pageSessionKey,
+   dataSources:runtime.compiled.dataSources,data:runtime.data,code:runtime.code});
   return ()=>{
-   stopLive();if(liveTimer)clearTimeout(liveTimer);
+   stopLive();
    unsubscribeShown.forEach(stop=>stop());
    stopMirror();unsubscribeSale();
    unsubscribeState?.();

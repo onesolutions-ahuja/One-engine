@@ -783,7 +783,10 @@ function SmartTabs({p,record,fire}){
  return <>{!vertical&&!p.builderPreview&&tabEdges.left&&arrow("left")}
  {!vertical&&!p.builderPreview&&tabEdges.right&&arrow("right")}
  <div ref={tabsScroller} data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,
-   display:"flex",flexDirection:"column",height:"100%",minHeight:0,width:"100%"}}>
+   display:"flex",flexDirection:"column",height:"100%",minHeight:0,
+    // Reserve real space for arrow controls, never overlay category text.
+    width:vertical?"100%":"calc(100% - 72px)",
+    marginLeft:vertical?0:36,marginRight:vertical?0:36}}>
   <nav className={"smart-tabs"+(p.backgroundColor?"":" is-segmented")} role="tablist" aria-label="Tabs"
    aria-orientation={vertical?"vertical":"horizontal"} style={{
     width:"100%",height:"100%",flex:"1 1 auto",minHeight:0,
@@ -794,10 +797,10 @@ function SmartTabs({p,record,fire}){
     aria-selected={selectedTabIndex===index} style={{height:number(p.tabHeight,44),
      maxHeight:vertical?undefined:"100%",minHeight:vertical?number(p.tabHeight,44):0,
      flex:vertical?"0 0 auto":"1 1 auto",
-     width:vertical?"100%":p.wrapText===true?number(p.tabWidth,120):undefined,
+     width:vertical?"100%":number(p.tabWidth,120),
      minWidth:vertical?0:number(p.tabWidth,120),
-     // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
-     maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
+     maxWidth:vertical?undefined:number(p.tabWidth,120),
+     overflow:"hidden",textOverflow:p.wrapText===true?undefined:"ellipsis",
      borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||SMART_BLUE):"transparent"):undefined,
      borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
      background:selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",

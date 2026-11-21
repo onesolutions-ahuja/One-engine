@@ -320,3 +320,51 @@ test('values saved with STATE() belong to that component; rewrite moves them off
  assert.deepEqual(changes.map(change=>change.after),['=@ThisPage.ResumeButton.heldError & @ThisPage.Input.recordId']);
  assert.match(compileDisplayFormula(changes[0].after).js,/\$\.pageValue\("ResumeButton", "heldError"\)/);
 });
+
+test('browser: fast taps keep counting from the newest prediction while earlier answers arrive',async()=>{
+ const module=pageCodeModule(buildPageCode(compiledPage as never));
+ const createCode=new Function('F','O',module.replace(/export /g,'')+'\nreturn createCode(F, O);') as (f:typeof F,o:typeof O)=>PageCode;
+ const code=createCode(F,O);
+ const cartId='22222222-2222-4222-8222-222222222222';
+ const cart=(total:number)=>({Id:cartId,SessionKey:'s-1',Status:'Open',Total:total,Subtotal:total});
+ const setsWith=(lines:Row[],total:number)=>Object.fromEntries(code.recordSets.map(set=>[set.key,
+  {rows:set.object==='Cart'?[cart(total)]:set.object==='CartLine'?lines:[],complete:true}]));
+ const answers:Array<(value:unknown)=>void>=[];
+ const rt=createPageCodeRuntime(code,{endpoint:'/apps/X',build:{buildId:'b'},sessionId:()=>'s-1',state:()=>({}),
+  request:(async(path:string)=>path.endsWith('/sets')?{ok:true,sets:setsWith([],0)}
+   :new Promise(resolve=>{answers.push(resolve);})) as never});
+ await rt.loadSets();
+ const total=rt.formulasFor('cart').get('=SUMIFS(Cart, Total, SessionKey, @ThisPage.Session.Id, Status, "Open")')!;
+ const shown:Array<{changes:Array<{objectApiName:string;operation:string;record:Row}>;optimistic?:string}>=[];
+ const io={show:(update:never)=>{shown.push(update);},effects:async()=>{}};
+ const tap=()=>rt.run('grid:click',{recordId:productId,record:{Id:productId,Name:'Cola',Price:1.5}},'Product',io);
+ const quantity=(index:number)=>shown[index].changes.find(change=>change.objectApiName==='CartLine')!.record.Quantity;
+ const running=[tap(),tap(),tap()];
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual([0,1,2].map(quantity),[1,2,3]);
+ assert.equal(total({}),4.5);
+ const provisionalId=String(shown[0].changes.find(change=>change.objectApiName==='CartLine')!.record.Id);
+ // Tap 1 is answered (the new line saved, quantity 1) while taps 2 and 3 still wait.
+ const saved={Id:'33333333-3333-4333-8333-333333333333',Cart:cartId,Product:productId,Name:'Cola',Quantity:1,
+  UnitPrice:1.5,LineTotal:1.5,session_key__c:'s-1',Status:'Open'};
+ answers[0]({ok:true,changes:[{objectApiName:'CartLine',operation:'create',record:saved}],state:{},effects:[],sets:setsWith([saved],1.5)});
+ await running[0];
+ assert.equal(total({}),4.5,'the held total keeps taps 2 and 3');
+ // Tap 4, after that answer, counts from 3: 4 (on the saved row, not the provisional one).
+ const fourth=tap();
+ await new Promise(resolve=>setTimeout(resolve,0));
+ const line=shown.at(-1)!.changes.find(change=>change.objectApiName==='CartLine')!;
+ assert.equal(line.record.Quantity,4);
+ assert.equal(line.record.Id,saved.Id);
+ assert.notEqual(line.record.Id,provisionalId);
+ assert.equal(total({}),6);
+ // An older answer arriving after a newer one never replaces the newer saved rows.
+ answers[2]({ok:true,changes:[],state:{},effects:[],sets:setsWith([{...saved,Quantity:3,LineTotal:4.5}],4.5)});
+ await running[2];
+ answers[1]({ok:true,changes:[],state:{},effects:[],sets:setsWith([{...saved,Quantity:2,LineTotal:3}],3)});
+ await running[1];
+ assert.equal(total({}),6,'tap 4 still waits on top of the newest answer');
+ answers[3]({ok:true,changes:[],state:{},effects:[],sets:setsWith([{...saved,Quantity:4,LineTotal:6}],6)});
+ await fourth;
+ assert.equal(total({}),6);
+});

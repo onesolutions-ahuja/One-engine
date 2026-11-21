@@ -37,7 +37,7 @@ import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type Co
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {showPageLayer} from '../PageRuntime/pageLayers';
 import {isLiveConnected,subscribeLiveChanges} from './liveChanges';
-import {connectPageLive} from './pageLiveWiring';
+import {connectPageLive,drawOwnTap,newTapLedger,type TapLedger} from './pageLiveWiring';
 import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession,mirrorSources,setFollowingSale} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
@@ -70,6 +70,8 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  data:CompiledDataLayer;request:Request;objects:ObjectMetadata[];pageSessionKey:string;recordId:string;
  /** The page as real code (v2), when the page file carries it. */
  code:PageCodeRuntime|null;
+ /** This screen's own taps still waiting for their answers (drawn in order, never stepping back). */
+ ownTaps:TapLedger;
  searchRecords(sourceId:string,query:string):Promise<Record<string,unknown>[]>;
  /** Remember what the user picked/typed/toggled in a component, under its page
   * name, so any formula, filter or action reads @ThisPage.Name.Selected.Id / Value / Text. */
@@ -215,7 +217,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
     if(!source)throw Error('Search Box has no configured Object data source');
     return sourceLoader.search(source,store.get(),query);
    },
-   pageSessionKey,recordId,
+   pageSessionKey,recordId,ownTaps:newTapLedger(),
    sessionId:()=>sessionId,
    subscribeSession(listener){sessionListeners.add(listener);return ()=>{sessionListeners.delete(listener);};},
    resetSession(next){
@@ -829,16 +831,17 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
       const stateChanges=Object.entries(update.state).map(([key,value])=>({key,value}));
       if(stateChanges.length)applyState(stateChanges);
       // Failed: every list reads SQL again, so the predicted change disappears.
-      if(update.failed){saved({});return;}
+      if(update.failed){
+       if(update.replaces){runtime.ownTaps.waiting.delete(update.replaces);runtime.ownTaps.answered.add(update.replaces);}
+       saved({});return;
+      }
       // Lists are told about their own Object only. Totals and lookups over other
       // Objects (SUMIFS over the cart) come from the page code's held rows.
       const listObjects=new Set(runtime.compiled.dataSources.map(item=>item.objectApiName));
-      for(const object of new Set(update.changes.map(change=>change.objectApiName))){
-       const own=update.changes.filter(change=>change.objectApiName===object);
-       if(!listObjects.has(object))continue;
-       if(update.optimistic)void runtime.data.saved({objectApiNames:[object],recordChanges:own,optimistic:update.optimistic});
-       else void runtime.data.saved({objectApiNames:[object],recordChanges:own,replacesOptimistic:update.replaces});
-      }
+      // Same rules as a tap relayed from another screen: in order, never stepping back.
+      void drawOwnTap({apiName:runtime.compiled.apiName,pageSessionKey:runtime.pageSessionKey,
+       dataSources:runtime.compiled.dataSources,data:runtime.data},
+       {...update,changes:update.changes.filter(change=>listObjects.has(change.objectApiName))},runtime.ownTaps);
       if(!update.optimistic)runtime.broadcastSaved({objectApiNames:[...new Set(update.changes.map(change=>change.objectApiName))]});
      },
      effects:runEffects,

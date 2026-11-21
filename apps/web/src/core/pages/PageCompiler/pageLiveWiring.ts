@@ -234,6 +234,23 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
  if(target.code&&settledObjects.length)work.push(target.code.liveChanged(settledObjects,[]).catch(()=>undefined));
  return Promise.all(work);
 }
+/**
+ * This screen's own tap (a till, a kiosk): its prediction, then its answer, drawn by the same
+ * rules as another screen's tap. Fast taps are answered one by one; an answer never draws
+ * over a row a later tap of this screen still waits to change (5, 6, 7, 8 never shows 5
+ * again), and a new row changes from provisional to saved in one step.
+ * A tap the browser could not predict has no batch: its answer is drawn the same way.
+ */
+let ownUnpredicted=0;
+export function drawOwnTap(target:PageLiveTarget,update:{changes:readonly LiveTapChange[];optimistic?:string;replaces?:string},
+ ledger:TapLedger,now=Date.now()):Promise<unknown>{
+ const own={...target,code:null};
+ if(update.optimistic)return drawLiveTap(own,'preview',{batch:update.optimistic,ok:true,changes:[...update.changes]},ledger,now);
+ // This window saved these records: their database notice needs no second read here.
+ noteOwnWrites(update.changes.map(change=>change.record.Id));
+ const batch=update.replaces??'own-'+(++ownUnpredicted);
+ return drawLiveTap(own,'settled',{batch,ok:true,changes:[...update.changes]},ledger,now);
+}
 /** A database notice drawn while taps still wait: rows those taps change again are left to
  * their answer (their newer prediction stays on screen). Changes left with nothing are dropped. */
 export function withoutWaiting(changes:readonly Pending[],waiting:{ids:Set<string>;objects:Set<string>}):Pending[]{

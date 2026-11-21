@@ -3,8 +3,8 @@ import {pathToFileURL} from 'node:url';
 
 /** Safe SmartTill tenant-page migration, from a known-good Page Builder draft.
  * --preflight runs pure checks, no database.
- * With DATABASE_URL, --tenant UUID --actor UUID: report all CONFIRMSCREEN uses and
- * plan the popup/customer-display page edits (no writes).
+ * With DATABASE_URL, --tenant UUID --actor UUID: inspect planned popup and
+ * customer-display page edits (no writes). Saved action formulas are out of scope.
  * --apply saves DRAFTS, --apply --publish publishes those drafts explicitly.
  * Do not bulk-rewrite payment Yes/No branches: pre-payment authorisation is not success.
  */
@@ -83,24 +83,6 @@ export function customerDraft(current,variant){
  return {changed:newBlocks.length>0,added:newBlocks.map(c=>c.id),
   draft:{...current,components:[...current.components,...newBlocks]}};
 }
-/** No broad regex rewriting: inventory every occurrence from every action (including branches).
- * Only the explicit server-confirmed RECORDPAYMENT effect is permitted to show success. */
-export function confirmScreenUses(page){
- const matches=[];
- for(const component of page.components??[]){
-  const scan=(value,path)=>{
-   if(typeof value==='string'){
-    if(/CONFIRMSCREEN\s*\(/i.test(value))matches.push({
-     component:component.id,label:component.label,path,formula:value
-    });
-   }else if(value&&typeof value==='object'&& !Array.isArray(value)){
-    for(const [key,child] of Object.entries(value))scan(child,path+'.'+key);
-   }else if(Array.isArray(value))value.forEach((child,index)=>scan(child,path+'['+index+']'));
-  };
-  scan(component.properties??{},'properties');
- }
- return matches;
-}
 export function validateVisualDraft(current,next){
  assert.equal(current.apiName,next.apiName);
  assert.equal(current.components.length<=next.components.length,true);
@@ -152,16 +134,7 @@ async function run(){
   if(existingPopup.length)assert.equal(existingPopup[0].page_type,'In-Screen Page',
    'Existing confirmation page must be an In-Screen Page');
   const runtime=new PageRuntime(db);
-  const jobs=[],uses=[];
-  // Read all saved page formulas before any write. No blind CONFIRMSCREEN replacement.
-  const tillPages=found.rows.filter(row=>api(row.api_name).startsWith('smarttill')||
-    api(row.api_name).startsWith('smarttill')||api(row.title).startsWith('smarttill'));
-  for(const row of tillPages)for(const variant of variants){
-   let page;
-   try{page=await runtime.editor(tenant,row.api_name,variant);}
-   catch(error){if(/not found|not configured/i.test(String(error)))continue;throw error;}
-   uses.push(...confirmScreenUses(page).map(use=>({page:row.api_name,variant,...use})));
-  }
+  const jobs=[];
   for(const variant of variants){
    const customer=await runtime.editor(tenant,actualCustomer,variant);
    const planned=customerDraft(customer,variant);
@@ -170,8 +143,7 @@ async function run(){
   }
   console.log(JSON.stringify({mode:publish?'publish':apply?'draft':'dry-run',
    confirmationPage:POPUP,popupExists:Boolean(existingPopup.length),
-   customerDrafts:jobs.map(job=>({variant:job.variant,added:job.added})),
-   confirmScreenUses:uses},null,2));
+   customerDrafts:jobs.map(job=>({variant:job.variant,added:job.added}))},null,2));
   if(!apply)return;
   if(!existingPopup.length)await runtime.save(tenant,POPUP,confirmationPage(),true);
   // Preserve every existing component, including all existing payment actions.

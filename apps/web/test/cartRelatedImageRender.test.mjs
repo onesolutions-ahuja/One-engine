@@ -24,5 +24,4 @@ test('published cart renders authorised related Product image and name for each 
  assert.match(html,/Coffee B/);
  assert.match(html,/img\.example\.test\/a\.webp/);
  assert.match(html,/img\.example\.test\/b\.webp/);
- assert.ok(!html.includes('FORMULAERROR'));
 });

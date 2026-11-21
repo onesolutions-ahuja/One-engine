@@ -260,8 +260,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      // Standalone Image captions retain intrinsic growth for large typography.
      height:headerHeight,minHeight:fixedGridHeader?0:"max-content",
      width:grid&&p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==""
-       ?number(p.headerBoxWidth,0,0,1200)+"px":undefined,
-     maxWidth:grid?"100%":undefined,
+       ?"min(100%, "+number(p.headerBoxWidth,0,0,1200)+"px)":undefined,
      maxHeight:fixedGridHeader?headerHeight:undefined,
      alignSelf:horizontal&&!idCard?"safe center":undefined,flexShrink:0,
      fontWeight:focusedWeight??(p.headerBold===false?400:700),

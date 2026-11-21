@@ -120,11 +120,13 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  /** Read the totals already shown again, keeping the old values on screen until the new
   * ones arrive (a customer display: the Till changes the rows, not this page). */
  let refreshingTotals=false;
- const refreshTotals=async()=>{
+ const refreshTotals=async(objects?:ReadonlySet<string>)=>{
   if(refreshingTotals||!aggregates.size)return;
+  // Only the totals over these Objects (a live change), else all of them.
+  const keys=[...aggregates.keys()].filter(key=>!objects||objects.has(String(JSON.parse(key)[1]).toLowerCase())).slice(0,100);
+  if(!keys.length)return;
   refreshingTotals=true;
   try{
-   const keys=[...aggregates.keys()].slice(0,100);
    const items=keys.map(key=>{const [kind,object,field,criteria]=JSON.parse(key) as [string,string,string,Criteria];return {kind,object,field,criteria};});
    const answer=await post<{values?:unknown[]}>('/page-code/aggregates',{...host.build,request:requestFor({},''),items});
    let any=false;
@@ -401,6 +403,15 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   setsFor:(key:string)=>sets.get(key),
   /** Re-read the server totals on screen without blanking them (live customer display). */
   refreshTotals:()=>refreshTotals(),
+  /** Someone saved records of these Objects (a live change): re-read the totals and
+   * record sets over them, keeping what is on screen until the new values arrive. */
+  async liveChanged(objects:readonly string[]){
+   const names=new Set(objects.map(name=>name.toLowerCase()));
+   await Promise.all([
+    refreshTotals(names),
+    code.recordSets.some(set=>names.has(String(set.object).toLowerCase()))?this.loadSets():Promise.resolve()
+   ]);
+  },
   /** The page reads @ThisPage.Device.MirrorKey: it shows another screen's sale. */
   readsMirror:Object.values(code.sources).some(source=>/@ThisPage\.Device\.MirrorKey/i.test(String(source))),
   /**

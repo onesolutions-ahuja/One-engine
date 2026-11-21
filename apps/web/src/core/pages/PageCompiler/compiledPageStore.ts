@@ -1,4 +1,5 @@
 import type {CompiledPage,CompiledDataSource} from './compilePage';
+import {noteOwnWrites} from './liveChanges';
 import {applySavedRecordMutations,withDependentObjects,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {applyPageSelection,changedPageStateNames,type PageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {withComponentProperties} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
@@ -249,6 +250,8 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
    const work:Promise<void>[]=[];
    // A new or deleted parent (a cart) is rediscovered on the next read.
    if(!detail.optimistic)load.invalidate?.(written);
+   // This window saved these records: their live echo needs no second read here.
+   if(!detail.optimistic&&detail.recordChanges)noteOwnWrites(detail.recordChanges.map(change=>change.record?.Id));
    for(const source of compiled.dataSources){
     if(written&&!readsObject(source,written))continue;
     // Reads only a roll-up parent of what was saved: re-read it after the real save.
@@ -274,6 +277,25 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
     // A prediction the list cannot show exactly is skipped; the real save follows.
     if(detail.optimistic)continue;
     work.push(reload(source.id));
+   }
+   return Promise.all(work).then(()=>undefined);
+  },
+  /** Someone saved records of `object` (a live change). Lists over it are read again,
+   * except a list that shows all its rows and none of the deleted ones (a delete cannot
+   * add rows; an update could move a row into the list, so it always re-reads). */
+  live(change:{object:string;ids:readonly string[];count:number;operation:string}):Promise<void>{
+   const object=change.object.toLowerCase();
+   const exact=change.operation==='delete'&&change.ids.length>0&&change.count<=change.ids.length;
+   const changed=new Set(change.ids);
+   const work:Promise<void>[]=[];
+   load.invalidate?.([change.object]);
+   for(const source of compiled.dataSources){
+    if(!readsObject(source,[change.object])&&source.objectApiName.toLowerCase()!==object)continue;
+    const current=snapshots.get(source.id);
+    const ownObject=source.objectApiName.toLowerCase()===object;
+    const fullyLoaded=Boolean(current&&!current.loading&&!current.hasMore&&current.records.length===current.total);
+    if(exact&&ownObject&&fullyLoaded&&!current!.records.some(row=>changed.has(String(row.Id))))continue;
+    work.push(reload(source.id,true));
    }
    return Promise.all(work).then(()=>undefined);
   },

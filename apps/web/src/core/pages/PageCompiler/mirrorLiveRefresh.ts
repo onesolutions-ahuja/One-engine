@@ -55,6 +55,8 @@ export function mirrorSources(sources:readonly CompiledDataSource[],followsSale=
  return sources.filter(source=>MIRROR.test(sourceText(source))||followsSale&&readsSession(source));
 }
 
+/** With the live stream up, the display's timer re-reads at most this often. */
+export const LIVE_FALLBACK_MS=30_000;
 type Target={
  reload(id:string,fresh?:boolean):Promise<void>;
  /** Move to the mirrored device's current sale when it changed (before the rows are read). */
@@ -62,6 +64,10 @@ type Target={
  loadSets?():Promise<void>;
  refreshTotals?():Promise<void>|void;
  subscribeDevice?(listener:()=>void):()=>void;
+ /** The live stream is up (changes arrive by themselves). */
+ isLive?():boolean;
+ /** Live events that concern this display (its device moved, or a resync). */
+ subscribeLive?(listener:()=>void):()=>void;
 };
 type Clock={
  setInterval(run:()=>void,ms:number):unknown;clearInterval(handle:unknown):void;
@@ -97,10 +103,16 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
    ]);
   }finally{busy=false;}
  };
- const tick=()=>{void refresh();};
- const timer=clock.setInterval(tick,intervalMs);
+ let last=0;
+ const tick=()=>{last=Date.now();void refresh();};
+ // With the live stream up, the Till's changes arrive by themselves: the timer is only a
+ // slow safety net. Without it (offline, a proxy that blocks streams) it checks every 2 s.
+ const timed=()=>{if(target.isLive?.()&&Date.now()-last<LIVE_FALLBACK_MS)return;tick();};
+ const timer=clock.setInterval(timed,intervalMs);
  const unlisten=clock.listen(tick);
  // The server tells a display which Till it follows a moment after the page opens.
  const unsubscribe=target.subscribeDevice?.(tick);
- return ()=>{stopped=true;clock.clearInterval(timer);unlisten();unsubscribe?.();};
+ // Live: the followed device changed sale or layer, or the stream came back.
+ const unsubscribeLive=target.subscribeLive?.(tick);
+ return ()=>{stopped=true;clock.clearInterval(timer);unlisten();unsubscribe?.();unsubscribeLive?.();};
 }

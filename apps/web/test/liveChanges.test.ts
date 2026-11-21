@@ -169,3 +169,34 @@ test('a display that was hidden reads at once when shown, even with the live str
  visible=true;tick();await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(reads,1,'shown: read at once (skipped hidden ticks do not count)');
 });
+
+test('a screen notice (SCREEN on the till, often on every tap) only asks which sale and layer; rows are not re-read',async()=>{
+ let live:(kind:'screen'|'resync')=>void=()=>{};
+ const clock={setInterval:()=>1,clearInterval:()=>{},visible:()=>true,listen:()=>()=>undefined};
+ const source={id:'CartLine#d',objectApiName:'CartLine',components:[],scope:{kind:'none'},complete:false,filters:null,
+  filterLogic:'AND',filterFormula:'@CartLine.DeviceKey = @ThisPage.Device.MirrorKey',stateInputs:[]} as never;
+ let reads=0,follows=0,sets=0;
+ const stop=startMirrorLiveRefresh([source],true,{reload:async()=>{reads++;},followSale:async()=>{follows++;},
+  loadSets:async()=>{sets++;},isLive:()=>true,subscribeLive:listener=>{live=listener;return ()=>undefined;}},clock);
+ live('screen');await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual({follows,reads,sets},{follows:1,reads:0,sets:0});
+ live('resync');await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual({reads,sets},{reads:1,sets:1},'the stream came back: everything is read again');
+ stop();
+});
+
+test('a display re-read waits while taps are on their way (it would draw an older saved value over them)',async()=>{
+ let live:(kind:'screen'|'resync')=>void=()=>{};
+ const clock={setInterval:()=>1,clearInterval:()=>{},visible:()=>true,listen:()=>()=>undefined};
+ const source={id:'CartLine#d',objectApiName:'CartLine',components:[],scope:{kind:'none'},complete:false,filters:null,
+  filterLogic:'AND',filterFormula:'@CartLine.DeviceKey = @ThisPage.Device.MirrorKey',stateInputs:[]} as never;
+ let reads=0,waiting=true;
+ const stop=startMirrorLiveRefresh([source],true,{reload:async()=>{reads++;},isLive:()=>true,tapsWaiting:()=>waiting,
+  subscribeLive:listener=>{live=listener;return ()=>undefined;}},clock);
+ live('resync');await new Promise(resolve=>setTimeout(resolve,20));
+ assert.equal(reads,0,'held while taps wait');
+ waiting=false;
+ await new Promise(resolve=>setTimeout(resolve,200));
+ assert.equal(reads,1,'read once they are answered');
+ stop();
+});

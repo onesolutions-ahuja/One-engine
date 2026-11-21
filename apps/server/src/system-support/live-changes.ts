@@ -58,7 +58,9 @@ CREATE TRIGGER md_live_screen_device AFTER INSERT OR UPDATE OF session_key,page_
 type Actor={tenant_id:string;user_id:string};
 export type LiveMessage={k:'record';t:string;o:string;n:number;ids:string[];op:string}|{k:'screen';t:string;d:string}
  |{k:'page';t:string;a:string|null;v:string;d:number|null;p:number|null};
-type Subscriber={userId:string;send:(event:string,data:unknown)=>void;readable:Map<string,{ok:boolean;at:number}>};
+/** `send` returns false (or throws) when the screen is gone: it is dropped at once. */
+type Send=(event:string,data:unknown)=>boolean|void;
+type Subscriber={userId:string;send:Send;readable:Map<string,{ok:boolean;at:number}>;closed:boolean;drop:()=>void};
 type Row=Record<string,unknown>;
 /** Reads saved rows as one user (the normal record API: sharing and field permissions). */
 export type LiveRowReader=(tenant:string,user:string,object:string,ids:readonly string[])=>Promise<Row[]>;
@@ -70,8 +72,12 @@ export function recordRowReader(records:Pick<RecordEngine,'list'>):LiveRowReader
 }
 
 const READ_CACHE_MS=60_000;
-const HEARTBEAT_MS=20_000;
-const MAX_STREAMS_PER_USER=20;
+const HEARTBEAT_MS=15_000;
+/** Shops share one login across tills, kiosks and screens: one stream per open window. */
+export const MAX_STREAMS_PER_USER=300;
+export const MAX_STREAMS_PER_TENANT=3000;
+/** A screen that stopped reading (sleeping tablet, dead network) holds at most this much unsent. */
+const MAX_UNSENT_BYTES=1_048_576;
 
 export class LiveChangeHub{
  private readonly tenants=new Map<string,Set<Subscriber>>();
@@ -95,7 +101,7 @@ export class LiveChangeHub{
     this.listener=null;
     try{client.release(true);}catch{/* already gone */}
     // Screens resync (reload what they show) when they reconnect after this.
-    for(const subscribers of this.tenants.values())for(const subscriber of subscribers)subscriber.send('resync',{});
+    for(const subscribers of this.tenants.values())for(const subscriber of [...subscribers])this.deliver(subscriber,'resync',{});
     if(!this.stopped)setTimeout(()=>void this.start(),2000);
    };
    client.on('error',()=>retry());
@@ -112,15 +118,30 @@ export class LiveChangeHub{
   const client=this.listener;this.listener=null;
   if(client){try{await client.query('UNLISTEN *');}catch{/* closing */}client.release(true);}
  }
- subscribe(actor:Actor,send:Subscriber['send']):()=>void{
+ subscribe(actor:Actor,send:Send):()=>void{
   const subscribers=this.tenants.get(actor.tenant_id)??new Set<Subscriber>();
-  if([...subscribers].filter(item=>item.userId===actor.user_id).length>=MAX_STREAMS_PER_USER)
-   throw Object.assign(Error('Too many live connections for this user'),{status:429});
-  const subscriber:Subscriber={userId:actor.user_id,send,readable:new Map()};
+  if(subscribers.size>=MAX_STREAMS_PER_TENANT)
+   throw Object.assign(Error('Too many live connections for this tenant'),{status:429});
+  let mine=0;
+  for(const item of subscribers)if(item.userId===actor.user_id)mine++;
+  if(mine>=MAX_STREAMS_PER_USER)throw Object.assign(Error('Too many live connections for this user'),{status:429});
+  const subscriber:Subscriber={userId:actor.user_id,send,readable:new Map(),closed:false,drop:()=>{
+   if(subscriber.closed)return;
+   subscriber.closed=true;
+   subscribers.delete(subscriber);
+   if(!subscribers.size&&this.tenants.get(actor.tenant_id)===subscribers)this.tenants.delete(actor.tenant_id);
+  }};
   // The database is listened to from the first screen that connects.
   void this.start();
   subscribers.add(subscriber);this.tenants.set(actor.tenant_id,subscribers);
-  return ()=>{subscribers.delete(subscriber);if(!subscribers.size)this.tenants.delete(actor.tenant_id);};
+  return subscriber.drop;
+ }
+ /** Send to one screen; a screen whose connection is gone is dropped at once. */
+ private deliver(subscriber:Subscriber,event:string,data:unknown):void{
+  if(subscriber.closed)return;
+  let ok:boolean|void;
+  try{ok=subscriber.send(event,data);}catch{ok=false;}
+  if(ok===false)subscriber.drop();
  }
  /** Page Builder co-editing: pass a designer's live edits (or presence) to the tenant's
   * other designers who may read pages. Not stored: Save stores. */
@@ -129,7 +150,7 @@ export class LiveChangeHub{
   if(!subscribers?.size)return 0;
   let sent=0;
   await Promise.all([...subscribers].map(async subscriber=>{
-   if(await this.canRead(actor.tenant_id,subscriber,'PageDefinition')){subscriber.send('page-edit',edit);sent++;}
+   if(!subscriber.closed&&await this.canRead(actor.tenant_id,subscriber,'PageDefinition')){this.deliver(subscriber,'page-edit',edit);sent++;}
   }));
   return sent;
  }
@@ -142,7 +163,7 @@ export class LiveChangeHub{
   const subscribers=this.tenants.get(message.t);
   if(!subscribers?.size)return;
   if(message.k==='screen'){
-   for(const subscriber of subscribers)subscriber.send('screen',{device:message.d});
+   for(const subscriber of [...subscribers])this.deliver(subscriber,'screen',{device:message.d});
    return;
   }
   if(message.k==='page'){
@@ -150,7 +171,7 @@ export class LiveChangeHub{
    if(!message.a)return;
    const page={page:message.a,variant:message.v,draft:message.d,published:message.p};
    for(const subscriber of subscribers)void this.canRead(message.t,subscriber,'PageDefinition')
-    .then(ok=>{if(ok)subscriber.send('page',page);}).catch(()=>undefined);
+    .then(ok=>{if(ok)this.deliver(subscriber,'page',page);}).catch(()=>undefined);
    return;
   }
   const change={object:message.o,ids:message.ids??[],count:message.n,operation:message.op};
@@ -167,7 +188,8 @@ export class LiveChangeHub{
   if(withRows){
    try{rows=await this.readRows!(tenant,user,change.object,change.ids);}catch{rows=undefined;}
   }
-  for(const subscriber of list)subscriber.send('change',rows?{...change,rows}:change);
+  const data=rows?{...change,rows}:change;
+  for(const subscriber of list)this.deliver(subscriber,'change',data);
  }
  private async canRead(tenant:string,subscriber:Subscriber,object:string):Promise<boolean>{
   const cached=subscriber.readable.get(object);
@@ -210,11 +232,28 @@ export function registerLiveChangeRoutes(app:Express,hub:LiveChangeHub,rbac?:Pic
  app.get('/api/live-changes',(req:Request,res:Response,next:NextFunction)=>{
   const actor=(req as Request&{actor?:Actor}).actor;
   if(!actor?.tenant_id||!actor.user_id){next(Object.assign(Error('Authenticated tenant required'),{status:401}));return;}
-  let unsubscribe:()=>void;
-  const write=(text:string)=>{try{res.write(text);}catch{/* closed */}};
+  let unsubscribe:()=>void=()=>undefined;
+  let heartbeat:ReturnType<typeof setInterval>|undefined;
+  let done=false;
+  // Closed by the screen, the network or a proxy: the screen is dropped at once (not at the
+  // next heartbeat), so its place is free for the window that reconnects.
+  const close=()=>{
+   if(done)return;
+   done=true;
+   if(heartbeat)clearInterval(heartbeat);
+   unsubscribe();
+   if(!res.writableEnded)try{res.end();}catch{/* gone */}
+  };
+  const write=(text:string):boolean=>{
+   if(done||res.destroyed||res.writableEnded||req.socket?.destroyed){close();return false;}
+   // A screen that stopped reading (asleep, dead network) is let go; it resyncs when it comes back.
+   if(res.writableLength>MAX_UNSENT_BYTES){close();res.destroy();return false;}
+   try{res.write(text);return true;}catch{close();return false;}
+  };
   try{
    unsubscribe=hub.subscribe(actor,(event,data)=>write('event: '+event+'\ndata: '+JSON.stringify(data)+'\n\n'));
   }catch(error){next(error);return;}
+  res.once('close',close);res.once('error',close);req.socket?.once('close',close);
   res.status(200);
   res.setHeader('Content-Type','text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control','no-cache, no-transform, private');
@@ -222,8 +261,8 @@ export function registerLiveChangeRoutes(app:Express,hub:LiveChangeHub,rbac?:Pic
   // Proxies (Nginx, load balancers) must pass each event on at once, not hold it.
   res.setHeader('X-Accel-Buffering','no');
   res.flushHeaders();
-  write('event: ready\ndata: {}\n\n');
-  const heartbeat=setInterval(()=>write(': keepalive\n\n'),HEARTBEAT_MS);
-  res.once('close',()=>{clearInterval(heartbeat);unsubscribe();});
+  if(!write('event: ready\ndata: {}\n\n'))return;
+  heartbeat=setInterval(()=>{write(': keepalive\n\n');},HEARTBEAT_MS);
+  heartbeat.unref?.();
  });
 }

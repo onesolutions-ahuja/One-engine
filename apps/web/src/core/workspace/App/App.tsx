@@ -12,6 +12,8 @@ import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLandin
 
 import { parseAppRoute, appRoutePath } from '../Navigation/appRouting';
 import {resolveStandaloneEntry,standaloneCanonicalPath,standaloneEntryForAppId} from '../Standalone/standaloneEntries';
+import {publishedAppIdFromPath} from '../AppShell/appRuntimeMetadata';
+import {rememberBootAppRuntime} from '../AppShell/bootAppRuntime';
 
 
 
@@ -121,6 +123,12 @@ function App() {
   React.useLayoutEffect(()=>{
     if(legacyStandalonePath)window.history.replaceState({},'',legacyStandalonePath);
   },[legacyStandalonePath]);
+  // Published app pages run in the app shell (runtime only); anything else, or leaving the
+  // app runtime, uses the full Setup workspace.
+  const [fullWorkspace, setFullWorkspace] = useState(()=>standaloneEntry!==null||!publishedAppIdFromPath(entryPath));
+  const leaveAppShell = React.useCallback(()=>setFullWorkspace(true),[]);
+  // Start the page runtime download now, in parallel with the sign-in refresh.
+  useEffect(()=>{if(fullWorkspace)return;void loadPageRuntimeViews().catch(()=>undefined);void import('../AppShell/AppPageShell').catch(()=>undefined);},[]);
   const [authState, setAuthState] = useState<AuthState>('restoring');
   const [authError, setAuthError] = useState('');
   const [entryTiming, setEntryTiming] = useState<EntryTiming | null>(null);
@@ -151,13 +159,19 @@ function App() {
     // Fast transient network failures and retryable HTTP responses still get one retry.
     const retryDelaysMs = [1000];
     const bootPage = bootPageEndpoint();
+    // A published app page opens in the app shell: its app's runtime metadata comes
+    // with this refresh instead of the Setup landing bootstrap.
+    const bootApp = publishedAppIdFromPath(window.location.pathname);
+    const refreshQuery = new URLSearchParams();
+    if (bootPage) refreshQuery.set('page', bootPage);
+    if (bootApp) refreshQuery.set('app', bootApp);
 
     for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 9000);
       try {
         const response = await withAuthRefreshLock(() =>
-          fetch(`${apiBase}/auth/refresh${bootPage ? '?page=' + encodeURIComponent(bootPage) : ''}`, {
+          fetch(`${apiBase}/auth/refresh${refreshQuery.toString() ? '?' + refreshQuery.toString() : ''}`, {
             method: 'POST',
             credentials: 'include',
             signal: controller.signal
@@ -173,11 +187,13 @@ function App() {
         }
 
         if (response.ok) {
-          const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string; userId?: string; page?: unknown };
+          const session = await response.json() as { access_token: string; landing?: LandingBootstrap; landingAppApi?: string; userId?: string; page?: unknown; appRuntime?: unknown };
           setAccessToken(session.access_token);
           rememberBootPage(session.page);
+          rememberBootAppRuntime(session.appRuntime);
           setSessionUserId(session.userId);
-          if (!session.landing) prefetchLandingBootstrap();
+          // The app shell never needs the Setup bootstrap; the full workspace asks for it itself.
+          if (!session.landing && !bootApp) prefetchLandingBootstrap();
           setAuthError('');
           setEntryTiming({ kind: 'restore', startedAt: restoreStartedAt, authenticatedAt: performance.now(), landing: session.landing, landingAppApi: session.landingAppApi });
           setAuthState('authenticated');
@@ -332,7 +348,10 @@ function App() {
   if(needsLandingRedirect)return <div className="auth-loading" role="status">Opening assigned application…</div>;
   if(isMailboxAdminRoute)return <MailboxAdminAccessGate onLogout={onLogout}/>;
   return <>
-    <SetupApp entryTiming={entryTiming} onLogout={onLogout} />
+    {fullWorkspace?<SetupApp entryTiming={entryTiming} onLogout={onLogout} />
+      :<React.Suspense fallback={<div className="auth-loading" role="status">Opening app…</div>}>
+        <LazyAppPageShell LightningAppRuntime={LazyLightningAppRuntime} onLeave={leaveAppShell}/>
+      </React.Suspense>}
     {onPairedScreenPage()?<React.Suspense fallback={null}><ScreenCornerCode/></React.Suspense>:null}
   </>;
 }
@@ -359,13 +378,16 @@ async function loadPageRuntimeViews() {
   pageRuntimeViewsPromise = createPageRuntimeViews(apiRequest);
   return pageRuntimeViewsPromise;
 }
+// One lazy page runtime for the app shell and the Setup workspace (same chunk, same views).
+const LazyLightningAppRuntime = React.lazy(async () => ({
+  default: (await loadPageRuntimeViews()).LightningAppRuntime
+}));
+const LazyAppPageShell = React.lazy(() => import('../AppShell/AppPageShell'));
 const LazySetupWorkspace = React.lazy(async () => {
   const [{ createSetupApp }, { ProfilePasswordMenu, ConnectionHealthIndicator }, { customTabStyles }] = await Promise.all([
     import('../SetupShell/setupAppShell'), import('../../authentication/AuthStatus/authStatusViews'), import('../SetupShell/customTabStyles')
   ]);
-  const LightningAppRuntime = React.lazy(async () => ({
-    default: (await loadPageRuntimeViews()).LightningAppRuntime
-  }));
+  const LightningAppRuntime = LazyLightningAppRuntime;
   const RecordWorkspace = React.lazy(async () => {
     const [{ createRecordWorkspaceViews }, runtime] = await Promise.all([
       import('../../records/RecordWorkspace/recordWorkspaceViews'), loadPageRuntimeViews()

@@ -124,6 +124,7 @@ const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));
 const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
 import { inspectPageDependencies } from './pageDependencies';
+import { requestPageWithLayoutFallback } from './pageLayoutFallback';
 import {CompiledPageProvider,MemoizedCompiledComponentNode,PageCodeFormulas} from '../PageCompiler/CompiledPageRuntime';
 import type {CompiledPage} from '../PageCompiler/compilePage';
 import {issuedAppPageScript,type LoadedPageScript} from '../PageCompiler/serverPageScript';
@@ -1284,7 +1285,10 @@ function LightningAppRuntime({
       primeAppPageScript(saved.page,issuedAppPageScript(saved.script));
       setPageLoad({routeKey,identity:pageIdentity,appId,page:saved.page,error:'',loading:false});
     }).catch(()=>undefined);
-    void apiRequest<{ page: LightningPageMetadata | null; script?: unknown }>(endpoint).then((payload) => {
+    // A layout this page does not have (a narrow window asks for Mobile) falls back at once.
+    const request=(layout:string)=>apiRequest<{ page: LightningPageMetadata | null; script?: unknown }>(layout===requestedLayout?endpoint
+      :appPageEndpoint(appId,pageApiName,Boolean(inScreenPage),Boolean(printPreview),layout,viewportWidth));
+    void (printPreview?request(requestedLayout):requestPageWithLayoutFallback(request,requestedLayout)).then((payload) => {
       if(payload.page&&!printPreview)writeLocal(currentSessionUserId(),localKey,{page:payload.page,script:payload.script});
       if(active){
         const next=samePageDefinition(showing,payload.page)?showing:payload.page;

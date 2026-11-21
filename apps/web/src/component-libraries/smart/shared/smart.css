@@ -199,7 +199,7 @@
 .smart-card-details{display:flex;flex:0 0 auto;flex-direction:column;gap:6px;min-width:0;padding:4px 10px 10px}
 .smart-card-description{display:block;min-width:0;overflow-wrap:anywhere;font-size:.85em;line-height:1.35;color:var(--md-secondary-text,#667085)}
 .smart-card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
-.smart-card-value{min-width:0;overflow-wrap:anywhere;font-size:1.2em;line-height:1.2}
+.smart-card-value{min-width:0;overflow-wrap:normal;white-space:nowrap;font-size:1.2em;line-height:1.2}
 .smart-card-button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;
  max-width:100%;min-height:34px;padding:7px 11px;border:1px solid;cursor:pointer;
  line-height:1.2;font-weight:700;text-align:center;white-space:normal;overflow-wrap:anywhere}

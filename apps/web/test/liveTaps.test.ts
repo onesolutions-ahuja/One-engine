@@ -195,3 +195,16 @@ test('database notices wait while another screen\'s taps wait, then draw once (n
  assert.equal(cart[0].recordChanges[0].record.Total,2.5,'the newest value');
  stop();
 });
+
+test('a new cart is drawn before its first line (the list finds the new cart, then the line)',async()=>{
+ const {parentsFirst}=await import('../src/core/pages/PageCompiler/pageLiveWiring.ts');
+ assert.deepEqual(parentsFirst([['CartLine',[{Id:'l1',Cart:'c2'}]],['Cart',[{Id:'c2'}]]]),[1,0]);
+ assert.deepEqual(parentsFirst([['Cart',[{Id:'c2'}]],['CartLine',[{Id:'l1',Cart:'c2'}]]]),[0,1]);
+ assert.deepEqual(parentsFirst([['A',[{Id:'a',B:'b'}]],['B',[{Id:'b',A:'a'}]]]),[1,0],'a loop still draws each once');
+ const {target,saved}=fakeTarget();
+ const ledger=newTapLedger();
+ await drawLiveTap(target,'settled',{batch:'0000c0de',ok:true,changes:[
+  {objectApiName:'CartLine',operation:'create',record:{Id:'l1',Cart:'c2'}},
+  {objectApiName:'Cart',operation:'create',record:{Id:'c2'}}]},ledger);
+ assert.deepEqual(saved.map(item=>(item as {objectApiNames:string[]}).objectApiNames[0]),['Cart','CartLine']);
+});

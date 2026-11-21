@@ -65,10 +65,30 @@ export function mergeLiveChange(before:Pending|undefined,change:LiveChange):Pend
  return pending;
 }
 
+/** Objects in drawing order: a parent before its children (an Object whose changed rows are
+ * pointed at by another Object's rows: a new cart before its first line). A list scoped to
+ * "this session's cart" then looks for the cart again before it places the line. */
+export function parentsFirst(groups:ReadonlyArray<[string,ReadonlyArray<Row>]>):number[]{
+ const ids=groups.map(([,rows])=>new Set(rows.map(row=>String(row.Id??'')).filter(Boolean)));
+ const pointsAt=(child:number,parent:number)=>child!==parent&&groups[child][1].some(row=>
+  Object.entries(row).some(([field,value])=>field!=='Id'&&typeof value==='string'&&ids[parent].has(value)));
+ const order:number[]=[],placed=new Set<number>();
+ const place=(index:number,path:Set<number>)=>{
+  if(placed.has(index)||path.has(index))return;
+  path.add(index);
+  for(let parent=0;parent<groups.length;parent++)if(pointsAt(index,parent))place(parent,path);
+  placed.add(index);order.push(index);
+ };
+ groups.forEach((_,index)=>place(index,new Set()));
+ return order;
+}
+
 /** Draw merged changes on the page. Returns the work (for tests and timings). */
 export function drawLiveChanges(target:PageLiveTarget,changes:readonly Pending[]):Promise<unknown>{
  const work:Promise<unknown>[]=[];
- for(const change of changes){
+ const ordered=parentsFirst(changes.map(change=>[change.object,change.rows?[...change.rows.values()]:[]] as [string,Row[]]))
+  .map(index=>changes[index]);
+ for(const change of ordered){
   const ids=[...change.ids];
   if(change.rows){
    const rows=[...change.rows.values()];
@@ -99,6 +119,10 @@ export const TAP_WAIT_MS=10_000;
 const remember=<T>(map:Map<string,T>|Set<string>,key:string,value?:T)=>{
  if(map instanceof Set)map.add(key);else map.set(key,value as T);
  if(map.size>LEDGER_LIMIT)map.delete(map.keys().next().value as string);
+};
+const inOrder=(changes:Map<string,LiveTapChange[]>):Array<[string,LiveTapChange[]]>=>{
+ const groups=[...changes];
+ return parentsFirst(groups.map(([object,list])=>[object,list.map(change=>change.record)] as [string,Row[]])).map(index=>groups[index]);
 };
 const byObject=(changes:readonly LiveTapChange[])=>{
  const out=new Map<string,LiveTapChange[]>();
@@ -136,7 +160,7 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
   // The answer came first (a slow preview): nothing to predict any more.
   if(ledger.answered.has(tap.batch))return Promise.resolve();
   const created=new Map<string,Set<string>>();
-  for(const [object,list] of changes){
+  for(const [object,list] of inOrder(changes)){
    work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:list,optimistic:tap.batch,live:true}).catch(()=>undefined));
    target.code?.applyLiveRows(object,rowsOf(list),deletedOf(list));
    created.set(object,new Set(list.filter(change=>change.operation==='create').map(change=>String(change.record.Id))));
@@ -153,7 +177,7 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
   return predicted?resyncPage(target):Promise.resolve();
  }
  const later=waitingFor(ledger,now);
- const objects=new Set([...changes.keys(),...predicted?.keys()??[]]);
+ const objects=new Set([...inOrder(changes).map(([object])=>object),...predicted?.keys()??[]]);
  // These rows are drawn now (or by the later tap's answer): their database notice needs no second read.
  noteOwnWrites(tap.changes.filter(change=>change.operation!=='delete').map(change=>change.record.Id));
  for(const object of objects){

@@ -1218,7 +1218,7 @@ export default function SmartRuntime(p){
   const minimumCardWidth=number(p.cardMinWidth??p.cardWidth,180,96,1200);
   // Exact repeated-card dimensions are optional: unset preserves the responsive grid.
   const bodyWidth=p.cardBodyWidth!==undefined&&p.cardBodyWidth!==null&&p.cardBodyWidth!==""
-   ?number(p.cardBodyWidth,0,24,1200):0;
+   ?number(p.cardBodyWidth,0,96,1200):0;
   const bodyHeight=p.cardBodyHeight!==undefined&&p.cardBodyHeight!==null&&p.cardBodyHeight!==""
    ?number(p.cardBodyHeight,0,24,1200):0;
   const boundRows=recordsOf(p);

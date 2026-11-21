@@ -25,7 +25,10 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
  loadPage:RecordPageLoader):SourceLoad&{invalidate(objectApiNames?:readonly string[]):void;
  search(source:CompiledDataSource,state:State,term:string):Promise<Record<string,unknown>[]>}{
  const sessionParents=new Map<string,{parents:string[];scope:Scope}>();
- const scopeFor=async(source:CompiledDataSource,fields:ReadonlyArray<FieldMetadata>,state:State,sessionId:string):Promise<Scope>=>{
+ // fresh: the list is read again because someone saved (a live change): its parent is looked
+ // for fresh too. A cached answer from before a new cart (after Clear sale or Hold) would
+ // pick the old cart and leave the new sale's lines out.
+ const scopeFor=async(source:CompiledDataSource,fields:ReadonlyArray<FieldMetadata>,state:State,sessionId:string,fresh=false):Promise<Scope>=>{
   const scope=source.scope;
   if(scope.kind==='none')return {blocked:false,field:'',parentId:undefined};
   // A display follows the till's current sale (its page session) when the till reports one;
@@ -45,7 +48,8 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   const cached=sessionParents.get(cacheKey);
   if(cached)return cached.scope;
   const query=await pageComponentSessionRelatedQuery(fields,objects,sessionId,(target,sessionKey)=>
-   loadPage(target,{limit:SESSION_PARENT_LIMIT,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false}}));
+   loadPage(target,{limit:SESSION_PARENT_LIMIT,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false},
+    ...(fresh?{forceRefresh:true}:{})}));
   const result={...query,field:query.filter?.field??'',parentId:query.filter?.value};
   // Only a found parent is remembered: a cart created later is found on the next read.
   if(!query.blocked&&query.filter)sessionParents.set(cacheKey,{scope:result,
@@ -63,7 +67,7 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
    if(query.error&&query.error!==EMPTY_FILTER_VALUE)throw Error(query.error);
    return null;
   }
-  const related=await scopeFor(source,fields,state,sessionId);
+  const related=await scopeFor(source,fields,state,sessionId,Boolean(window.fresh));
   if(related.blocked)return null;
   // Server-filtered queries page; a browser-side filter needs one bounded read.
   const paged=Boolean(query.filters)||!source.filters||(Array.isArray(source.filters)&&source.filters.length===0);

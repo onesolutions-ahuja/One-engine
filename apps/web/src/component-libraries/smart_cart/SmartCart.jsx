@@ -382,7 +382,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     borderTopColor:p.footerBorderColor||undefined,
     whiteSpace:p.footerWrapText===false?"nowrap":undefined,
     ...(p.footerWidth!==undefined&&p.footerWidth!==null&&p.footerWidth!==""
-     ?{width:n(p.footerWidth,0,0,10000)+"px",maxWidth:"100%"}:{}),
+     ?{width:n(p.footerWidth,0,0,10000)+"px",maxWidth:"none",boxSizing:"border-box"}:{}),
     ...(p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
      ?{height:n(p.footerHeight,0,0,10000)+"px",minHeight:0,flexShrink:0}:{})
    }}>

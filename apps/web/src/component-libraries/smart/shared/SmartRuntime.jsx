@@ -365,6 +365,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
    {(value||buttonText||customButtons.length>0)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
     style={{...smartPartOffsetStyle(p,"footer"),backgroundColor:p.footerBackgroundColor||undefined,
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
+     height:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
+      ?number(p.footerHeight,0,0,1200):undefined,
      minHeight:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
       ?number(p.footerHeight,0,0,1200):undefined,
      width:p.footerWidth!==undefined&&p.footerWidth!==null&&p.footerWidth!==""

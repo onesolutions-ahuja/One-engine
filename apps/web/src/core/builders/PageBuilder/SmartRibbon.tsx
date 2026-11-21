@@ -973,7 +973,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           <span className="smart-design2-active-area" title="Click a part of the component on the canvas to edit it">
             {api==='smart_cart'&&selectedCartColumn
               ?`Column ${selectedCartColumn} — ${['Product','Unit price','Quantity','Total','Discount'][selectedCartColumn-1]}`
-              :activeDesign2Area}
+              :activeDesign2Area==='Body'?'Whole Component':activeDesign2Area}
           </span>
         </button>
         {designSectionOpen('Properties')&&<div className="smart-inspector-section-content">

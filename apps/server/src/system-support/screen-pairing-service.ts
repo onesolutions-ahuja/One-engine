@@ -181,6 +181,8 @@ export class ScreenPairingService{
      ELSE md_screen_devices.page_layers END,
     payment_confirmation=CASE WHEN md_screen_devices.session_key IS DISTINCT FROM EXCLUDED.session_key
      THEN NULL ELSE md_screen_devices.payment_confirmation END,
+    layer_revision=CASE WHEN md_screen_devices.session_key IS DISTINCT FROM EXCLUDED.session_key
+      THEN md_screen_devices.layer_revision+1 ELSE md_screen_devices.layer_revision END,
     session_key=EXCLUDED.session_key,session_at=now(),seen_at=now(),offline=false`,[actor.tenant_id,deviceKey,sessionId]);
   return {ok:true};
  }
@@ -192,14 +194,14 @@ export class ScreenPairingService{
  }
  /** The sale the mirrored device is on now ('' = none reported), and the layer each page
   * should show on its screens (SCREEN(page, n) run on that device). */
- async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string;layers:Record<string,number>;payment:Record<string,unknown>|null}>{
-  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:'',layers:{},payment:null};
+ async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string;layers:Record<string,number>;payment:Record<string,unknown>|null;layerRevision:number}>{
+  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:'',layers:{},payment:null,layerRevision:0};
   const {rows}=await this.db.query<{session_key:string|null;page_layers:Record<string,number>|null;
-   payment_confirmation:Record<string,unknown>|null}>(
-   'SELECT session_key,page_layers,payment_confirmation FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',
+   payment_confirmation:Record<string,unknown>|null;layer_revision:number}>(
+   'SELECT session_key,page_layers,payment_confirmation,layer_revision FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',
    [actor.tenant_id,mirrorKey]);
   return {sessionId:rows[0]?.session_key??'',layers:rows[0]?.page_layers??{},
-   payment:rows[0]?.payment_confirmation??null};
+   payment:rows[0]?.payment_confirmation??null,layerRevision:Number(rows[0]?.layer_revision??0)};
  }
  /** Only a server-paid Invoice the current user can read is displayed as completed.
   * Ignore client-supplied amount, method and change; get all from the saved invoice. */
@@ -221,7 +223,8 @@ export class ScreenPairingService{
    ON CONFLICT(tenant_id,device_key) DO UPDATE SET
     page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)
       ||jsonb_build_object('smart_till_customer_display',1),
-    payment_confirmation=EXCLUDED.payment_confirmation`,
+    payment_confirmation=EXCLUDED.payment_confirmation,
+    layer_revision=md_screen_devices.layer_revision+1`,
    [actor.tenant_id,deviceKey,JSON.stringify(payment)]);
   return payment;
  }
@@ -236,7 +239,8 @@ export class ScreenPairingService{
    ON CONFLICT(tenant_id,device_key) DO UPDATE SET
     page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)||jsonb_build_object($3::text,$4::int),
     payment_confirmation=CASE WHEN $3='smart_till_customer_display' AND $4::int=0
-     THEN NULL ELSE md_screen_devices.payment_confirmation END`,
+     THEN NULL ELSE md_screen_devices.payment_confirmation END,
+    layer_revision=md_screen_devices.layer_revision+1`,
   [actor.tenant_id,deviceKey,key,layer]);
   const {rows}=await this.db.query<{count:string}>(`SELECT count(*) AS count FROM md_screen_pairings WHERE tenant_id=$1 AND mirror_key=$2
    AND lower(page_api_name)=$3 AND revoked_at IS NULL AND approved_at IS NOT NULL`,[actor.tenant_id,deviceKey,key]);
@@ -358,6 +362,7 @@ CREATE TABLE IF NOT EXISTS md_screen_devices (
 );
 ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS page_layers jsonb;
 ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS payment_confirmation jsonb;
+ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS layer_revision bigint NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_mirror ON md_screen_pairings(tenant_id,mirror_key) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_code ON md_screen_pairings(code) WHERE approved_at IS NULL AND revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_device ON md_screen_pairings(tenant_id,device_record_id) WHERE revoked_at IS NULL;

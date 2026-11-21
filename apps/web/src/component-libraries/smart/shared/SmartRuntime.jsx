@@ -1213,6 +1213,11 @@ export default function SmartRuntime(p){
   // The requested column count remains exact, but cards never collapse below
   // a usable minimum width. Excess columns scroll horizontally in this grid.
   const minimumCardWidth=number(p.cardMinWidth??p.cardWidth,180,96,1200);
+  // Exact repeated-card dimensions are optional: unset preserves the responsive grid.
+  const bodyWidth=p.cardBodyWidth!==undefined&&p.cardBodyWidth!==null&&p.cardBodyWidth!==""
+   ?number(p.cardBodyWidth,0,24,1200):0;
+  const bodyHeight=p.cardBodyHeight!==undefined&&p.cardBodyHeight!==null&&p.cardBodyHeight!==""
+   ?number(p.cardBodyHeight,0,24,1200):0;
   const boundRows=recordsOf(p);
   const selection=p.selectedCardColor||p.focusedCardWidth||p.focusedCardHeight||p.focusedCardBorderColor||p.focusedCardShadow||
    p.focusedTextColor||p.focusedTextBold!==undefined||p.focusedTextSize
@@ -1242,7 +1247,7 @@ export default function SmartRuntime(p){
    // published pages and the Page Builder (all Cards/Rows settings).
    padding:4,scrollPadding:4,
    gap,
-   gridTemplateColumns:"repeat("+columns+",minmax("+minimumCardWidth+"px,1fr))",
+   gridTemplateColumns:"repeat("+columns+","+(bodyWidth>0?bodyWidth+"px":"minmax("+minimumCardWidth+"px,1fr)")+")",
    // Keep every authorised record; 'Rows' controls the *visible* viewport only.
    // A measured pixel row height avoids percentage tracks shrinking to their
    // min-content size and painting a second row within a one-row viewport.
@@ -1250,6 +1255,7 @@ export default function SmartRuntime(p){
    ...(gridViewportHeight>0?{
     gridAutoRows:Math.max(minimumCardHeight,(gridViewportHeight-(rows-1)*gap)/rows)+"px"
    }:{}),
+   ...(bodyHeight>0?{gridAutoRows:bodyHeight+"px"}:{}),
    alignContent:"start",backgroundColor:p.gridBackgroundColor||undefined
   }}>
    {previewRows.map((r,i)=>{

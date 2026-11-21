@@ -132,6 +132,16 @@
 /* Toggle: iOS green track and soft thumb shadow. */
 .smart-runtime.smart-ios .smart-switch-thumb{box-shadow:0 2px 4px rgb(0 0 0 / .18),0 0 0 .5px rgb(0 0 0 / .04)}
 
+/* Static Smart Button labels must not re-rasterise as the cursor enters.
+   Preserve colour/keyboard feedback without moving or scaling text. */
+@media (hover:hover){
+ .smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-button,.smart-card-button):not(:disabled):hover{
+  transform:none;filter:none;box-shadow:0 3px 8px rgb(0 0 0 / .10);
+ }
+}
+.smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-button,.smart-card-button):not(:disabled):active{
+ transform:none;filter:none;
+}
 @media (prefers-reduced-motion:reduce){
  .smart-runtime.smart-ios *{transition:none!important}
  .smart-runtime.smart-ios :is(button,.smart-card):is(:hover,:active),

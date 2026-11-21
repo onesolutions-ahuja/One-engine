@@ -27,7 +27,7 @@ test('layers are separate screens: only the current layer shows, layer 0 include
 
 test('SCREEN(page, n) opens or switches page to layer n; modes still work',()=>{
  assert.deepEqual(parseScreenAction('SCREEN(smart_till_customer_display, 3)'),
-  {page:'smart_till_customer_display',mode:'current',record:undefined,layer:3});
+  {page:'smart_till_customer_display',mode:'current',record:undefined,layer:3,modeGiven:false});
  assert.equal(parseScreenAction('SCREEN(Payment, popup)').mode,'popup');
  assert.equal(parseScreenAction('SCREEN(Payment, popup)').layer,undefined);
  assert.throws(()=>parseScreenAction('SCREEN(Payment, 12)'));
@@ -35,7 +35,10 @@ test('SCREEN(page, n) opens or switches page to layer n; modes still work',()=>{
  const plan=compileActionPlan('=ACTIONS(SCREEN(smart_till_customer_display, 3))') as unknown as Array<{name:string;values:Array<{value:unknown}>}>;
  assert.equal(plan[0]?.name,'SCREEN');assert.equal(plan[0]?.values[2]?.value,3);
  // Server-built page code passes the layer on to the browser, which reads it as SCREEN(page,3).
- assert.match(compileActionFormula('=SCREEN(smart_till_customer_display, 3)','').js,/\$\.ui\("SCREEN", "smart_till_customer_display", "current", "", "3"\)/);
+ // No mode: blank, so the browser only switches the page where it shows (never leaves this screen).
+ assert.match(compileActionFormula('=SCREEN(smart_till_customer_display, 3)','').js,/\$\.ui\("SCREEN", "smart_till_customer_display", "", "", "3"\)/);
+ assert.match(compileActionFormula('=SCREEN(smart_till_customer_display, current, 3)','').js,/\$\.ui\("SCREEN", "smart_till_customer_display", "current", "", "3"\)/);
+ assert.equal(parseScreenAction('SCREEN(smart_till_customer_display, current, 3)').modeGiven,true);
 });
 
 test('Upload CSV reads and writes the page layer of a component',()=>{
@@ -54,15 +57,15 @@ test('Upload CSV reads and writes the page layer of a component',()=>{
 });
 
 test('SCREEN inputs after the page come in any order, blanks allowed; old formulas unchanged',()=>{
- const want={page:'Payment',mode:'popup',record:'ThisPage.Cart.recordId',layer:2};
+ const want={page:'Payment',mode:'popup',record:'ThisPage.Cart.recordId',layer:2,modeGiven:true};
  for(const formula of ['SCREEN(Payment, popup, @ThisPage.Cart.recordId, 2)','SCREEN(Payment, 2, popup, @ThisPage.Cart.recordId)',
   'SCREEN(Payment, @ThisPage.Cart.recordId, 2, popup)']){
   const parsed=parseScreenAction(formula);
   assert.deepEqual({...parsed,record:parsed.record?.replace(/^@/,'')},want,formula);
  }
- assert.deepEqual(parseScreenAction('SCREEN(Payment, popup, , 2)'),{page:'Payment',mode:'popup',record:undefined,layer:2});
- assert.deepEqual(parseScreenAction('SCREEN(Payment, , , 2)'),{page:'Payment',mode:'current',record:undefined,layer:2});
- assert.deepEqual(parseScreenAction('SCREEN(Payment, second, 3)'),{page:'Payment',mode:'second',record:undefined,layer:3});
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, popup, , 2)'),{page:'Payment',mode:'popup',record:undefined,layer:2,modeGiven:true});
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, , , 2)'),{page:'Payment',mode:'current',record:undefined,layer:2,modeGiven:false});
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, second, 3)'),{page:'Payment',mode:'second',record:undefined,layer:3,modeGiven:true});
  // Existing formulas: same result as before.
  assert.deepEqual(parseScreenAction('SCREEN(Payment)'),{page:'Payment',mode:'current',record:undefined});
  assert.deepEqual(parseScreenAction('SCREEN(Payment, popup)'),{page:'Payment',mode:'popup',record:undefined});

@@ -365,10 +365,11 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    // After the page: mode, record and layer in any order, blanks allowed (screenArguments).
    let parsed:ReturnType<typeof screenArguments>;
    try{parsed=screenArguments(args.slice(1));}catch(error){fail(error instanceof Error?error.message:String(error));}
-   const {mode,record,layer}=parsed!;
+   const {mode,modeGiven,record,layer}=parsed!;
    scope.ui.add('SCREEN');
    // $.ui("SCREEN", page, mode, record, layer): the browser opens it (CompiledPageRuntime).
-   return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(record||layer!==undefined?', '+(record?value(record):'""'):'')
+   // A layer switch keeps "no mode" blank: SCREEN(page, n) only switches page where it shows.
+   return ['await $.ui("SCREEN", '+q(page)+', '+q(modeGiven||layer===undefined?mode:'')+(record||layer!==undefined?', '+(record?value(record):'""'):'')
     +(layer!==undefined?', '+q(String(layer)):'')+');'];
   }
   case 'PAIRDISPLAY':{

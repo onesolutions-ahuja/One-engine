@@ -28,8 +28,10 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   const value=resolveRecord(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$/.test(record)?'@'+record:record);
   recordId=value===null||value===undefined?'':String(value);
  }
- // SCREEN(Page, 3): switch Page where it shows, else open it here (openPageLayer).
- if(parsed.layer!==undefined&&mode==='current')return openPageLayer(page,parsed.layer,context,onNavigate);
+ // SCREEN(Page, 3): switch Page where it shows (this window, second screen, paired or
+ // mirroring displays); this window never leaves for it. SCREEN(Page, current, 3) also
+ // opens Page here when it shows nowhere (openPageLayer).
+ if(parsed.layer!==undefined&&mode==='current')return openPageLayer(page,parsed.layer,context,onNavigate,parsed.modeGiven!==false);
  // A popup or other window opens on that layer.
  if(parsed.layer!==undefined)rememberRequestedLayer(page,parsed.layer);
  const inScreen=mode==='popup'&&context.pages.some(item=>
@@ -54,10 +56,11 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
 }
 
 /** SCREEN(Page, n): show layer n of Page. Where Page is already showing (this window, the
- * second screen, or paired screens that follow this device) it switches there; only when
- * it shows nowhere does this window open Page on layer n. */
+ * second screen, or screens that follow this device) it switches there. Only SCREEN(Page,
+ * current, n) (`openHere`) opens Page in this window when it shows nowhere: a till telling
+ * its customer display to change must never leave the till itself. */
 async function openPageLayer(page:string,layer:number,context:PageActionRoutingContext,
- onNavigate:(route:PageActionRoute)=>void):Promise<{navigated:true}>{
+ onNavigate:(route:PageActionRoute)=>void,openHere:boolean):Promise<{navigated:true}>{
  if(showPageLayer(page,layer))return {navigated:true};
  let second=false;
  try{
@@ -73,7 +76,8 @@ async function openPageLayer(page:string,layer:number,context:PageActionRoutingC
   ?await apiRequest<{screens:number}>('/screens/layer',{method:'POST',body:JSON.stringify({deviceKey:device,page,layer})})
    .catch(()=>({screens:0}))
   :{screens:0};
- if(second||screens>0)return {navigated:true};
+ // The layer is stored for this device either way: displays that mirror it pick it up.
+ if(second||screens>0||!openHere)return {navigated:true};
  const route=resolvePageActionRoute({navigationTargetType:'App Page',navigationPageApiName:page},context);
  if(!route)throw Error('Page '+page+' is not in this app');
  rememberRequestedLayer(page,layer);

@@ -242,6 +242,24 @@ export class FlowRecordTriggers {
   }
  }
 
+ /** Could a Record-Triggered Flow run (or be checked) for this save? Entry conditions are
+  * not looked at: "yes" only means execute() must be called. An invalid Flow says yes, so
+  * execute() reports it exactly as before. */
+ async mayRun(client:PoolClient,tenantId:string,objectApi:string,
+   operation:TriggerOperation,phase:TriggerPhase):Promise<boolean>{
+  if(this.flowExecution.getStore())return false;
+  const loaded=await this.activeRecordFlows(client,tenantId);
+  return loaded.some(({graph})=>{
+   if(!graph||!Array.isArray(graph.elements))return true;
+   const start=graph.elements.find(element=>element.type==='Start');
+   if(!start)return true;
+   const config=start.config;
+   if(config.object!==objectApi||(config.runWhen??'after-save')!==phase)return false;
+   if(phase==='before-save'&&operation==='deleted')return false;
+   const trigger=String(config.trigger??'created-or-updated');
+   return trigger==='created-or-updated'||trigger===operation;
+  });
+ }
  async execute(client:PoolClient,tenantId:string,userId:string,objectApi:string,
    operation:TriggerOperation,record:Snapshot|null,prior:Snapshot|null,
    phase:TriggerPhase='after-save',isClone=false):Promise<Snapshot|void> {

@@ -47,8 +47,14 @@ jobs:
       - name: Till tap SQL round trips (PostgreSQL)
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
-          TRIPS_BUDGET: '60'
+          TRIPS_BUDGET: '34'
+          TRIPS_BUDGET_PLAIN: '43'
         run: node --import tsx apps/server/scripts/record-trips-probe.mjs
+      - name: Bulk saves, 100 records in one action (PostgreSQL)
+        env:
+          METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
+          BULK_BUDGET_MS: '300'
+        run: node --import tsx apps/server/scripts/bulk-save-sql-smoke.mjs
       - name: Shared payment order PostgreSQL tests
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test

@@ -72,16 +72,20 @@ type NativeFieldMetadataRow={
  sql_type:string|null;data_type:string|null;
 };
 
+export const NATIVE_FIELDS_SQL=`SELECT o.table_name,f.field_api,f.column_name,f.sql_type,f.data_type
+   FROM md_native_objects o LEFT JOIN md_native_fields f
+    ON f.tenant_id=o.tenant_id AND f.object_api=o.object_api
+   WHERE o.tenant_id=$1 AND o.object_api=$2 ORDER BY f.field_api`;
 /** Load native Object and all its fields in one round trip (including an Object with zero fields). */
 export async function loadNativeFields(executor:{query:(
  sql:string,params:unknown[])=>Promise<{rows:unknown[]}>},
  tenantId:string,objectApi:string):Promise<NativeFieldsMetadata>{
- const result=await executor.query(
-  `SELECT o.table_name,f.field_api,f.column_name,f.sql_type,f.data_type
-   FROM md_native_objects o LEFT JOIN md_native_fields f
-    ON f.tenant_id=o.tenant_id AND f.object_api=o.object_api
-   WHERE o.tenant_id=$1 AND o.object_api=$2 ORDER BY f.field_api`,[tenantId,objectApi]);
- const rows=result.rows as NativeFieldMetadataRow[];
+ const result=await executor.query(NATIVE_FIELDS_SQL,[tenantId,objectApi]);
+ return nativeFieldsFromRows(result.rows);
+}
+/** Checked native metadata from the rows of NATIVE_FIELDS_SQL. */
+export function nativeFieldsFromRows(source:unknown[]):NativeFieldsMetadata{
+ const rows=source as NativeFieldMetadataRow[];
  if(!rows.length)throw Error('Object has no native table');
  const table=rows[0].table_name;
  nativeTableSql({table,fields:new Map()});

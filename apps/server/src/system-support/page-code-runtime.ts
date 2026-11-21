@@ -34,7 +34,7 @@ import type {NamedCredentialService} from './named-credential-service.js';
 
 type Actor={tenant_id:string;user_id:string};
 type Row=Record<string,unknown>;
-type Records=Pick<RecordEngine,'list'|'get'|'create'|'update'|'remove'>;
+type Records=Pick<RecordEngine,'list'|'get'|'create'|'update'|'remove'>&Partial<Pick<RecordEngine,'createMany'|'updateMany'>>;
 type Sql=Pick<SqlPersistence,'transaction'|'query'>;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const key=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
@@ -176,6 +176,7 @@ class ServerScope{
  private tillRow:Row|null=null;
  /** Read once before the code runs (page values are plain, synchronous reads). */
  async loadTill(){
+  await this.flush();
   this.tillRow=await findDeviceTill(this.records,this.actor,this.request.deviceKey);
   // A display opened from a till says which till it follows; otherwise look it up.
   this.mirrorKey=this.request.mirrorKey||await findMirrorKey(this.records,this.actor,this.request.deviceKey);
@@ -262,6 +263,7 @@ class ServerScope{
   });
  }
  async getRecord(object:string,criteria:Array<[string,unknown]>){
+  await this.flush();
   // GETRECORD(Object, Id, x): one row by Id.
   if(criteria.length===1&&criteria[0][0]==='Id'){
    const id=criteria[0][1];
@@ -278,11 +280,13 @@ class ServerScope{
   });
  }
  async list(object:string,criteria:Array<[string,unknown]>){
+  await this.flush();
   const result=await this.rows(object,criteria,RECORD_SET_LIMIT);
   if(!result.complete)throw Error('FOREACH matches more than '+RECORD_SET_LIMIT+' records; narrow the criteria');
   return result.rows;
  }
  async agg(kind:string,object:string,field:string,criteria:Array<[string,unknown]>){
+  await this.flush();
   if(kind==='COUNTIFS'){
    const filters=criteriaFilters(criteria);
    return this.cached(object,'count:'+JSON.stringify(filters),async()=>{
@@ -311,18 +315,78 @@ class ServerScope{
   this.forget(object);
   return row;
  }
+ /** Loop saves queued by generated code (FOREACH saves whose result is not used). They are
+  * saved together, in order, before anything else reads or writes records, runs a service,
+  * or the action ends: later steps always see them. */
+ private pending:Array<{kind:'create'|'update';object:string;id?:string;values:Row}>=[];
+ async createLater(object:string,pairs:Array<[string,unknown]>){
+  const values=this.values(pairs);
+  this.forget(object);
+  this.pending.push({kind:'create',object,values});
+ }
+ async updateLater(object:string,id:unknown,pairs:Array<[string,unknown]>){
+  if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
+  const values=this.values(pairs);
+  this.forget(object);
+  this.pending.push({kind:'update',object,id,values});
+ }
+ /** Save the queued loop saves: each run of the same save on one Object is one bulk save. */
+ async flush(){
+  while(this.pending.length){
+   const first=this.pending[0];
+   let count=1;
+   while(count<this.pending.length&&this.pending[count].kind===first.kind&&this.pending[count].object===first.object)count++;
+   const run=this.pending.splice(0,count);
+   const {tenant_id:tenant,user_id:user}=this.actor;
+   let ids:string[];
+   if(first.kind==='create'){
+    if(this.records.createMany)ids=await this.records.createMany(tenant,user,first.object,run.map(item=>item.values));
+    else{
+     ids=[];
+     for(const item of run)ids.push(String(await this.records.create(tenant,user,first.object,item.values)));
+    }
+   }else{
+    const items=run.map(item=>({id:item.id!,values:item.values}));
+    if(this.records.updateMany)await this.records.updateMany(tenant,user,first.object,items);
+    else for(const item of items)await this.records.update(tenant,user,first.object,item.id,item.values);
+    ids=items.map(item=>item.id);
+   }
+   await this.savedMany(first.object,ids.map(String),first.kind);
+  }
+ }
+ /** The saved rows for the page, read together (100 per read). */
+ private async savedMany(object:string,ids:string[],operation:'create'|'update'){
+  const rows=new Map<string,Row>();
+  try{
+   for(let at=0;at<ids.length;at+=100){
+    const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,100,0,
+     {filters:[{field:'Id',operator:'in',value:ids.slice(at,at+100)}]}) as {records:Row[]};
+    for(const row of page.records)rows.set(String(row.Id).toLowerCase(),row);
+   }
+  }catch{rows.clear();}
+  for(const id of ids){
+   const row=rows.get(id.toLowerCase());
+   if(row)this.changes.push({objectApiName:object,operation,record:row});
+   else await this.saved(object,id,operation);
+  }
+  this.written.add(object);
+  this.forget(object);
+ }
  async create(object:string,pairs:Array<[string,unknown]>){
+  await this.flush();
   this.forget(object);
   const id=await this.records.create(this.actor.tenant_id,this.actor.user_id,object,this.values(pairs)) as unknown as string;
   return this.saved(object,String(id),'create');
  }
  async update(object:string,id:unknown,pairs:Array<[string,unknown]>){
+  await this.flush();
   if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
   this.forget(object);
   await this.records.update(this.actor.tenant_id,this.actor.user_id,object,id,this.values(pairs));
   return this.saved(object,id,'update');
  }
  async remove(object:string,id:unknown){
+  await this.flush();
   if(typeof id!=='string'||!uuid.test(id))throw Error('DELETERECORD needs a record Id');
   this.forget(object);
   await this.records.remove(this.actor.tenant_id,this.actor.user_id,object,id);
@@ -334,8 +398,9 @@ class ServerScope{
   if(!key.test(name))throw Error('Invalid Page State key');
   this.stateChanges[name]=value;
  }
- async ui(name:string,...args:unknown[]){this.effects.push({name,args});}
+ async ui(name:string,...args:unknown[]){await this.flush();this.effects.push({name,args});}
  async service(name:string,args:unknown[]=[],variables?:Record<string,unknown>){
+  await this.flush();
   if(name==='WAIT'){
    const [minutes,seconds,ordinal,formula]=args;
    if(typeof formula!=='string'||!formula)throw Error('WAIT is unavailable');
@@ -559,6 +624,7 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
   const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{
    await scope.loadEventRecord();
    await action.run(scope);
+   await scope.flush();
    // All held sets: roll-ups and triggers can change Objects the action did not write.
    const sets=scope.written.size?await loadSets(scope,code):{};
    return {ok:true,changes:scope.changes,state:{...scope.stateChanges},effects:scope.effects,sets};

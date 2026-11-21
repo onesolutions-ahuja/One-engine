@@ -1,6 +1,7 @@
 import type {PoolClient} from 'pg';
 import type {RecordStoredValue} from './record-value-write.js';
-import {loadNativeFields,nativeTableSql,type NativeFieldsMetadata} from './native-object-query.js';
+import {nativeTableSql,type NativeFieldsMetadata} from './native-object-query.js';
+import {objectNativeFields} from './object-save-setup.js';
 
 type Field=NativeFieldsMetadata['fields'] extends Map<string,infer V>?V:never;
 const empty=(value:unknown)=>value===null||value===undefined||value==='';
@@ -55,7 +56,7 @@ export async function writeNativeValues(client:PoolClient,tenantId:string,object
  recordId:string,values:ReadonlyMap<string,RecordStoredValue>):Promise<void>{
  const entries=[...values].filter(([name])=>!name.startsWith('__'));
  if(!entries.length)return;
- const meta=await loadNativeFields(client,tenantId,objectApi);
+ const meta=await objectNativeFields(client,tenantId,objectApi);
  const params:unknown[]=[tenantId,recordId];
  const bind=(v:unknown)=>{params.push(v);return '$'+params.length;};
  const assignments:string[]=[];
@@ -104,4 +105,67 @@ export async function writeNativeValues(client:PoolClient,tenantId:string,object
   SELECT $1,$2,$3,v.field_api,v.value,v.sort_order
   FROM jsonb_to_recordset($4::jsonb) AS v(field_api text,value text,sort_order integer)`,
   [tenantId,recordId,objectApi,JSON.stringify(selections)]);
+}
+
+/**
+ * The same native write for many records in as few statements as possible: records that
+ * set the same fields share ONE UPDATE (rows passed as arrays). The stored result is the
+ * same as calling writeNativeValues for each record. Records with values that are not
+ * plain scalars (geolocation, address) or with multi-select values use writeNativeValues.
+ */
+export async function writeNativeValuesMany(client:PoolClient,tenantId:string,objectApi:string,
+ rows:ReadonlyArray<{id:string;values:ReadonlyMap<string,RecordStoredValue>}>):Promise<void>{
+ const meta=await objectNativeFields(client,tenantId,objectApi);
+ const groups=new Map<string,Array<{id:string;raw:unknown[]}>>();
+ const single:typeof rows[number][]=[];
+ for(const row of rows){
+  const entries=[...row.values].filter(([name])=>!name.startsWith('__'));
+  if(!entries.length)continue;
+  let plain=true;
+  const raw=entries.map(([fieldApi,stored])=>{
+   const field=meta.fields.get(fieldApi);
+   if(!field)throw Error('Native field metadata unavailable: '+fieldApi);
+   if(stored.multi_values!==undefined)plain=false;
+   const value=storedNativeValue(field,stored);
+   if(value!==null&&!['string','number','boolean'].includes(typeof value)&&!(value instanceof Date))plain=false;
+   return value;
+  });
+  if(!plain){single.push(row);continue;}
+  const signature=entries.map(([name])=>name).join(',');
+  const group=groups.get(signature)??[];
+  group.push({id:row.id,raw});groups.set(signature,group);
+ }
+ for(const [signature,group] of groups){
+  const names=signature.split(',');
+  const params:unknown[]=[tenantId,group.map(row=>row.id)];
+  const bind=(value:unknown)=>{params.push(value);return '$'+params.length;};
+  const columns:string[]=['id'],assignments:string[]=[],patches:string[]=[],slots:string[]=[];
+  names.forEach((fieldApi,index)=>{
+   const field=meta.fields.get(fieldApi)!;
+   const slot='p'+index;
+   columns.push(slot);
+   slots.push(bind(group.map(row=>{
+    const value=row.raw[index];
+    return empty(value)?null:value instanceof Date?value.toISOString():String(value);
+   }))+'::text[]');
+   const typed='v.'+slot+'::'+field.sqlType;
+   if(field.column)assignments.push('"'+field.column+'"='+typed);
+   else patches.push('CASE WHEN v.'+slot+' IS NULL THEN \'{}\'::jsonb ELSE jsonb_build_object('+
+    bind(fieldApi)+'::text,to_jsonb('+typed+')) END');
+  });
+  const unnest='unnest($2::uuid[],'+slots.join(',')+')';
+  const changed=bind(names);
+  // Fields with a value, per record, in field order (same as writeNativeValues).
+  const present='ARRAY(SELECT n.field FROM unnest('+changed+'::text[]) WITH ORDINALITY AS n(field,i)'+
+   ' WHERE (ARRAY['+names.map((_,index)=>'v.p'+index+' IS NOT NULL').join(',')+'])[n.i] ORDER BY n.i)';
+  assignments.push("extras=(COALESCE(extras,'{}'::jsonb)-"+changed+'::text[])||('+
+   (patches.length?patches.join(' || '):"'{}'::jsonb")+')');
+  assignments.push('present_fields=(ARRAY(SELECT previous.field FROM '+
+   'unnest(COALESCE(present_fields,ARRAY[]::text[])) AS previous(field) '+
+   'WHERE NOT(previous.field=ANY('+changed+'::text[]))) || '+present+')');
+  const result=await client.query('UPDATE '+nativeTableSql(meta)+' t SET '+assignments.join(', ')+
+   ' FROM '+unnest+' AS v('+columns.join(',')+') WHERE t.tenant_id=$1 AND t.id=v.id',params);
+  if(result.rowCount!==group.length)throw Error('Native record not found');
+ }
+ for(const row of single)await writeNativeValues(client,tenantId,objectApi,row.id,row.values);
 }

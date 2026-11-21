@@ -362,6 +362,8 @@ export function createSystemServer(db:SqlPersistence) {
     });
   records.setRecordTriggerHandler((client,tenantId,userId,objectApi,operation,record,prior,phase,isClone)=>
     flowRecordTriggers.execute(client,tenantId,userId,objectApi,operation,record,prior,phase,isClone));
+  records.setRecordTriggerProbe((client,tenantId,objectApi,operation,phase)=>
+    flowRecordTriggers.mayRun(client,tenantId,objectApi,operation,phase));
   const apps=new AppRuntime(db);
   const appPublishing=new AppPublishingService(db,rbac,apps,metadataPackages,definitions,pages,library,flows);
   const platformTenants=new PlatformTenantService(db,rbac);

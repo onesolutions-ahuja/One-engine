@@ -2,6 +2,7 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {timeSqlTrip,clearRequestRbacMemo} from '../system-support/audit-context.js';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import {auditContext,setSqlAuditContext} from '../system-support/audit-context.js';
+import {noteStatement} from '../system-support/record-read-scope.js';
 export function resolveSqlConnection(databaseUrl:string,env:NodeJS.ProcessEnv) {
   if(!databaseUrl)throw new Error('DATABASE_URL is required');
   const uri=new URL(databaseUrl);
@@ -47,6 +48,7 @@ export class SqlPersistence {
     this.pool = new Pool({ ...config, max: resolveSqlPoolSize(process.env), connectionTimeoutMillis: 10000 });
   }
   query<T extends QueryResultRow = QueryResultRow>(sql: string, params: readonly unknown[] = []) {
+    noteStatement(sql);
     const active=this.activeTransaction.getStore();
     if(active)return active.query<T>(sql,[...params]);
     const context=auditContext();
@@ -58,6 +60,7 @@ export class SqlPersistence {
   /** One statement on a table with no setup-audit trigger: send it directly (1 round
    * trip) instead of BEGIN + SET LOCAL audit context + statement + COMMIT. */
   queryUnaudited<T extends QueryResultRow = QueryResultRow>(sql: string, params: readonly unknown[] = []) {
+    noteStatement(sql);
     const active=this.activeTransaction.getStore();
     if(active)return active.query<T>(sql,[...params]);
     return timeSqlTrip(this.pool.query<T>(sql, [...params]));
@@ -86,6 +89,7 @@ export class SqlPersistence {
     // Every statement on this connection is one round trip to the database.
     const query=client.query.bind(client) as (...args:unknown[])=>unknown;
     (client as unknown as {query:(...args:unknown[])=>unknown}).query=(...args:unknown[])=>{
+      noteStatement(typeof args[0]==='string'?args[0]:(args[0] as {text?:string}|undefined)?.text??'');
       const result=query(...args);
       return result instanceof Promise?timeSqlTrip(result):result;
     };

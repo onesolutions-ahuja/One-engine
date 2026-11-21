@@ -113,8 +113,8 @@ test('fast taps: an older answer never draws over a newer tap still waiting (1, 
  await drawLiveTap(target,'preview',{batch:'0000000a',ok:true,changes:line(1)},ledger);
  await drawLiveTap(target,'preview',{batch:'0000000b',ok:true,changes:line(2)},ledger);
  await drawLiveTap(target,'settled',{batch:'0000000a',ok:true,changes:line(1)},ledger);
- assert.deepEqual((saved[2] as {recordChanges:unknown[]}).recordChanges,[],'tap 1\'s saved row waits for tap 2');
- assert.deepEqual(applied[2],['CartLine',[],[]]);
+ assert.equal(saved.length,2,'tap 1\'s saved row waits for tap 2: lists are not touched (no re-read)');
+ assert.equal(applied.length,2,'held rows keep tap 2\'s prediction');
  assert.equal(changed.length,0,'no server totals while a tap on the Object waits');
  // A database notice of the same line now is left to tap 2's answer; other rows still draw.
  const notice=[{object:'CartLine',ids:new Set(['line-1','line-9']),count:2,operation:'update',
@@ -125,7 +125,7 @@ test('fast taps: an older answer never draws over a newer tap still waiting (1, 
  assert.equal(kept[0].count,1);
  assert.equal(withoutWaiting([{...notice[0],ids:new Set(['line-1']),rows:new Map([['line-1',{Id:'line-1'}]])}],waitingFor(ledger)).length,0);
  await drawLiveTap(target,'settled',{batch:'0000000b',ok:true,changes:line(2)},ledger);
- assert.deepEqual(applied[3],['CartLine',[{Id:'line-1',Qty:2}],[]],'the last answer draws the saved row');
+ assert.deepEqual(applied[2],['CartLine',[{Id:'line-1',Qty:2}],[]],'the last answer draws the saved row');
  assert.deepEqual(changed[0],[['CartLine'],[]]);
  // A tap whose answer never comes stops holding its rows.
  await drawLiveTap(target,'preview',{batch:'0000000c',ok:true,changes:line(3)},ledger,1000);
@@ -174,5 +174,24 @@ test('a display moves to the followed device\'s sale as soon as that device taps
  await new Promise(resolve=>setTimeout(resolve,0));
  assert.deepEqual(followed,['till-device-key-0001>sale-2'],'moved to the sale before drawing');
  assert.equal(saved.length,1,'then the tap is drawn there');
+ stop();
+});
+
+test('database notices wait while another screen\'s taps wait, then draw once (nothing steps back)',async()=>{
+ const {connectPageLive}=await import('../src/core/pages/PageCompiler/pageLiveWiring.ts');
+ const {target,saved}=fakeTarget();
+ let listener:((event:never)=>void)|undefined;
+ const stop=connectPageLive(target,next=>{listener=next as never;return ()=>undefined;},0);
+ const send=(event:unknown)=>listener!(event as never);
+ send({kind:'preview',tap:{batch:'000000a1',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'line-1',Qty:2}}]}});
+ send({kind:'change',change:{object:'Cart',ids:['cart-1'],count:1,operation:'update',rows:[{Id:'cart-1',Total:1.25}]}});
+ await new Promise(resolve=>setTimeout(resolve,20));
+ assert.equal(saved.filter(item=>(item as {objectApiNames:string[]}).objectApiNames[0]==='Cart').length,0,'held while the tap waits');
+ send({kind:'change',change:{object:'Cart',ids:['cart-1'],count:1,operation:'update',rows:[{Id:'cart-1',Total:2.5}]}});
+ send({kind:'settled',tap:{batch:'000000a1',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'line-1',Qty:2}}]}});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ const cart=saved.filter(item=>(item as {objectApiNames:string[]}).objectApiNames[0]==='Cart') as Array<{recordChanges:Array<{record:{Total:number}}>}>;
+ assert.equal(cart.length,1,'drawn once, merged');
+ assert.equal(cart[0].recordChanges[0].record.Total,2.5,'the newest value');
  stop();
 });

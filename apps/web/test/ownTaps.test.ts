@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {drawOwnTap,newTapLedger,type PageLiveTarget} from '../src/core/pages/PageCompiler/pageLiveWiring.ts';
+import {connectPageLive,drawOwnTap,newTapLedger,type PageLiveTarget} from '../src/core/pages/PageCompiler/pageLiveWiring.ts';
 
 // The tapping screen itself (a till, a kiosk, any app): fast taps are answered one by one,
 // and each answer is the saved state up to its own tap. The list must never step back.
@@ -61,4 +61,26 @@ test('a tap the till could not predict is drawn when answered, after waiting tap
  await drawOwnTap(target,{changes:[line('line-1',1)]},ledger);
  await drawOwnTap(target,{changes:[line('line-1',2)],replaces:'00000011'},ledger);
  assert.deepEqual(shown.filter((value,index)=>index===0||value!==shown[index-1]),[2]);
+});
+
+test('the database notice of an earlier own save waits until the till\'s later taps are answered',async()=>{
+ const {target,shown}=screen([]);
+ const ledger=newTapLedger();
+ let listener:((event:unknown)=>void)|undefined;
+ const stop=connectPageLive(target,next=>{listener=next as never;return ()=>undefined;},0,ledger);
+ const first='000000f1',p=provisional(first);
+ await drawOwnTap(target,{changes:[{objectApiName:'CartLine',operation:'create',record:{Id:p,Quantity:1}}],optimistic:first},ledger);
+ await drawOwnTap(target,{changes:[line(p,2)],optimistic:'000000f2'},ledger);
+ await drawOwnTap(target,{changes:[line(p,3)],optimistic:'000000f3'},ledger);
+ // Tap 1 is saved: its database notice comes (quantity 1) while taps 2 and 3 still wait.
+ listener!({kind:'change',change:{object:'CartLine',ids:['saved-f'],count:1,operation:'insert',rows:[{Id:'saved-f',Quantity:1}]}});
+ await new Promise(resolve=>setTimeout(resolve,20));
+ await drawOwnTap(target,{changes:[{objectApiName:'CartLine',operation:'create',record:{Id:'saved-f',Quantity:1}}],replaces:first},ledger);
+ await new Promise(resolve=>setTimeout(resolve,80));
+ assert.deepEqual(shown.filter((value,index)=>index===0||value!==shown[index-1]),[1,2,3],'never back to 1');
+ await drawOwnTap(target,{changes:[line('saved-f',2)],replaces:'000000f2'},ledger);
+ await drawOwnTap(target,{changes:[line('saved-f',3)],replaces:'000000f3'},ledger);
+ await new Promise(resolve=>setTimeout(resolve,80));
+ assert.deepEqual(shown.filter((value,index)=>index===0||value!==shown[index-1]),[1,2,3]);
+ stop();
 });

@@ -307,14 +307,34 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   // "Customer display on second screen" On for this device: the till opens it as it loads.
   if(sells)autoOpenCustomerDisplay(runtime.sessionId());
   // A customer display follows the Till's sale live: nobody taps the display itself.
+  // Only changes of the mirrored display layer require a full data revalidation.
+  // A normal screen notice/tap never causes an extra CartLine query.
+  let previousCustomerLayer:number|undefined;
   const stopMirror=startMirrorLiveRefresh(runtime.compiled.dataSources,Boolean(runtime.code?.readsMirror),{
    reload:(id,fresh)=>runtime.data.reload(id,fresh),
    // The display shows the sale the till is on now: it takes the till's page session.
    followSale:()=>followMirroredSale({mirrorKey:mirrorDeviceKey(),request:runtime.request,
     sessionId:runtime.sessionId,resetSession:runtime.resetSession,openedWithSession:openedWithScreenSession(),
     // SCREEN(this page, n) on the till: this screen shows layer n.
-    onLayers:layers=>{const layer=layers[runtime.compiled.apiName.toLowerCase()];
-     if(typeof layer==='number')showPageLayer(runtime.compiled.apiName,layer);}}),
+    onLayers:layers=>{
+     const layer=layers[runtime.compiled.apiName.toLowerCase()];
+     if(typeof layer!=='number')return;
+     showPageLayer(runtime.compiled.apiName,layer);
+     if(previousCustomerLayer!==undefined&&previousCustomerLayer!==layer){
+      for(const source of mirrorSources(runtime.compiled.dataSources,true))
+       void runtime.data.reload(source.id,true).catch(()=>undefined);
+      void runtime.code?.loadSets().catch(()=>undefined);
+      void runtime.code?.refreshTotals().catch(()=>undefined);
+     }
+     previousCustomerLayer=layer;
+    },
+    onPayment:payment=>{
+     const values={paymentAmount:payment?.amount??'',
+      paymentMethod:payment?.method??'',changeAmount:payment?.change??'',
+      paymentInvoiceId:payment?.invoiceId??''};
+     for(const [key,value] of Object.entries(values))
+      runtime.store.select('state',key,value);
+    }}),
    loadSets:runtime.code?()=>runtime.code!.loadSets():undefined,
    refreshTotals:runtime.code?()=>runtime.code!.refreshTotals():undefined,
    subscribeDevice:subscribeDeviceTill,
@@ -745,6 +765,13 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      .map(([key,value])=>({key,value})));
    if(settings.resetSessionOnSuccess===true)runtime.resetSession();
    else if(settings.mutatesData!==false)saved({});
+   if(currentAppId.toUpperCase()==='SMARTTILL'&&
+     ['AcetillResumeHeldCart','AcetillCopilotNewCart'].includes(flowApiName)){
+    // Resume and New sale are distinct from a completed payment.
+    // The display returns to its sale layer; its new/cart rows load by normal live events.
+    void runtime.request('/screens/layer',{method:'POST',body:JSON.stringify({
+     deviceKey:tillDeviceKey(),page:'smart_till_customer_display',layer:0})}).catch(()=>undefined);
+   }
    return {...response,completed:typeof settings.successOutput==='string'
     &&response.outputs?.[settings.successOutput]===settings.successValue};
   };
@@ -797,6 +824,29 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      // SCREEN effect: page, mode, record, layer (the record goes in separately below).
      if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+(fourth?','+fourth:'')+')',navigationContext,
       onNavigate as never,runtime.pageSessionKey,session,third||String(payload.recordId??runtime.store.get().recordId??record?.Id??''));
+     else if(effect.name==='PAID_INVOICE'){
+      // This event comes from RECORDPAYMENT only after the server records Paid.
+      // Other apps keep their own payment UX. Never show success for PartPaid.
+      if(currentAppId.toUpperCase()==='SMARTTILL'&&/^[0-9a-f-]{36}$/i.test(first)){
+       try{
+        const receipt=await runtime.request<{amount:number;method:string;change:number;invoiceId:string}>(
+         '/screens/paid-invoice',{method:'POST',body:JSON.stringify({
+          deviceKey:tillDeviceKey(),invoiceId:first})});
+        const confirmationPage=pages.find(p=>p.apiName.toLowerCase()==='smart_till_sale_confirmation'
+         &&p.status==='Active'&&p.pageType==='In-Screen Page');
+        if(confirmationPage&&!effects.some(item=>item.name==='SCREEN'&&
+          String(item.args[0]??'').toLowerCase()==='smart_till_sale_confirmation')){
+         openFormulaScreen('SCREEN(smart_till_sale_confirmation,popup)',navigationContext,
+          onNavigate as never,runtime.pageSessionKey,session,receipt.invoiceId,undefined,
+          {paymentAmount:receipt.amount,paymentMethod:receipt.method,changeAmount:receipt.change,
+           paymentInvoiceId:receipt.invoiceId});
+        }
+       }catch(error){
+        // Payment is already committed. A display failure must never roll it back.
+        console.warn('Customer payment confirmation could not be displayed',error);
+       }
+      }
+     }
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();

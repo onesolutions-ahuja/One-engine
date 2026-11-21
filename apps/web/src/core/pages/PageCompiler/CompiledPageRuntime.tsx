@@ -310,23 +310,29 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   // Only changes of the mirrored display layer require a full data revalidation.
   // A normal screen notice/tap never causes an extra CartLine query.
   let previousCustomerLayer:number|undefined;
+  let previousCustomerRevision:number|undefined;
   const stopMirror=startMirrorLiveRefresh(runtime.compiled.dataSources,Boolean(runtime.code?.readsMirror),{
    reload:(id,fresh)=>runtime.data.reload(id,fresh),
    // The display shows the sale the till is on now: it takes the till's page session.
    followSale:()=>followMirroredSale({mirrorKey:mirrorDeviceKey(),request:runtime.request,
     sessionId:runtime.sessionId,resetSession:runtime.resetSession,openedWithSession:openedWithScreenSession(),
     // SCREEN(this page, n) on the till: this screen shows layer n.
-    onLayers:layers=>{
+    onLayers:(layers,revision)=>{
      const layer=layers[runtime.compiled.apiName.toLowerCase()];
      if(typeof layer!=='number')return;
      showPageLayer(runtime.compiled.apiName,layer);
-     if(previousCustomerLayer!==undefined&&previousCustomerLayer!==layer){
+     // Resume can explicitly return to layer 0 while layer 0 was already showing.
+     // Refresh on a NEW screen-action revision, not on every till tap or 2s poll.
+     const changedLayer=previousCustomerLayer!==undefined&&previousCustomerLayer!==layer;
+     const changedAction=previousCustomerRevision!==undefined&&revision!==previousCustomerRevision;
+     if(changedLayer||changedAction){
       for(const source of mirrorSources(runtime.compiled.dataSources,true))
        void runtime.data.reload(source.id,true).catch(()=>undefined);
       void runtime.code?.loadSets().catch(()=>undefined);
       void runtime.code?.refreshTotals().catch(()=>undefined);
      }
      previousCustomerLayer=layer;
+     previousCustomerRevision=revision;
     },
     onPayment:payment=>{
      const values={paymentAmount:payment?.amount??'',

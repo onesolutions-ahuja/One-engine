@@ -384,7 +384,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     ...(p.footerWidth!==undefined&&p.footerWidth!==null&&p.footerWidth!==""
      ?{width:n(p.footerWidth,0,0,10000)+"px",maxWidth:"100%"}:{}),
     ...(p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
-     ?{minHeight:n(p.footerHeight,0,0,10000)+"px"}:{})
+     ?{height:n(p.footerHeight,0,0,10000)+"px",minHeight:0,flexShrink:0}:{})
    }}>
     <span data-md-bind={p.builderPreview?"totalLabel":undefined} data-md-bind-titles={p.builderPreview?"Total summary heading":undefined}>{summaryLabels.Total}</span><span data-md-bind={p.builderPreview?"totalValue":undefined} data-md-bind-titles={p.builderPreview?"Total amount":undefined} aria-label={summaryAmounts.Total===null?summaryLabels.Total+" not bound":undefined}>{summaryAmounts.Total??"—"}</span>
    </div>

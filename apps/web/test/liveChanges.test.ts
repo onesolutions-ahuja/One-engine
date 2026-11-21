@@ -62,3 +62,34 @@ test('with the live stream up a display re-reads on live events, and its timer o
  tick();await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(reads,1,'the 2 s timer is quiet while live');
 });
+
+test('saved rows travel with the change, read once per user as that user; deletes and bulk saves send Ids',async()=>{
+ const reads:string[]=[];
+ const hub=new LiveChangeHub({pool:{connect:()=>new Promise(()=>undefined)}} as never,{allowed:async()=>true} as never,
+  async(_tenant,user,object,ids)=>{reads.push(user+':'+object+':'+ids.join(','));
+   return user==='u2'?[]:ids.map(id=>({Id:id,Name:'Pepsi',Secret:user==='u1'?'seen':undefined}));});
+ const got:Record<string,unknown[]>={a:[],b:[],c:[]};
+ hub.subscribe({tenant_id:'T',user_id:'u1'},(_e,data)=>got.a.push(data));
+ hub.subscribe({tenant_id:'T',user_id:'u1'},(_e,data)=>got.b.push(data));
+ hub.subscribe({tenant_id:'T',user_id:'u2'},(_e,data)=>got.c.push(data));
+ hub.dispatch({k:'record',t:'T',o:'CartLine',n:1,ids:['r1'],op:'insert'});
+ await new Promise(resolve=>setTimeout(resolve,5));
+ assert.deepEqual(reads.sort(),['u1:CartLine:r1','u2:CartLine:r1'],'one read per user, not per screen');
+ assert.deepEqual((got.a[0] as {rows:unknown[]}).rows,[{Id:'r1',Name:'Pepsi',Secret:'seen'}]);
+ assert.deepEqual(got.a[0],got.b[0]);
+ assert.deepEqual((got.c[0] as {rows:unknown[]}).rows,[],'u2 may not see r1: it is reported as gone for u2');
+ reads.length=0;
+ hub.dispatch({k:'record',t:'T',o:'CartLine',n:1,ids:['r1'],op:'delete'});
+ hub.dispatch({k:'record',t:'T',o:'CartLine',n:90,ids:['r1','r2'],op:'update'});
+ await new Promise(resolve=>setTimeout(resolve,5));
+ assert.equal(reads.length,0,'no row reads for deletes or bulk saves');
+ assert.equal((got.a.at(-1) as {rows?:unknown}).rows,undefined);
+});
+
+test('a page code record set can follow the rows the page shows (the tapped row\'s related rows)',async()=>{
+ const {compileActionFormula}=await import('../../server/src/page-compiler/code/generateCode.ts');
+ const code=compileActionFormula('=IF(COUNTIFS(ProductOptionGroup, Product, @recordId, Active, TRUE) > 0, SCREEN(opts, popup, @recordId), "")','Product');
+ assert.deepEqual(code.sets.map(set=>[set.object,set.parent]),[['ProductOptionGroup',{key:'@shown:Product',field:'Product'}]]);
+ // Without a tapped-row criterion nothing changes: literal-only lookups are still never held.
+ assert.deepEqual(compileActionFormula('=IF(COUNTIFS(ProductOptionGroup, Active, TRUE) > 0, SCREEN(opts, popup), "")','Product').sets,[]);
+});

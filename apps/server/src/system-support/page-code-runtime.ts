@@ -7,6 +7,7 @@
  * tenant isolation, object/field permissions, sharing, validation and triggers
  * apply exactly as for any other save. If any step fails, nothing is saved.
  */
+import {SHOWN_ROWS} from '../page-compiler/code/generateCode.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
 import type {RecordFilter} from '../object-engine/QueryBuilder.js';
@@ -52,6 +53,8 @@ export type PageCodeRequest={
  deviceKey?:string;
  /** A customer display opened from a till: the key of the till it shows. */
  mirrorKey?:string;
+ /** Ids of the rows the page shows, per Object (record sets held for shown rows). */
+ shown?:Record<string,string[]>;
  /** Seen by the server itself, never sent by the browser: for audit. */
  deviceIp?:string;deviceAgent?:string;
 };
@@ -135,7 +138,7 @@ class ServerScope{
  readonly written=new Set<string>();
  row:Row={};
  private eventRecord:Row={};
- constructor(private readonly records:Records,private readonly actor:Actor,private readonly request:PageCodeRequest,
+ constructor(private readonly records:Records,private readonly actor:Actor,readonly request:PageCodeRequest,
   private readonly identity:TrustedFormulaSession|null,private readonly connections:ConnectionSnapshot|null,
   private readonly verify:((pin:unknown,userId?:unknown)=>Promise<boolean>)|null,
   private readonly services:{db?:SqlPersistence;rbac?:RbacEngine;namedCredentials?:NamedCredentialService}={}){}
@@ -409,10 +412,12 @@ class ServerScope{
  async loadSet(object:string,criteria:Array<[string,unknown]>,parent?:{field:string;ids:string[]}){
   if(parent){
    if(!parent.ids.length)return {rows:[],complete:true};
-   const ids=parent.ids.filter(id=>uuid.test(id)).slice(0,100);
-   const page=await this.records.list(this.actor.tenant_id,this.actor.user_id,object,100,0,
-    {filters:[...criteriaFilters(criteria),{field:parent.field,operator:'in',value:ids}]}) as {records:Row[];total:number};
-   return {rows:page.records,complete:page.total<=page.records.length};
+   const ids=parent.ids.filter(id=>uuid.test(id)).slice(0,SHOWN_LIMIT);
+   // 100 parent Ids per read, read together (a grid of products and their option groups).
+   const chunks:string[][]=[];for(let at=0;at<ids.length;at+=100)chunks.push(ids.slice(at,at+100));
+   const pages=await Promise.all(chunks.map(chunk=>this.records.list(this.actor.tenant_id,this.actor.user_id,object,RECORD_SET_LIMIT,0,
+    {filters:[...criteriaFilters(criteria),{field:parent.field,operator:'in',value:chunk}]}) as Promise<{records:Row[];total:number}>));
+   return {rows:pages.flatMap(page=>page.records),complete:pages.every(page=>page.total<=page.records.length)};
   }
   return this.rows(object,criteria,RECORD_SET_LIMIT);
  }
@@ -426,7 +431,10 @@ async function loadSets(scope:ServerScope,code:ServerPageCode,only?:ReadonlySet<
   const set=byKey.get(setKey)!;
   const criteria=set.criteria(scope);
   let parentIds:string[]|undefined;
-  if(set.parent){
+  if(set.parent?.key.startsWith(SHOWN_ROWS)){
+   // Held for the rows the page shows (the browser sends their Ids).
+   parentIds=scope.request.shown?.[set.parent.key.slice(SHOWN_ROWS.length)]??[];
+  }else if(set.parent){
    const parent=await load(set.parent.key);
    parentIds=parent.rows.map(row=>String(row.Id??''));
   }
@@ -518,8 +526,21 @@ export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unkno
   device:deviceAnswers(raw.device),
   ...(typeof raw.deviceKey==='string'&&deviceKeyPattern.test(raw.deviceKey)?{deviceKey:raw.deviceKey}:{}),
   ...(typeof raw.mirrorKey==='string'&&deviceKeyPattern.test(raw.mirrorKey)?{mirrorKey:raw.mirrorKey}:{}),
+  ...(shownRows(raw.shown)?{shown:shownRows(raw.shown)!}:{}),
   ...(typeof seen.ip==='string'&&seen.ip?{deviceIp:seen.ip.slice(0,64)}:{}),
   ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{})};
+}
+
+/** Shown row Ids per Object: at most 5 Objects and 500 Ids each, Ids only. */
+const SHOWN_LIMIT=500;
+function shownRows(value:unknown):Record<string,string[]>|undefined{
+ if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
+ const out:Record<string,string[]>=Object.create(null);
+ for(const [object,ids] of Object.entries(value).slice(0,5)){
+  if(!key.test(object)||!Array.isArray(ids))continue;
+  out[object]=[...new Set(ids.filter((id):id is string=>typeof id==='string'&&uuid.test(id)))].slice(0,SHOWN_LIMIT);
+ }
+ return Object.keys(out).length?out:undefined;
 }
 
 /** True when an action reads the signed-in user or the company (formula text or generated code). */

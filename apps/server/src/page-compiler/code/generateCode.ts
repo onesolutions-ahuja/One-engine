@@ -159,6 +159,8 @@ function criteriaCode(pairs:readonly Expression[],scope:Scope,label:string):stri
  }
  return '['+out.join(', ')+']';
 }
+/** Parent key of a set held for the rows of an Object the page shows (`@shown:Product`). */
+export const SHOWN_ROWS='@shown:';
 /** Remember which rows the page should hold for this lookup; returns the set key. */
 function noteSet(object:string,pairs:readonly Expression[],scope:Scope):string|null{
  const criteria:RecordSetCriterion[]=[];
@@ -171,6 +173,13 @@ function noteSet(object:string,pairs:readonly Expression[],scope:Scope):string|n
    // GETRECORD(Cart, Id, sc.Id): the same rows as sc's own set.
    if(field==='Id'&&scope.sets.find(set=>set.key===aliasSet)?.object===object)return aliasSet;
    if(!parent&&field!=='Id')parent={key:aliasSet,field};
+   continue;
+  }
+  // The tapped row's Id (COUNTIFS(ProductOptionGroup, Product, @recordId)): hold the rows
+  // for every row of that Object the page shows, so the tap needs no server trip.
+  if(!parent&&field!=='Id'&&scope.row==='$.row'&&scope.rowObject&&value.kind==='reference'
+   &&['recordId','event.recordId',scope.rowObject+'.Id'].includes(value.value)){
+   parent={key:SHOWN_ROWS+scope.rowObject,field};
    continue;
   }
   if(!pageKnown(value,scope))continue;

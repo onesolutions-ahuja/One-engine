@@ -81,7 +81,7 @@ import {registerDeclarativeRuleRoutes} from './declarative-rule-routes.js';
 import {DeclarativeRuleError} from '../system-files/declarative-rules.js';
 import {registerVersionedApiRoutes} from './versioned-api-routes.js';
 import {registerPlatformEventStreamRoutes} from './platform-event-stream-routes.js';
-import {LiveChangeHub,registerLiveChangeRoutes} from './live-changes.js';
+import {LiveChangeHub,recordRowReader,registerLiveChangeRoutes} from './live-changes.js';
 import {registerBusinessContextRoutes} from './business-context-routes.js';
 import {registerOutboundWebhookRoutes} from './outbound-webhook-service.js';
 import {registerDockerMailAdminRoutes} from './docker-mail-admin-routes.js';
@@ -3066,7 +3066,7 @@ export function createSystemServer(db:SqlPersistence) {
   registerVersionedApiRoutes(app,records,definitions,rbac,db);
   registerPlatformEventStreamRoutes(app,db,rbac);
   // One live stream per open page: saved records reach other screens at once.
-  const liveChanges=new LiveChangeHub(db,rbac);
+  const liveChanges=new LiveChangeHub(db,rbac,recordRowReader(records));
   registerLiveChangeRoutes(app,liveChanges);
   registerBusinessContextRoutes(app,db,rbac,records);
   registerOutboundWebhookRoutes(app,db,rbac);

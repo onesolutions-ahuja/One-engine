@@ -150,7 +150,7 @@ export default function AppPageShell({ LightningAppRuntime, onLeave }: {
     <WorkspaceFormulaScreen key={JSON.stringify(route)} canvasOf={name => pageCanvasOf(metadata.pages, name)}
       render={({ appId: popupApp, screen, frameDevice }) => <LightningAppRuntime
         appId={popupApp} pageApiName={screen.page} instanceKey={screen.instance} inScreenPage={screen.inScreen || Boolean(screen.print)}
-        printPreview={screen.print ? screen : undefined} inScreenContext={{ sessionId: screen.sessionId, values: { recordId: screen.recordId } }}
+        printPreview={screen.print ? screen : undefined} inScreenContext={{ sessionId: screen.sessionId, values: { recordId: screen.recordId, ...(screen.values??{}) } }}
         formFactor={frameDevice === 'Phone' || frameDevice === 'Tablet' ? frameDevice : formFactor}
         onStandaloneModeChange={() => {}} {...shared} />} />
     {toast && <div className="toast" role="status"><span className="toast-message">{toast}</span>

@@ -27,6 +27,7 @@ import type {PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {scopedFieldAllows} from '../PageRuntime/fieldScopedRecordFilters';
 import {loadFlowScreenRecordPage,loadFlowScreenRecords,getAccessToken,currentSessionUserId} from '../../authentication/Client/authClient';
 import {fingerprint,readLocal,writeLocal} from './localCopy';
+import {markPageOpen,noteLiveDrawn,timingNow} from './pageTimings';
 import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {presentPageRecords,type ChannelGrant} from '../../records/RecordWorkspace/recordPresentationAdapters';
 import {resolveFlowOutputBindings,resolveStructuredFlowInput} from '../../automation/FlowScreen/flowInputBindings';
@@ -117,6 +118,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
  const carried=useRef<CarriedPageState|null>(null);
  const runtime=useMemo<Runtime>(()=>{
   let sessionId=pageSessionId(pageSessionKey,sessionIdOverride);
+  markPageOpen(compiled.apiName);
   const sessionListeners=new Set<()=>void>();
   // Which selections clear which (Category → Product): computed once for the page.
   const store=createCompiledPageStore(compiled,
@@ -132,7 +134,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    :script?.previewId?'/pages/'+encodeURIComponent(compiled.apiName):'';
   const code=script?.code&&endpoint?createPageCodeRuntime(script.code,{request,endpoint,
    build:script.app?{buildId:script.app.buildId}:{previewId:script.previewId},
-   sessionId:()=>sessionId,state:store.get,
+   sessionId:()=>sessionId,state:store.get,page:compiled.apiName,
    local:{key:()=>currentSessionUserId()?'sets|'+compiled.apiName+'|'+fingerprint([script!.code!.recordSets.map((set:{key:string})=>set.key),localContext()]):null,
     read:key=>readLocal(currentSessionUserId(),key),write:(key,value)=>writeLocal(currentSessionUserId(),key,value)},
    // Rows of an Object the page shows now (a product grid): held rows follow them.
@@ -320,10 +322,14 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   // user) show here at once. Only the lists and totals over those Objects are read again.
   const liveChanges=new Map<string,LiveChange>();
   let liveTimer:ReturnType<typeof setTimeout>|null=null;
+  let liveReceived=0;
   const flushLive=()=>{
    liveTimer=null;
    const changes=[...liveChanges.values()];liveChanges.clear();
    if(!changes.length)return;
+   // Speed timing: received -> drawn (rows patched in place now; re-reads count when they land).
+   const received=liveReceived;
+   queueMicrotask(()=>noteLiveDrawn(runtime.compiled.apiName,received,changes.map(change=>change.object).join(',')));
    for(const change of changes){
     if(change.rows){
      // The rows came with the change: patch what is on screen, no second request.
@@ -354,6 +360,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
     count:before.count+event.change.count,operation:before.operation===event.change.operation?before.operation:'insert',
     ...(rows?{rows}:{})}:event.change);
    // Several saves at once (a line and its cart) are read in one go.
+   if(!liveTimer)liveReceived=timingNow();
    liveTimer??=setTimeout(flushLive,30);
   });
   return ()=>{

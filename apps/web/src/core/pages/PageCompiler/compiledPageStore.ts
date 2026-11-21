@@ -1,4 +1,5 @@
 import type {CompiledPage,CompiledDataSource} from './compilePage';
+import {notePageRows} from './pageTimings';
 import {noteOwnWrites} from './liveChanges';
 import {applySavedRecordMutations,withDependentObjects,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {applyPageSelection,changedPageStateNames,type PageStateDependencies} from '../PageRuntime/pageStateDependencies';
@@ -161,6 +162,7 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
  };
  const publish=(id:string,next:SourceSnapshot,fromLocal=false)=>{
   snapshots.set(id,next);
+  if(!next.loading&&!next.error)notePageRows(compiled.apiName,fromLocal?'local':'server');
   listeners.get(id)?.forEach(listener=>listener());
   // Keep what the server answered (and live patches) for the next time the page opens.
   const source=sources.get(id);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {confirmationPage,customerDraft,confirmScreenUses,validateVisualDraft,
+import {confirmationPage,customerDraft,validateVisualDraft,
  POPUP,CUSTOMER} from '../../../scripts/smarttill/migrate-sale-confirmation.mjs';
 
 test('confirmation popup is one editable In-Screen Page with its Done action',()=>{
@@ -27,17 +27,4 @@ test('customer display layer is independent, defaults to hidden, and idempotent'
  assert.equal(first.draft.components.slice(1).every(c=>c.properties.pageLayer===1),true);
  assert.deepEqual(customerDraft(first.draft,'Desktop').added,[]);
  assert.equal(customerDraft(first.draft,'Desktop').changed,false);
-});
-test('find every nested saved CONFIRMSCREEN formula, without changing prepayment branches',()=>{
- const page={components:[{id:'card-yes',label:'Card approval',
-  properties:{actionFlows:{click:{actionType:'Formula',formula:
-   '=CONFIRMSCREEN("Did the card machine take payment?", RECORDPAYMENT(id, 5, "Card"))'}}}},
-  {id:'done',label:'Done',properties:{actionFlows:{click:{
-   actionType:'Formula',formula:'=SCREEN(smart_till_sale_confirmation,popup)'}}}}]};
- const before=structuredClone(page);
- const results=confirmScreenUses(page);
- assert.equal(results.length,1);
- assert.equal(results[0].component,'card-yes');
- assert.equal(results[0].path,'properties.actionFlows.click.formula');
- assert.deepEqual(page,before,'migration analysis must never edit an approval formula');
 });

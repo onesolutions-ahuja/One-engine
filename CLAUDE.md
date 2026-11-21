@@ -27,7 +27,7 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
   `saved()`/`live()`, `compiledSourceLoader.ts`, `pageCodeRuntime.ts` instant taps + totals/sets,
   `mirrorLiveRefresh.ts` displays, `liveChanges.ts` live stream); views `core/pages/PageRuntime/pageRuntimeViews.tsx`.
 - Page layers: `core/pages/PageRuntime/pageLayers.ts` (component property `pageLayer`; each layer is its own screen, only one shows; 0 = default);
-  `SCREEN(page, [mode], [record], [layer 0-9])` any order after the page: `screenFormula.ts`.
+  `SCREEN(page, [mode], [record], [layer 0-9])` any order after the page: `screenFormula.ts`. `SCREEN(page, n)` only switches page where it shows (never leaves this screen); `SCREEN(page, current, n)` may open it here.
 - Page Builder: `core/builders/PageBuilder/editor/` (`usePageEditorState.tsx`, `usePageComponentActions.tsx`,
   canvas `canvas/PageCanvasStage.tsx`, Layers bar `canvas/PageLayerBar.tsx`). Page CSV: `system-support/page-inventory-csv.ts`.
 - Screens (customer displays, any app): `system-support/screen-pairing-service.ts` (pair by 4-digit code, current sale,

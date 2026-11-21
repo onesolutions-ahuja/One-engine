@@ -37,7 +37,7 @@ import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type Co
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {showPageLayer} from '../PageRuntime/pageLayers';
 import {isLiveConnected,subscribeLiveChanges} from './liveChanges';
-import {connectPageLive,drawOwnTap,newTapLedger,type TapLedger} from './pageLiveWiring';
+import {connectPageLive,drawOwnTap,newTapLedger,waitingFor,type TapLedger} from './pageLiveWiring';
 import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession,mirrorSources,setFollowingSale} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
@@ -320,8 +320,10 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    subscribeDevice:subscribeDeviceTill,
    isLive:isLiveConnected,
    subscribeLive:listener=>subscribeLiveChanges(event=>{
-    if(event.kind==='resync'||event.kind==='screen'&&event.device===mirrorDeviceKey())listener();
-   })});
+    if(event.kind==='resync')listener('resync');
+    else if(event.kind==='screen'&&event.device===mirrorDeviceKey())listener('screen');
+   }),
+   tapsWaiting:()=>waitingFor(runtime.ownTaps).ids.size>0});
   // Live changes: records saved anywhere (another till, a display's till, a Flow, another
   // user) show here at once. Only the lists and totals over those Objects are read again.
   // A display (it reads @ThisPage.Device.MirrorKey) moves to the followed device's sale as

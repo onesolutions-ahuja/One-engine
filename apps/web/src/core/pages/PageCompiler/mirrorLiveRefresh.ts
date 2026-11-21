@@ -66,9 +66,15 @@ type Target={
  subscribeDevice?(listener:()=>void):()=>void;
  /** The live stream is up (changes arrive by themselves). */
  isLive?():boolean;
- /** Live events that concern this display (its device moved, or a resync). */
- subscribeLive?(listener:()=>void):()=>void;
+ /** Live events that concern this display: 'screen' (its device changed sale or layer)
+  * or 'resync' (the stream came back; anything may have changed). */
+ subscribeLive?(listener:(kind:'screen'|'resync')=>void):()=>void;
+ /** Taps are on their way (predicted, not answered yet): a re-read now would draw an older
+  * saved value over them, so it waits until they are answered. */
+ tapsWaiting?():boolean;
 };
+/** How soon a re-read that waited for taps is tried again. */
+export const TAPS_RETRY_MS=150;
 type Clock={
  setInterval(run:()=>void,ms:number):unknown;clearInterval(handle:unknown):void;
  visible():boolean;listen(run:()=>void):()=>void;
@@ -91,9 +97,14 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
  const mirrored=mirrorSources(sources,true);
  let busy=false,stopped=false;
  let last=0;
+ let retry:ReturnType<typeof setTimeout>|null=null;
  const refresh=async()=>{
   // One read at a time: a slow network never piles requests up behind each other.
   if(stopped||busy||!clock.visible())return;
+  if(target.tapsWaiting?.()){
+   if(!retry)retry=setTimeout(()=>{retry=null;void refresh();},TAPS_RETRY_MS);
+   return;
+  }
   // Only a read that really ran counts for the live safety net (a hidden tab's skipped
   // ticks must not delay the read once it is shown).
   last=Date.now();
@@ -115,7 +126,15 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
  const unlisten=clock.listen(tick);
  // The server tells a display which Till it follows a moment after the page opens.
  const unsubscribe=target.subscribeDevice?.(tick);
- // Live: the followed device changed sale or layer, or the stream came back.
- const unsubscribeLive=target.subscribeLive?.(tick);
- return ()=>{stopped=true;clock.clearInterval(timer);unlisten();unsubscribe?.();unsubscribeLive?.();};
+ // Live: the followed device changed sale or layer (SCREEN on the till, often on every tap):
+ // only ask which sale and layer; a new sale reloads everything (resetSession), the rows of
+ // the same sale come by the live stream. The stream came back: read everything again.
+ let following=false;
+ const follow=async()=>{
+  if(stopped||following)return;
+  following=true;
+  try{await target.followSale?.().catch(()=>undefined);}finally{following=false;}
+ };
+ const unsubscribeLive=target.subscribeLive?.(kind=>{if(kind==='screen'&&target.followSale)void follow();else tick();});
+ return ()=>{stopped=true;if(retry)clearTimeout(retry);clock.clearInterval(timer);unlisten();unsubscribe?.();unsubscribeLive?.();};
 }

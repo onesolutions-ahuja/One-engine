@@ -92,6 +92,15 @@ const SHOWN_ROWS='@shown:';
 
 export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  const sets=new Map<string,{rows:Row[];complete:boolean}>();
+ /** Taps sent and not yet answered, in tap order. An answer is the saved state up to its own
+  * tap: the predictions of taps still waiting are put back on top, so fast taps never step
+  * back (5, 6, 7, 8 never shows 5 again) and the next tap counts from the newest number. */
+ const waitingTaps:Array<{seq:number;scope:Scope|null}>=[];
+ let tapSeq=0,answeredSeq=0;
+ /** Provisional Id -> saved Id, once a tap's new row is saved (a later tap may still name it). */
+ const savedIds=new Map<string,string>();
+ const savedId=(id:string)=>savedIds.get(id)??id;
+ const mapValue=(value:unknown)=>typeof value==='string'?savedId(value):value;
  const listeners=new Set<()=>void>();
  let version=0;
  const changed=()=>{version++;listeners.forEach(listener=>listener());};
@@ -313,7 +322,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(!map){map=new Map();this.overlay.set(object,map);}
    map.set(id,row);
   }
-  private current(object:string,id:string,lookup=false):Row|null{
+  private current(object:string,provisional:string,lookup=false):Row|null{
+   const id=savedId(provisional);
    const local=this.overlay.get(object)?.get(id);
    if(local===null){if(lookup)return null;notHeld('Deleted');}
    if(local)return local;
@@ -326,15 +336,16 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   async create(object:string,pairs:Criteria){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    const id=optimisticIdPrefix(this.batch)+String(++this.created).padStart(4,'0');
-   const row:Row={Id:id,CreatedAt:new Date().toISOString(),...Object.fromEntries(pairs)};
+   const row:Row={Id:id,CreatedAt:new Date().toISOString(),...Object.fromEntries(pairs.map(([key,value])=>[key,mapValue(value)]))};
    this.write(object,id,row);
    this.changes.push({objectApiName:object,operation:'create',record:row});
    return row;
   }
   async update(object:string,id:unknown,pairs:Criteria){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   const row={...this.current(object,String(id))!,...Object.fromEntries(pairs)};
-   this.write(object,String(id),row);
+   const key=savedId(String(id));
+   const row={...this.current(object,key)!,...Object.fromEntries(pairs.map(([name,value])=>[name,mapValue(value)]))};
+   this.write(object,key,row);
    this.changes.push({objectApiName:object,operation:'update',record:row});
    return row;
   }
@@ -344,9 +355,10 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   async updateLater(object:string,id:unknown,pairs:Criteria){await this.update(object,id,pairs);}
   async remove(object:string,id:unknown){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   this.current(object,String(id));
-   this.write(object,String(id),null);
-   this.changes.push({objectApiName:object,operation:'delete',record:{Id:String(id)}});
+   const key=savedId(String(id));
+   this.current(object,key);
+   this.write(object,key,null);
+   this.changes.push({objectApiName:object,operation:'delete',record:{Id:key}});
   }
   setState(name:string,value:unknown){this.stateChanges[name]=value;}
   /** `@ThisPage.CashBox.Value = …`: the component shows and holds the new value. */
@@ -362,9 +374,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  const display=new Scope('display');
  const formulaCache=new Map<string,(row:Row)=>unknown>();
  /** Held rows after a tap's simulated writes. */
- const applyOverlay=(scope:Scope)=>{
+ const applyOverlay=(scope:Scope,overlay:Scope['overlay']=scope.overlay)=>{
   for(const set of code.recordSets){
-   const local=scope.overlay.get(set.object);
+   const local=overlay.get(set.object);
    const held=sets.get(set.key);
    if(!local||!held)continue;
    const criteria=set.criteria(scope);
@@ -374,6 +386,26 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     else rows.delete(id);
    }
    sets.set(set.key,{...held,rows:[...rows.values()]});
+  }
+ };
+ /** A waiting tap's predicted rows with the saved Ids of rows saved since it was predicted. */
+ const savedOverlay=(scope:Scope):Scope['overlay']=>new Map([...scope.overlay].map(([object,rows])=>[object,
+  new Map([...rows].map(([id,row])=>[savedId(id),row&&Object.fromEntries(Object.entries(row).map(([key,value])=>[key,mapValue(value)]))]))]));
+ /** Put the predictions of taps still waiting (after `seq`) back on top of the held rows. */
+ const reapplyWaiting=(seq:number)=>{
+  for(const item of waitingTaps)if(item.seq>seq&&item.scope)applyOverlay(item.scope,savedOverlay(item.scope));
+ };
+ /** This tap's new rows, saved: provisional Id -> saved Id (per Object, in the order made). */
+ const noteSavedIds=(predicted:readonly RecordChange[],saved:readonly RecordChange[])=>{
+  const creates=(list:readonly RecordChange[],object:string)=>list.filter(change=>change.objectApiName===object&&change.operation==='create')
+   .map(change=>String(change.record.Id));
+  for(const object of new Set(predicted.map(change=>change.objectApiName))){
+   const mine=creates(predicted,object),real=creates(saved,object);
+   if(mine.length!==real.length)continue;
+   mine.forEach((id,index)=>{
+    savedIds.set(id,real[index]);
+    if(savedIds.size>200)savedIds.delete(savedIds.keys().next().value as string);
+   });
   }
  };
  const post=<T>(path:string,body:unknown)=>host.request<T>(host.endpoint+path,{method:'POST',body:JSON.stringify(body)});
@@ -578,6 +610,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    // The prediction goes with the save: the server shows it at once on this login's other
    // screens (a customer display), then replaces it with the saved rows.
    noteOwnBatch(batch);
+   const seq=++tapSeq;
+   waitingTaps.push({seq,scope:predicted?tap:null});
+   const answered=()=>{const index=waitingTaps.findIndex(item=>item.seq===seq);if(index>=0)waitingTaps.splice(index,1);};
    const saving=post<ServerResult>('/page-code/execute',{...host.build,key,request:requestFor(event,rowObject),
     live:predicted&&tap.changes.length?{batch,changes:tap.changes}:{batch}});
    if(predicted){
@@ -601,14 +636,22 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(result.needs)throw Error('Too many device steps in one action');
    }
    catch(error){result={ok:false,error:error instanceof Error?error.message:'The save failed',changes:[],state:{},effects:[],sets:{}};}
+   answered();
    if(!result.ok){
-    // Undo the screen change: the held rows and lists go back to what SQL has.
-    if(predicted){sets.clear();for(const [k,v] of before)sets.set(k,v);changed();}
+    // Undo the screen change: the held rows and lists go back to what SQL has
+    // (taps made after this one keep their predictions until their own answers).
+    if(predicted){sets.clear();for(const [k,v] of before)sets.set(k,v);reapplyWaiting(seq);changed();}
     io.show({changes:[],state:{},failed:true,replaces:predicted?batch:undefined});
     if(early.length)await io.effects([{name:'CLOSESCREEN',args:[]}]).catch(()=>undefined);
     throw Error(result.error||'The save failed; nothing was saved');
    }
-   for(const [setKey,value] of Object.entries(result.sets))sets.set(setKey,value);
+   if(predicted)noteSavedIds(tap.changes,result.changes);
+   // An older answer arriving after a newer one never replaces the newer saved rows.
+   if(seq>answeredSeq){
+    answeredSeq=seq;
+    for(const [setKey,value] of Object.entries(result.sets))sets.set(setKey,value);
+    reapplyWaiting(seq);
+   }
    forgetAggregates(result.changes.map(change=>change.objectApiName));
    changed();
    io.show({changes:result.changes,state:result.state,replaces:predicted?batch:undefined});

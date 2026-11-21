@@ -21,7 +21,8 @@ export function createRecordPageCoalescer<Row>() {
  return function coalesce(
   key:string,limit:number,load:(limit:number)=>Promise<RecordPage<Row>>,forceFresh=false
  ):Promise<RecordPage<Row>>{
-  const running=inFlight.get(key);
+  // A fresh read (someone saved since) never joins a request that started before the save.
+  const running=forceFresh?undefined:inFlight.get(key);
   if(running&&running.limit>=limit)
    return running.promise.then(result=>project(result,limit));
   const saved=forceFresh?undefined:settled.get(key);

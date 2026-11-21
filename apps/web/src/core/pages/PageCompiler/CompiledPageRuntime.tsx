@@ -34,6 +34,7 @@ import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
 import {showPageLayer} from '../PageRuntime/pageLayers';
+import {isLiveConnected,subscribeLiveChanges,type LiveChange} from './liveChanges';
 import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
@@ -296,8 +297,40 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
      if(typeof layer==='number')showPageLayer(runtime.compiled.apiName,layer);}}),
    loadSets:runtime.code?()=>runtime.code!.loadSets():undefined,
    refreshTotals:runtime.code?()=>runtime.code!.refreshTotals():undefined,
-   subscribeDevice:subscribeDeviceTill});
+   subscribeDevice:subscribeDeviceTill,
+   isLive:isLiveConnected,
+   subscribeLive:listener=>subscribeLiveChanges(event=>{
+    if(event.kind==='resync'||event.kind==='screen'&&event.device===mirrorDeviceKey())listener();
+   })});
+  // Live changes: records saved anywhere (another till, a display's till, a Flow, another
+  // user) show here at once. Only the lists and totals over those Objects are read again.
+  const liveChanges=new Map<string,LiveChange>();
+  let liveTimer:ReturnType<typeof setTimeout>|null=null;
+  const flushLive=()=>{
+   liveTimer=null;
+   const changes=[...liveChanges.values()];liveChanges.clear();
+   if(!changes.length)return;
+   for(const change of changes)void runtime.data.live(change).catch(()=>undefined);
+   void runtime.code?.liveChanged(changes.map(change=>change.object)).catch(()=>undefined);
+  };
+  const stopLive=subscribeLiveChanges(event=>{
+   if(event.kind==='resync'){
+    for(const source of runtime.compiled.dataSources)void runtime.data.reload(source.id,true).catch(()=>undefined);
+    void runtime.code?.loadSets().catch(()=>undefined);
+    void runtime.code?.refreshTotals();
+    return;
+   }
+   if(event.kind!=='change')return;
+   // Changes to one Object within a moment are merged (one read for a line and its cart).
+   const key=event.change.object.toLowerCase();
+   const before=liveChanges.get(key);
+   liveChanges.set(key,before?{object:before.object,ids:[...new Set([...before.ids,...event.change.ids])],
+    count:before.count+event.change.count,operation:before.operation===event.change.operation?before.operation:'insert'}:event.change);
+   // Several saves at once (a line and its cart) are read in one go.
+   liveTimer??=setTimeout(flushLive,30);
+  });
   return ()=>{
+   stopLive();if(liveTimer)clearTimeout(liveTimer);
    stopMirror();unsubscribeSale();
    unsubscribeState?.();
    window.removeEventListener('metadrive:page-local-state',onState);

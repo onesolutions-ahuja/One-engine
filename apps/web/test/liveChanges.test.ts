@@ -93,3 +93,18 @@ test('a page code record set can follow the rows the page shows (the tapped row\
  // Without a tapped-row criterion nothing changes: literal-only lookups are still never held.
  assert.deepEqual(compileActionFormula('=IF(COUNTIFS(ProductOptionGroup, Active, TRUE) > 0, SCREEN(opts, popup), "")','Product').sets,[]);
 });
+
+test('a saved or published page layout reaches the Page Builders that may read pages',async()=>{
+ const hub=new LiveChangeHub({pool:{connect:()=>new Promise(()=>undefined)}} as never,
+  {allowed:async(_t:string,user:string,resource:string)=>resource==='PageDefinition'&&user==='designer'} as never);
+ const got:Record<string,unknown[]>={designer:[],cashier:[]};
+ hub.subscribe({tenant_id:'T',user_id:'designer'},(event,data)=>got.designer.push([event,data]));
+ hub.subscribe({tenant_id:'T',user_id:'cashier'},(event,data)=>got.cashier.push([event,data]));
+ hub.dispatch({k:'page',t:'T',a:'smart_till_billing',v:'Custom',d:42,p:41});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual(got.designer,[['page',{page:'smart_till_billing',variant:'Custom',draft:42,published:41}]]);
+ assert.equal(got.cashier.length,0,'no page access: nothing sent');
+ const events:unknown[]=[];
+ new LiveFrameParser(event=>events.push(event)).append('event: page\ndata: {"page":"p","variant":"Custom","draft":3,"published":null}\n\n');
+ assert.deepEqual(events,[{kind:'page',page:{page:'p',variant:'Custom',draft:3,published:null}}]);
+});

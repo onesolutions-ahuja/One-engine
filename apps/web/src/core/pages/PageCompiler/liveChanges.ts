@@ -8,7 +8,9 @@
 /** `rows`: the saved rows as this user may see them (none for deletes and bulk saves).
  * An Id in `ids` but not in `rows` was deleted or is no longer visible to this user. */
 export type LiveChange={object:string;ids:readonly string[];count:number;operation:string;rows?:ReadonlyArray<Record<string,unknown>>};
-export type LiveEvent={kind:'change';change:LiveChange}|{kind:'screen';device:string}|{kind:'resync'};
+/** A page layout was saved (draft) or published, by anyone (Page Builder co-design). */
+export type LivePage={page:string;variant:string;draft:number|null;published:number|null};
+export type LiveEvent={kind:'change';change:LiveChange}|{kind:'screen';device:string}|{kind:'page';page:LivePage}|{kind:'resync'};
 type Listener=(event:LiveEvent)=>void;
 
 const listeners=new Set<Listener>();
@@ -53,6 +55,8 @@ export class LiveFrameParser{
    if(name==='ready')this.push({kind:'ready'});
    else if(name==='resync')this.push({kind:'resync'});
    else if(name==='screen'&&typeof data.device==='string')this.push({kind:'screen',device:data.device});
+   else if(name==='page'&&typeof data.page==='string')this.push({kind:'page',page:{page:data.page,variant:String(data.variant??''),
+    draft:typeof data.draft==='number'?data.draft:null,published:typeof data.published==='number'?data.published:null}});
    else if(name==='change'&&typeof data.object==='string')this.push({kind:'change',change:{
     object:data.object,ids:Array.isArray(data.ids)?data.ids.filter((id):id is string=>typeof id==='string'):[],
     count:typeof data.count==='number'?data.count:0,operation:String(data.operation??''),

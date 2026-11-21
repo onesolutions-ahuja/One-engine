@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { isCanvasLocked, ungroupCanvasComponent } from '../../canvasInteractions';
 import {
 canvasGroupKey, groupCanvasSelection, ungroupCanvasSelection, moveCanvasLayer, shiftCanvasLayer,
@@ -52,6 +52,36 @@ export function usePageLayoutActions(
       .catch(error => {if(active)onNotify(error instanceof Error?error.message:'Unable to load page draft');});
     return ()=>{active=false;};
   },[editorMode,page.apiName,initialLayoutVariant]);
+  // Co-design: another person saved this layout. With no edits here it loads at once;
+  // with edits here they are kept, and Save asks before replacing the newer revision.
+  const dirtyRef=useRef(false);
+  dirtyRef.current=undoStack.length>0;
+  const shownRevision=useRef<number|undefined>(undefined);
+  shownRevision.current=typeof page.draftRevision==='number'?page.draftRevision:undefined;
+  useEffect(()=>{
+   if(!editorMode)return;
+   const variant=page.layoutVariant??'Desktop';
+   let stopped=false;
+   let stop:()=>void=()=>undefined;
+   void import('../../../../pages/PageCompiler/liveChanges').then(live=>{
+    if(stopped)return;
+    stop=live.subscribeLiveChanges(event=>{
+     if(event.kind!=='page'||event.page.page!==page.apiName||event.page.variant!==variant)return;
+     const draft=event.page.draft;
+     const newer=()=>typeof draft==='number'&&(shownRevision.current===undefined||draft>shownRevision.current);
+     if(!newer())return;
+     // Our own Save announces itself too: give its answer a moment to arrive first.
+     setTimeout(()=>{if(!stopped&&newer())react();},1500);
+    });
+    function react(){
+     if(dirtyRef.current){onNotify('Someone else saved this page. Your edits are kept; Save will ask before replacing their version.');return;}
+     void request<{page:LightningPageMetadata}>(`/metadata/pages/${encodeURIComponent(page.apiName)}/layouts/${variant}/editor`)
+      .then(result=>{if(!stopped&&!dirtyRef.current){onChange(result.page);onNotify('Updated: someone else saved this page');}})
+      .catch(()=>undefined);
+    }
+   });
+   return ()=>{stopped=true;stop();};
+  },[editorMode,page.apiName,page.layoutVariant]); // eslint-disable-line react-hooks/exhaustive-deps
   const switchLayoutVariant=async(variant:'Mobile'|'Desktop'|'Tablet'|'Custom'):Promise<boolean>=>{
     if((page.layoutVariant??'Desktop')===variant)return true;
     if(switchingLayout)return false;

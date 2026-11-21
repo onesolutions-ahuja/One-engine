@@ -829,7 +829,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
       // Other apps keep their own payment UX. Never show success for PartPaid.
       if(currentAppId.toUpperCase()==='SMARTTILL'&&/^[0-9a-f-]{36}$/i.test(first)){
        try{
-        const receipt=await runtime.request<{amount:number;method:string;change:number;invoiceId:string}>(
+        const receipt=await runtime.request<{amount:number;method:string;change:number|null;invoiceId:string}>(
          '/screens/paid-invoice',{method:'POST',body:JSON.stringify({
           deviceKey:tillDeviceKey(),invoiceId:first})});
         const confirmationPage=pages.find(p=>p.apiName.toLowerCase()==='smart_till_sale_confirmation'

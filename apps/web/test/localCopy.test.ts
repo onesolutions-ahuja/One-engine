@@ -47,3 +47,16 @@ test('kept rows are never used for another user, session or filter value',async(
  void signedOut.start();await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(signedOut.get('Product#grid').loading,true,'nobody signed in: nothing read');
 });
+
+test('a live change re-reads lists fresh (never from the short read cache)',async()=>{
+ const windows:Array<{fresh?:boolean}>=[];
+ const layer=createCompiledDataLayer(compiled,async(_source,_state,window)=>{windows.push(window);return {records:[],total:0,predictable:false,paged:true};},()=>({category:'Drinks'}));
+ await layer.start();
+ windows.length=0;
+ await layer.saved({objectApiNames:['Product'],recordChanges:[{objectApiName:'Product',operation:'create',record:{Id:'p9'}}],live:true});
+ assert.equal(windows.length,1);
+ assert.equal(windows[0].fresh,true);
+ windows.length=0;
+ await layer.saved({objectApiNames:['Product']});
+ assert.ok(!windows[0].fresh,'this window\'s own saves keep using the cache rules as before');
+});

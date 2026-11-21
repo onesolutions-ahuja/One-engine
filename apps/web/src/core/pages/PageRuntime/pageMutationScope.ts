@@ -14,6 +14,8 @@ export type PageMutationDetail={
  recordChanges?:readonly SavedRecordMutation[];
  /** Show-first prediction batch: rows are provisional until the real save. */
  optimistic?:string;
+ /** Saved elsewhere (a live change): lists re-read from the server, never from the short read cache. */
+ live?:boolean;
  /** The real save that replaces a prediction batch's provisional rows. */
  replacesOptimistic?:string;
 };

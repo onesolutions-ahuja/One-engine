@@ -289,7 +289,7 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
     if(written&&!readsObject(source,written))continue;
     // Reads only a roll-up parent of what was saved: re-read it after the real save.
     if(own&&written&&!readsObject(source,own)){
-     if(!detail.optimistic)work.push(reload(source.id));
+     if(!detail.optimistic)work.push(reload(source.id,Boolean(detail.live)));
      continue;
     }
     const current=snapshots.get(source.id);
@@ -309,7 +309,7 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
     }
     // A prediction the list cannot show exactly is skipped; the real save follows.
     if(detail.optimistic)continue;
-    work.push(reload(source.id));
+    work.push(reload(source.id,Boolean(detail.live)));
    }
    return Promise.all(work).then(()=>undefined);
   },

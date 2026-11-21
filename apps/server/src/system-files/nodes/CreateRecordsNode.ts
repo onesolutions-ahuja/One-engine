@@ -10,6 +10,21 @@ async function enforceCashLedgerReversalIfConfigured(context:FlowNodeContext,gua
  if(guard!==null&&guard!==undefined)
   await enforceCashLedgerReversal(context,guard,fields);
 }
+const CREATE_GUARDS=['businessCalendarGuard','overlapGuard','uniqueInputGuard','availabilityGuard',
+ 'documentConversion','sourceLinkGuard','manualPaymentGuard','cashReversalGuard'] as const;
+/** One collection item's fields, checked as the one-by-one loop checks them. */
+function collectionFields(item:Record<string,unknown>,apiName:RegExp,scalar:(value:unknown)=>boolean){
+ const fields:Record<string,unknown>={};
+ if(Object.keys(item).filter(field=>field!=='Id').length>100)
+  throw new Error('Create Records collection items may contain at most 100 fields');
+ for(const [field,value] of Object.entries(item)){
+  if(field==='Id')continue;
+  if(!apiName.test(field)||!scalar(value))
+   throw new Error('Invalid Create Records collection field: '+field);
+  fields[field]=value;
+ }
+ return fields;
+}
 export async function executeCreateRecordsNode(context:FlowNodeContext):Promise<FlowActionResult>{
  const {tenantId,userId,client,node,records,vars,evaluate,set,recordValues,scalar}=context;
  const config=node.config;
@@ -18,7 +33,23 @@ export async function executeCreateRecordsNode(context:FlowNodeContext):Promise<
     if(!apiName.test(objectApi))throw new Error('Invalid Flow Object');
     const lineTotalsConfig=(objectApi==='QuotationLine'||objectApi==='InvoiceLine')
       ?config.documentLineTotals??defaultDocumentLineTotalsConfig(objectApi):null;
-    if(config.recordSource==='collection'){
+    // With no step check that reads records (guards, document lines), the whole collection
+    // is one bulk save. The records and errors are the same as saving them one by one.
+    const guarded=objectApi==='QuotationLine'||objectApi==='InvoiceLine'||CREATE_GUARDS.some(name=>
+      config[name]!==undefined&&config[name]!==null);
+    if(config.recordSource==='collection'&&!guarded){
+      const source=recordValues(vars[String(config.collection??'')]);
+      const lists:Record<string,unknown>[]=[];
+      let invalid:unknown=null;
+      for(const item of source){
+        try{lists.push(collectionFields(item,apiName,scalar));}catch(error){invalid=error;break;}
+      }
+      // Records before an invalid item are saved before the error, as one by one.
+      const ids=await records.createMany(tenantId,userId,objectApi,lists,client);
+      if(invalid)throw invalid;
+      if(typeof config.resultVariable==='string'&&config.resultVariable)
+        vars[config.resultVariable]=lists.map((fields,index)=>({...fields,Id:ids[index]}));
+    }else if(config.recordSource==='collection'){
       const source=recordValues(vars[String(config.collection??'')]);
       const created:Record<string,unknown>[]=[];
       for(const item of source){

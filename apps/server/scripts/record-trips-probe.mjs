@@ -82,7 +82,9 @@ try{
   console.info((scoped?'page-code scope':'plain')+': '+total+' SQL trips | '+steps.map(([n,t])=>n+' '+t).join(', '));
   return total;
  };
- await run(false);
+ const plain=await run(false);
+ // Budget for the same tap outside page code (each read and save on its own).
+ assert(plain<=Number(process.env.TRIPS_BUDGET_PLAIN??999),'SQL trips over budget (plain): '+plain);
  if(process.env.TRIPS_TRACE)trace=[];
  const scoped=await run(true);
  if(trace){console.info(trace.join('\n'));trace=null;}

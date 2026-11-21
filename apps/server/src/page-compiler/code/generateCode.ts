@@ -331,9 +331,12 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
     pairs.push('['+q(field)+', '+value(args[i+1])+']');
    }
    scope.data=true;scope.writes.add(object);
+   // Inside FOREACH, a save whose result is not used is queued: the server saves the
+   // loop's saves together (one bulk save) before anything reads records again.
+   const later=scope.loop&&!alias?'Later':'';
    const call=node.name==='CREATERECORD'
-    ?'await $.create('+q(object)+', ['+pairs.join(', ')+'])'
-    :'await $.update('+q(object)+', '+id+', ['+pairs.join(', ')+'])';
+    ?'await $.create'+later+'('+q(object)+', ['+pairs.join(', ')+'])'
+    :'await $.update'+later+'('+q(object)+', '+id+', ['+pairs.join(', ')+'])';
    return [(alias?'v['+q(alias)+'] = ':'')+call+';'];
   }
   case 'DELETERECORD':{

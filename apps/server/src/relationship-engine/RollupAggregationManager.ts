@@ -1,21 +1,18 @@
 import type {PoolClient} from 'pg';
-import {scopedMetadata} from '../system-support/record-read-scope.js';
-import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
+import {objectSetup,objectNativeFields} from '../system-files/object-save-setup.js';
+import {nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 import {writeNativeValues} from '../system-files/native-values.js';
 /** The existing SQL rollup implementation, extracted verbatim from RecordEngine. */
 export async function rollupParents(client:PoolClient,tenantId:string,childObject:string,recordId:string) {
-    const {rows}=await scopedMetadata('rollup-parents\u0000'+tenantId+'\u0000'+childObject,()=>client.query<{
+    const {rows}=await objectSetup<{
       parent_object:string;relationship_field:string;
-    }>(`SELECT object_api AS parent_object,rollup_relationship_field AS relationship_field
-      FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
-        AND rollup_child_object=$2 AND deleted_at IS NULL`,
-    [tenantId,childObject]));
+    }>(client,'rollup-parents',tenantId,childObject);
     const parents=new Map<string,Set<string>>();
     const configs=rows.filter(config=>typeof config.parent_object==='string'
       &&typeof config.relationship_field==='string');
     if(!configs.length)return parents;
     const fields=[...new Set(configs.map(config=>config.relationship_field))];
-    const native=await loadNativeFields(client,tenantId,childObject);
+    const native=await objectNativeFields(client,tenantId,childObject);
     const slots=fields.map((field,index)=>
       `(${nativeValueSql(native,field,'nr')},$${index+3}::text)`).join(',');
     const values=await client.query<{field_api:string;reference_record_id:string|null}>(`
@@ -32,25 +29,41 @@ export async function rollupParents(client:PoolClient,tenantId:string,childObjec
     }
     return parents;
   }
+/** rollupParents for many records of one Object in one read (parents merged). */
+export async function rollupParentsMany(client:PoolClient,tenantId:string,childObject:string,recordIds:readonly string[]) {
+    const parents=new Map<string,Set<string>>();
+    if(!recordIds.length)return parents;
+    const {rows}=await objectSetup<{parent_object:string;relationship_field:string}>(client,'rollup-parents',tenantId,childObject);
+    const configs=rows.filter(config=>typeof config.parent_object==='string'
+      &&typeof config.relationship_field==='string');
+    if(!configs.length)return parents;
+    const fields=[...new Set(configs.map(config=>config.relationship_field))];
+    const native=await objectNativeFields(client,tenantId,childObject);
+    const slots=fields.map((field,index)=>
+      `(${nativeValueSql(native,field,'nr')},$${index+3}::text)`).join(',');
+    const values=await client.query<{field_api:string;reference_record_id:string|null}>(`
+      SELECT found.field_api,found.reference_record_id
+      FROM ${nativeTableSql(native)} nr
+      JOIN LATERAL (VALUES ${slots}) AS found(reference_record_id,field_api) ON true
+      WHERE nr.tenant_id=$1 AND nr.id=ANY($2::uuid[])`,[tenantId,[...recordIds],...fields]);
+    const parentForField=new Map(configs.map(config=>[config.relationship_field,config.parent_object]));
+    for(const value of values.rows){
+      const parentObject=parentForField.get(value.field_api);
+      if(!parentObject||!value.reference_record_id)continue;
+      const ids=parents.get(parentObject)??new Set<string>();
+      ids.add(value.reference_record_id);parents.set(parentObject,ids);
+    }
+    return parents;
+  }
 export async function refreshRollups(client:PoolClient,tenantId:string,childObject:string,
     parentIds:Map<string,Set<string>>,visited=new Set<string>(),depth=0) {
     if(!parentIds.size)return;
     if(depth>50)throw new Error('Roll-Up Summary nesting limit exceeded');
-    const {rows}=await scopedMetadata('rollups\u0000'+tenantId+'\u0000'+childObject,()=>client.query<{
+    const {rows}=await objectSetup<{
       parent_object:string;field_api:string;relationship_field:string;operation:string;source_field:string|null;
       source_data_type:string|null;filter_logic:string;
-    }>(`SELECT object_api AS parent_object,api_name AS field_api,
-        rollup_relationship_field AS relationship_field,rollup_operation AS operation,
-        rollup_source_field AS source_field,rollup_filter_logic AS filter_logic,
-        (SELECT s.data_type FROM md_field_definitions s
-         WHERE s.tenant_id=md_field_definitions.tenant_id
-           AND s.object_api=md_field_definitions.rollup_child_object
-           AND s.api_name=md_field_definitions.rollup_source_field AND s.deleted_at IS NULL)
-          AS source_data_type
-      FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
-        AND rollup_child_object=$2 AND deleted_at IS NULL`,
-    [tenantId,childObject]));
-    const native=await loadNativeFields(client,tenantId,childObject);
+    }>(client,'rollups',tenantId,childObject);
+    const native=await objectNativeFields(client,tenantId,childObject);
     const table=nativeTableSql(native);
     const rollups=rows.filter(rollup=>typeof rollup.parent_object==='string'
       &&typeof rollup.field_api==='string'&&typeof rollup.relationship_field==='string'

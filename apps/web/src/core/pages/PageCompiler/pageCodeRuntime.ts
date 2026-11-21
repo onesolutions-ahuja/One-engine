@@ -337,6 +337,10 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    this.changes.push({objectApiName:object,operation:'update',record:row});
    return row;
   }
+  /** Loop saves whose result is not used: here the same as create/update (the server
+   * saves them together). */
+  async createLater(object:string,pairs:Criteria){await this.create(object,pairs);}
+  async updateLater(object:string,id:unknown,pairs:Criteria){await this.update(object,id,pairs);}
   async remove(object:string,id:unknown){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    this.current(object,String(id));

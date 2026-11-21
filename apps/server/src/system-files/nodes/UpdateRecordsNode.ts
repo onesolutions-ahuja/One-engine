@@ -41,6 +41,24 @@ export async function executeUpdateRecordsNode(context:FlowNodeContext):Promise<
    mapped[field]=value;
   }
  }
+ // With no step check that reads records (guards, document lines), all targets are one bulk
+ // save. The records and errors are the same as saving them one by one.
+ const guarded=objectApi==='QuotationLine'||objectApi==='InvoiceLine'||['overlapGuard','availabilityGuard','documentIssue']
+  .some(name=>config[name]!==undefined&&config[name]!==null);
+ if(!guarded){
+  const items:Array<{id:string;values:Record<string,unknown>}>=[];
+  let invalid:unknown=null;
+  for(const record of targets){
+   try{
+    if(typeof record.Id!=='string')throw Error('Invalid Update Records target');
+    items.push({id:record.Id,values:dynamic?fieldsFromRecord(record,scalar):mapped});
+   }catch(error){invalid=error;break;}
+  }
+  // Records before an invalid target are saved before the error, as one by one.
+  await records.updateMany(tenantId,userId,objectApi,items,client);
+  if(invalid)throw invalid;
+  return {handled:true,clearHistory:true};
+ }
  for(const record of targets){
   if(typeof record.Id!=='string')throw Error('Invalid Update Records target');
   const values=dynamic?fieldsFromRecord(record,scalar):mapped;

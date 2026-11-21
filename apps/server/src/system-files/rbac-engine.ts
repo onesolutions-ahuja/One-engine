@@ -6,15 +6,31 @@ export type PermissionCheck={resource:string;action:string};
 /** One central SQL RBAC evaluator. OneEngine is an ordinary configurable permission set. */
 export class RbacEngine{
  constructor(private readonly db:SqlPersistence){}
+ /** Where decisions are remembered. Inside one page action or one save (record read
+  * scope) they are kept until a Flow runs or setup changes. Otherwise, within ONE request
+  * outside a transaction they are kept until any database write in the request. */
+ private memo():Map<string,boolean>|undefined{
+  const scope=recordReadScope();
+  if(scope)return scope.rbac;
+  if(!(this.db instanceof SqlPersistence))return undefined;
+  const context=auditContext();
+  return !this.db.inTransaction()&&context?(context.rbacMemo??=new Map<string,boolean>()):undefined;
+ }
+ /** Ask several decisions now in ONE query and remember them for the checks that follow.
+  * Does nothing where decisions are not remembered (they are then asked when needed). */
+ async prime(tenantId:string,userId:string,checks:readonly PermissionCheck[]):Promise<void>{
+  const memo=this.memo();
+  if(!memo)return;
+  const keyOf=(check:PermissionCheck)=>tenantId+'\u0000'+userId+'\u0000'+check.resource+'\u0000'+check.action;
+  const seen=new Set<string>();
+  const missing=checks.filter(check=>{const key=keyOf(check);if(memo.has(key)||seen.has(key))return false;seen.add(key);return true;});
+  if(!missing.length)return;
+  const answers=await this.decide(tenantId,userId,missing);
+  missing.forEach((check,index)=>memo.set(keyOf(check),answers[index]));
+ }
  async allowedMany(tenantId:string,userId:string,checks:readonly PermissionCheck[]):Promise<boolean[]>{
   if(!checks.length)return [];
-  // Within ONE request the same decision is asked many times (object, then each
-  // field, again by nested services). Remember it for this request only; any
-  // database write in the request clears it. Not used inside a transaction.
-  const context=auditContext();
-  // Inside one page action (record read scope) decisions are kept until a Flow runs.
-  const memo=this.db instanceof SqlPersistence&&!this.db.inTransaction()&&context
-   ?(context.rbacMemo??=new Map<string,boolean>()):recordReadScope()?.rbac;
+  const memo=this.memo();
   const keyOf=(check:PermissionCheck)=>tenantId+'\u0000'+userId+'\u0000'+check.resource+'\u0000'+check.action;
   if(memo){
    const missing=checks.filter(check=>!memo.has(keyOf(check)));

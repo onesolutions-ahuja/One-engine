@@ -51,6 +51,7 @@ import {ObjectMetadataHistory,restorableObjectLayoutSnapshot} from '../system-fi
 import {CustomMetadataService} from '../system-files/custom-metadata-service.js';
 import { RbacEngine } from '../system-files/rbac-engine.js';
 import {permittedApps} from './rbac-navigation.js';
+import {appPageLayoutFallbacks} from './page-layout-fallback.js';
 import {RbacAdministration} from './rbac-administration.js';
 import {NamedCredentialService} from './named-credential-service.js';
 import {DurableJobService} from './durable-job-service.js';
@@ -1572,7 +1573,7 @@ export function createSystemServer(db:SqlPersistence) {
   };
   type PageQuery=Request['query'];
   type PageActor={tenant_id:string;user_id:string};
-  const homePageAnswer=async(actor:PageActor,appId:string,query:PageQuery)=>{
+  const homePageAnswer=async(actor:PageActor,appId:string,query:PageQuery):Promise<{page:unknown;script?:unknown}>=>{
     const req={params:{appId},query,actor};
     const viewportWidth=Number(req.query.viewportWidth??0);
     const factor=String(req.query.formFactor??'Desktop');
@@ -1615,6 +1616,9 @@ export function createSystemServer(db:SqlPersistence) {
       ?customPage:null;
     if(!targeted&&assignedResult.error)throw assignedResult.error;
     const page=targeted??assignedResult.page;
+    // No Home Page for this window size: the best layout the app has, in this same answer.
+    const [fallback]=appPageLayoutFallbacks(factor);
+    if(!page&&fallback)return homePageAnswer(actor,appId,{...query,formFactor:fallback});
     const script=await withPageScript(req,req.params.appId,page);
     return script?{page,script}:{page};
   };
@@ -1622,7 +1626,13 @@ export function createSystemServer(db:SqlPersistence) {
     await rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
     const factor=String(query.formFactor??'Desktop');
     const viewportWidth=Number(query.viewportWidth??0);
-    const page=await pages.resolveAppPage(actor.tenant_id,appId,pageApiName,factor,viewportWidth);
+    let page=await pages.resolveAppPage(actor.tenant_id,appId,pageApiName,factor,viewportWidth);
+    // No layout for this window size (a narrow window asks for Mobile): answer the best
+    // layout the page has now, never "Page not found" followed by a second request.
+    for(const fallback of appPageLayoutFallbacks(factor)){
+      if(page)break;
+      page=await pages.resolveAppPage(actor.tenant_id,appId,pageApiName,fallback);
+    }
     if(!page)throw new Error('Page not found');
     const script=await withPageScript({query,actor},appId,page.page);
     return script?{page:page.page,script}:{page:page.page};

@@ -1,6 +1,6 @@
 import type {CompiledDataSource} from './compilePage';
 import type {CompiledDataLayer} from './compiledPageStore';
-import {noteOwnWrites,subscribeLiveChanges,type LiveChange,type LiveEvent,type LiveTap,type LiveTapChange} from './liveChanges';
+import {noteOwnWrites,ownWriteAt,subscribeLiveChanges,type LiveChange,type LiveEvent,type LiveTap,type LiveTapChange} from './liveChanges';
 import {noteLiveDrawn,timingNow} from './pageTimings';
 
 /**
@@ -36,15 +36,18 @@ export type PageLiveTarget={
 
 /** Live changes of one Object waiting to be drawn. `rows` null: something came without
  * its rows (a bulk save): the lists re-read instead of patching. */
-type Pending={object:string;ids:Set<string>;count:number;operation:string;rows:Map<string,Row>|null;created:Set<string>};
+type Pending={object:string;ids:Set<string>;count:number;operation:string;rows:Map<string,Row>|null;created:Set<string>;
+ /** When each record's notice arrived (a save drawn after it is newer). */
+ seen?:Map<string,number>};
 
 const exactDelete=(change:LiveChange)=>change.operation==='delete'&&change.ids.length>0&&change.count<=change.ids.length;
 
 /** Fold one more change of the same Object into what is waiting. A delete (Ids only) folds
  * into saved rows exactly: an Id in `ids` without a row is drawn as gone. */
-export function mergeLiveChange(before:Pending|undefined,change:LiveChange):Pending{
+export function mergeLiveChange(before:Pending|undefined,change:LiveChange,now=Date.now()):Pending{
  const pending:Pending=before??{object:change.object,ids:new Set(),count:0,operation:change.operation,
-  rows:change.rows||exactDelete(change)?new Map():null,created:new Set()};
+  rows:change.rows||exactDelete(change)?new Map():null,created:new Set(),seen:new Map()};
+ for(const id of change.ids)pending.seen?.set(id,now);
  if(before&&before.operation!==change.operation)pending.operation='mixed';
  pending.count+=change.count;
  for(const id of change.ids)pending.ids.add(id);
@@ -243,13 +246,16 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
  */
 let ownUnpredicted=0;
 export function drawOwnTap(target:PageLiveTarget,update:{changes:readonly LiveTapChange[];optimistic?:string;replaces?:string},
- ledger:TapLedger,now=Date.now()):Promise<unknown>{
+ ledger:TapLedger,lists?:ReadonlySet<string>,now=Date.now()):Promise<unknown>{
  const own={...target,code:null};
- if(update.optimistic)return drawLiveTap(own,'preview',{batch:update.optimistic,ok:true,changes:[...update.changes]},ledger,now);
- // This window saved these records: their database notice needs no second read here.
+ // Lists are told about their own Object only (totals over other Objects come from held rows).
+ const changes=lists?update.changes.filter(change=>lists.has(change.objectApiName)):[...update.changes];
+ if(update.optimistic)return drawLiveTap(own,'preview',{batch:update.optimistic,ok:true,changes},ledger,now);
+ // This window saved these records (every Object, a cart total too): their database notice
+ // needs no second read here.
  noteOwnWrites(update.changes.map(change=>change.record.Id));
  const batch=update.replaces??'own-'+(++ownUnpredicted);
- return drawLiveTap(own,'settled',{batch,ok:true,changes:[...update.changes]},ledger,now);
+ return drawLiveTap(own,'settled',{batch,ok:true,changes},ledger,now);
 }
 /** A database notice drawn while taps still wait: rows those taps change again are left to
  * their answer (their newer prediction stays on screen). Changes left with nothing are dropped. */
@@ -266,6 +272,17 @@ export function withoutWaiting(changes:readonly Pending[],waiting:{ids:Set<strin
  return out;
 }
 
+/** Notices held while taps waited: records this screen drew from a save after the notice
+ * came (a tap's answer) are newer on screen than the notice's rows, which are dropped. */
+export function withoutDrawnSince(changes:readonly Pending[],now=Date.now()):Pending[]{
+ const drawn=new Set<string>();
+ for(const change of changes)for(const [id,at] of change.seen??[]){
+  const own=ownWriteAt(id,now);
+  if(own!==undefined&&own>=at)drawn.add(id);
+ }
+ return drawn.size?withoutWaiting(changes,{ids:drawn,objects:new Set()}):[...changes];
+}
+
 /** Read everything the page shows again (the stream was down: anything may have changed). */
 export function resyncPage(target:PageLiveTarget):Promise<unknown>{
  return Promise.all([
@@ -274,13 +291,15 @@ export function resyncPage(target:PageLiveTarget):Promise<unknown>{
  ]);
 }
 
-/** Connect a page to the live stream; returns stop. */
+/** Connect a page to the live stream; returns stop. `ledger`: the page's taps still waiting
+ * (this screen's own taps too): database notices wait for their answers, so an earlier
+ * save's notice never draws over a newer tap. */
 export function connectPageLive(target:PageLiveTarget,
- subscribe:(listener:(event:LiveEvent)=>void)=>()=>void=subscribeLiveChanges,mergeMs=LIVE_MERGE_MS):()=>void{
+ subscribe:(listener:(event:LiveEvent)=>void)=>()=>void=subscribeLiveChanges,mergeMs=LIVE_MERGE_MS,
+ ledger:TapLedger=newTapLedger()):()=>void{
  const pending=new Map<string,Pending>();
  let timer:ReturnType<typeof setTimeout>|null=null;
  let received=0;
- const ledger=newTapLedger();
  let heldSince=0;
  const flush=()=>{
   timer=null;
@@ -293,7 +312,7 @@ export function connectPageLive(target:PageLiveTarget,
    if(Date.now()-heldSince<NOTICE_HOLD_MS){timer=setTimeout(flush,NOTICE_RETRY_MS);return;}
   }
   heldSince=0;
-  const changes=withoutWaiting([...pending.values()],waiting);pending.clear();
+  const changes=withoutWaiting(withoutDrawnSince([...pending.values()]),waiting);pending.clear();
   if(!changes.length)return;
   // Speed timing: received -> drawn (rows patched in place now; re-reads count when they land).
   const at=received;

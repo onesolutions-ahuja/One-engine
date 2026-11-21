@@ -71,6 +71,11 @@ export function noteOwnWrites(ids:readonly unknown[]):void{
  for(const id of ids)if(typeof id==='string'&&id)ownWrites.set(id,now);
  if(ownWrites.size>500)for(const [id,at] of ownWrites)if(now-at>OWN_WRITE_MS)ownWrites.delete(id);
 }
+/** When this window last drew a save of the record as its own (undefined: not lately). */
+export function ownWriteAt(id:string,now=Date.now()):number|undefined{
+ const at=ownWrites.get(id);
+ return at!==undefined&&now-at<=OWN_WRITE_MS?at:undefined;
+}
 /** True when every record of the change was saved by this window just now. */
 export function isOwnEcho(change:LiveChange,now=Date.now()):boolean{
  if(!change.ids.length||change.count>change.ids.length)return false;

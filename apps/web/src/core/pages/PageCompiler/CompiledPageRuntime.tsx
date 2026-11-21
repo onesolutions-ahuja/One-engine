@@ -335,7 +335,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
     if(session===runtime.sessionId())return false;
     runtime.resetSession(session);
     return true;
-   }:undefined});
+   }:undefined},undefined,undefined,runtime.ownTaps);
   return ()=>{
    stopLive();
    unsubscribeShown.forEach(stop=>stop());
@@ -841,7 +841,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
       // Same rules as a tap relayed from another screen: in order, never stepping back.
       void drawOwnTap({apiName:runtime.compiled.apiName,pageSessionKey:runtime.pageSessionKey,
        dataSources:runtime.compiled.dataSources,data:runtime.data},
-       {...update,changes:update.changes.filter(change=>listObjects.has(change.objectApiName))},runtime.ownTaps);
+       update,runtime.ownTaps,listObjects);
       if(!update.optimistic)runtime.broadcastSaved({objectApiNames:[...new Set(update.changes.map(change=>change.objectApiName))]});
      },
      effects:runEffects,

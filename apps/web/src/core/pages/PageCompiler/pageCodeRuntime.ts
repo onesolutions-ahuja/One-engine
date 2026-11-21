@@ -76,7 +76,11 @@ export type PageCodeHost={
  sessionId():string;
  state():Readonly<Record<string,unknown>>;
  readComponent?(component:string,property:string):unknown;
+ /** Ids of the rows of `object` the page shows now (record sets held for shown rows). */
+ shownRows?(object:string):string[];
 };
+/** Parent key of a set held for the rows of an Object the page shows (generateCode SHOWN_ROWS). */
+const SHOWN_ROWS='@shown:';
 
 export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  const sets=new Map<string,{rows:Row[];complete:boolean}>();
@@ -84,6 +88,13 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  let version=0;
  const changed=()=>{version++;listeners.forEach(listener=>listener());};
  const byKey=new Map(code.recordSets.map(set=>[set.key,set]));
+ /** Objects whose shown rows have record sets held for them (option groups of shown products). */
+ const shownObjects=[...new Set(code.recordSets.map(set=>set.parent?.key??'').filter(key=>key.startsWith(SHOWN_ROWS))
+  .map(key=>key.slice(SHOWN_ROWS.length)))];
+ /** Shown row Ids each such set was loaded for: a tap on another row asks the server. */
+ const shownCoverage=new Map<string,ReadonlySet<string>>();
+ const shownNow=()=>Object.fromEntries(shownObjects.map(object=>[object,(host.shownRows?.(object)??[]).slice(0,500)]));
+ let shownReload:ReturnType<typeof setTimeout>|undefined;
  /** Server totals for display formulas over rows not held: key -> value. */
  const aggregates=new Map<string,unknown>();
  const asked=new Map<string,{kind:string;object:string;field:string;criteria:Criteria}>();
@@ -249,7 +260,11 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(!held?.complete)continue;
     const needs=set.criteria(this);
     if(!needs.every(([field,value])=>criteria.some(([f,v])=>f===field&&same(v,value))))continue;
-    if(set.parent){
+    if(set.parent?.key.startsWith(SHOWN_ROWS)){
+     // Held for the rows the page showed when loaded: another row (new category) is read again.
+     const wanted=criteria.find(([field])=>field===set.parent!.field);
+     if(!wanted||!shownCoverage.get(set.key)?.has(String(wanted[1]??''))){api.shownChanged();continue;}
+    }else if(set.parent){
      const parentIds=new Set(this.rows(byKey.get(set.parent.key)!.object,byKey.get(set.parent.key)!.criteria(this))
       .map(row=>String(row.Id??'')));
      const wanted=criteria.find(([field])=>field===set.parent!.field);
@@ -350,6 +365,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   void loadDeviceTill(host.request);
  }
  const requestFor=(ev:Row,rowObject:string)=>({sessionId:host.sessionId(),state:host.state(),rowObject,
+  ...(shownObjects.length?{shown:shownNow()}:{}),
   ...(usesDevice?{deviceKey:tillDeviceKey(),...(openerMirrorKey()?{mirrorKey:openerMirrorKey()}:{})}:{}),
   event:{recordId:ev.recordId,value:ev.value,index:ev.index,label:ev.label},
   timeZone:typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:undefined});
@@ -396,21 +412,72 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   /** Load every record set for the current state (one request). */
   async loadSets(rowObject=''){
    if(!code.recordSets.length)return;
-   const answer=await post<{ok:boolean;sets:ServerResult['sets']}>('/page-code/sets',{...host.build,request:requestFor({},rowObject)});
-   for(const [key,value] of Object.entries(answer.sets??{}))sets.set(key,value);
+   const request=requestFor({},rowObject);
+   const answer=await post<{ok:boolean;sets:ServerResult['sets']}>('/page-code/sets',{...host.build,request});
+   for(const [key,value] of Object.entries(answer.sets??{})){
+    sets.set(key,value);
+    const parent=byKey.get(key)?.parent?.key;
+    if(parent?.startsWith(SHOWN_ROWS))shownCoverage.set(key,new Set(request.shown?.[parent.slice(SHOWN_ROWS.length)]??[]));
+   }
    changed();
+  },
+  /** Objects whose shown rows the held sets follow (the page reloads them when those rows change). */
+  shownObjects,
+  /** The shown rows changed (another category, a search): read their held rows again, once. */
+  shownChanged(){
+   if(!shownObjects.length||shownReload)return;
+   shownReload=setTimeout(()=>{
+    shownReload=undefined;
+    const now=shownNow();
+    const same=code.recordSets.every(set=>{
+     const parent=set.parent?.key;
+     if(!parent?.startsWith(SHOWN_ROWS))return true;
+     const ids=now[parent.slice(SHOWN_ROWS.length)]??[],had=shownCoverage.get(set.key);
+     return Boolean(had)&&ids.every(id=>had!.has(id));
+    });
+    if(!same)void api.loadSets().catch(()=>undefined);
+   },120);
   },
   setsFor:(key:string)=>sets.get(key),
   /** Re-read the server totals on screen without blanking them (live customer display). */
   refreshTotals:()=>refreshTotals(),
   /** Someone saved records of these Objects (a live change): re-read the totals and
    * record sets over them, keeping what is on screen until the new values arrive. */
-  async liveChanged(objects:readonly string[]){
+  async liveChanged(objects:readonly string[],withoutRows:readonly string[]=objects){
    const names=new Set(objects.map(name=>name.toLowerCase()));
+   // Held rows were patched from the change itself (applyLiveRows); only changes that
+   // came without rows (bulk saves) read the held sets again.
+   const reread=new Set(withoutRows.map(name=>name.toLowerCase()));
    await Promise.all([
     refreshTotals(names),
-    code.recordSets.some(set=>names.has(String(set.object).toLowerCase()))?this.loadSets():Promise.resolve()
+    code.recordSets.some(set=>reread.has(String(set.object).toLowerCase()))?this.loadSets():Promise.resolve()
    ]);
+  },
+  /** Saved rows pushed live: update the held rows in place (totals over them redraw at once). */
+  applyLiveRows(object:string,rows:ReadonlyArray<Row>,gone:readonly string[]=[]){
+   const name=object.toLowerCase();
+   const removed=new Set(gone);
+   let any=false;
+   const scope=new Scope('display');
+   for(const set of code.recordSets){
+    if(String(set.object).toLowerCase()!==name)continue;
+    const held=sets.get(set.key);
+    if(!held)continue;
+    let criteria:Criteria;
+    try{criteria=set.criteria(scope);}catch{continue;}
+    const parentIds=set.parent?.key.startsWith(SHOWN_ROWS)?shownCoverage.get(set.key)
+     :set.parent?new Set((sets.get(set.parent.key)?.rows??[]).map(row=>String(row.Id??''))):null;
+    const belongs=(row:Row)=>rowMatches(row,criteria)&&(!set.parent||Boolean(parentIds?.has(String(row[set.parent.field]??''))));
+    const byId=new Map(held.rows.map(row=>[String(row.Id??''),row]));
+    for(const id of removed)if(byId.delete(id))any=true;
+    for(const row of rows){
+     const id=String(row.Id??'');
+     if(belongs(row)){byId.set(id,{...byId.get(id),...row});any=true;}
+     else if(byId.delete(id))any=true;
+    }
+    sets.set(set.key,{...held,rows:[...byId.values()]});
+   }
+   if(any)changed();
   },
   /** The page reads @ThisPage.Device.MirrorKey: it shows another screen's sale. */
   readsMirror:Object.values(code.sources).some(source=>/@ThisPage\.Device\.MirrorKey/i.test(String(source))),

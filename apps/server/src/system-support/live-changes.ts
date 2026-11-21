@@ -1,6 +1,7 @@
 import type {Express,NextFunction,Request,Response} from 'express';
 import type {PoolClient} from 'pg';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
+import type {RecordEngine} from '../system-files/record-engine.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 
 /**
@@ -8,8 +9,9 @@ import type {SqlPersistence} from '../system-files/sql-persistence.js';
  * events). The database tells this server the moment a record is saved (a trigger on
  * md_records NOTIFYs at commit, whatever wrote it: a page, a Flow, an import, the API),
  * and the server passes the Object and record Ids on to the screens of that tenant that
- * may read the Object. Screens then re-read only what they show, through the normal
- * permission-checked record API, so no record data travels on the stream.
+ * may read the Object, WITH the saved rows: each user's rows are read as that user
+ * (record sharing and field permissions apply), so a screen draws the change at once
+ * without asking again. Deletes send Ids only; very large saves send Ids for a re-read.
  * Paired screens also hear when the device they follow changes sale or layer.
  */
 export const LIVE_CHANGES_DDL=`
@@ -46,6 +48,15 @@ CREATE TRIGGER md_live_screen_device AFTER INSERT OR UPDATE OF session_key,page_
 type Actor={tenant_id:string;user_id:string};
 export type LiveMessage={k:'record';t:string;o:string;n:number;ids:string[];op:string}|{k:'screen';t:string;d:string};
 type Subscriber={userId:string;send:(event:string,data:unknown)=>void;readable:Map<string,{ok:boolean;at:number}>};
+type Row=Record<string,unknown>;
+/** Reads saved rows as one user (the normal record API: sharing and field permissions). */
+export type LiveRowReader=(tenant:string,user:string,object:string,ids:readonly string[])=>Promise<Row[]>;
+export function recordRowReader(records:Pick<RecordEngine,'list'>):LiveRowReader{
+ return async(tenant,user,object,ids)=>{
+  const page=await records.list(tenant,user,object,ids.length,0,{filters:[{field:'Id',operator:'in',value:[...ids]}]}) as {records:Row[]};
+  return page.records;
+ };
+}
 
 const READ_CACHE_MS=60_000;
 const HEARTBEAT_MS=20_000;
@@ -55,7 +66,8 @@ export class LiveChangeHub{
  private readonly tenants=new Map<string,Set<Subscriber>>();
  private listener:PoolClient|null=null;
  private stopped=false;
- constructor(private readonly db:SqlPersistence,private readonly rbac:Pick<RbacEngine,'allowed'>){}
+ constructor(private readonly db:SqlPersistence,private readonly rbac:Pick<RbacEngine,'allowed'>,
+  private readonly readRows?:LiveRowReader){}
 
  /** Listen to the database; reconnects by itself if the connection drops. */
  async start():Promise<void>{
@@ -112,8 +124,20 @@ export class LiveChangeHub{
    return;
   }
   const change={object:message.o,ids:message.ids??[],count:message.n,operation:message.op};
-  for(const subscriber of subscribers)void this.canRead(message.t,subscriber,message.o)
-   .then(ok=>{if(ok)subscriber.send('change',change);}).catch(()=>undefined);
+  // Rows go with the change when every saved row is named (not a bulk save) and it is not a delete.
+  const withRows=Boolean(this.readRows)&&change.operation!=='delete'&&change.ids.length>0&&change.count<=change.ids.length;
+  const byUser=new Map<string,Subscriber[]>();
+  for(const subscriber of subscribers)byUser.set(subscriber.userId,[...byUser.get(subscriber.userId)??[],subscriber]);
+  for(const [user,list] of byUser)void this.sendTo(message.t,user,list,change,withRows).catch(()=>undefined);
+ }
+ /** One read per user (not per screen): the user's own view of the saved rows. */
+ private async sendTo(tenant:string,user:string,list:Subscriber[],change:{object:string;ids:string[];count:number;operation:string},withRows:boolean){
+  if(!await this.canRead(tenant,list[0],change.object))return;
+  let rows:Row[]|undefined;
+  if(withRows){
+   try{rows=await this.readRows!(tenant,user,change.object,change.ids);}catch{rows=undefined;}
+  }
+  for(const subscriber of list)subscriber.send('change',rows?{...change,rows}:change);
  }
  private async canRead(tenant:string,subscriber:Subscriber,object:string):Promise<boolean>{
   const cached=subscriber.readable.get(object);

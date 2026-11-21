@@ -128,7 +128,10 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    :script?.previewId?'/pages/'+encodeURIComponent(compiled.apiName):'';
   const code=script?.code&&endpoint?createPageCodeRuntime(script.code,{request,endpoint,
    build:script.app?{buildId:script.app.buildId}:{previewId:script.previewId},
-   sessionId:()=>sessionId,state:store.get}):null;
+   sessionId:()=>sessionId,state:store.get,
+   // Rows of an Object the page shows now (a product grid): held rows follow them.
+   shownRows:object=>[...new Set(compiled.dataSources.filter(source=>source.objectApiName===object)
+    .flatMap(source=>data.get(source.id).records.map(row=>String(row.Id??''))).filter(Boolean))]}):null;
   const stateNames=new Map([...componentInstanceNames(components)].map(([id,name])=>[id,componentStateName(name)]));
   const typing=new Map<string,number>();
   const publish=(name:string,value:ComponentState)=>{
@@ -235,6 +238,11 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
   void ensureTenantBrand();
   // Rows for instant taps and totals: one request with the first data.
   void runtime.code?.loadSets().catch(error=>console.warn('[PageCode] record sets:',error instanceof Error?error.message:error));
+  // Held rows for the rows the page shows (option groups of the products on screen)
+  // follow those rows: a new category or search reads them again.
+  const unsubscribeShown=(runtime.code?.shownObjects??[]).flatMap(object=>runtime.compiled.dataSources
+   .filter(source=>source.objectApiName===object)
+   .map(source=>runtime.data.subscribe(source.id,()=>runtime.code?.shownChanged())));
   // A state value the held rows depend on ($state.x in their criteria) reloads them.
   const setStateKeys=new Set((runtime.code?.code.recordSets??[]).flatMap(set=>
    [...String(set.criteria).matchAll(/\$\.state\("([A-Za-z0-9_]+)"\)/g)].map(match=>match[1].toLowerCase())));
@@ -310,8 +318,18 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    liveTimer=null;
    const changes=[...liveChanges.values()];liveChanges.clear();
    if(!changes.length)return;
-   for(const change of changes)void runtime.data.live(change).catch(()=>undefined);
-   void runtime.code?.liveChanged(changes.map(change=>change.object)).catch(()=>undefined);
+   for(const change of changes){
+    if(change.rows){
+     // The rows came with the change: patch what is on screen, no second request.
+     const seen=new Set(change.rows.map(row=>String(row.Id??'')));
+     const recordChanges=[...change.rows.map(record=>({objectApiName:change.object,
+      operation:(change.operation==='insert'?'create':'update') as 'create'|'update',record})),
+      ...change.ids.filter(id=>!seen.has(id)).map(id=>({objectApiName:change.object,operation:'delete' as const,record:{Id:id}}))];
+     void runtime.data.saved({pageSessionKey:runtime.pageSessionKey,objectApiNames:[change.object],recordChanges}).catch(()=>undefined);
+     runtime.code?.applyLiveRows(change.object,change.rows,change.ids.filter(id=>!seen.has(id)));
+    }else void runtime.data.live(change).catch(()=>undefined);
+   }
+   void runtime.code?.liveChanged(changes.map(change=>change.object),changes.filter(change=>!change.rows).map(change=>change.object)).catch(()=>undefined);
   };
   const stopLive=subscribeLiveChanges(event=>{
    if(event.kind==='resync'){
@@ -324,13 +342,17 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    // Changes to one Object within a moment are merged (one read for a line and its cart).
    const key=event.change.object.toLowerCase();
    const before=liveChanges.get(key);
+   const rows=before?.rows&&event.change.rows
+    ?[...new Map([...before.rows,...event.change.rows].map(row=>[String(row.Id??''),row])).values()]:undefined;
    liveChanges.set(key,before?{object:before.object,ids:[...new Set([...before.ids,...event.change.ids])],
-    count:before.count+event.change.count,operation:before.operation===event.change.operation?before.operation:'insert'}:event.change);
+    count:before.count+event.change.count,operation:before.operation===event.change.operation?before.operation:'insert',
+    ...(rows?{rows}:{})}:event.change);
    // Several saves at once (a line and its cart) are read in one go.
    liveTimer??=setTimeout(flushLive,30);
   });
   return ()=>{
    stopLive();if(liveTimer)clearTimeout(liveTimer);
+   unsubscribeShown.forEach(stop=>stop());
    stopMirror();unsubscribeSale();
    unsubscribeState?.();
    window.removeEventListener('metadrive:page-local-state',onState);

@@ -603,7 +603,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      ('customButton1Bold','Custom 1 bold','Button','customButton3Bold',false,10),
      ('customButton2Bold','Custom 2 bold','Button 2','customButton3Bold',false,11),
      ('supportingRadius','Supporting radius','Header Supporting','rowSupportingRadius',true,12),
-     ('headerRadius','Header radius','Header','rowSupportingRadius',true,13)
+     ('headerRadius','Header radius','Header','rowSupportingRadius',true,13),
+     ('footerWidth','Footer width','Footer','footerHeight',false,14)
     ), missing AS (
       SELECT specs.* FROM specs WHERE NOT EXISTS(
         SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key)
@@ -648,7 +649,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      ('smart_card_grid','Header Supporting','fill','supportingBackgroundColor'),
      ('smart_card_grid','Header Supporting','border','supportingBorderColor'),
      ('smart_card_grid','Footer','fill','footerBackgroundColor'),('smart_card_grid','Footer','border','footerBorderColor'),
-     ('smart_card_grid','Footer','height','footerHeight'),('smart_card_grid','Footer','alignment','footerAlignment'),
+     ('smart_card_grid','Footer','height','footerHeight'),('smart_card_grid','Footer','width','footerWidth'),
+     ('smart_card_grid','Footer','alignment','footerAlignment'),
      ('smart_numpad','Button 2','bold','customButton1Bold'),('smart_numpad','Button 3','bold','customButton2Bold'),
      ('smart_textbox','Header Supporting','fill','supportingBackgroundColor'),
      ('smart_textbox','Header Supporting','height','supportingBoxHeight'),

@@ -1,5 +1,6 @@
 import {runComponentFormula} from "../shared/formulaCodeLookup.js";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
+import {smartCustomButtonAppearance} from "../smart/shared/SmartCustomButtonAppearance.js";
 
 /** Smart Paired Screens: the screens (customer displays, kitchen or order-status screens)
  * paired with this device, for ANY app's settings page. "+ Add display" pairs a screen that
@@ -62,11 +63,18 @@ export default function SmartComponent(p){
   void act(()=>ask("add",{code,name,page}),()=>{setAdding(false);setCode("");setName("");setMessage("Paired. The screen opens in a moment.");});
  };
  const title=typeof p.label==="string"&&p.label?p.label:"Screens";
+ // The buttons keep their trusted pairing handlers; their design areas and
+ // appearance are independent metadata targets in Page Builder.
+ const button=(which,area)=>({
+  "data-design-area":preview?area:undefined,
+  title:which+" — built-in paired-screen action",
+  style:smartCustomButtonAppearance(p,"paired"+which)
+ });
  return <section className="smart-paired-screens" aria-label={title}
   style={{background:p.backgroundColor,color:p.labelColor,borderRadius:p.radius,border:p.borderColor?"1px solid "+p.borderColor:undefined}}>
   <header>
    <h3 style={{color:p.headerTextColor,fontSize:p.headerTextSize}}>{title}</h3>
-   {!adding&&<button type="button" className="sps-add" onClick={()=>{setAdding(true);setMessage("");}}>+ Add display</button>}
+   {!adding&&<button type="button" className="sps-add" {...button("Add","Button")} onClick={()=>{setAdding(true);setMessage("");}}>+ Add display</button>}
   </header>
   {adding&&<div className="sps-form">
    <p className="sps-help">On the screen open <strong>{typeof window!=="undefined"?window.location.host:""}/display</strong>, then type the code it shows.</p>
@@ -76,8 +84,8 @@ export default function SmartComponent(p){
    <input className="sps-name" maxLength={60} aria-label="Screen name (optional)" placeholder="Name, e.g. Counter"
     value={name} onChange={event=>setName(event.target.value)} onKeyDown={event=>{if(event.key==="Enter")pair();}}/>
    <div className="sps-actions">
-    <button type="button" onClick={()=>{setAdding(false);setCode("");setName("");setMessage("");}}>Cancel</button>
-    <button type="button" className="sps-primary" disabled={busy} onClick={pair}>Pair</button>
+    <button type="button" {...button("Cancel","Button 5")} onClick={()=>{setAdding(false);setCode("");setName("");setMessage("");}}>Cancel</button>
+    <button type="button" {...button("Pair","Button 2")} className="sps-primary" disabled={busy} onClick={pair}>Pair</button>
    </div>
   </div>}
   <label className="sps-auto">
@@ -98,9 +106,9 @@ export default function SmartComponent(p){
      :<span className="sps-name-text">{screen.name}</span>}
     <span className="sps-status">{screen.online?"Online":ago(screen.lastSeenAt)}</span>
     {renaming===screen.id
-     ?<button type="button" onClick={()=>void act(()=>ask("rename",{id:screen.id,name:newName}),()=>setRenaming(""))}>Save</button>
-     :<button type="button" onClick={()=>{setRenaming(screen.id);setNewName(screen.name);}}>Rename</button>}
-    <button type="button" className="sps-danger" disabled={busy}
+     ?<button type="button" {...button("Rename","Button 3")} onClick={()=>void act(()=>ask("rename",{id:screen.id,name:newName}),()=>setRenaming(""))}>Save</button>
+     :<button type="button" {...button("Rename","Button 3")} onClick={()=>{setRenaming(screen.id);setNewName(screen.name);}}>Rename</button>}
+    <button type="button" {...button("Unpair","Button 4")} className="sps-danger" disabled={busy}
      onClick={()=>void act(()=>ask("revoke",{id:screen.id}),()=>setMessage(screen.name+" unpaired."))}>Unpair</button>
    </li>)}
   </ul>

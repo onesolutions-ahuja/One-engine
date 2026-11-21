@@ -54,7 +54,7 @@ export async function applySmartPairedScreens(client:Query){
    (property_key,label,tab,section_group,control_kind,sort_order,default_value,min_value,max_value,
     field_select,choices,scope,design_row,design_width,design_height,design_order,
     design_caption,design_caption_width,design_display,enabled_when)
-  SELECT m.property_key,m.label,'Design2',m.area,t.control_kind,tail.n+m.ordinal,
+  SELECT m.property_key,m.label,'Design2',m.area,t.control_kind,tail.n+m.ordinal::integer,
    NULL,t.min_value,t.max_value,t.field_select,t.choices,t.scope,
    t.design_row,t.design_width,t.design_height,t.design_order,
    t.design_caption,t.design_caption_width,t.design_display,t.enabled_when

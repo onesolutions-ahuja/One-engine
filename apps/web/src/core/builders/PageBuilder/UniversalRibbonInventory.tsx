@@ -137,7 +137,9 @@ function PropertyEditor({definition,enabled,reviewOnly=false,properties,onChange
  else if(definition.kind==='NUMBER'||definition.kind==='CURRENCY'){
    const field=<BuilderNumberInput {...props} key={key}
      min={definition.min} max={definition.max}
-     value={typeof value==='number'?value:''} onValueChange={update}/>;
+     value={typeof value==='number'?value:
+      typeof value==='string'&&value.trim()!==''&&Number.isFinite(Number(value))?Number(value):''}
+      onValueChange={update}/>;
    editor=unit?<span className="smart-unit-field" data-unit={unit}>{field}</span>:field;
  }
  else if(definition.kind==='IMAGE')editor=<><button type="button" disabled={!enabled} title={tip} onClick={()=>setMediaOpen(true)}>Choose / Upload</button>

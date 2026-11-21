@@ -10,7 +10,11 @@
 export type LiveChange={object:string;ids:readonly string[];count:number;operation:string;rows?:ReadonlyArray<Record<string,unknown>>};
 /** A page layout was saved (draft) or published, by anyone (Page Builder co-design). */
 export type LivePage={page:string;variant:string;draft:number|null;published:number|null};
-export type LiveEvent={kind:'change';change:LiveChange}|{kind:'screen';device:string}|{kind:'page';page:LivePage}|{kind:'resync'};
+/** Another designer's live edit or presence on a page layout (Page Builder co-editing). */
+export type LivePageEdit={page:string;variant:string;clientId:string;name:string;selection:string[];
+ ops:{upsert:Array<{id:string}&Record<string,unknown>>;remove:string[]}};
+export type LiveEvent={kind:'change';change:LiveChange}|{kind:'screen';device:string}|{kind:'page';page:LivePage}
+ |{kind:'page-edit';edit:LivePageEdit}|{kind:'resync'};
 type Listener=(event:LiveEvent)=>void;
 
 const listeners=new Set<Listener>();
@@ -55,6 +59,13 @@ export class LiveFrameParser{
    if(name==='ready')this.push({kind:'ready'});
    else if(name==='resync')this.push({kind:'resync'});
    else if(name==='screen'&&typeof data.device==='string')this.push({kind:'screen',device:data.device});
+   else if(name==='page-edit'&&typeof data.page==='string'&&typeof data.clientId==='string'){
+    const ops=(data.ops??{}) as {upsert?:unknown;remove?:unknown};
+    this.push({kind:'page-edit',edit:{page:data.page,variant:String(data.variant??''),clientId:data.clientId,name:String(data.name??''),
+     selection:Array.isArray(data.selection)?data.selection.filter((id):id is string=>typeof id==='string'):[],
+     ops:{upsert:Array.isArray(ops.upsert)?ops.upsert.filter((item):item is {id:string}=>Boolean(item)&&typeof (item as {id?:unknown}).id==='string'):[],
+      remove:Array.isArray(ops.remove)?ops.remove.filter((id):id is string=>typeof id==='string'):[]}}});
+   }
    else if(name==='page'&&typeof data.page==='string')this.push({kind:'page',page:{page:data.page,variant:String(data.variant??''),
     draft:typeof data.draft==='number'?data.draft:null,published:typeof data.published==='number'?data.published:null}});
    else if(name==='change'&&typeof data.object==='string')this.push({kind:'change',change:{

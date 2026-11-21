@@ -122,6 +122,17 @@ export class LiveChangeHub{
   subscribers.add(subscriber);this.tenants.set(actor.tenant_id,subscribers);
   return ()=>{subscribers.delete(subscriber);if(!subscribers.size)this.tenants.delete(actor.tenant_id);};
  }
+ /** Page Builder co-editing: pass a designer's live edits (or presence) to the tenant's
+  * other designers who may read pages. Not stored: Save stores. */
+ async pageEdit(actor:Actor,edit:Record<string,unknown>):Promise<number>{
+  const subscribers=this.tenants.get(actor.tenant_id);
+  if(!subscribers?.size)return 0;
+  let sent=0;
+  await Promise.all([...subscribers].map(async subscriber=>{
+   if(await this.canRead(actor.tenant_id,subscriber,'PageDefinition')){subscriber.send('page-edit',edit);sent++;}
+  }));
+  return sent;
+ }
  /** How many screens are connected now (diagnostics and tests). */
  count(tenant?:string):number{
   return tenant?this.tenants.get(tenant)?.size??0:[...this.tenants.values()].reduce((total,set)=>total+set.size,0);
@@ -167,7 +178,35 @@ export class LiveChangeHub{
  }
 }
 
-export function registerLiveChangeRoutes(app:Express,hub:LiveChangeHub){
+const pageName=/^[A-Za-z][A-Za-z0-9_]{0,79}$/,clientPattern=/^[A-Za-z0-9-]{8,64}$/;
+/** A designer's live edit, checked: page, layout, client, at most 200 components and 500 removals. */
+export function readPageEdit(body:unknown):Record<string,unknown>{
+ const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
+ if(typeof raw.page!=='string'||!pageName.test(raw.page))throw Error('Choose the page');
+ if(!['Mobile','Desktop','Tablet','Custom'].includes(String(raw.variant)))throw Error('Choose the layout');
+ if(typeof raw.clientId!=='string'||!clientPattern.test(raw.clientId))throw Error('Invalid editor');
+ const ops=(raw.ops&&typeof raw.ops==='object'&&!Array.isArray(raw.ops)?raw.ops:{}) as Record<string,unknown>;
+ const upsert=Array.isArray(ops.upsert)?ops.upsert:[];
+ const remove=Array.isArray(ops.remove)?ops.remove:[];
+ if(upsert.length>200||remove.length>500||upsert.some(item=>!item||typeof item!=='object'||typeof (item as {id?:unknown}).id!=='string')
+  ||remove.some(id=>typeof id!=='string'))throw Error('Invalid page edit');
+ const selection=Array.isArray(raw.selection)?raw.selection.filter((id):id is string=>typeof id==='string').slice(0,50):[];
+ return {page:raw.page,variant:raw.variant,clientId:raw.clientId,ops:{upsert,remove},selection};
+}
+
+export function registerLiveChangeRoutes(app:Express,hub:LiveChangeHub,rbac?:Pick<RbacEngine,'require'>,
+ nameOf?:(actor:Actor)=>Promise<string>){
+ // Page Builder co-editing: live edits and presence between designers (not saved).
+ app.post('/api/page-edits',(req:Request,res:Response,next:NextFunction)=>{
+  const actor=(req as Request&{actor?:Actor}).actor;
+  void (async()=>{
+   if(!actor?.tenant_id||!actor.user_id)throw Object.assign(Error('Authenticated tenant required'),{status:401});
+   await rbac?.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+   const edit=readPageEdit(req.body);
+   const name=nameOf?await nameOf(actor).catch(()=>''):'';
+   res.json({sent:await hub.pageEdit(actor,{...edit,user:actor.user_id,name})});
+  })().catch(next);
+ });
  app.get('/api/live-changes',(req:Request,res:Response,next:NextFunction)=>{
   const actor=(req as Request&{actor?:Actor}).actor;
   if(!actor?.tenant_id||!actor.user_id){next(Object.assign(Error('Authenticated tenant required'),{status:401}));return;}

@@ -3087,7 +3087,10 @@ export function createSystemServer(db:SqlPersistence) {
   registerPlatformEventStreamRoutes(app,db,rbac);
   // One live stream per open page: saved records reach other screens at once.
   const liveChanges=new LiveChangeHub(db,rbac,recordRowReader(records));
-  registerLiveChangeRoutes(app,liveChanges);
+  registerLiveChangeRoutes(app,liveChanges,rbac,async actor=>{
+    const {rows}=await db.query<{name:string}>(`SELECT COALESCE(NULLIF(display_name,''),email,'') AS name FROM md_users WHERE id=$1 AND tenant_id=$2`,[actor.user_id,actor.tenant_id]);
+    return rows[0]?.name??'';
+  });
   registerBusinessContextRoutes(app,db,rbac,records);
   registerOutboundWebhookRoutes(app,db,rbac);
   registerDockerMailAdminRoutes(app,db,rbac,adminMailAccess,platformTenants);

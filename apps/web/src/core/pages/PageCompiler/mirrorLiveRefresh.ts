@@ -90,9 +90,13 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
  if(!display)return ()=>undefined;
  const mirrored=mirrorSources(sources,true);
  let busy=false,stopped=false;
+ let last=0;
  const refresh=async()=>{
   // One read at a time: a slow network never piles requests up behind each other.
   if(stopped||busy||!clock.visible())return;
+  // Only a read that really ran counts for the live safety net (a hidden tab's skipped
+  // ticks must not delay the read once it is shown).
+  last=Date.now();
   busy=true;
   try{
    await target.followSale?.().catch(()=>undefined);
@@ -103,8 +107,7 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
    ]);
   }finally{busy=false;}
  };
- let last=0;
- const tick=()=>{last=Date.now();void refresh();};
+ const tick=()=>{void refresh();};
  // With the live stream up, the Till's changes arrive by themselves: the timer is only a
  // slow safety net. Without it (offline, a proxy that blocks streams) it checks every 2 s.
  const timed=()=>{if(target.isLive?.()&&Date.now()-last<LIVE_FALLBACK_MS)return;tick();};

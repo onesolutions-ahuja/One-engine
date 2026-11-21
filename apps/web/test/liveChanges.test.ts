@@ -108,3 +108,17 @@ test('a saved or published page layout reaches the Page Builders that may read p
  new LiveFrameParser(event=>events.push(event)).append('event: page\ndata: {"page":"p","variant":"Custom","draft":3,"published":null}\n\n');
  assert.deepEqual(events,[{kind:'page',page:{page:'p',variant:'Custom',draft:3,published:null}}]);
 });
+
+test('a display that was hidden reads at once when shown, even with the live stream up',async()=>{
+ let tick:()=>void=()=>{};
+ let visible=false;
+ const clock={setInterval:(run:()=>void)=>{tick=run;return 1;},clearInterval:()=>{},visible:()=>visible,listen:()=>()=>undefined};
+ const source={id:'CartLine#d',objectApiName:'CartLine',components:[],scope:{kind:'none'},complete:false,filters:null,
+  filterLogic:'AND',filterFormula:'@CartLine.DeviceKey = @ThisPage.Device.MirrorKey',stateInputs:[]} as never;
+ let reads=0;
+ startMirrorLiveRefresh([source],true,{reload:async()=>{reads++;},isLive:()=>true,subscribeLive:()=>()=>undefined},clock);
+ tick();tick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,0,'hidden: nothing read');
+ visible=true;tick();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(reads,1,'shown: read at once (skipped hidden ticks do not count)');
+});

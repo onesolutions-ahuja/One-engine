@@ -136,8 +136,14 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  /** Read the totals already shown again, keeping the old values on screen until the new
   * ones arrive (a customer display: the Till changes the rows, not this page). */
  let refreshingTotals=false;
- const refreshTotals=async(objects?:ReadonlySet<string>)=>{
-  if(refreshingTotals||!aggregates.size)return;
+ /** Asked again while a read was running (a second save landed meanwhile): read once more after it. */
+ let totalsAgain:Set<string>|'all'|null=null;
+ const refreshTotals=async(objects?:ReadonlySet<string>):Promise<void>=>{
+  if(!aggregates.size)return;
+  if(refreshingTotals){
+   totalsAgain=!objects||totalsAgain==='all'?'all':new Set([...(totalsAgain??[]),...objects]);
+   return;
+  }
   // Only the totals over these Objects (a live change), else all of them.
   const keys=[...aggregates.keys()].filter(key=>!objects||objects.has(String(JSON.parse(key)[1]).toLowerCase())).slice(0,100);
   if(!keys.length)return;
@@ -153,7 +159,11 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    });
    if(any)changed();
   }catch{/* keep the last totals; the next refresh tries again */}
-  finally{refreshingTotals=false;}
+  finally{
+   refreshingTotals=false;
+   const again=totalsAgain;totalsAgain=null;
+   if(again)void refreshTotals(again==='all'?undefined:again);
+  }
  };
  /** A save of these Objects: their server totals are read again. */
  const forgetAggregates=(objects:Iterable<string>)=>{

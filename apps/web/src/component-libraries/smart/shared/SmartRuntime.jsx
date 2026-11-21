@@ -379,8 +379,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        focusedText||p.footerTextColor||undefined,
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
-        ?number(p.footerTextSize,19,8,96):undefined,
-       whiteSpace:"nowrap"}}>{value}</strong>}
+        ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
     {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
       disabled={!onButtonClick} aria-label={buttonText}
       style={{

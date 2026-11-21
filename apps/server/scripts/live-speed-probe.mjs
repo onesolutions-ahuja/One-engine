@@ -3,6 +3,10 @@
 //    a rolled-back save and a screen presence ping announce nothing.
 // 2. Page open: the lists of a page read together (as POST /api/records-batch does) stay
 //    within BATCH_BUDGET_MS, and are not slower than reading them one after another.
+// 3. Live for everything, server half: a save reaches every open screen of one shared login
+//    (more than the old 20-stream cap) over the real GET /api/live-changes stream, WITH the
+//    saved rows, within LIVE_E2E_BUDGET_MS; a user without read access hears nothing; a
+//    closed screen is dropped at once.
 // Prints the numbers and fails past a budget.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -13,9 +17,14 @@ import {activateNativeObject} from '../src/system-support/native-object-storage.
 import {ObjectDefinitionService} from '../src/system-files/object-definition.ts';
 import {RecordEngine} from '../src/system-files/record-engine.ts';
 import {RbacEngine} from '../src/system-files/rbac-engine.ts';
+import express from 'express';
+import {once} from 'node:events';
+import {LiveChangeHub,recordRowReader,registerLiveChangeRoutes} from '../src/system-support/live-changes.ts';
 
 const LIVE_BUDGET_MS=Number(process.env.LIVE_BUDGET_MS??100);
 const BATCH_BUDGET_MS=Number(process.env.BATCH_BUDGET_MS??250);
+const LIVE_E2E_BUDGET_MS=Number(process.env.LIVE_E2E_BUDGET_MS??500);
+const SCREENS=Number(process.env.LIVE_SCREENS??40);
 const url=process.env.METADRIVE_SQL_TEST_DATABASE_URL;
 if(!url||new URL(url).pathname!=='/metadrive_native_copy_test')throw Error('Disposable SQL database required');
 const setup=new Pool({connectionString:url});
@@ -24,6 +33,7 @@ const isolated=new URL(url);isolated.searchParams.set('options','-c search_path=
 const db=new SqlPersistence(isolated.toString());
 const listener=new pg.Client({connectionString:isolated.toString()});
 const median=values=>[...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
+let hub=null,server=null;const streams=[];
 try{
  await db.query(readFileSync(new URL('../src/system-files/schema.sql',import.meta.url),'utf8'));
  await applySystemMigrations(db);
@@ -113,4 +123,76 @@ try{
  assert(batchMedian<=BATCH_BUDGET_MS,'page lists read together over budget: '+batchMedian.toFixed(1)+' ms');
  // Read together must not be slower than one after another (small margin for timer noise).
  assert(batchMedian<=sequentialMedian*1.2+5,'reading together is slower than one by one');
-}finally{await listener.end().catch(()=>undefined);await db.close();}
+
+ // 3. Live for everything, server half (real Express route, RBAC and row reads).
+ const blocked=(await db.query("INSERT INTO md_users(tenant_id,email,password_hash) VALUES($1,'blocked@example.invalid','fixture') RETURNING id",[tenant])).rows[0].id;
+ hub=new LiveChangeHub(db,new RbacEngine(db),recordRowReader(records));
+ const app=express();
+ app.use((req,_res,next)=>{req.actor={tenant_id:tenant,user_id:req.get('x-probe-user')==='blocked'?blocked:user};next();});
+ registerLiveChangeRoutes(app,hub);
+ app.use((error,_req,res,_next)=>{res.status(error.status??500).json({error:error.message});});
+ server=app.listen(0,'127.0.0.1');await once(server,'listening');
+ const base='http://127.0.0.1:'+server.address().port;
+ /** One screen: its stream, the events it got and when. */
+ const openScreen=async who=>{
+  const controller=new AbortController();
+  const response=await fetch(base+'/api/live-changes',{headers:{'x-probe-user':who},signal:controller.signal});
+  assert.equal(response.status,200,'a stream opens for screen '+streams.length);
+  const screen={who,controller,events:[],ready:false};
+  void (async()=>{
+   const reader=response.body.getReader(),decoder=new TextDecoder();let pending='';
+   try{for(;;){
+    const chunk=await reader.read();if(chunk.done)break;
+    pending+=decoder.decode(chunk.value,{stream:true});
+    for(let at=pending.indexOf('\n\n');at>=0;at=pending.indexOf('\n\n')){
+     const frame=pending.slice(0,at);pending=pending.slice(at+2);
+     const name=/^event: (.*)$/m.exec(frame)?.[1];const data=/^data: (.*)$/m.exec(frame)?.[1];
+     if(name==='ready')screen.ready=true;
+     else if(name)screen.events.push({at:performance.now(),name,data:JSON.parse(data??'{}')});
+    }
+   }}catch{/* aborted */}
+  })();
+  streams.push(screen);
+  return screen;
+ };
+ const until=async(test,ms)=>{const end=performance.now()+ms;while(performance.now()<end){if(test())return true;await new Promise(r=>setTimeout(r,2));}return test();};
+ const screens=[];
+ for(let index=0;index<SCREENS;index++)screens.push(await openScreen('shop'));
+ const outsider=await openScreen('blocked');
+ assert(await until(()=>streams.every(item=>item.ready),5000),'every screen is connected');
+ assert.equal(hub.count(tenant),SCREENS+1,SCREENS+' screens of one login are all served');
+ // The hub listens from the first screen; give LISTEN a moment.
+ await new Promise(r=>setTimeout(r,300));
+ const e2e=[];
+ for(let round=0;round<5;round++){
+  const sent=performance.now();
+  const id=await records.create(tenant,user,'LiveD',{Name:'Screen '+round,Amount:round});
+  const got=item=>item.events.find(event=>event.name==='change'&&event.data.ids?.includes(id));
+  assert(await until(()=>screens.every(got),LIVE_E2E_BUDGET_MS*4),'every screen hears the save');
+  for(const item of screens){
+   const event=got(item);
+   assert.equal(event.data.object,'LiveD');
+   assert.equal(event.data.rows?.[0]?.Name,'Screen '+round,'the saved row travels with the change');
+   e2e.push(event.at-sent);
+  }
+  // The same row again at once (quantity +1): every screen hears that too.
+  await records.update(tenant,user,'LiveD',id,{Amount:round+100});
+  assert(await until(()=>screens.every(item=>item.events.some(event=>event.name==='change'&&event.data.ids?.includes(id)
+   &&event.data.rows?.[0]?.Amount===round+100)),LIVE_E2E_BUDGET_MS*4),'a quick second change is heard');
+ }
+ assert.equal(outsider.events.filter(event=>event.name==='change').length,0,'no read access: nothing is sent');
+ const e2eMedian=median(e2e),e2eWorst=Math.max(...e2e);
+ console.info('live for everything: save -> '+SCREENS+' screens with rows, median '+e2eMedian.toFixed(1)+' ms, worst '
+  +e2eWorst.toFixed(1)+' ms (budget '+LIVE_E2E_BUDGET_MS+' ms)');
+ assert(e2eWorst<=LIVE_E2E_BUDGET_MS,'live change to screens over budget: '+e2eWorst.toFixed(1)+' ms');
+ // Closed screens are dropped at once, so their places are free for the windows that reconnect.
+ const closedAt=performance.now();
+ for(const item of screens.slice(0,SCREENS/2))item.controller.abort();
+ assert(await until(()=>hub.count(tenant)===SCREENS/2+1,1000),'closed screens are dropped: '+hub.count(tenant)+' left');
+ console.info('closed screens dropped in '+(performance.now()-closedAt).toFixed(1)+' ms');
+}finally{
+ for(const item of streams)item.controller.abort();
+ if(server){server.closeAllConnections?.();server.close();}
+ await hub?.stop().catch(()=>undefined);
+ await listener.end().catch(()=>undefined);await db.close();
+}

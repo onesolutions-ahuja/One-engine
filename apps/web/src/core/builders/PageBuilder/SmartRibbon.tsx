@@ -48,6 +48,22 @@ type Props={tab:BuilderTab;api:string;definitions:readonly BuilderRibbonProperty
  part?:'formulaBar'|'source'|'designTail';};
 const weekdays=[['sun','Sun'],['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat']] as const;
 const fallback=(value:unknown)=>typeof value==='string'?value:'';
+// The renderer may inherit an old summary value instead of storing a second
+// Footer key. Reflect that effective value without writing it into the page.
+function runtimeRibbonDefault(api:string,key:string,props:Readonly<Record<string,unknown>>):unknown{
+ const filled=(name:string)=>props[name]!==undefined&&props[name]!==null&&props[name]!=='';
+ if(api==='smart_cart'){
+  if(key==='footerTextSize')return filled('summary2TextSize')?props.summary2TextSize:18;
+  if(key==='footerTextColor')return filled('summary2TextColor')?props.summary2TextColor:'#1c3558';
+  if(key==='footerBold')return props.summary2TextWeight!==false;
+ }
+ if(api==='smart_table'){
+  if(key==='footerTextSize')return filled('summaryTextSize')?props.summaryTextSize:12;
+  if(key==='footerHeight')return filled('summaryHeight')?props.summaryHeight:36;
+  if(key==='footerWidth')return filled('summaryWidth')?props.summaryWidth:undefined;
+ }
+ return undefined;
+}
 const cartSummaryLabels:Record<string,{key:string;slot:string}>={
  subtotalValue:{key:'subtotalLabel',slot:'Summary 1'},
  totalValue:{key:'totalLabel',slot:'Summary 2'},
@@ -492,6 +508,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      ['smart_numpad','smart_keyboard','smart_dock'].includes(api)
        ?properties.numpadGap:undefined;
    const value=mixedPropertyIds?.includes(property.id)?'':properties[key]??legacyGap??
+    runtimeRibbonDefault(api,key,properties)??
     (property.id==='visualStyle'?'Classic':property.defaultsOverrides?.[api]??property.default??'');
    const write=(v:unknown)=>{
     if(!enabled)return;
@@ -620,6 +637,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
       property.id==='width'?<ArrowLeftRight size={15}/>:property.id==='height'?<ArrowUpDown size={15}/>:null}
      <BuilderNumberInput key={componentId+':'+property.id}
        className="smart-office-number" aria-label={title} disabled={!enabled}
+       placeholder={value===''&&['width','height','cardBodyWidth','cardBodyHeight','footerWidth','footerHeight','imageWidth'].includes(key)?'Auto':undefined}
        min={property.min??0} max={property.max} step={isTabIndex?1:undefined}
        integer={isTabIndex}
        value={kind==='position'&&useCanvasPosition?position?.[property.id as keyof Position]??'':

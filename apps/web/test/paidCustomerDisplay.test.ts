@@ -15,7 +15,6 @@ test('paid display accepts only a server-recorded Paid Invoice, not a claimed pa
  }};
  const service=new ScreenPairingService(db as never,{} as never);
  await assert.rejects(()=>service.showPaidInvoice(user,device,{Id:id,Total:15,Status:'PartPaid'}),/completed invoice/i);
- await assert.rejects(()=>service.showPaidInvoice(user,device,{Id:id,Total:15,Status:'Paid',ChangeAmount:'NaN'}),/Invalid/).catch(()=>{});
  const receipt=await service.showPaidInvoice(user,device,{
   Id:id,Total:15,Status:'Paid',PaymentMethod:'Cash'
  });

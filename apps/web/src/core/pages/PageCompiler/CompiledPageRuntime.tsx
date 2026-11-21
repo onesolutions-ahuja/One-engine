@@ -337,7 +337,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
      const recordChanges=[...change.rows.map(record=>({objectApiName:change.object,
       operation:(change.operation==='insert'?'create':'update') as 'create'|'update',record})),
       ...change.ids.filter(id=>!seen.has(id)).map(id=>({objectApiName:change.object,operation:'delete' as const,record:{Id:id}}))];
-     void runtime.data.saved({pageSessionKey:runtime.pageSessionKey,objectApiNames:[change.object],recordChanges}).catch(()=>undefined);
+     void runtime.data.saved({pageSessionKey:runtime.pageSessionKey,objectApiNames:[change.object],recordChanges,live:true}).catch(()=>undefined);
      runtime.code?.applyLiveRows(change.object,change.rows,change.ids.filter(id=>!seen.has(id)));
     }else void runtime.data.live(change).catch(()=>undefined);
    }

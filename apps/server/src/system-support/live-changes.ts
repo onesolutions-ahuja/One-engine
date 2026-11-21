@@ -75,7 +75,7 @@ export class LiveChangeHub{
     for(const subscribers of this.tenants.values())for(const subscriber of subscribers)subscriber.send('resync',{});
     if(!this.stopped)setTimeout(()=>void this.start(),2000);
    };
-   client.on('error',retry);
+   client.on('error',()=>retry());
    client.on('end',retry);
    await client.query('LISTEN md_live_changes');
   }catch(error){

@@ -52,6 +52,9 @@
 .smart-runtime.smart_navigation>.smart-navigation{width:100%;height:100%;min-height:0}
 .smart-runtime.smart_card_grid>.smart-grid{grid-auto-rows:minmax(0,1fr)}
 .smart-runtime.smart_card_grid .smart-card{min-height:0}
+/* Card overflow stays accessible, but repeated product cards do not show individual scrollbars. */
+.smart-runtime.smart_card_grid .smart-card{scrollbar-width:none}
+.smart-runtime.smart_card_grid .smart-card::-webkit-scrollbar{display:none;width:0;height:0}
 .smart-runtime.smart_tabs>.smart-tabs-shell{overflow:auto;min-height:0}
 .smart-runtime.smart_navigation>.smart-navigation{align-content:start}
 .smart-runtime.smart_toggle{padding:0;min-height:0}

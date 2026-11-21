@@ -263,6 +263,9 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const device=await pairingDevice(deps.records,actor,body.deviceKey);
   const invoice=await deps.records.get(actor.tenant_id,actor.user_id,'Invoice',
    String(body.invoiceId??'')) as Record<string,unknown>;
+  // A paid Invoice from another till must not replace this till's customer display.
+  if(invoice.TillId&&String(invoice.TillId)!==device.id)
+   throw Error('This Invoice belongs to a different till');
   res.json(await screens().showPaidInvoice(actor,device.deviceKey,invoice));
  }));
  // SCREEN(page, n): the screens following this device that show page switch to layer n.

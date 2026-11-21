@@ -19,6 +19,7 @@ import {isConnected} from '../../../../../server/src/expression-engine/FormulaCo
 import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
+import {startTap} from './pageTimings';
 import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,openerMirrorKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
 type Row=Record<string,unknown>;
@@ -76,6 +77,8 @@ export type PageCodeHost={
  sessionId():string;
  state():Readonly<Record<string,unknown>>;
  readComponent?(component:string,property:string):unknown;
+ /** Page name for speed timings (pageTimings.ts). */
+ page?:string;
  /** Ids of the rows of `object` the page shows now (record sets held for shown rows). */
  shownRows?(object:string):string[];
  /** Local copy of the held rows (localCopy.ts): drawn at page open while the server answers. */
@@ -520,6 +523,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    const record=(ev.record&&typeof ev.record==='object'?ev.record:ev) as Row;
    const event={...ev,record,recordId:ev.recordId??record.Id};
    const tap=new Scope('tap',event,record,batch);
+   const timing=startTap(host.page??'',key);
    let predicted=false;
    const before=new Map(sets);
    try{
@@ -534,6 +538,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     // Screen-only action (STATE, SCREEN, LOCKSCREEN): nothing to save.
     if(!predicted)throw Error('This action needs the server');
     io.show({changes:[],state:{...tap.stateChanges}});
+    timing.shown(true);
     release();
     await io.effects(tap.effects);
     return;
@@ -545,6 +550,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(predicted){
     applyOverlay(tap);changed();
     io.show({changes:tap.changes,state:{...tap.stateChanges},optimistic:batch});
+    timing.shown(true);
     if(early.length)void io.effects(early).catch(()=>undefined);
    }
    release();
@@ -573,6 +579,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    forgetAggregates(result.changes.map(change=>change.objectApiName));
    changed();
    io.show({changes:result.changes,state:result.state,replaces:predicted?batch:undefined});
+   timing.shown(false);timing.saved();
    // Skip the popups already opened from the prediction (same screen, same arguments).
    const opened=early.map(effect=>JSON.stringify(effect));
    await io.effects(result.effects.filter(effect=>{

@@ -28,13 +28,13 @@ test('customer display restores new session, then applies verified payment value
  let session='old',reset=false;const calls:string[]=[];
  await followMirroredSale({
   mirrorKey:device,openedWithSession:false,
-  request:(async()=>({sessionId:'new',layers:{smart_till_customer_display:1},
+  request:(async()=>({sessionId:'new',layers:{smart_till_customer_display:1},layerRevision:2,
    payment:{amount:15,method:'Cash',change:null,invoiceId:id}})) as never,
   sessionId:()=>session,
   resetSession:next=>{reset=true;session=next??'';calls.push('reset');},
-  onLayers:layers=>{calls.push('layer:'+layers.smart_till_customer_display);},
+  onLayers:(layers,revision)=>{calls.push('layer:'+layers.smart_till_customer_display+':'+revision);},
   onPayment:payment=>{calls.push('payment:'+payment?.amount);}
  });
  assert.equal(reset,true);
- assert.deepEqual(calls,['reset','layer:1','payment:15']);
+ assert.deepEqual(calls,['reset','layer:1:2','payment:15']);
 });

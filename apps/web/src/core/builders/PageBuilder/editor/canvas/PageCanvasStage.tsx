@@ -63,14 +63,9 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   const renderTopLevel = () => {
     const top = childrenOf(page.components, null);
     const render = (component: typeof top[number]) => renderPageComponent(component, page.components.findIndex((item) => item.id === component.id));
-    if (!designLayers) return top.map(render);
-    // Designing layer n: only its components, over layer 0 shown faded (not pickable).
-    const base = top.filter(component => componentLayer(component, page.components) === 0);
-    if (canvasLayer === 0) return base.map(render);
-    return <>
-      <div className="canvas-layer-base-faded" aria-hidden="true">{base.map(render)}</div>
-      {top.filter(component => componentLayer(component, page.components) === canvasLayer).map(render)}
-    </>;
+    if (page.layoutMode !== 'free-canvas') return top.map(render);
+    // Each layer is its own blank screen: design (and preview) only the open layer's components.
+    return top.filter(component => componentLayer(component, page.components) === canvasLayer).map(render);
   };
   const compiledPreview = useMemo(() => previewMode ? compilePageCached(page, objects, {strictLegacy:true}) : null, [previewMode, page, objects]);
   // Preview: the server converts the page exactly as shown (no Save needed) and Preview runs that file.

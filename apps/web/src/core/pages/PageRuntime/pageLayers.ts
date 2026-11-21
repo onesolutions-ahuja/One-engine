@@ -2,9 +2,10 @@ import {useEffect,useState} from 'react';
 import type {PageComponentMetadata} from '../../metadata/Definitions/metadata';
 
 /**
- * Page layers: every component sits on a numbered layer (property `pageLayer`, none = 0).
- * Layer 0 is the page itself and always shows. One other layer at a time shows on top of
- * it: the page opens on layer 0 unless asked for another, e.g. SCREEN(page, 3), the
+ * Page layers: one page (one API name) holds several screens, like the slides of a deck.
+ * Every component sits on a numbered layer (property `pageLayer`, none = 0), and each
+ * layer is its own blank canvas: exactly one layer shows at a time, never stacked on
+ * another. The page opens on layer 0 unless asked for another, e.g. SCREEN(page, 3), the
  * address ?layer=3, or SCREEN(page, 3) run on the page that is already open.
  * A nested component sits on its parent's layer.
  */
@@ -31,21 +32,16 @@ export function componentLayer(component:Item,components:readonly Item[]):number
  }
  return 0;
 }
-/** Layer 0 always shows; another layer only while it is the page's current layer. */
-export function layerShows(layer:number,current:number):boolean{return layer===0||layer===current;}
+/** Only the page's current layer shows: layers are separate screens, not overlays. */
+export function layerShows(layer:number,current:number):boolean{return layer===current;}
 /** The layers a page uses, in order, always with 0. */
 export function pageLayerNumbers(components:readonly Item[]):number[]{
  const used=new Set([0]);
  for(const item of components)used.add(componentLayer(item,components));
  return [...used].sort((a,b)=>a-b);
 }
-/** What a layer tab says besides its number: "Default" for 0, else its first component's name. */
-export function layerCaption(layer:number,components:readonly Item[]):string{
- if(layer===0)return 'Default';
- const first=components.find(item=>!parentOf(item)&&componentLayer(item,components)===layer);
- const name=first?.properties?.navigatorName;
- return typeof name==='string'?name:'';
-}
+/** What a layer tab says besides its number: "Default" for 0, else "Screen". */
+export function layerCaption(layer:number):string{return layer===0?'Default':'Screen';}
 const PENDING='md.page.layer:';
 /** SCREEN(page, n) that opens page here: the page starts on layer n. */
 export function rememberRequestedLayer(page:string,layer:number){

@@ -88,7 +88,8 @@ const initialsOf=name=>String(name??"").trim().split(/\s+/).filter(Boolean).slic
 function SmartPicture({src,alt,loadAsset,style,initials=false}){
  const source=useTenantImageSource(src,loadAsset);
  const [failed,setFailed]=React.useState(false);
- React.useEffect(()=>setFailed(false),[src]);
+ // A late-loaded asset changes the resolved URL without changing its original asset: key.
+ React.useEffect(()=>setFailed(false),[src,source]);
  // No picture (none set, or it failed to load): the same grey stripes the Page Builder
  // shows, so an empty image area reads as "no image" instead of a blank box.
  return source&&!failed?<img src={source} alt={alt} style={style} onError={()=>setFailed(true)}/>

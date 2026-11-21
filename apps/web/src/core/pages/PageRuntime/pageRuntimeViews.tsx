@@ -1411,6 +1411,11 @@ function LightningAppRuntime({
             onNavigate={onNavigate} onLaunchFlow={onLaunchFlow} />
         : <PageCodeFormulas key={component.id} componentId={component.id}>{(formulaCode,given)=><RegisteredComponent definition={definition} layoutTransparent props={{
             ...component.properties, pageState:layoutState,
+            // A static asset: image does not need the metadata-query runtime,
+            // but published Smart Image, Card and Cart STILL need the same
+            // tenant-authenticated media loader as Builder and compiled pages.
+            loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(
+              apiRequest,id,getAccessToken()??''),
             ...(formulaCode?{__formulaCode:formulaCode}:{}),
             ...componentLayoutProps(component.properties, layoutDevice),
             ...(definition.apiName.startsWith('smart_') && component.position

@@ -37,12 +37,15 @@ export function openedWithScreenSession():boolean{
 /** One step of following: ask the server which sale the mirrored till is on and move to it.
  * The till may be THIS device (a second monitor on the same computer): it still follows. */
 export async function followMirroredSale(deps:{mirrorKey:string;openedWithSession:boolean;
- request:<T>(path:string,init?:RequestInit)=>Promise<T>;sessionId():string;resetSession(next?:string):void}):Promise<void>{
+ request:<T>(path:string,init?:RequestInit)=>Promise<T>;sessionId():string;resetSession(next?:string):void;
+ /** SCREEN(page, n) run on the mirrored device: the layer each page shows (lower-case page names). */
+ onLayers?(layers:Record<string,number>):void}):Promise<void>{
  if(!deps.mirrorKey){setFollowingSale(deps.openedWithSession);return;}
- const {sessionId}=await deps.request<{sessionId:string}>('/screens/current-session',
+ const {sessionId,layers}=await deps.request<{sessionId:string;layers?:Record<string,number>}>('/screens/current-session',
   {method:'POST',body:JSON.stringify({mirrorKey:deps.mirrorKey})});
  // No sale reported yet: a window opened by the till already shares its sale.
  setFollowingSale(Boolean(sessionId)||deps.openedWithSession);
+ if(layers&&typeof layers==='object')deps.onLayers?.(layers);
  if(sessionId&&sessionId!==deps.sessionId())deps.resetSession(sessionId);
 }
 /** Data sources that show another device's rows: their filter reads MirrorKey, or, on a

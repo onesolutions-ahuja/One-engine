@@ -1,4 +1,6 @@
 import {Parser,formulaTruth,type Expression} from './FormulaParser.js';
+import {screenArguments,screenLayerArg} from './screenLayer.js';
+export {screenLayerArg};
 import {tokenize} from './FormulaTokenizer.js';
 import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,savedValueKey,assignedComponent,assignedProperty,COMPONENT_VALUES} from './PageReferences.js';
 import {COMPONENT_PROPERTIES,uiPropertyValue,withComponentProperties} from './FormulaComponentState.js';
@@ -307,11 +309,18 @@ export function compileActionPlan(source:string):ActionStep[] {
    return;
   }
   if(['EMAIL','WHATSAPP','SMS','FLOW','SCREEN'].includes(node.name)){
-   const bounds:Record<string,[number,number]>={EMAIL:[3,23],WHATSAPP:[2,22],SMS:[2,2],FLOW:[0,0],SCREEN:[0,2]};
+   const bounds:Record<string,[number,number]>={EMAIL:[3,23],WHATSAPP:[2,22],SMS:[2,2],FLOW:[0,0],SCREEN:[0,3]};
    const [min,max]=bounds[node.name];
    if(args.length<min||args.length>max)throw Error('Invalid '+node.name+' arguments');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
-   if(node.name==='SCREEN'&&args.length)nameOf(args[0],'screen mode');
+   if(node.name==='SCREEN'){
+    // Any order after the page; kept as [mode, record, layer] (blank = not given).
+    const {mode,modeGiven,record:screenRecord,layer}=screenArguments(args);
+    const none:Expression={kind:'literal',value:null};
+    steps.push({name:node.name,object,fields:new Map(),guards,values:[
+     modeGiven?{kind:'reference',value:mode}:none,screenRecord??none,layer!==undefined?{kind:'literal',value:layer}:none]});
+    return;
+   }
    steps.push({name:node.name,object,values:args,fields:new Map(),guards});
    return;
   }
@@ -402,16 +411,16 @@ export function askMessageScreen(kind:'confirm'|'info',message:string,yesLabel='
 export const isScreenAction=(source:string)=>/^\s*=?\s*SCREEN\s*\(/i.test(source);
 export function parseScreenAction(source:string){
  const node=new Parser(tokenize(source)).parse();
- if(node.kind!=='call'||node.name!=='SCREEN'||node.args.length<1||node.args.length>3)
-  throw Error('SCREEN requires a page API name, optional mode and optional record Id');
+ if(node.kind!=='call'||node.name!=='SCREEN'||node.args.length<1)
+  throw Error('SCREEN requires a page API name, then optional mode, record and layer (any order)');
  const page=nameOf(node.args[0],'page API name');
- const mode=node.args[1]?nameOf(node.args[1],'window mode').toLowerCase():'current';
- if(!['current','popup','newwindow','second'].includes(mode))throw Error('Choose current, popup, newwindow or second');
- // Optional 3rd argument: the record the screen opens with, e.g.
- // SCREEN(Payment,popup,@ThisPage.Cart2.recordId). The caller evaluates it.
- if(node.args[2])validateFormulaFunctions(node.args[2],'ribbon_binding');
- const record=node.args[2]?serializeFormulaSqlExpression(node.args[2]):undefined;
- return {page,mode,record};
+ // After the page: mode, record and layer in any order (see screenArguments).
+ const {mode,record:recordNode,layer}=screenArguments(node.args.slice(1));
+ // The record the screen opens with, e.g. SCREEN(Payment,popup,@ThisPage.Cart2.recordId).
+ // The caller evaluates it.
+ if(recordNode)validateFormulaFunctions(recordNode,'ribbon_binding');
+ const record=recordNode?serializeFormulaSqlExpression(recordNode):undefined;
+ return {page,mode,record,...(layer!==undefined?{layer}:{})};
 }
 
 function readsResultField(node:Expression,alias:string):boolean{
@@ -466,7 +475,7 @@ export type ActionServices={
  request:<T>(path:string,init?:{method:string;body?:string})=>Promise<T>;
  print?:(template:string,id:string)=>Promise<void>;
  createPdf?:(template:string,id:string)=>Promise<{FileId:string}>;
- runPageAction?:(name:string,target:string,mode?:string,recordId?:string)=>Promise<unknown>;
+ runPageAction?:(name:string,target:string,mode?:string,recordId?:string,layer?:number)=>Promise<unknown>;
  /** Optional opt-in observer. Its errors must never affect action execution. */
  onTiming?:(timing:ActionPlanTiming)=>void;
  /** Stable metadata identifier, not the authored formula text or a field value. */
@@ -939,9 +948,13 @@ export async function executeActionPlan(formula:string,record:Record<string,unkn
       const mode=step.values?.[0];
       // SCREEN(Page,popup,record): the record Id is evaluated here, so an alias
       // from an earlier step (sale.Id) or @ThisPage.Cart2.recordId both work.
-      const record=step.name==='SCREEN'&&step.values?.[1]?evaluate(step.values[1]):undefined;
-      await runPageAction(step.name,step.object,mode?.kind==='reference'?mode.value:mode?.kind==='literal'?String(mode.value):undefined,
-       record===undefined||record===null?undefined:String(record));
+      const given=(node?:Expression)=>node&&!(node.kind==='literal'&&node.value===null)?node:undefined;
+      const record=step.name==='SCREEN'&&given(step.values?.[1])?evaluate(step.values![1]):undefined;
+      const layer=step.name==='SCREEN'?given(step.values?.[2]):undefined;
+      const modeNode=given(mode);
+      await runPageAction(step.name,step.object,modeNode?.kind==='reference'?modeNode.value:modeNode?.kind==='literal'?String(modeNode.value):undefined,
+       record===undefined||record===null?undefined:String(record),
+       layer?.kind==='literal'&&typeof layer.value==='number'?layer.value:undefined);
       completed++;
       continue;
      }

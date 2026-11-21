@@ -17,6 +17,7 @@
  */
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
 import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
+import {screenArguments} from '../../expression-engine/screenLayer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
 import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
 import {uiProperty} from '../../expression-engine/FormulaComponentState.js';
@@ -345,10 +346,14 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   }
   case 'SCREEN':{
    const page=literalName(args[0],'SCREEN page');
-   const mode=args[1]?literalName(args[1],'SCREEN mode').toLowerCase():'current';
-   if(!['current','popup','newwindow','second'].includes(mode))fail('SCREEN mode must be current, popup, newwindow or second');
+   // After the page: mode, record and layer in any order, blanks allowed (screenArguments).
+   let parsed:ReturnType<typeof screenArguments>;
+   try{parsed=screenArguments(args.slice(1));}catch(error){fail(error instanceof Error?error.message:String(error));}
+   const {mode,record,layer}=parsed!;
    scope.ui.add('SCREEN');
-   return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(args[2]?', '+value(args[2]):'')+');'];
+   // $.ui("SCREEN", page, mode, record, layer): the browser opens it (CompiledPageRuntime).
+   return ['await $.ui("SCREEN", '+q(page)+', '+q(mode)+(record||layer!==undefined?', '+(record?value(record):'""'):'')
+    +(layer!==undefined?', '+q(String(layer)):'')+');'];
   }
   case 'PAIRDISPLAY':{
    // PAIRDISPLAY(Page): pair a /display screen with this device; it shows Page of this app.

@@ -68,6 +68,11 @@ export function usePageEditorState(
     && (component !== 'Report Chart' || targetObject?.settings?.allowReports));
   const stringList = pageStringList;
   const [selectedId, setSelectedId] = useState('');
+  // Page layers: the layer being designed (0 = the page itself). Extra layers added with +
+  // stay listed until the page changes, even before a component is put on them.
+  const [canvasLayer, setCanvasLayer] = useState(0);
+  const [addedLayers, setAddedLayers] = useState<number[]>([]);
+  useEffect(() => { setCanvasLayer(0); setAddedLayers([]); }, [page.apiName, page.layoutVariant]);
   const [selectedRegion, setSelectedRegion] = useState<'header' | 'main' | 'sidebar' | null>(null);
   const [selectionIds, setSelectionIds] = useState<string[]>([]);
   const [groupEditId,setGroupEditId]=useState('');
@@ -483,6 +488,6 @@ export function usePageEditorState(
     setPendingArchivePageApiName, switchingLayout, setSwitchingLayout, layoutVersions, setLayoutVersions,
     showLayoutHistory, setShowLayoutHistory, selectedHistoryVersion, setSelectedHistoryVersion,
     setSavedFeedback, fields, pageLayouts, selected, applyPage, updateComponent, openComponentInspector,
-    openAddBlocks,
+    openAddBlocks, canvasLayer, setCanvasLayer, addedLayers, setAddedLayers,
   };
 }

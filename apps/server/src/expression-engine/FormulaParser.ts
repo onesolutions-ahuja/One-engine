@@ -84,7 +84,9 @@ export class Parser {
         const args:Expression[]=[];
         if(this.tokens[this.position]?.value!==')'){
           do {
-            args.push(this.expression(0,depth+1));
+            // SCREEN(Page, popup, , 2): a blank argument is skipped (SCREEN only).
+            const blank=name==='SCREEN'&&args.length>0&&[',',')'].includes(String(this.tokens[this.position]?.value));
+            args.push(blank?this.addNode({kind:'literal',value:null}):this.expression(0,depth+1));
             if(this.tokens[this.position]?.value!==',')break;
             this.position++;
           }while(true);

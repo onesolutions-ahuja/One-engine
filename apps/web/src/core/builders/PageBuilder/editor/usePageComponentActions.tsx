@@ -146,6 +146,8 @@ export function usePageComponentActions(
     // Author a visible, editable border only for new components.
     const inserted = components.find(item => item.id === id)!;
     inserted.properties={...inserted.properties,navigatorName:allocated};
+    // A new top-level component goes on the layer being designed (nested ones follow their parent).
+    if(editorState.canvasLayer>0&&!parentId)inserted.properties={...inserted.properties,pageLayer:editorState.canvasLayer};
     const authored = inserted.properties.visualStyle && typeof inserted.properties.visualStyle === 'object'
       && !Array.isArray(inserted.properties.visualStyle)
       ? inserted.properties.visualStyle as Record<string,unknown> : {};
@@ -389,7 +391,11 @@ export function usePageComponentActions(
       x:parentId?16:Math.max(0,Math.min(page.canvasWidth-root.position.width,root.position.x+24)),
       y:parentId?16:Math.max(0,Math.min(page.canvasHeight-root.position.height,root.position.y+24))
     }:undefined;
-    const inserted=cloned.components.map(item=>item.id===root.id?{...item,position,region:selected?.region??item.region}:item);
+    // A pasted top-level component lands on the layer being designed.
+    const layerProps=(item:PageComponentMetadata)=>parentId?item.properties
+      :editorState.canvasLayer>0?{...item.properties,pageLayer:editorState.canvasLayer}
+      :Object.fromEntries(Object.entries(item.properties).filter(([key])=>key!=='pageLayer'));
+    const inserted=cloned.components.map(item=>item.id===root.id?{...item,position,region:selected?.region??item.region,properties:layerProps(item)}:item);
     const originalIndex=selected?page.components.findIndex(item=>item.id===selected.id):-1;
     const components=[...page.components];
     components.splice(originalIndex<0?components.length:originalIndex+1,0,...inserted);

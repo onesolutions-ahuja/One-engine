@@ -208,6 +208,9 @@ export function keepScreenParams(path:string,search:string):string{
    const value=from.get(name);
    if(value&&/^[A-Za-z0-9_-]{16,128}$/.test(value))kept.set(name,value);
  }
+ // ?layer=n: the page layer this window opens on (SCREEN(page, second, n)).
+ const layer=from.get('layer');
+ if(layer&&/^\d$/.test(layer))kept.set('layer',layer);
  if(!kept.size)return path;
  const url=new URL(path,'https://placeholder.invalid');
  kept.forEach((value,name)=>url.searchParams.set(name,value));

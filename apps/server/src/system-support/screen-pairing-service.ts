@@ -184,12 +184,27 @@ export class ScreenPairingService{
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,seen_at,offline) VALUES($1,$2,now(),$3)
    ON CONFLICT(tenant_id,device_key) DO UPDATE SET seen_at=now(),offline=EXCLUDED.offline`,[actor.tenant_id,deviceKey,!online]);
  }
- /** The sale the mirrored device is on now ('' = none reported). */
- async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string}>{
-  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:''};
-  const {rows}=await this.db.query<{session_key:string|null}>(
-   'SELECT session_key FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',[actor.tenant_id,mirrorKey]);
-  return {sessionId:rows[0]?.session_key??''};
+ /** The sale the mirrored device is on now ('' = none reported), and the layer each page
+  * should show on its screens (SCREEN(page, n) run on that device). */
+ async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string;layers:Record<string,number>}>{
+  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:'',layers:{}};
+  const {rows}=await this.db.query<{session_key:string|null;page_layers:Record<string,number>|null}>(
+   'SELECT session_key,page_layers FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',[actor.tenant_id,mirrorKey]);
+  return {sessionId:rows[0]?.session_key??'',layers:rows[0]?.page_layers??{}};
+ }
+ /** SCREEN(page, n) on a device: the screens that follow it and show that page switch to layer n.
+  * Returns how many paired screens show that page (0: nobody follows it with that page). */
+ async showLayer(actor:Actor,deviceKey:unknown,page:unknown,layer:unknown):Promise<{screens:number}>{
+  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))fail('This device has no valid device key');
+  if(typeof page!=='string'||!apiName.test(page))fail('Choose the page');
+  if(typeof layer!=='number'||!Number.isInteger(layer)||layer<0||layer>9)fail('Choose a layer 0-9');
+  const key=page.toLowerCase();
+  await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,page_layers) VALUES($1,$2,jsonb_build_object($3::text,$4::int))
+   ON CONFLICT(tenant_id,device_key) DO UPDATE SET page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)||jsonb_build_object($3::text,$4::int)`,
+  [actor.tenant_id,deviceKey,key,layer]);
+  const {rows}=await this.db.query<{count:string}>(`SELECT count(*) AS count FROM md_screen_pairings WHERE tenant_id=$1 AND mirror_key=$2
+   AND lower(page_api_name)=$3 AND revoked_at IS NULL AND approved_at IS NOT NULL`,[actor.tenant_id,deviceKey,key]);
+  return {screens:Number(rows[0]?.count??0)};
  }
  /** The small code in the corner of a paired screen: changes every minute. Only the screen
   * device paired with that till (its own device key, in this tenant) may read it; its sign-in
@@ -305,6 +320,7 @@ CREATE TABLE IF NOT EXISTS md_screen_devices (
  corner_secret text,
  PRIMARY KEY(tenant_id,device_key)
 );
+ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS page_layers jsonb;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_mirror ON md_screen_pairings(tenant_id,mirror_key) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_code ON md_screen_pairings(code) WHERE approved_at IS NULL AND revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_device ON md_screen_pairings(tenant_id,device_record_id) WHERE revoked_at IS NULL;

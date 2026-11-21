@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LiveFrameParser,isOwnEcho,noteOwnWrites} from '../src/core/pages/PageCompiler/liveChanges.ts';
-import {LiveChangeHub} from '../../server/src/system-support/live-changes.ts';
+import {LiveChangeHub,MAX_STREAMS_PER_TENANT,MAX_STREAMS_PER_USER,registerLiveChangeRoutes} from '../../server/src/system-support/live-changes.ts';
 import {startMirrorLiveRefresh} from '../src/core/pages/PageCompiler/mirrorLiveRefresh.ts';
 
 test('the live stream is read event by event, even when split across chunks',()=>{
@@ -44,8 +44,55 @@ test('the server passes a saved record on to the tenant\'s screens that may read
  hub.dispatch({k:'screen',t:'T',d:'till-device'});
  assert.deepEqual(got.u3.at(-1),['screen',{device:'till-device'}]);
  stop();assert.equal(hub.count('T2'),0);assert.equal(hub.count('T'),3);
- for(let index=0;index<19;index++)hub.subscribe({tenant_id:'T',user_id:'u1'},()=>undefined);
- assert.throws(()=>hub.subscribe({tenant_id:'T',user_id:'u1'},()=>undefined),/Too many/);
+ // Shops share one login across tills and screens: hundreds of streams per user.
+ for(let index=0;index<MAX_STREAMS_PER_USER-1;index++)hub.subscribe({tenant_id:'T',user_id:'u1'},()=>undefined);
+ assert.throws(()=>hub.subscribe({tenant_id:'T',user_id:'u1'},()=>undefined),/Too many live connections for this user/);
+ assert.equal(MAX_STREAMS_PER_USER,300);assert.equal(MAX_STREAMS_PER_TENANT,3000);
+});
+
+test('a screen whose connection is gone is dropped at the first failed send; the tenant has its own cap',async()=>{
+ const hub=new LiveChangeHub({pool:{connect:()=>new Promise(()=>undefined)}} as never,{allowed:async()=>true} as never);
+ let alive=0;
+ hub.subscribe({tenant_id:'T',user_id:'u'},()=>{alive++;});
+ hub.subscribe({tenant_id:'T',user_id:'u'},()=>false);
+ hub.subscribe({tenant_id:'T',user_id:'u'},()=>{throw Error('socket closed');});
+ assert.equal(hub.count('T'),3);
+ hub.dispatch({k:'screen',t:'T',d:'till'});
+ assert.equal(hub.count('T'),1,'dead screens are dropped at once');
+ hub.dispatch({k:'record',t:'T',o:'CartLine',n:1,ids:['r1'],op:'insert'});
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(alive,2);
+ const stops=Array.from({length:MAX_STREAMS_PER_TENANT-1},(_,index)=>hub.subscribe({tenant_id:'T',user_id:'user-'+(index%20)},()=>undefined));
+ assert.throws(()=>hub.subscribe({tenant_id:'T',user_id:'new'},()=>undefined),/for this tenant/);
+ stops.forEach(stop=>stop());stops.forEach(stop=>stop());
+ assert.equal(hub.count('T'),1,'unsubscribing twice is harmless');
+});
+
+test('GET /api/live-changes drops the screen as soon as its connection closes',async()=>{
+ const {EventEmitter}=await import('node:events');
+ const hub=new LiveChangeHub({pool:{connect:()=>new Promise(()=>undefined)}} as never,{allowed:async()=>true} as never);
+ let handler:((req:unknown,res:unknown,next:(error?:unknown)=>void)=>void)|undefined;
+ const app={post:()=>undefined,get:(_path:string,run:typeof handler)=>{handler=run;}};
+ registerLiveChangeRoutes(app as never,hub);
+ const open=()=>{
+  const socket=new EventEmitter() as EventEmitter&{destroyed:boolean};socket.destroyed=false;
+  const res=Object.assign(new EventEmitter(),{written:[] as string[],destroyed:false,writableEnded:false,writableLength:0,
+   status(){return res;},setHeader(){},flushHeaders(){},write(text:string){res.written.push(text);return true;},
+   end(){res.writableEnded=true;},destroy(){res.destroyed=true;}});
+  const req={actor:{tenant_id:'T',user_id:'u'},socket};
+  let failed:unknown;
+  handler!(req,res,error=>{failed=error;});
+  return {res,socket,failed:()=>failed};
+ };
+ const a=open(),b=open();
+ assert.equal(hub.count('T'),2);
+ assert.match(a.res.written[0],/event: ready/);
+ a.res.emit('close');
+ assert.equal(hub.count('T'),1,'closed: dropped at once, not at the next heartbeat');
+ b.socket.destroyed=true;
+ hub.dispatch({k:'screen',t:'T',d:'till'});
+ assert.equal(hub.count('T'),0,'a write to a dead socket drops the screen');
+ assert.equal(b.res.writableEnded,true);
 });
 
 test('with the live stream up a display re-reads on live events, and its timer only every 30 s',async()=>{

@@ -58,10 +58,12 @@ jobs:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
           SEARCH_BUDGET_MS: '150'
         run: node --import tsx apps/server/scripts/search-10k-probe.mjs
-      - name: Live changes and page-open reads speed (PostgreSQL)
+      - name: Live changes, live for everything and page-open reads speed (PostgreSQL)
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
           LIVE_BUDGET_MS: '100'
+          LIVE_E2E_BUDGET_MS: '500'
+          LIVE_SCREENS: '40'
           BATCH_BUDGET_MS: '250'
         run: node --import tsx apps/server/scripts/live-speed-probe.mjs
   build:

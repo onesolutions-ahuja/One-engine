@@ -2854,12 +2854,12 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     res.json(await records.history(actor.tenant_id,actor.user_id,req.params.objectApi,req.params.id));
   }));
-  app.get('/api/records/:objectApi',route(async(req,res)=>{
-    const actor=req.actor!;
-    const limit=Number(req.query.limit??50),offset=Number(req.query.offset??0);
+  /** One record list read (GET /api/records/:objectApi and each read of a batch). */
+  const listRecordsFor=async(actor:{tenant_id:string;user_id:string},objectApi:string,query:Record<string,unknown>)=>{
+    const limit=Number(query.limit??50),offset=Number(query.offset??0);
     if(!Number.isInteger(limit)||!Number.isInteger(offset)||limit<1||offset<0) throw new Error('Invalid pagination');
     const queryString=(name:string):string|undefined=>{
-      const value=req.query[name];
+      const value=query[name];
       if(value===undefined)return undefined;
       if(typeof value!=='string')throw new Error('Invalid record list query');
       return value;
@@ -2888,17 +2888,37 @@ export function createSystemServer(db:SqlPersistence) {
     if(filterLogic!==undefined&&!filters.length)throw new Error('Filter logic requires filters');
     const cursor=parseRecordCursor(cursorValue);
     const viewId=queryString('viewId');
-    const view=viewId?await recordListViews.load(actor.tenant_id,actor.user_id,req.params.objectApi,viewId):undefined;
-    const objectApi=req.params.objectApi;
-    if(typeof objectApi!=='string')throw new Error('Invalid object name');
-    res.json(await records.list(actor.tenant_id,actor.user_id,objectApi,limit,offset,{
+    const view=viewId?await recordListViews.load(actor.tenant_id,actor.user_id,objectApi,viewId):undefined;
+    return records.list(actor.tenant_id,actor.user_id,objectApi,limit,offset,{
       search,prefixSearch:searchPrefix==='1',filterField,filterValue,filterOperator:filterOperator as 'Equals'|'Includes'|'Excludes',
       relatedField:queryString('relatedField'),relatedId:queryString('relatedId'),
       sortField:queryString('sortField')??view?.sort_field??undefined,
       sortDirection:(sortDirection as 'asc'|'desc'|undefined)??view?.sort_direction,
       filters:filters.length?filters:view?.filters,filterLogic:filterLogic??view?.filter_logic,
       scope:view?.scope,cursor
+    });
+  };
+  app.get('/api/records/:objectApi',route(async(req,res)=>{
+    const objectApi=req.params.objectApi;
+    if(typeof objectApi!=='string')throw new Error('Invalid object name');
+    res.json(await listRecordsFor(req.actor!,objectApi,req.query as Record<string,unknown>));
+  }));
+  // Page open: all the page's list reads in ONE request (each read is the same as GET
+  // /api/records/:objectApi, with the same checks); answers keep the order asked.
+  app.post('/api/records-batch',route(async(req,res)=>{
+    const reads=(req.body as {reads?:unknown}|undefined)?.reads;
+    if(!Array.isArray(reads)||!reads.length||reads.length>25)throw new Error('Invalid record batch');
+    const answers=await Promise.all(reads.map(async item=>{
+      const read=item as {object?:unknown;query?:unknown};
+      try{
+        if(typeof read.object!=='string'||!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(read.object)
+          ||typeof read.query!=='string'||read.query.length>16000)throw new Error('Invalid record list query');
+        const query=Object.fromEntries(new URLSearchParams(read.query));
+        return {ok:true,data:await listRecordsFor(req.actor!,read.object,query)};
+      }catch(error){return {ok:false,error:error instanceof Error?error.message:'Unable to load records'};}
     }));
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({answers});
   }));
   app.patch('/api/records/:objectApi/external/:fieldApi/:externalValue',route(async(req,res)=>{
     const actor=req.actor!;

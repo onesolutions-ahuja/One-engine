@@ -308,7 +308,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   // A font size entered in Design must not be silently reduced to 96px.
   // Preserve existing overflow behaviour for large authored content, but hide
   // the unwanted card-level scrollbar in Card Grid.
-  borderRadius:number(p.radius,12),overflow:"hidden",overflowY:grid?"hidden":"auto",position:"relative",minWidth:0,
+  borderRadius:number(p.radius,12),overflow:"hidden",overflowY:"auto",scrollbarWidth:grid?"none":undefined,position:"relative",minWidth:0,
   fontSize:focused&&p.focusedTextSize!==undefined&&p.focusedTextSize!==null&&p.focusedTextSize!==""
    ?number(p.focusedTextSize,16,8):number(p.textSize,16,8),
   color:focusedText||undefined,

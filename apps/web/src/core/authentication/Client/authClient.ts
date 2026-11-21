@@ -1,4 +1,5 @@
 import { currentFormFactor } from '../../workspace/Responsive/useFormFactor';
+import {createRecordBatcher} from './recordBatch';
 import {createRecordPageCoalescer} from './recordPageCoalescer';
 import {invalidatePageMediaAssets} from '../../pages/PageRuntime/pageMediaAssetCoalescer';
 import {setAuthenticatedFormulaBindingContext} from '../../components/RegisteredComponent/fieldExpressionRuntime';
@@ -313,13 +314,16 @@ export async function loadFlowScreenRecordPage(
   const page=await pageCoalescer(key,limit,combinedLimit=>{
    const query=new URLSearchParams(params);
    query.set('limit',String(combinedLimit));
-   return apiRequest<{records:Record<string,unknown>[];total:number}>(
-    '/records/'+encodeURIComponent(objectApiName)+'?'+query.toString());
+   return batchedRecordRead<{records:Record<string,unknown>[];total:number}>(objectApiName,query.toString());
   },options.forceRefresh===true);
   if(setFilters&&Array.isArray(page?.records)&&typeof page.total==='number')
    rememberCompleteRecordSet(readScope,objectApiName,setFilters,page.records,page.total,setGeneration);
   return page;
 }
+// Page open asks for several lists at once: reads made within the same moment go to the
+// server as ONE request (recordBatch.ts). A lone read stays a plain GET.
+const batchedRecordRead=createRecordBatcher((path,init)=>apiRequest(path,init),
+  (message,object)=>new ApiRequestError(message,{path:'/records/'+object},400));
 /** Equality-only, AND-only queries describe an exact record set the store can reuse. */
 function recordSetFilters(options:FlowScreenRecordPageOptions):SetFilter[]|null{
   const out:SetFilter[]=[];

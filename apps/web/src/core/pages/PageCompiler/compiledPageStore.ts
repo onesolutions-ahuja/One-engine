@@ -130,8 +130,16 @@ const API_LIMIT=100;
 const emptySnapshot:SourceSnapshot=Object.freeze({records:[],total:0,loading:true,error:'',hasMore:false,
  loadingMore:false,predictable:false,version:0}) as SourceSnapshot;
 
+/** Local copy (localCopy.ts): who the rows belong to and what else they depend on
+ * (session, followed till). Without it nothing is kept in the browser. */
+export type LocalCopyOptions={owner():string|undefined;context():unknown;
+ read<T>(owner:string|undefined,key:string):Promise<T|undefined>;write(owner:string|undefined,key:string,value:unknown):void;
+ fingerprint(value:unknown):string};
+type Saved={records:Record<string,unknown>[];total:number;hasMore:boolean;predictable:boolean;
+ serverFilters?:SourceSnapshot['serverFilters'];relatedFilter?:SourceSnapshot['relatedFilter']};
+
 export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,getState:()=>State,
- objects?:Parameters<typeof withDependentObjects>[1]){
+ objects?:Parameters<typeof withDependentObjects>[1],local?:LocalCopyOptions){
  const snapshots=new Map<string,SourceSnapshot>();
  const listeners=new Map<string,Set<Listener>>();
  const requests=new Map<string,number>();
@@ -145,9 +153,32 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
   if(a.length!==b.length)return false;
   try{return JSON.stringify(a)===JSON.stringify(b);}catch{return false;}
  };
- const publish=(id:string,next:SourceSnapshot)=>{
+ /** The local-copy key of a source: its definition, the state it reads, session and till. */
+ const localKey=(source:CompiledDataSource)=>{
+  const state=getState() as Record<string,unknown>;
+  const inputs=source.stateInputs.map(key=>[key,state[key]??state[key.toLowerCase()]??null]);
+  return 'source|'+compiled.apiName+'|'+source.id+'|'+local!.fingerprint([source,inputs,local!.context()]);
+ };
+ const publish=(id:string,next:SourceSnapshot,fromLocal=false)=>{
   snapshots.set(id,next);
   listeners.get(id)?.forEach(listener=>listener());
+  // Keep what the server answered (and live patches) for the next time the page opens.
+  const source=sources.get(id);
+  if(local&&source&&!fromLocal&&!next.loading&&!next.loadingMore&&!next.error)
+   local.write(local.owner(),localKey(source),{records:next.records,total:next.total,hasMore:next.hasMore,
+    predictable:next.predictable,serverFilters:next.serverFilters,relatedFilter:next.relatedFilter} satisfies Saved);
+ };
+ /** Page open: draw the rows kept from last time while the server is asked. */
+ const fromLocal=async(id:string):Promise<void>=>{
+  const source=sources.get(id);
+  if(!local||!source)return;
+  const saved=await local.read<Saved>(local.owner(),localKey(source)).catch(()=>undefined);
+  const current=snapshots.get(id);
+  // The server answered first, or nothing kept: nothing to do.
+  if(!saved||!Array.isArray(saved.records)||(current&&!current.loading))return;
+  publish(id,{records:saved.records,total:saved.total,hasMore:saved.hasMore,predictable:saved.predictable,
+   serverFilters:saved.serverFilters,relatedFilter:saved.relatedFilter,loading:false,loadingMore:false,error:'',
+   version:(current?.version??0)+1},true);
  };
  /** Read rows [0, count) in Record API sized pages. */
  const readRows=async(source:CompiledDataSource,count:number,fresh=false):Promise<SourceLoadResult|null>=>{
@@ -234,7 +265,7 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
    return ()=>{set.delete(listener);};
   },
   /** Load every source once, in parallel. */
-  start:():Promise<void>=>Promise.all([...sources.keys()].map(id=>reload(id))).then(()=>undefined),
+  start:():Promise<void>=>Promise.all([...sources.keys()].map(id=>{void fromLocal(id);return reload(id);})).then(()=>undefined),
   reload,loadMore,
   /** Only sources whose filter reads a changed state key reload. */
   stateChanged(keys:readonly string[]):Promise<void>{

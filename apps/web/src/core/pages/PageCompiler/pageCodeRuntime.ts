@@ -78,6 +78,8 @@ export type PageCodeHost={
  readComponent?(component:string,property:string):unknown;
  /** Ids of the rows of `object` the page shows now (record sets held for shown rows). */
  shownRows?(object:string):string[];
+ /** Local copy of the held rows (localCopy.ts): drawn at page open while the server answers. */
+ local?:{key():string|null;read<T>(key:string):Promise<T|undefined>;write(key:string,value:unknown):void};
 };
 /** Parent key of a set held for the rows of an Object the page shows (generateCode SHOWN_ROWS). */
 const SHOWN_ROWS='@shown:';
@@ -412,6 +414,15 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   /** Load every record set for the current state (one request). */
   async loadSets(rowObject=''){
    if(!code.recordSets.length)return;
+   const localKey=host.local?.key()??null;
+   // Page open: the held rows from last time show at once (taps and totals work at once too).
+   if(localKey&&!sets.size)void host.local!.read<{sets:Record<string,{rows:Row[];complete:boolean}>;coverage:Record<string,string[]>}>(localKey)
+    .then(saved=>{
+     if(!saved||sets.size)return;
+     for(const [key,value] of Object.entries(saved.sets??{}))if(byKey.has(key))sets.set(key,value);
+     for(const [key,ids] of Object.entries(saved.coverage??{}))shownCoverage.set(key,new Set(ids));
+     changed();
+    }).catch(()=>undefined);
    const request=requestFor({},rowObject);
    const answer=await post<{ok:boolean;sets:ServerResult['sets']}>('/page-code/sets',{...host.build,request});
    for(const [key,value] of Object.entries(answer.sets??{})){
@@ -420,6 +431,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(parent?.startsWith(SHOWN_ROWS))shownCoverage.set(key,new Set(request.shown?.[parent.slice(SHOWN_ROWS.length)]??[]));
    }
    changed();
+   if(localKey)host.local!.write(localKey,{sets:Object.fromEntries(sets),
+    coverage:Object.fromEntries([...shownCoverage].map(([key,ids])=>[key,[...ids]]))});
   },
   /** Objects whose shown rows the held sets follow (the page reloads them when those rows change). */
   shownObjects,

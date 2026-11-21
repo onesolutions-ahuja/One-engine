@@ -25,7 +25,8 @@ import {runtimeComponentLabel} from '../PageRuntime/smartComponentLabel';
 import {requestPageMediaAsset} from '../PageRuntime/pageMediaAssetCoalescer';
 import type {PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {scopedFieldAllows} from '../PageRuntime/fieldScopedRecordFilters';
-import {loadFlowScreenRecordPage,loadFlowScreenRecords,getAccessToken} from '../../authentication/Client/authClient';
+import {loadFlowScreenRecordPage,loadFlowScreenRecords,getAccessToken,currentSessionUserId} from '../../authentication/Client/authClient';
+import {fingerprint,readLocal,writeLocal} from './localCopy';
 import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {presentPageRecords,type ChannelGrant} from '../../records/RecordWorkspace/recordPresentationAdapters';
 import {resolveFlowOutputBindings,resolveStructuredFlowInput} from '../../automation/FlowScreen/flowInputBindings';
@@ -122,13 +123,18 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    carriedPageState(carried.current,pageSessionKey+'\n'+sessionId,initialState),pageStateDependencies(components));
   carried.current={session:()=>pageSessionKey+'\n'+sessionId,state:store.get};
   const sourceLoader=compiledSourceLoader(objects,()=>({sessionId,recordId}),loadFlowScreenRecordPage);
-  const data=createCompiledDataLayer(compiled,sourceLoader,store.get,objects);
+  // Local copy: last rows drawn at once on open (per user; session and followed till in the key).
+  const localContext=()=>[sessionId,mirrorDeviceKey(),tillDeviceKey()];
+  const data=createCompiledDataLayer(compiled,sourceLoader,store.get,objects,
+   {owner:currentSessionUserId,context:localContext,read:readLocal,write:writeLocal,fingerprint});
   // Published app pages and Builder Preview run their generated code.
   const endpoint=script?.app?'/apps/'+encodeURIComponent(script.app.appId)
    :script?.previewId?'/pages/'+encodeURIComponent(compiled.apiName):'';
   const code=script?.code&&endpoint?createPageCodeRuntime(script.code,{request,endpoint,
    build:script.app?{buildId:script.app.buildId}:{previewId:script.previewId},
    sessionId:()=>sessionId,state:store.get,
+   local:{key:()=>currentSessionUserId()?'sets|'+compiled.apiName+'|'+fingerprint([script!.code!.recordSets.map((set:{key:string})=>set.key),localContext()]):null,
+    read:key=>readLocal(currentSessionUserId(),key),write:(key,value)=>writeLocal(currentSessionUserId(),key,value)},
    // Rows of an Object the page shows now (a product grid): held rows follow them.
    shownRows:object=>[...new Set(compiled.dataSources.filter(source=>source.objectApiName===object)
     .flatMap(source=>data.get(source.id).records.map(row=>String(row.Id??''))).filter(Boolean))]}):null;

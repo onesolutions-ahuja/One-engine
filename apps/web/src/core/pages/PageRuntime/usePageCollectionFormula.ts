@@ -3,7 +3,8 @@ import {F} from '../../../../../server/src/page-compiler/code/formulaLibrary.js'
 import {visiblePageCollectionResult} from './pageCollectionVisibility';
 import {Parser,type Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
-import {evaluateCollectionFormula,evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
+import {buildCollectionSource} from '../../../component-libraries/shared/collectionSource.js';
+import {bareFieldsOnRow,ROW_FIELDS,runFormulaNode,runFormulaText} from '../PageCompiler/formulaText';
 import {loadFlowScreenRecordPage} from '../../authentication/Client/authClient';
 import {loadBoundedCollectionSource} from './loadBoundedCollectionSource';
 import {sharedAggregate} from '../../../component-libraries/shared/PageFormulaShare.js';
@@ -184,11 +185,16 @@ export function usePageCollectionFormula(
  // A fixed option list, COLLECTION("Name", "a", "b"): the converted formula's own function.
  const literal=fullObject?null:literalCollection(source);
  if(literal)return {collection:{...literal,key:formulaCollectionReferenceKey(literal.name)},error:null,loading:false};
- const resolved=evaluateCollectionFormula(fullObject?'TABLE(@'+fullObject+')':source,sources,{state:pageState,session:{id:sessionId},
-   primaryObject,record:primaryRecords.length===1?primaryRecords[0]:{},
-   collectionSourceFields:Object.fromEntries(objects.map(object=>[
-    object.apiName,object.fields.map(field=>field.apiName)])),
-   namedCollections:registry.collections});
+ // The list's rows come from records already loaded; every value inside (a criterion such as
+ // @ThisPage.Tabs.Value) runs as converted page code.
+ const record=primaryRecords.length===1?primaryRecords[0]:{};
+ const resolved=buildCollectionSource(fullObject?'TABLE(@'+fullObject+')':source,sources,
+   Object.fromEntries(objects.map(object=>[object.apiName,object.fields.map(field=>field.apiName)])),
+   node=>{
+    const value=runFormulaNode(node,record,{pageState,sessionId,rowObject:primaryObject});
+    if(value.error)throw Error(value.error);
+    return value.value;
+   },registry.collections);
  const value=resolved.value as PageNamedCollection|null;
  return {collection:value?{...value,key:formulaCollectionReferenceKey(value.name)}:null,
    error:resolved.error??null,loading:false};
@@ -208,7 +214,9 @@ export function usePageCollectionFormula(
    {pageState,sessionId},properties.filterLogic==='OR'?'OR':'AND'):rows;
   let formulaError:string|null=null;
   const kept=authored?visualRows.filter(row=>{
-   const outcome=evaluateFieldExpressionDetailed(authored,row,{namedCollections:registry.collections});
+   // Bare @Name / @Value read the collection row's own values.
+   const outcome=runFormulaText(bareFieldsOnRow(authored.startsWith('=')?authored:'='+authored),row,
+    {pageState,sessionId,rowObject:ROW_FIELDS});
    if(outcome.error){formulaError=outcome.error;return false;}
    return outcome.value==='true'||outcome.value===true;
   }):visualRows;

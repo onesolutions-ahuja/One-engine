@@ -2,14 +2,14 @@ import {declarativeSource,modernizeReferences} from '../../../../../server/src/e
 import {beginOptimisticNumberChange} from '../PageRuntime/optimisticPageNumbers';
 import {runSerializedPageAction,planReadWriteObjects} from '../PageRuntime/pageActionCoordinator';
 import {runSequenceFlow} from '../PageRuntime/formulaFlowSequence';
-import {evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
+import {runFormulaText} from '../PageCompiler/formulaText';
 import {shouldInvalidatePageComponent,pageComponentReadObjectNames,applyCompleteRecordMutation,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
 import {isActionPlan,isScreenAction,PartialActionError} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {previewPrintTemplate,openFormulaScreen,closeFormulaScreen} from '../PageRuntime/screenFormula';
 import {lockTillScreen} from '../../authentication/TillDevice/tillDevice';
 import {useComponentFormulaState,publishComponentInput} from '../../components/RegisteredComponent/PageFormulaScope';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
-import {notConvertedAction} from '../PageRuntime/formulaAction';
+import {notConvertedAction} from '../PageCompiler/notConverted';
 import {resolveMetadataProperties} from '../../metadata/Definitions/metadataReferences';
 import * as React from 'react';
 import {useState,useEffect,useRef,useMemo} from 'react';
@@ -394,7 +394,7 @@ export default function MetadataBoundPageComponent({
     if (source === '$session'||source==='$session.id') return sessionId;
     if (typeof source==='string'&&source.startsWith('$session.')) {
       // Same value the formula spelling (@ThisTenant.User.Name …) reads.
-      const resolved=evaluateFieldExpressionDetailed(modernizeReferences(source),{}, {sessionId,pageState});
+      const resolved=runFormulaText('='+modernizeReferences(source),{},{sessionId,pageState});
       if(resolved.error)throw Error(resolved.error);
       return resolved.value;
     }
@@ -458,8 +458,8 @@ export default function MetadataBoundPageComponent({
         objects,apps,pages,currentAppId,defaultObjectApiName:objectApiName
       },onNavigate,pageSessionKey,sessionId,String(payload?.recordId??pageState.recordId??recordId??''),
       formula=>{
-        const result=evaluateFieldExpressionDetailed('='+formula,
-          payload&&typeof payload==='object'?payload as Record<string,unknown>:{},{sessionId,pageState});
+        const result=runFormulaText('='+formula,{},{sessionId,pageState,
+          event:payload&&typeof payload==='object'?payload as Record<string,unknown>:{}});
         if(result.error)throw Error('SCREEN record Id: '+result.error);
         return result.value;
       });

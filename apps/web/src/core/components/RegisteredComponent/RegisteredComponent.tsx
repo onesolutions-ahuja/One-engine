@@ -11,8 +11,8 @@ import {applyRecordViewAdapter} from '../../records/RecordWorkspace/recordViewAd
 import {registeredComponentAppearance, registeredComponentAppearanceClasses} from './registeredComponentAppearance';
 import './registeredComponentAppearance.css';
 import {pagePropertyIssues} from '../Properties/pagePropertyContract';
-import {resolveRegisteredTextProperties} from './fieldExpressionRuntime';
-import {FieldExpressionEvaluationError} from '../../../component-libraries/shared/FieldExpression.js';
+import {resolveRegisteredTextProperties,FieldExpressionEvaluationError} from './fieldExpressionRuntime';
+import {formulaCompilers} from '../../pages/PageCompiler/formulaText';
 import {resolveComponentFormulaProps} from './componentFormulaProps';
 import {validatePrimitiveMetadata, primitiveAccessibilityProps} from './sharedPrimitiveMetadata';
 import {loadSharedSmartRenderer} from './sharedSmartRenderer';
@@ -247,15 +247,25 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const codeFunctions=formulaCode instanceof Map
     ?formulaCode as Map<string,(row:Record<string,unknown>)=>unknown>:null;
   const sqlProps=resolveComponentFormulaProps(configuredProps,definition.apiName,codeFunctions,editorPreview===true);
+  // One formula engine: the page file's functions, and for a formula given at run time the
+  // same converter (the page's own `$` when the page has page code, else a standalone `$`).
+  const given=props.__formulaCode as {functions?:unknown;compile?:unknown;compileNode?:unknown}|undefined;
+  const standalone=typeof given?.compile==='function'?null:formulaCompilers(()=>({
+    pageState:(props.pageState&&typeof props.pageState==='object'?props.pageState:undefined) as Record<string,unknown>|undefined,
+    sessionId:typeof props.sessionId==='string'?props.sessionId:undefined,readComponent:formulaScope?.read,
+    rowObject:typeof props.objectApiName==='string'?props.objectApiName:''}));
+  const formulaCodeProp=!standalone&&codeFunctions?given!:{...(given??{}),functions:codeFunctions??new Map(),
+    compile:standalone?standalone.compile:given!.compile,compileNode:standalone?standalone.compileNode:given!.compileNode};
   let effectiveProps:Record<string,unknown>;
   try{
-    effectiveProps=resolveRegisteredTextProperties(definitions,applyRecordViewAdapter(sqlProps),undefined,formulaScope?.read);
+    effectiveProps=resolveRegisteredTextProperties(definitions,applyRecordViewAdapter(sqlProps),undefined,formulaScope?.read,
+      formulaCodeProp.compile as (text:unknown)=>((row:Record<string,unknown>)=>unknown)|null);
   }catch(error){
     if(error instanceof FieldExpressionEvaluationError)
       return <div className="registered-component-error" role="alert">Formula error: {error.message}</div>;
     throw error;
   }
-  const published=<PublishedFormulaProperties id={formulaInstanceId} rendered={rendered} values={{...effectiveProps,kind:definition.apiName}}/>;
+  const published=<PublishedFormulaProperties id={formulaInstanceId} rendered={rendered} values={{...effectiveProps,__formulaCode:formulaCodeProp,kind:definition.apiName}}/>;
   const primitive = definition.primitiveMetadata;
   const primitiveCheck = primitive ? cachedPrimitiveCheck(primitive) : null;
   if (primitiveCheck && !primitiveCheck.valid) return <div className="registered-component-error" role="alert">Invalid primitive metadata: {primitiveCheck.errors.join('; ')}</div>;
@@ -271,6 +281,6 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   if(!hydratedDefinition)return <div role="alert" className="registered-component-error">Bundled renderer is unavailable.</div>;
   return <div {...accessibility} style={layoutTransparent?{display:'contents'}:undefined}>{published}<ComponentRenderBoundary key={`${definition.apiName}-${definition.version}`}>
     <RegisteredComponentBody definition={hydratedDefinition} props={{...effectiveProps,readComponent:formulaScope?.read,onFormulaDisplay:setRendered,
-      ...(codeFunctions?{__formulaCode:props.__formulaCode}:{})}} appearanceProps={props} layoutTransparent={layoutTransparent} />
+      __formulaCode:formulaCodeProp}} appearanceProps={props} layoutTransparent={layoutTransparent} />
   </ComponentRenderBoundary></div>;
 }

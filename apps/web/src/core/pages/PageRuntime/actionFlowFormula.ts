@@ -1,8 +1,8 @@
 import {normalizeFlowCalls} from '../../../../../server/src/expression-engine/ActionFormulas.js';
-import {evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
+import {runFormulaNode} from '../PageCompiler/formulaText';
 import {Parser,type Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
-import {FLOW_MARKER,isFlowMarker} from '../../../../../server/src/expression-engine/PageReferences.js';
+import {FLOW_MARKER,isFlowMarker,modernizeFormula} from '../../../../../server/src/expression-engine/PageReferences.js';
 
 /**
  * Action formula that chooses a Flow, e.g.
@@ -91,9 +91,9 @@ export function flowActionFormulaTarget(binding:Record<string,unknown>,eventValu
  const runnable=runnableActionFlows(flows);
  const payload=eventValue&&typeof eventValue==='object'&&!Array.isArray(eventValue)
   ?eventValue as Record<string,unknown>:{value:eventValue};
- const evaluated=evaluateFieldExpressionDetailed('='+strip(formula),
-  {state:pageState,event:payload,session:{id:sessionId}},
-  {pageState,sessionId,flowReferences:runnable.map(flow=>flow.apiName)});
+ // The choice runs as converted page code: FLOW(Name) is the text "FLOW:Name".
+ const evaluated=runFormulaNode(normalizeFlowCalls(new Parser(tokenize(modernizeFormula(strip(formula)))).parse()),
+  {},{pageState,sessionId,event:payload});
  if(evaluated.error)throw Error('Invalid action formula: '+evaluated.error);
  const result=String(evaluated.value??'').trim();
  if(!result)return '';

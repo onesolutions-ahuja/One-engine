@@ -1,5 +1,4 @@
-import {convertedFormula} from "../shared/formulaCodeLookup.js";
-import {evaluateFieldExpression} from "../shared/FieldExpression.js";
+import {runComponentFormula} from "../shared/formulaCodeLookup.js";
 import {encodeQr} from "./qrEncode.mjs";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
 
@@ -20,17 +19,8 @@ export default function SmartComponent(p){
  if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const records=Array.isArray(p.records)?p.records:Array.isArray(p.items)?p.items:[];
  const row=records[0]||p.record||{};
- const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
  const source=p.textSource;
- let value="";
- const run=code&&source?convertedFormula(code,source):null;
- if(run){try{value=run(row);}catch{value="";}}
- else if(typeof source==="string"&&source){
-  value=evaluateFieldExpression(source,row,{
-   readComponent:p.readComponent,rootObjectApiName:p.objectApiName,pageState:p.pageState,
-   sessionId:p.sessionId,collectionSources:p.formulaCollectionSources,namedCollections:p.namedCollections,
-   namedCollectionSelections:p.pageState?.collectionSelections});
- }
+ const value=typeof source==="string"&&source?runComponentFormula(p,source,row).value:"";
  const allowed=typeof p.fieldAllowed!=="function"||p.fieldAllowed("textSource",row);
  const text=allowed&&value!==null&&value!==undefined?String(value):"";
  const matrix=matrixFor(text);

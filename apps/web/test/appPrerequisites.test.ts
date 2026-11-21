@@ -8,7 +8,7 @@ import {detectAppPrerequisites,parsePrerequisites,connectorInstallNeeded,message
 import {validateFormulaFunctions} from '../../server/src/expression-engine/FormulaFunctionRegistry.ts';
 import {Parser} from '../../server/src/expression-engine/FormulaParser.ts';
 import {tokenize} from '../../server/src/expression-engine/FormulaTokenizer.ts';
-import {evaluateFieldExpressionDetailed} from '../src/component-libraries/shared/FieldExpression.js';
+import {runFormulaText} from '../src/core/pages/PageCompiler/formulaText';
 
 const read=(path:string)=>readFileSync(new URL(path,import.meta.url),'utf8');
 const snapshot={systemAvailable:['whatsapp','sms_gate','brevo'],systemConnected:['whatsapp'],customConnected:['my_api','whatsapp']};
@@ -40,7 +40,11 @@ test('CONNECTED() is TRUE only when connected, and a custom callout cannot pose 
 test('CONNECTED() works in page formulas (browser) with the session snapshot',()=>{
  // Display formulas may return TRUE/FALSE as text; Visible treats both alike.
  const run=(formula:string,connections=snapshot)=>
-  String(evaluateFieldExpressionDetailed(formula,{},{connections} as never).value).toLowerCase();
+  {
+   // The signed-in session's connector names (set at sign-in; names only, never secrets).
+   (globalThis as Record<symbol,unknown>)[Symbol.for('une.authenticatedFormulaIdentity')]={connections};
+   return String(runFormulaText(formula,{}).value).toLowerCase();
+  };
  assert.equal(run('CONNECTED("whatsapp")'),'true');
  assert.equal(run('NOT(CONNECTED("sms_gate"))'),'true');
  assert.equal(run('IF(CONNECTED("my_api"),"Send","Hidden")'),'send');
@@ -118,7 +122,8 @@ test('install flow is wired end to end',()=>{
  assert.match(read('../../server/src/system-support/server.ts'),/installPrerequisites:req\.body\?\.installPrerequisites===true/);
  assert.match(read('../../server/src/system-support/system-migrations.ts'),/ADD COLUMN IF NOT EXISTS prerequisites jsonb/);
  assert.match(read('../../server/src/system-files/session-metadata.ts'),/loadConnectionSnapshot\(db,tenantId\)/);
- assert.match(read('../../server/src/system-support/formula-data-action-runtime.ts'),/resolveConnectedCalls\(node,connections\)/);
+ // Server page code answers CONNECTED() from the tenant's connection snapshot.
+ assert.match(read('../../server/src/system-support/page-code-runtime.ts'),/connected\(name:unknown\)\{return isConnected\(this\.connections,name\);\}/);
  const screen=read('../src/core/applications/AppExchange/AppExchange.tsx');
  assert.match(screen,/'Install both'/);
  assert.match(screen,/Connections this app uses/);

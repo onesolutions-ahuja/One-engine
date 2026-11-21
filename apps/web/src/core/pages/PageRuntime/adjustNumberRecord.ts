@@ -1,5 +1,5 @@
 import type {FieldMetadata} from '../../metadata/Definitions/metadata';
-import {evaluateFieldExpressionDetailed} from '../../../component-libraries/shared/FieldExpression.js';
+import {bareFieldsOnRow,ROW_FIELDS,runFormulaText} from '../PageCompiler/formulaText';
 
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 export type AdjustNumberBinding={
@@ -39,10 +39,12 @@ export function evaluateNumberActionFormula(
   throw Error('Quantity formula references an unavailable numeric field.');
  const values:Record<string,number>={};
  for(const name of new Set(references))values[name]=valueNumber(row[name]);
- const result=evaluateFieldExpressionDetailed(formula,values);
+ // Converted like every formula; each bare @Field reads this row's value.
+ const source=formula.trim().startsWith('=')?formula.trim():'='+formula.trim();
+ const result=runFormulaText(bareFieldsOnRow(source),values,{rowObject:ROW_FIELDS});
  if(result.error)throw Error('Invalid quantity formula: '+result.error);
- if(typeof result.value!=='string'||!result.value.trim()||
-    !Number.isFinite(Number(result.value)))
+ if(result.value===null||result.value===undefined||typeof result.value==='boolean'
+    ||!String(result.value).trim()||!Number.isFinite(Number(result.value)))
   throw Error('Quantity formula must return a finite number.');
  return Number(result.value);
 }

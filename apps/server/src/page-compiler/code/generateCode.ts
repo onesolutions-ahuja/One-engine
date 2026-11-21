@@ -228,8 +228,12 @@ export function expression(node:Expression,scope:Scope):string{
 export type CompiledFormulaCode={js:string;functions:string[];references:string[];sets:RecordSetNeed[];reads:string[]};
 /** A display formula -> `(row, $) => value`. */
 export function compileDisplayFormula(source:string,rowObject=''):CompiledFormulaCode{
+ return compileDisplayNode(parseFormula(source),rowObject);
+}
+/** An already parsed display formula (a part of a COLLECTION, a FLOW() choice) -> `(row, $) => value`. */
+export function compileDisplayNode(node:Expression,rowObject=''):CompiledFormulaCode{
  const scope:Scope={rowObject,row:'row',aliases:new Set(),async:false,functions:new Set(),references:new Set(),sets:[],reads:new Set()};
- const body=expression(parseFormula(source),scope);
+ const body=expression(node,scope);
  return {js:'(row, $) => O.out('+body+')',functions:[...scope.functions],references:[...scope.references],
   sets:scope.sets,reads:[...scope.reads]};
 }

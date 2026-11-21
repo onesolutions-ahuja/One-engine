@@ -37,7 +37,7 @@ window.tillSpeedTest=async function tillSpeedTest({products=['Coca-Cola Original
     await new Promise(resolve=>setTimeout(resolve,settleMs));
     observer.disconnect();
     const save=performance.getEntriesByType('resource')
-      .find(entry=>entry.name.includes('/action-formulas/execute-data'));
+      .find(entry=>entry.name.includes('/page-code/execute'));
     const requests=performance.getEntriesByType('resource')
       .filter(entry=>entry.name.includes('/api/')&&!/health|notifications/.test(entry.name))
       .map(entry=>entry.name.split('/api')[1].split('?')[0]);

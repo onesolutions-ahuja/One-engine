@@ -333,8 +333,9 @@ export async function resolveCollectionMentionRows(
       const context=await loadMentionContext(objects,root,record,properties,cached);
       const values:Record<string,unknown>={};
       for(const path of paths){
-        const ref=path.reference??'@'+path.path+'.'+path.field.apiName;
-        values[ref]=resolveMentionValue(ref,context.records,context.fields,objects,root);
+        const canonical='@'+path.path+'.'+path.field.apiName;
+        const ref=path.reference??canonical;
+        values[ref]=resolveMentionValue(canonical,context.records,context.fields,objects,root);
       }
       resolved[index]={...record,__mentionValues:values};
     }

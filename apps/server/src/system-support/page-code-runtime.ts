@@ -437,7 +437,7 @@ class ServerScope{
    // A RECEIPT is only announced after the server confirms the FINAL tender.
    // PartPaid must never show the customer a successful completed sale.
    if(result.status==='Paid'&&!result.duplicate){
-    this.effects.push({name:'PAID_INVOICE',args:[result.invoiceId]});
+    this.effects.push({name:'PAID_INVOICE',args:[result.invoiceId,result.amountPaid,method]});
    }
    return result;
   }

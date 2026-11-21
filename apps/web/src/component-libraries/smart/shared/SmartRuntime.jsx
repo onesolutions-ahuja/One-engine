@@ -785,8 +785,8 @@ function SmartTabs({p,record,fire}){
  <div ref={tabsScroller} data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,
    display:"flex",flexDirection:"column",height:"100%",minHeight:0,
     // Reserve real space for arrow controls, never overlay category text.
-    width:vertical?"100%":"calc(100% - 72px)",
-    marginLeft:vertical?0:36,marginRight:vertical?0:36}}>
+    width:vertical?"100%":"calc(100% - 96px)",
+    marginLeft:vertical?0:48,marginRight:vertical?0:48}}>
   <nav className={"smart-tabs"+(p.backgroundColor?"":" is-segmented")} role="tablist" aria-label="Tabs"
    aria-orientation={vertical?"vertical":"horizontal"} style={{
     width:"100%",height:"100%",flex:"1 1 auto",minHeight:0,

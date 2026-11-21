@@ -244,6 +244,13 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
  const nonCanvasDesign2Areas=new Set(['Focused','Others','Extras']);
  const canvasDesign2Areas=design2Areas.filter(area=>!nonCanvasDesign2Areas.has(area));
  const activeDesign2Area=expandedInspector&&canvasDesign2Areas.includes(expandedInspector)?expandedInspector:'Body';
+ const builtInScreenActions:Record<string,string>={
+  Button:'Add display — opens the screen pairing form',
+  'Button 2':'Pair — verifies the four-digit screen code',
+  'Button 3':'Rename — updates the selected paired screen name',
+  'Button 4':'Unpair — revokes the selected display',
+  'Button 5':'Cancel — closes the pairing form'
+ };
  const approvedMatrixAreas=new Set(design2SlotRules.map(rule=>rule.area));
  // A SINGLE, fixed Design scaffold for all sections and selected components.
  // Image placement and fill participate in the shared Position/Typography rows.
@@ -995,6 +1002,11 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
           </span>
         </button>
         {designSectionOpen('Properties')&&<div className="smart-inspector-section-content">
+          {api==='smart_paired_screens'&&builtInScreenActions[activeDesign2Area]&&
+            <p className="smart-design2-builtin-action" aria-label="Assigned button action"
+              style={{margin:'0 0 6px',fontSize:12,color:'var(--text-secondary,#617185)'}}>
+              Assigned action: {builtInScreenActions[activeDesign2Area]} (built-in)
+            </p>}
           <div className="smart-ribbon-items">
             {[1,2,3].map(row=><div key={row} className="smart-ribbon-row"
               data-design-row={row} style={{gridTemplateColumns:design2GridColumns(row)}}>

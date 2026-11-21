@@ -208,3 +208,25 @@ test('a new cart is drawn before its first line (the list finds the new cart, th
   {objectApiName:'Cart',operation:'create',record:{Id:'c2'}}]},ledger);
  assert.deepEqual(saved.map(item=>(item as {objectApiNames:string[]}).objectApiNames[0]),['Cart','CartLine']);
 });
+
+test('fast taps on a NEW line: the line counts 1, 2, 3, 4 on the display, never back',async()=>{
+ const {target,saved,applied}=fakeTarget();
+ const ledger=newTapLedger();
+ const p=provisional('000000b1');
+ // Tap 1 creates the line (provisional on the till); taps 2-3 change it before tap 1 is saved.
+ await drawLiveTap(target,'preview',{batch:'000000b1',ok:true,changes:[{objectApiName:'CartLine',operation:'create',record:{Id:p,Qty:1}}]},ledger);
+ await drawLiveTap(target,'preview',{batch:'000000b2',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:p,Qty:2}}]},ledger);
+ await drawLiveTap(target,'settled',{batch:'000000b1',ok:true,changes:[{objectApiName:'CartLine',operation:'create',record:{Id:'real',Qty:1}}]},ledger);
+ assert.equal(saved.length,2,'tap 1\'s answer leaves the line (still provisional, qty 2) alone');
+ // Tap 3 was predicted on the saved Id: drawn on the provisional row still shown.
+ await drawLiveTap(target,'preview',{batch:'000000b3',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'real',Qty:3}}]},ledger);
+ assert.equal((saved[2] as {recordChanges:Array<{record:{Id:string}}>}).recordChanges[0].record.Id,p);
+ await drawLiveTap(target,'settled',{batch:'000000b2',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'real',Qty:2}}]},ledger);
+ assert.equal(saved.length,3,'tap 2\'s answer waits for tap 3');
+ await drawLiveTap(target,'settled',{batch:'000000b3',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'real',Qty:3}}]},ledger);
+ const last=saved[3] as {recordChanges:Array<{operation:string;record:{Id:string;Qty?:number}}>};
+ assert.deepEqual(last.recordChanges,[{objectApiName:'CartLine',operation:'delete',record:{Id:p}},
+  {objectApiName:'CartLine',operation:'create',record:{Id:'real',Qty:3}}],'the saved line takes the provisional one\'s place');
+ assert.deepEqual(applied.at(-1),['CartLine',[{Id:'real',Qty:3}],[p]]);
+ assert.equal(ledger.real.size,0);
+});

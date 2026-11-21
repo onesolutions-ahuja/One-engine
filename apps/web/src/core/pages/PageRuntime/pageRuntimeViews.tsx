@@ -1,4 +1,5 @@
 import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
+import {readLocal,writeLocal} from '../PageCompiler/localCopy';
 import {componentLayer,layerShows,usePageLayer} from './pageLayers';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {runtimeComponentLabel} from './smartComponentLabel';
@@ -13,7 +14,7 @@ import {resolveMetadataProperties} from '../../metadata/Definitions/metadataRefe
 import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChannel';
 import { presentPageRecords, type ChannelGrant } from '../../records/RecordWorkspace/recordPresentationAdapters';
 import TemplatePageRuntimeLayout from '../TemplatePageRuntime/TemplatePageRuntimeLayout';
-import { loadFlowScreenRecordPage, loadFlowScreenRecords, getAccessToken } from '../../authentication/Client/authClient';
+import { loadFlowScreenRecordPage, loadFlowScreenRecords, getAccessToken, currentSessionUserId } from '../../authentication/Client/authClient';
 import {uploadTenantImageFile} from '../../builders/ComponentProperties/TenantMediaPicker';
 import {shouldInvalidatePageComponent,pageComponentReadObjectNames,applySavedRecordMutations,
   type PageMutationDetail,type LoadedRecordListScope} from './pageMutationScope';
@@ -1269,11 +1270,21 @@ function LightningAppRuntime({
       return ()=>{active=false;};
     }
     // Expired or other-width copy stays on screen; only a changed page replaces it.
-    const showing=readStalePageDefinition(pageDefinitionCache,cacheKey)
+    let showing=readStalePageDefinition(pageDefinitionCache,cacheKey)
       ??(pageLoadRef.current.identity===pageIdentity?pageLoadRef.current.page:null);
     setPageLoad({routeKey,identity:pageIdentity,appId,page:showing,error:'',loading:!showing});
     const endpoint=appPageEndpoint(appId,pageApiName,Boolean(inScreenPage),Boolean(printPreview),requestedLayout,viewportWidth);
+    // Local copy: the page (and its converted file ticket) this user opened last time
+    // draws at once, even after a restart; the server's answer replaces it if changed.
+    const localKey='page|'+cacheKey;
+    if(!showing&&!printPreview)void readLocal<{page:LightningPageMetadata;script?:unknown}>(currentSessionUserId(),localKey).then(saved=>{
+      if(!active||!saved?.page||pageLoadRef.current.page)return;
+      showing=saved.page;
+      primeAppPageScript(saved.page,issuedAppPageScript(saved.script));
+      setPageLoad({routeKey,identity:pageIdentity,appId,page:saved.page,error:'',loading:false});
+    }).catch(()=>undefined);
     void apiRequest<{ page: LightningPageMetadata | null; script?: unknown }>(endpoint).then((payload) => {
+      if(payload.page&&!printPreview)writeLocal(currentSessionUserId(),localKey,{page:payload.page,script:payload.script});
       if(active){
         const next=samePageDefinition(showing,payload.page)?showing:payload.page;
         // The converted page file came with the page: no second round trip.

@@ -39,7 +39,7 @@ export function confirmationComponents(variant){
   label('sts-success-method','Payment method',rect(24,293,w-48,38),
    '="Payment method: " & @ThisPage.Input.paymentMethod',phone?15:18),
   label('sts-success-change','Change returned',rect(24,334,w-48,34),
-   '="Change returned: " & FORMAT(@ThisPage.Input.changeAmount, "£0.00")',phone?15:18),
+   '=IF(ISBLANK(@ThisPage.Input.changeAmount), "", "Change returned: " & FORMAT(@ThisPage.Input.changeAmount, "£0.00"))',phone?15:18),
   node('sts-success-done','smart_button','Done',rect(phone?50:145,h-91,phone?w-100:w-290,56),
    {label:'Done',labelAlignment:'center',backgroundColor:colours.green,
     labelColor:colours.white,radius:14,textSize:19,

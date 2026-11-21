@@ -638,12 +638,12 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      CROSS JOIN last_order
     ON CONFLICT(property_key) DO NOTHING
   `);
-  // Card Body dimensions must be enabled for both repeated-card variants.
+  // The Card Grid is registered here. applySmartIdCard later copies these rules
+  // after registering smart_id_card, avoiding a fresh-database FK violation.
   await client.query(`
     INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
     SELECT spec.component_api,spec.property_key,true FROM (VALUES
-      ('smart_card_grid','cardBodyWidth'),('smart_card_grid','cardBodyHeight'),
-      ('smart_id_card','cardBodyWidth'),('smart_id_card','cardBodyHeight')
+      ('smart_card_grid','cardBodyWidth'),('smart_card_grid','cardBodyHeight')
     ) AS spec(component_api,property_key)
     JOIN md_builder_shared_properties p ON p.property_key=spec.property_key
     ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true

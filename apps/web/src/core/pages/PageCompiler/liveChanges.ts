@@ -17,7 +17,9 @@ export type LivePageEdit={page:string;variant:string;clientId:string;name:string
  * save's answer ('settled': the saved rows, or ok false when nothing was saved). `batch` names
  * the tap: its predicted new rows carry provisional Ids of that batch. */
 export type LiveTapChange={objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>};
-export type LiveTap={batch:string;ok:boolean;changes:LiveTapChange[]};
+export type LiveTap={batch:string;ok:boolean;changes:LiveTapChange[];
+ /** The tapping screen's device key and page session (its sale), when it has them. */
+ device?:string;session?:string};
 export type LiveEvent={kind:'change';change:LiveChange}|{kind:'screen';device:string}|{kind:'page';page:LivePage}
  |{kind:'page-edit';edit:LivePageEdit}|{kind:'preview';tap:LiveTap}|{kind:'settled';tap:LiveTap}|{kind:'resync'};
 type Listener=(event:LiveEvent)=>void;
@@ -104,7 +106,9 @@ export class LiveFrameParser{
    else if(name==='page'&&typeof data.page==='string')this.push({kind:'page',page:{page:data.page,variant:String(data.variant??''),
     draft:typeof data.draft==='number'?data.draft:null,published:typeof data.published==='number'?data.published:null}});
    else if((name==='preview'||name==='settled')&&typeof data.batch==='string'&&/^[0-9a-f]{8}$/.test(data.batch)){
-    const tap={batch:data.batch,ok:name==='preview'||data.ok===true,changes:tapChanges(data.changes)};
+    const tap:LiveTap={batch:data.batch,ok:name==='preview'||data.ok===true,changes:tapChanges(data.changes),
+     ...(typeof data.device==='string'&&/^[A-Za-z0-9_-]{16,128}$/.test(data.device)?{device:data.device}:{}),
+     ...(typeof data.session==='string'&&data.session&&data.session.length<=80?{session:data.session}:{})};
     this.push(name==='preview'?{kind:'preview',tap}:{kind:'settled',tap});
    }
    else if(name==='change'&&typeof data.object==='string')this.push({kind:'change',change:{

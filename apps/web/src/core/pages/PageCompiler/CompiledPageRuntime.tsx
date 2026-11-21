@@ -38,7 +38,7 @@ import {compiledSourceLoader} from './compiledSourceLoader';
 import {showPageLayer} from '../PageRuntime/pageLayers';
 import {isLiveConnected,subscribeLiveChanges} from './liveChanges';
 import {connectPageLive} from './pageLiveWiring';
-import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession} from './mirrorLiveRefresh';
+import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession,mirrorSources,setFollowingSale} from './mirrorLiveRefresh';
 import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import {isCompiledStateReference,declarativeSource,COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
@@ -322,8 +322,18 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    })});
   // Live changes: records saved anywhere (another till, a display's till, a Flow, another
   // user) show here at once. Only the lists and totals over those Objects are read again.
+  // A display (it reads @ThisPage.Device.MirrorKey) moves to the followed device's sale as
+  // soon as that device taps on it, without waiting for the screen notice.
+  const followsDevice=Boolean(runtime.code?.readsMirror)||mirrorSources(runtime.compiled.dataSources).length>0;
   const stopLive=connectPageLive({apiName:runtime.compiled.apiName,pageSessionKey:runtime.pageSessionKey,
-   dataSources:runtime.compiled.dataSources,data:runtime.data,code:runtime.code});
+   dataSources:runtime.compiled.dataSources,data:runtime.data,code:runtime.code,
+   follow:followsDevice?(device,session)=>{
+    if(device!==mirrorDeviceKey())return false;
+    setFollowingSale(true);
+    if(session===runtime.sessionId())return false;
+    runtime.resetSession(session);
+    return true;
+   }:undefined});
   return ()=>{
    stopLive();
    unsubscribeShown.forEach(stop=>stop());

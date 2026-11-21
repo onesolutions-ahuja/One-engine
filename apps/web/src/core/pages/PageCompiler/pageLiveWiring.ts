@@ -14,6 +14,9 @@ import {noteLiveDrawn,timingNow} from './pageTimings';
  * Changes to one Object within MERGE_MS are merged, so a line and its cart are one step.
  */
 export const LIVE_MERGE_MS=30;
+/** Database notices wait at most this long for another screen's fast taps to be answered. */
+export const NOTICE_HOLD_MS=2_000;
+const NOTICE_RETRY_MS=50;
 type Row=Record<string,unknown>;
 type CodeTarget={
  applyLiveRows(object:string,rows:ReadonlyArray<Row>,gone?:readonly string[]):void;
@@ -26,6 +29,9 @@ export type PageLiveTarget={
  dataSources:readonly CompiledDataSource[];
  data:Pick<CompiledDataLayer,'saved'|'live'|'reload'>;
  code?:CodeTarget|null;
+ /** A screen that follows another device (a customer display): the tapping device's sale.
+  * Returns true when this page moved to that sale (it then reads everything again). */
+ follow?(device:string,session:string):boolean;
 };
 
 /** Live changes of one Object waiting to be drawn. `rows` null: something came without
@@ -151,9 +157,16 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
  // These rows are drawn now (or by the later tap's answer): their database notice needs no second read.
  noteOwnWrites(tap.changes.filter(change=>change.operation!=='delete').map(change=>change.record.Id));
  for(const object of objects){
-  const list=(changes.get(object)??[]).filter(change=>change.operation==='delete'||!later.ids.has(String(change.record.Id)));
-  work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:list,replacesOptimistic:tap.batch,live:true}).catch(()=>undefined));
-  target.code?.applyLiveRows(object,rowsOf(list),[...predicted?.get(object)??[],...deletedOf(list)]);
+  const all=changes.get(object)??[];
+  const list=all.filter(change=>change.operation==='delete'||!later.ids.has(String(change.record.Id)));
+  const provisional=[...predicted?.get(object)??[]];
+  // Everything here is left to a later tap's answer and no provisional row to take away:
+  // nothing to draw (a re-read now would show the older saved value for a moment).
+  if(!list.length&&!provisional.length)continue;
+  // Provisional rows go with this answer: the lists take the saved rows in the same step.
+  const shown=list.length?list:all;
+  work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:shown,replacesOptimistic:tap.batch,live:true}).catch(()=>undefined));
+  target.code?.applyLiveRows(object,rowsOf(list),[...provisional,...deletedOf(list)]);
  }
  // Server totals over these Objects (display formulas over rows the page does not hold),
  // once the last waiting tap on them has answered.
@@ -191,9 +204,19 @@ export function connectPageLive(target:PageLiveTarget,
  let timer:ReturnType<typeof setTimeout>|null=null;
  let received=0;
  const ledger=newTapLedger();
+ let heldSince=0;
  const flush=()=>{
   timer=null;
-  const changes=withoutWaiting([...pending.values()],waitingFor(ledger));pending.clear();
+  // Taps of another screen still wait for their answers (a burst of fast taps): database
+  // notices (older saves, roll-up parents such as a cart total) are held and merged, and
+  // drawn once the last answer is in, so nothing on screen steps back. At most HOLD_MS.
+  const waiting=waitingFor(ledger);
+  if(pending.size&&waiting.ids.size){
+   heldSince||=Date.now();
+   if(Date.now()-heldSince<NOTICE_HOLD_MS){timer=setTimeout(flush,NOTICE_RETRY_MS);return;}
+  }
+  heldSince=0;
+  const changes=withoutWaiting([...pending.values()],waiting);pending.clear();
   if(!changes.length)return;
   // Speed timing: received -> drawn (rows patched in place now; re-reads count when they land).
   const at=received;
@@ -203,9 +226,14 @@ export function connectPageLive(target:PageLiveTarget,
  const stop=subscribe(event=>{
   if(event.kind==='resync'){ledger.waiting.clear();void resyncPage(target);return;}
   if(event.kind==='preview'||event.kind==='settled'){
+   // The device this display follows tapped on a sale the display is not on yet (a new
+   // sale): it moves to that sale first, then the tap draws there.
+   if(event.tap.device&&event.tap.session&&target.follow?.(event.tap.device,event.tap.session))ledger.waiting.clear();
    // Drawn at once (not merged): this is the fastest path from a till to its display.
    const at=timingNow();
    void drawLiveTap(target,event.kind,event.tap,ledger);
+   // The last waiting answer is in: held database notices draw now.
+   if(event.kind==='settled'&&pending.size&&!waitingFor(ledger).ids.size){if(timer)clearTimeout(timer);flush();}
    queueMicrotask(()=>noteLiveDrawn(target.apiName,at,event.kind+':'+[...new Set(event.tap.changes.map(change=>change.objectApiName))].join(',')));
    return;
   }

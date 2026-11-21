@@ -144,18 +144,20 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    const source=build.pageCode.actions.find(item=>item.key===key)?.js??'';
    // The tap's prediction goes to the same login's other screens (a customer display) now,
    // before the save: they show it as fast as the till itself.
+   const request=parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent')});
    const live=deps.live?readLiveRelay(body.live):null;
-   if(live?.changes?.length)void deps.live!.relay(actor,'preview',{batch:live.batch,changes:live.changes}).catch(()=>undefined);
+   // Which device and sale tapped: a display following that device moves to the sale at once.
+   const from={...(request.deviceKey?{device:request.deviceKey}:{}),...(request.sessionId?{session:request.sessionId}:{})};
+   if(live?.changes?.length)void deps.live!.relay(actor,'preview',{batch:live.batch,...from,changes:live.changes}).catch(()=>undefined);
    // @ThisPage.Device.Ip / Agent: what the server itself saw, never what the browser says.
-   const result=await executePageCodeAction(deps,actor,build.serverCode,key,
-    parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent')}),source);
+   const result=await executePageCodeAction(deps,actor,build.serverCode,key,request,source);
    res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1));
    res.json(result);
    // The answer replaces the prediction there (saved rows, or ok false: it is taken back).
    // A device step (result.needs) is not an answer yet: the browser sends the action again.
    if(live&&!result.needs){
     const saved=result.ok?relayChanges(result.changes)??[]:[];
-    void deps.live!.relay(actor,'settled',{batch:live.batch,ok:Boolean(result.ok),changes:saved}).catch(()=>undefined);
+    void deps.live!.relay(actor,'settled',{batch:live.batch,ok:Boolean(result.ok),...from,changes:saved}).catch(()=>undefined);
    }
   }));
   app.post(prefix+'/page-code/aggregates',wrap(async(req,res)=>{

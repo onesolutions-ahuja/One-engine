@@ -156,3 +156,23 @@ test('a new row of another parent makes a parent-scoped list read again (its par
   recordChanges:[{objectApiName:'CartLine',operation:'create',record:{Id:'l2',Cart:'old',Qty:1}}]},scope);
  assert.deepEqual(same?.records.map(row=>row.Id),['l1','l2'],'same parent: drawn in place');
 });
+
+test('a display moves to the followed device\'s sale as soon as that device taps on it',async()=>{
+ const {connectPageLive}=await import('../src/core/pages/PageCompiler/pageLiveWiring.ts');
+ const events:unknown[]=[];
+ const parser=new LiveFrameParser(event=>events.push(event));
+ parser.append('event: preview\ndata: {"batch":"0000f00d","device":"till-device-key-0001","session":"sale-2","changes":[{"objectApiName":"CartLine","operation":"create","record":{"Id":"p"}}]}\n\n');
+ const tap=(events[0] as {tap:{device:string;session:string}}).tap;
+ assert.equal(tap.device,'till-device-key-0001');
+ assert.equal(tap.session,'sale-2');
+ const {target,saved}=fakeTarget();
+ const followed:string[]=[];
+ let listener:((event:never)=>void)|undefined;
+ const stop=connectPageLive({...target,follow:(device:string,session:string)=>{followed.push(device+'>'+session);return true;}},
+  next=>{listener=next as never;return ()=>undefined;});
+ listener!(events[0] as never);
+ await new Promise(resolve=>setTimeout(resolve,0));
+ assert.deepEqual(followed,['till-device-key-0001>sale-2'],'moved to the sale before drawing');
+ assert.equal(saved.length,1,'then the tap is drawn there');
+ stop();
+});

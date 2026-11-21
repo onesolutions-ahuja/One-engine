@@ -225,6 +225,9 @@ export class LiveChangeHub{
 
 /** A page's predicted or saved record changes, passed to the same login's other screens. */
 export type LiveRelay={batch:string;ok?:boolean;
+ /** The tapping screen's device and page session (its sale): a screen that follows that
+  * device moves to the sale at once, before drawing the tap. */
+ device?:string;session?:string;
  changes:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Row}>};
 const objectName=/^[A-Za-z][A-Za-z0-9_]{0,79}$/,batchPattern=/^[0-9a-f]{8}$/;
 /** Largest relayed change (one tap's rows); a bigger one is not relayed (the saved rows still go). */

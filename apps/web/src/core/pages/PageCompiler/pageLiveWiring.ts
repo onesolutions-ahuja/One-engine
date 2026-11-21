@@ -26,6 +26,9 @@ export type PageLiveTarget={
  dataSources:readonly CompiledDataSource[];
  data:Pick<CompiledDataLayer,'saved'|'live'|'reload'>;
  code?:CodeTarget|null;
+ /** A screen that follows another device (a customer display): the tapping device's sale.
+  * Returns true when this page moved to that sale (it then reads everything again). */
+ follow?(device:string,session:string):boolean;
 };
 
 /** Live changes of one Object waiting to be drawn. `rows` null: something came without
@@ -203,6 +206,9 @@ export function connectPageLive(target:PageLiveTarget,
  const stop=subscribe(event=>{
   if(event.kind==='resync'){ledger.waiting.clear();void resyncPage(target);return;}
   if(event.kind==='preview'||event.kind==='settled'){
+   // The device this display follows tapped on a sale the display is not on yet (a new
+   // sale): it moves to that sale first, then the tap draws there.
+   if(event.tap.device&&event.tap.session&&target.follow?.(event.tap.device,event.tap.session))ledger.waiting.clear();
    // Drawn at once (not merged): this is the fastest path from a till to its display.
    const at=timingNow();
    void drawLiveTap(target,event.kind,event.tap,ledger);

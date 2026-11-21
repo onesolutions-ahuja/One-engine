@@ -204,15 +204,17 @@ export class ScreenPairingService{
  /** Only a server-paid Invoice the current user can read is displayed as completed.
   * Ignore client-supplied amount, method and change; get all from the saved invoice. */
  async showPaidInvoice(actor:Actor,deviceKey:unknown,invoice:Record<string,unknown>):
-   Promise<{amount:number;method:string;change:number;invoiceId:string}>{
+   Promise<{amount:number;method:string;change:number|null;invoiceId:string}>{
   if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))fail('Invalid till device');
   if(typeof invoice.Id!=='string'||!uuid.test(invoice.Id)||String(invoice.Status)!=='Paid')
    fail('Only a completed invoice can be shown as paid');
   const amount=Number(invoice.Total);
   if(!Number.isFinite(amount)||amount<0||amount>100000000)fail('Invalid completed invoice total');
   const method=String(invoice.PaymentMethod??invoice.PaymentType??'');
-  const changeRaw=Number(invoice.ChangeAmount??0);
-  const change=Number.isFinite(changeRaw)&&changeRaw>=0?changeRaw:0;
+  const changeRaw=Number(invoice.ChangeAmount);
+  // Absent change must remain unknown, never an invented zero.
+  const change=invoice.ChangeAmount!==undefined&&invoice.ChangeAmount!==null
+   &&invoice.ChangeAmount!==''&&Number.isFinite(changeRaw)&&changeRaw>=0?changeRaw:null;
   const payment={invoiceId:invoice.Id,amount,method,change};
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,page_layers,payment_confirmation)
    VALUES($1,$2,jsonb_build_object('smart_till_customer_display',1),$3::jsonb)

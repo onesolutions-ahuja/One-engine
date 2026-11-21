@@ -367,12 +367,13 @@ export function parseScreenAction(source:string){
   throw Error('SCREEN requires a page API name, then optional mode, record and layer (any order)');
  const page=nameOf(node.args[0],'page API name');
  // After the page: mode, record and layer in any order (see screenArguments).
- const {mode,record:recordNode,layer}=screenArguments(node.args.slice(1));
+ const {mode,modeGiven,record:recordNode,layer}=screenArguments(node.args.slice(1));
  // The record the screen opens with, e.g. SCREEN(Payment,popup,@ThisPage.Cart2.recordId).
  // The caller evaluates it.
  if(recordNode)validateFormulaFunctions(recordNode,'ribbon_binding');
  const record=recordNode?serializeFormulaSqlExpression(recordNode):undefined;
- return {page,mode,record,...(layer!==undefined?{layer}:{})};
+ // modeGiven only matters with a layer: SCREEN(page, n) switches, SCREEN(page, current, n) may also open.
+ return {page,mode,record,...(layer!==undefined?{layer,modeGiven}:{})};
 }
 
 const stepNodes=(step:ActionStep):Expression[]=>[...(step.id?[step.id]:[]),...step.fields.values(),

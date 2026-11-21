@@ -39,14 +39,17 @@ export function openedWithScreenSession():boolean{
 export async function followMirroredSale(deps:{mirrorKey:string;openedWithSession:boolean;
  request:<T>(path:string,init?:RequestInit)=>Promise<T>;sessionId():string;resetSession(next?:string):void;
  /** SCREEN(page, n) run on the mirrored device: the layer each page shows (lower-case page names). */
- onLayers?(layers:Record<string,number>):void}):Promise<void>{
+ onLayers?(layers:Record<string,number>):void;
+ onPayment?(payment:Record<string,unknown>|null):void}):Promise<void>{
  if(!deps.mirrorKey){setFollowingSale(deps.openedWithSession);return;}
- const {sessionId,layers}=await deps.request<{sessionId:string;layers?:Record<string,number>}>('/screens/current-session',
+ const {sessionId,layers,payment}=await deps.request<{sessionId:string;layers?:Record<string,number>;
+  payment?:Record<string,unknown>|null}>('/screens/current-session',
   {method:'POST',body:JSON.stringify({mirrorKey:deps.mirrorKey})});
  // No sale reported yet: a window opened by the till already shares its sale.
  setFollowingSale(Boolean(sessionId)||deps.openedWithSession);
- if(layers&&typeof layers==='object')deps.onLayers?.(layers);
  if(sessionId&&sessionId!==deps.sessionId())deps.resetSession(sessionId);
+ if(layers&&typeof layers==='object')deps.onLayers?.(layers);
+ deps.onPayment?.(payment??null);
 }
 /** Data sources that show another device's rows: their filter reads MirrorKey, or, on a
  * display (followsSale), the page session, which is the till's current sale. A display cart
@@ -121,7 +124,14 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
  const tick=()=>{void refresh();};
  // With the live stream up, the Till's changes arrive by themselves: the timer is only a
  // slow safety net. Without it (offline, a proxy that blocks streams) it checks every 2 s.
- const timed=()=>{if(target.isLive?.()&&Date.now()-last<LIVE_FALLBACK_MS)return;tick();};
+ // Even with live Object events, a remote customer screen needs the till's layer and
+ // receipt state. Follow its lightweight device record, without re-reading cart rows.
+ const timed=()=>{
+  if(target.isLive?.()&&Date.now()-last<LIVE_FALLBACK_MS){
+   if(target.followSale)void follow();return;
+  }
+  tick();
+ };
  const timer=clock.setInterval(timed,intervalMs);
  const unlisten=clock.listen(tick);
  // The server tells a display which Till it follows a moment after the page opens.

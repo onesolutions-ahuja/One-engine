@@ -81,3 +81,22 @@ Merge only when BOTH CI jobs succeed (use a script that checks every conclusion;
 - Measure: tap test = click `article.smart-card`, watch the `[class*=smart-cart]` text change (MutationObserver);
   save time = resource timing of `/page-code/execute` (Server-Timing `action`).
 - Smart Till tenant data is dummy: test sales are fine.
+- Deploy, if the bearer route is refused here: Setup, top-right "System and release information"
+  (wide window), "Deploy latest to OCI" (the owner clicks it; it asks to confirm).
+- Full live tap check (one go, every case): `scripts/live-tap-check.js`. Paste the DISPLAY part in the
+  display tab (in front, `?mirror=<till device key>`; without it the display may follow another device) and run
+  `tapCheck.install()`; paste the TAPPER part in the till tab and run `tapCheck.run()` (about 40 s; it spaces
+  taps without timers, so a background till tab is not slowed); then `tapCheck.report(result)` in the display
+  tab. Cases: first item after Clear sale x3, 4 fast taps on a new line x2 and on an existing line, Clear sale
+  then 4 fast taps. `tapCheck.trace(at)` lists the live events (preview/settled/change) around a case.
+
+## Live taps on other screens (21 Nov 2026, PRs #239, #240 and the new-sale PR)
+- One set of rules per page for every way a screen changes (its own tap, a tap relayed from
+  another screen, a database notice): answers in order, never over a newer tap (TapLedger).
+- A list scoped to the session's newest parent (cart lines) knows that parent's Object and
+  session (`relatedFilter.parent`); a tap that makes a new parent moves the list to it at once
+  (`movedSessionParent`), so the first item of a new sale shows from the prediction.
+- "Total to pay" on the display already shows from the prediction (~0.1 s).
+- Not done, on purpose: predictions are not relayed to screens of ANOTHER login. Row access is
+  checked per saved record (`md_record_access`); a prediction is not saved yet, so it cannot be
+  checked. Those screens get the saved rows from database notices.

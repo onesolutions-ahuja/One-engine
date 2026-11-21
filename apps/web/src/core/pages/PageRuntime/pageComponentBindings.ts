@@ -183,7 +183,7 @@ export async function pageComponentSessionRelatedQuery(
  objects:ReadonlyArray<{apiName:string;fields:ReadonlyArray<FieldMetadata>}>,
  sessionId:string,
  load:(target:string,sessionKey:string)=>Promise<{records:Record<string,unknown>[];total:number}>
-):Promise<{blocked:boolean;filter?:PageQueryFilter}>{
+):Promise<SessionRelatedQuery>{
  if(typeof sessionId!=='string'||!sessionId.trim()||sessionId.length>128)return {blocked:true};
  const eligible=fields.flatMap(field=>{
   if(!field.relationship||!isServerFilterable(field,'Equals'))return [];
@@ -193,7 +193,7 @@ export async function pageComponentSessionRelatedQuery(
   return [{field,target:parent.apiName}];
  });
  if(eligible.length===0||eligible.length>8)return {blocked:true};
- const matches:PageQueryFilter[]=[];
+ const matches:Array<{filter:PageQueryFilter;parentObject:string}>=[];
  for(const {field,target} of eligible){
   try{
    const page=await load(target,sessionId);
@@ -202,11 +202,18 @@ export async function pageComponentSessionRelatedQuery(
    if(page.total===0)continue;
    const row=newestSessionParent(page.records);
    if(!row)return {blocked:true};
-   matches.push({field:field.apiName,value:row.Id,related:true});
+   matches.push({filter:{field:field.apiName,value:row.Id,related:true},parentObject:target});
   }catch{return {blocked:true};}
  }
- return matches.length===1?{blocked:false,filter:matches[0]}:{blocked:true};
+ if(matches.length===1)return {blocked:false,filter:matches[0].filter,parentObject:matches[0].parentObject};
+ // No parent yet (a new till's first sale): nothing to show, but the list knows which parent
+ // it waits for, so the first tap's new parent can be shown at once.
+ if(!matches.length&&eligible.length===1)return {blocked:true,waiting:{field:eligible[0].field.apiName,parentObject:eligible[0].target}};
+ return {blocked:true};
 }
+/** The session's parent (a cart) the list belongs to, or the one it waits for. */
+export type SessionRelatedQuery={blocked:boolean;filter?:PageQueryFilter;parentObject?:string;
+ waiting?:{field:string;parentObject:string}};
 const isDynamic=(value:unknown):value is {source:string;key?:string;skipWhenBlank?:boolean;allWhenStar?:boolean}=>
   Boolean(value&&typeof value==='object'&&!Array.isArray(value));
 /** Resolve only declared, typed page context sources; never evaluate expressions. */

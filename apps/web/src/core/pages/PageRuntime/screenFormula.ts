@@ -7,14 +7,14 @@ import {LAYER_EVENT,rememberRequestedLayer,showPageLayer} from './pageLayers';
 
 export type PopupScreen={page:string;sessionId:string;recordId:string;instance:string;inScreen:boolean;
  /** Page session that opened the popup: refreshed when the popup closes. */
- parentKey?:string;print?:boolean;ready?:()=>void;failed?:(reason:Error)=>void};
+ parentKey?:string;values?:Record<string,unknown>;print?:boolean;ready?:()=>void;failed?:(reason:Error)=>void};
 /** SCREEN(Page[,mode[,record]]). The optional record (for example
  * @ThisPage.Cart2.recordId) is evaluated by the caller's resolveRecord with the
  * page's own formula context; the popup reads it as @ThisPage.Input.recordId. The
  * popup shares the session (@ThisPage.Session.Id) and gets its own page values. */
 export function openFormulaScreen(source:string,context:PageActionRoutingContext,
  onNavigate:(route:PageActionRoute)=>void,parentKey:string,sessionId:string,recordId:string,
- resolveRecord?:(formula:string)=>unknown){
+ resolveRecord?:(formula:string)=>unknown,extraValues?:Record<string,unknown>){
  const parsed=parseScreenAction(source);
  const {mode,record}=parsed;
  // Page API names are lowercase; formulas may keep the label's casing.
@@ -38,7 +38,8 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   item.apiName===page&&item.pageType==='In-Screen Page'&&item.status==='Active');
  const route=inScreen?null:resolvePageActionRoute({navigationTargetType:'App Page',navigationPageApiName:page},context);
  if(mode==='popup'){
-  const screen:PopupScreen={page,sessionId,recordId,instance:crypto.randomUUID(),inScreen,parentKey};
+  const screen:PopupScreen={page,sessionId,recordId,instance:crypto.randomUUID(),inScreen,parentKey,
+   ...(extraValues?{values:extraValues}:{})};
   const handled=!window.dispatchEvent(new CustomEvent('metadrive:open-formula-screen',{
    detail:{parentKey,screen},cancelable:true
   }));

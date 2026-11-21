@@ -604,7 +604,16 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      ('customButton2Bold','Custom 2 bold','Button 2','customButton3Bold',false,11),
      ('supportingRadius','Supporting radius','Header Supporting','rowSupportingRadius',true,12),
      ('headerRadius','Header radius','Header','rowSupportingRadius',true,13),
-     ('footerWidth','Footer width','Footer','footerHeight',false,14)
+     ('footerWidth','Footer width','Footer','footerHeight',false,14),
+     ('headerBoxWidth','Header width','Header','footerHeight',false,15),
+     ('badgeWidth','Badge width','Badge','footerHeight',false,16),
+     ('badgeHeight','Badge height','Badge','footerHeight',false,17),
+     ('cardButtonWidth','Card button width','Button 3','footerHeight',false,18),
+     ('cardButtonHeight','Card button height','Button 3','footerHeight',false,19),
+     ('customButton1Width','Button width','Button','footerHeight',false,20),
+     ('customButton1Height','Button height','Button','footerHeight',false,21),
+     ('customButton2Width','Button 2 width','Button 2','footerHeight',false,22),
+     ('customButton2Height','Button 2 height','Button 2','footerHeight',false,23)
     ), missing AS (
       SELECT specs.* FROM specs WHERE NOT EXISTS(
         SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key)
@@ -641,6 +650,11 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      ('smart_cart','Button 5','bold','qtyDecreaseBold'),
      ('smart_cart','Image','border','imageBorderColor'),('smart_cart','Image','fill','imageBackgroundColor'),
      ('smart_table','Row','fill','rowBackgroundColor'),('smart_table','Row','wrap','rowWrapText'),
+     ('smart_card_grid','Header','width','headerBoxWidth'),
+     ('smart_card_grid','Badge','width','badgeWidth'),('smart_card_grid','Badge','height','badgeHeight'),
+     ('smart_card_grid','Button','width','customButton1Width'),('smart_card_grid','Button','height','customButton1Height'),
+     ('smart_card_grid','Button 2','width','customButton2Width'),('smart_card_grid','Button 2','height','customButton2Height'),
+     ('smart_card_grid','Button 3','width','cardButtonWidth'),('smart_card_grid','Button 3','height','cardButtonHeight'),
      ('smart_card_grid','Button','bold','customButton1Bold'),
      ('smart_card_grid','Button 2','alignment','customButton2Alignment'),('smart_card_grid','Button 2','size','customButton2TextSize'),
      ('smart_card_grid','Button 2','bold','customButton2Bold'),

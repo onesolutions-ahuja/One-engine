@@ -638,6 +638,15 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      CROSS JOIN last_order
     ON CONFLICT(property_key) DO NOTHING
   `);
+  // Width must never silently clamp a displayed value from 24px to 96px.
+  await client.query(`
+    UPDATE md_builder_shared_properties SET
+      min_value=CASE WHEN property_key='cardBodyWidth' THEN 96 ELSE 24 END,
+      max_value=1200
+    WHERE property_key IN ('cardBodyWidth','cardBodyHeight')
+      AND (min_value,max_value) IS DISTINCT FROM
+        (CASE WHEN property_key='cardBodyWidth' THEN 96 ELSE 24 END,1200)
+  `);
   // The Card Grid is registered here. applySmartIdCard later copies these rules
   // after registering smart_id_card, avoiding a fresh-database FK violation.
   await client.query(`

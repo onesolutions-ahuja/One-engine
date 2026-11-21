@@ -1327,7 +1327,7 @@ function LightningAppRuntime({
   useEffect(() => {
     setActiveTabs({});
   }, [page?.apiName]);
-  // Page layers: layer 0 always, plus the one layer the page is on now (?layer=, SCREEN(page, n)).
+  // Page layers: only the one layer (screen) the page is on now (?layer=, SCREEN(page, n)).
   const currentLayer=usePageLayer(page?.apiName);
   // Once this page runs, get the pages it can open ready in the background.
   const pageReady=Boolean(page)&&appScript.status!=='loading';

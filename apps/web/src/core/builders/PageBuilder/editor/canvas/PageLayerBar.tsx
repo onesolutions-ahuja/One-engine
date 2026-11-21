@@ -5,8 +5,9 @@ import type { PageComponentMetadata } from '../../../../metadata/Definitions/met
 import { MAX_PAGE_LAYER, componentLayer, layerCaption, pageLayerNumbers } from '../../../../pages/PageRuntime/pageLayers';
 import './PageLayerBar.css';
 
-/** Layers tab bar under the canvas: pick the layer to design, + adds the next layer, and
- * the selected component can be moved to another layer. Layer 0 is the page itself. */
+/** Layers tab bar under the canvas: each layer is a separate blank screen of the same page
+ * (like slides). Pick the layer to design, + adds the next one, and the selected component
+ * can be moved to another layer. The page opens on layer 0. */
 export default function PageLayerBar({ components, current, added, selected, onPick, onAdd, onMove }: {
   components: readonly PageComponentMetadata[];
   current: number;
@@ -28,10 +29,10 @@ export default function PageLayerBar({ components, current, added, selected, onP
     <span className="page-layer-bar-title">Layers</span>
     <div className="page-layer-bar-tabs" role="tablist">
       {layers.map(layer => {
-        const caption = layerCaption(layer, components);
+        const caption = layerCaption(layer);
         return <button key={layer} type="button" role="tab" aria-selected={layer === current}
           className={'page-layer-tab' + (layer === current ? ' is-current' : '')}
-          title={layer === 0 ? 'Layer 0: the page itself, always shown' : 'Layer ' + layer + ': shown over layer 0 when opened with SCREEN(page, ' + layer + ')'}
+          title={layer === 0 ? 'Layer 0: the screen the page opens on' : 'Layer ' + layer + ': a separate screen, shown instead of the others with SCREEN(page, ' + layer + ')'}
           onClick={() => onPick(layer)}>
           <b>{layer}</b>{caption && <span>{caption}</span>}
         </button>;

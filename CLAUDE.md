@@ -26,7 +26,7 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
 - Browser runtime: `core/pages/PageCompiler/` (`CompiledPageRuntime.tsx` wiring, `compiledPageStore.ts` data layer
   `saved()`/`live()`, `compiledSourceLoader.ts`, `pageCodeRuntime.ts` instant taps + totals/sets,
   `mirrorLiveRefresh.ts` displays, `liveChanges.ts` live stream); views `core/pages/PageRuntime/pageRuntimeViews.tsx`.
-- Page layers: `core/pages/PageRuntime/pageLayers.ts` (component property `pageLayer`, 0 always shows);
+- Page layers: `core/pages/PageRuntime/pageLayers.ts` (component property `pageLayer`; each layer is its own screen, only one shows; 0 = default);
   `SCREEN(page, [mode], [record], [layer 0-9])` any order after the page: `screenFormula.ts`.
 - Page Builder: `core/builders/PageBuilder/editor/` (`usePageEditorState.tsx`, `usePageComponentActions.tsx`,
   canvas `canvas/PageCanvasStage.tsx`, Layers bar `canvas/PageLayerBar.tsx`). Page CSV: `system-support/page-inventory-csv.ts`.

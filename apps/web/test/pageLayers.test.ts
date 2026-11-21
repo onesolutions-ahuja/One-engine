@@ -12,13 +12,14 @@ const components=[c('Cart'),c('PayOverlay',{pageLayer:1}),c('PayAmount',{layoutP
 test('a component is on its own layer, else its container\'s, else 0',()=>{
  assert.deepEqual(components.map(item=>componentLayer(item,components)),[0,1,1,3,0]);
  assert.deepEqual(pageLayerNumbers(components),[0,1,3]);
- assert.equal(layerCaption(0,components),'Default');
- assert.equal(layerCaption(3,components),'ThanksBox');
+ assert.equal(layerCaption(0),'Default');
+ assert.equal(layerCaption(3),'Screen');
  assert.equal(layerNumber('2'),2);assert.equal(layerNumber(10),null);assert.equal(layerNumber(-1),null);
 });
 
-test('layer 0 always shows; one other layer shows on top only while it is current',()=>{
- assert.equal(layerShows(0,3),true);
+test('layers are separate screens: only the current layer shows, layer 0 included',()=>{
+ assert.equal(layerShows(0,3),false);
+ assert.equal(layerShows(0,0),true);
  assert.equal(layerShows(3,3),true);
  assert.equal(layerShows(1,3),false);
  assert.equal(layerShows(1,0),false);

@@ -434,6 +434,11 @@ class ServerScope{
    if(typeof paid.ledgerId==='string'&&paid.ledgerId)await this.saved('CashLedger',paid.ledgerId,'create');
    if(typeof paid.invoiceId==='string'&&paid.invoiceId)await this.saved('Invoice',paid.invoiceId,'update');
    for(const object of ['Invoice','CashLedger']){this.written.add(object);this.forget(object);}
+   // A RECEIPT is only announced after the server confirms the FINAL tender.
+   // PartPaid must never show the customer a successful completed sale.
+   if(result.status==='Paid'&&!result.duplicate){
+    this.effects.push({name:'PAID_INVOICE',args:[result.invoiceId]});
+   }
    return result;
   }
   if(name==='CASHMOVE'){

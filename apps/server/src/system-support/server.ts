@@ -466,6 +466,12 @@ export function createSystemServer(db:SqlPersistence) {
   // metadata), the apps, a one-line summary of each page (for SCREEN/navigation and
   // popup sizes, no components) and the session. Same RBAC as the landing bootstrap;
   // a dataset the user may not read is empty, exactly as its own endpoint would fail.
+  /** Drawn full screen without the app frame: a component on the page asks for it. */
+  const hasStandalonePresentation=(components:ReadonlyArray<{properties?:unknown}>)=>components.some(item=>{
+    const properties=item.properties;
+    return typeof properties==='object'&&properties!==null&&'standalonePresentation' in properties
+      &&properties.standalonePresentation===true;
+  });
   const appRuntimeMetadata=async(tenantId:string,userId:string,appId:string)=>{
     if(!/^[A-Za-z][A-Za-z0-9_]*$/.test(appId))throw new Error('Invalid app');
     await rbac.require(tenantId,userId,'App:'+appId,'read');
@@ -479,9 +485,8 @@ export function createSystemServer(db:SqlPersistence) {
       (async()=>{
         if(!await rbac.allowed(tenantId,userId,'PageDefinition','read'))return [];
         return (await pages.list(tenantId)).map(page=>{
-          const {components,...rest}=page as typeof page&{components:Array<{properties?:Record<string,unknown>}>};
-          return {...rest,components:[],
-            standalonePresentation:components.some(item=>item.properties?.standalonePresentation===true)};
+          const {components,...rest}=page;
+          return {...rest,components:[],standalonePresentation:hasStandalonePresentation(components)};
         });
       })(),
       (async()=>permittedApps(rbac,tenantId,userId,await apps.listMetadata(tenantId)))(),

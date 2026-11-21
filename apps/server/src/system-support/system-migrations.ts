@@ -616,7 +616,9 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      ('customButton1Width','Button width','Button','footerHeight',false,20),
      ('customButton1Height','Button height','Button','footerHeight',false,21),
      ('customButton2Width','Button 2 width','Button 2','footerHeight',false,22),
-     ('customButton2Height','Button 2 height','Button 2','footerHeight',false,23)
+     ('customButton2Height','Button 2 height','Button 2','footerHeight',false,23),
+     ('cardBodyWidth','Card Body width','Card Body','footerHeight',false,24),
+     ('cardBodyHeight','Card Body height','Card Body','footerHeight',false,25)
     ), missing AS (
       SELECT specs.* FROM specs WHERE NOT EXISTS(
         SELECT 1 FROM md_builder_shared_properties p WHERE p.property_key=specs.property_key)
@@ -635,6 +637,16 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
     FROM missing m JOIN md_builder_shared_properties t ON t.property_key=m.template_key
      CROSS JOIN last_order
     ON CONFLICT(property_key) DO NOTHING
+  `);
+  // Card Body dimensions must be enabled for both repeated-card variants.
+  await client.query(`
+    INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+    SELECT spec.component_api,spec.property_key,true FROM (VALUES
+      ('smart_card_grid','cardBodyWidth'),('smart_card_grid','cardBodyHeight'),
+      ('smart_id_card','cardBodyWidth'),('smart_id_card','cardBodyHeight')
+    ) AS spec(component_api,property_key)
+    JOIN md_builder_shared_properties p ON p.property_key=spec.property_key
+    ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
   `);
   // 2) Which component uses which property, and on which icon of which area.
   //    Cart/Card Grid/Numpad button areas follow the existing SQL mapping:

@@ -28,6 +28,13 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
  if(typeof v!=="string")return {value:text(v)};
  // Keep literal text and asset URLs unchanged; only formulas can fail.
  if(/^(?:https:\/\/|asset:|data:image\/)/i.test(v.trim()))return {value:v};
+ // The authorised row loader already resolved a related Product/parent value.
+ // Read that exact key before the component's general formula code; a short
+ // @Product.ImageUrl binding must not disappear on compiled/public Cart rows.
+ const direct=/^\s*=?\s*(@[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){1,4})\s*$/.exec(v);
+ const mentions=record&&typeof record==='object'?record.__mentionValues:null;
+ if(direct&&mentions&&typeof mentions==='object'&&Object.prototype.hasOwnProperty.call(mentions,direct[1]))
+  return {value:mentions[direct[1]]??''};
  // An email address ("qa@example.com") is a value; an @Object.Field reference starts with @.
  if(/^\s*[^\s@=(),"&]+@[^\s@]+\.[^\s@]+\s*$/.test(v))return {value:v};
  // A plain date or date-time ("2026-11-16") is a value, not a subtraction.

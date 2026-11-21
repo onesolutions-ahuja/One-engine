@@ -12,6 +12,8 @@ export type MentionGroup = {
 export type MentionPath = {
   path: string; root: string; target: ObjectMetadata;
   field: FieldMetadata; steps: Array<{ source: string; target: string; lookupField: string; name: string }>;
+  /** Original row formula spelling; resolved only through a unique authorised lookup. */
+  reference?: string;
 };
 type DataRecord = Record<string, unknown>;
 export type MentionContext = { records: Record<string, DataRecord | undefined>; fields: Record<string, string[]> };
@@ -139,6 +141,19 @@ export function mentionSegments(
   return output.length ? output : [{ text: value, reference: false }];
 }
 
+/** A short @Product.Field in a CartLine row is allowed only if ONE declared
+ * parent lookup goes from CartLine to Product. Never infer by app membership. */
+function rowMentionPath(raw: string, objects: readonly ObjectMetadata[], root: string): MentionPath | null {
+  const canonical = validateMentionPath(raw, objects, root);
+  if (canonical) return canonical;
+  const parts = raw.split('.');
+  if (parts.length !== 2 || parts[0] === root) return null;
+  const candidates = mentionPaths(objects, root).filter(candidate =>
+    candidate.steps.length === 1 && candidate.object.apiName === parts[0]);
+  if (candidates.length !== 1) return null;
+  const path = validateMentionPath(candidates[0].path + '.' + parts[1], objects, root);
+  return path ? {...path, reference: '@' + raw} : null;
+}
 export function referencedMentionPaths(
   properties: Readonly<Record<string, unknown>>, objects: readonly ObjectMetadata[], root: string
 ): MentionPath[] {
@@ -146,8 +161,12 @@ export function referencedMentionPaths(
   for (const raw of Object.values(properties)) {
     if (typeof raw !== 'string') continue;
     for (const match of raw.matchAll(REFERENCE)) {
-      const path = validateMentionPath(match[2], objects, root);
-      if (path) distinct.set(path.path, path);
+      const path = rowMentionPath(match[2], objects, root);
+      if (path) {
+        // Different fields of the same parent must ALL be fetched (Name AND ImageUrl).
+        const reference = path.reference ?? '@' + path.path + '.' + path.field.apiName;
+        distinct.set(reference, path);
+      }
       if (distinct.size >= MAX_REFERENCES) return [...distinct.values()];
     }
   }
@@ -314,7 +333,7 @@ export async function resolveCollectionMentionRows(
       const context=await loadMentionContext(objects,root,record,properties,cached);
       const values:Record<string,unknown>={};
       for(const path of paths){
-        const ref='@'+path.path+'.'+path.field.apiName;
+        const ref=path.reference??'@'+path.path+'.'+path.field.apiName;
         values[ref]=resolveMentionValue(ref,context.records,context.fields,objects,root);
       }
       resolved[index]={...record,__mentionValues:values};

@@ -231,7 +231,10 @@ export class ScreenPairingService{
   if(typeof layer!=='number'||!Number.isInteger(layer)||layer<0||layer>9)fail('Choose a layer 0-9');
   const key=page.toLowerCase();
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,page_layers) VALUES($1,$2,jsonb_build_object($3::text,$4::int))
-   ON CONFLICT(tenant_id,device_key) DO UPDATE SET page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)||jsonb_build_object($3::text,$4::int)`,
+   ON CONFLICT(tenant_id,device_key) DO UPDATE SET
+    page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)||jsonb_build_object($3::text,$4::int),
+    payment_confirmation=CASE WHEN $3='smart_till_customer_display' AND $4::int=0
+     THEN NULL ELSE md_screen_devices.payment_confirmation END`,
   [actor.tenant_id,deviceKey,key,layer]);
   const {rows}=await this.db.query<{count:string}>(`SELECT count(*) AS count FROM md_screen_pairings WHERE tenant_id=$1 AND mirror_key=$2
    AND lower(page_api_name)=$3 AND revoked_at IS NULL AND approved_at IS NOT NULL`,[actor.tenant_id,deviceKey,key]);

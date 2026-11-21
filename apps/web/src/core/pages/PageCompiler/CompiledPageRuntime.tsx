@@ -828,22 +828,27 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
       // This event comes from RECORDPAYMENT only after the server records Paid.
       // Other apps keep their own payment UX. Never show success for PartPaid.
       if(currentAppId.toUpperCase()==='SMARTTILL'&&/^[0-9a-f-]{36}$/i.test(first)){
+       // The till's own confirmation does not depend on paired-device setup.
+       const verifiedAmount=Number(second);
+       if(!Number.isFinite(verifiedAmount)||verifiedAmount<0)continue;
+       const receipt={invoiceId:first,amount:verifiedAmount,method:third,change:null as number|null};
        try{
-        const receipt=await runtime.request<{amount:number;method:string;change:number|null;invoiceId:string}>(
+        const mirrored=await runtime.request<{amount:number;method:string;change:number|null;invoiceId:string}>(
          '/screens/paid-invoice',{method:'POST',body:JSON.stringify({
           deviceKey:tillDeviceKey(),invoiceId:first})});
-        const confirmationPage=pages.find(p=>p.apiName.toLowerCase()==='smart_till_sale_confirmation'
-         &&p.status==='Active'&&p.pageType==='In-Screen Page');
-        if(confirmationPage&&!effects.some(item=>item.name==='SCREEN'&&
-          String(item.args[0]??'').toLowerCase()==='smart_till_sale_confirmation')){
-         openFormulaScreen('SCREEN(smart_till_sale_confirmation,popup)',navigationContext,
-          onNavigate as never,runtime.pageSessionKey,session,receipt.invoiceId,undefined,
-          {paymentAmount:receipt.amount,paymentMethod:receipt.method,changeAmount:receipt.change,
-           paymentInvoiceId:receipt.invoiceId});
-        }
+        receipt.change=mirrored.change;
        }catch(error){
-        // Payment is already committed. A display failure must never roll it back.
-        console.warn('Customer payment confirmation could not be displayed',error);
+        // Unpaired tills still get the sale popup. Financial posting is complete.
+        console.warn('Paired customer receipt could not be updated',error);
+       }
+       const confirmationPage=pages.find(p=>p.apiName.toLowerCase()==='smart_till_sale_confirmation'
+        &&p.status==='Active'&&p.pageType==='In-Screen Page');
+       if(confirmationPage&&!effects.some(item=>item.name==='SCREEN'&&
+         String(item.args[0]??'').toLowerCase()==='smart_till_sale_confirmation')){
+        openFormulaScreen('SCREEN(smart_till_sale_confirmation,popup)',navigationContext,
+         onNavigate as never,runtime.pageSessionKey,session,receipt.invoiceId,undefined,
+         {paymentAmount:receipt.amount,paymentMethod:receipt.method,changeAmount:receipt.change,
+          paymentInvoiceId:receipt.invoiceId});
        }
       }
      }

@@ -1,7 +1,7 @@
 import type {CompiledPage,CompiledDataSource} from './compilePage';
 import {notePageRows} from './pageTimings';
 import {noteOwnWrites} from './liveChanges';
-import {applySavedRecordMutations,withDependentObjects,type PageMutationDetail} from '../PageRuntime/pageMutationScope';
+import {applySavedRecordMutations,movedSessionParent,withDependentObjects,type PageMutationDetail,type SessionParentFilter} from '../PageRuntime/pageMutationScope';
 import {applyPageSelection,changedPageStateNames,type PageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {withComponentProperties} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 
@@ -122,10 +122,10 @@ export type SourceSnapshot={records:Record<string,unknown>[];total:number;loadin
  hasMore:boolean;loadingMore:boolean;
  /** Filters as resolved for the last load (used to predict saved rows). */
  serverFilters?:ReadonlyArray<{field:string;operator:string;value:string}>;
- relatedFilter?:{field:string;value:string;related:boolean};predictable:boolean;version:number};
+ relatedFilter?:SessionParentFilter;predictable:boolean;version:number};
 export type SourceLoadResult={records:Record<string,unknown>[];total:number;
  serverFilters?:ReadonlyArray<{field:string;operator:string;value:string}>;predictable:boolean;
- relatedFilter?:{field:string;value:string;related:boolean};
+ relatedFilter?:SessionParentFilter;
  /** The loader could not page (client-side filter): rows are all it will return. */
  paged:boolean};
 export type SourceLoad=((source:CompiledDataSource,state:State,window:{offset:number;limit:number;fresh?:boolean})=>
@@ -295,6 +295,14 @@ export function createCompiledDataLayer(compiled:CompiledPage,load:SourceLoad,ge
    // This window saved these records: their live echo needs no second read here.
    // (Not for rows another screen saved: their next change must still be drawn here.)
    if(!detail.optimistic&&!detail.live&&detail.recordChanges)noteOwnWrites(detail.recordChanges.map(change=>change.record?.Id));
+   // A tap made the session's new parent (a new sale): its child lists move to it now.
+   for(const source of compiled.dataSources){
+    const current=snapshots.get(source.id);
+    const moved=current&&!current.loading?movedSessionParent(current.relatedFilter,detail):null;
+    if(!moved)continue;
+    publish(source.id,{...current!,records:moved.keepRows?current!.records:[],total:moved.keepRows?current!.total:0,
+     hasMore:moved.keepRows?current!.hasMore:false,relatedFilter:{...current!.relatedFilter!,value:moved.value},version:current!.version+1});
+   }
    for(const source of compiled.dataSources){
     if(written&&!readsObject(source,written))continue;
     // Reads only a roll-up parent of what was saved: re-read it after the real save.

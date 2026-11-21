@@ -169,3 +169,26 @@ export function applySavedRecordMutations(
  }
  return {records:next,total};
 }
+
+/** A list scoped to the session's newest parent (a cart): which Object and which session. */
+export type SessionParentFilter={field:string;value:string;related:boolean;parent?:{object:string;session:string}};
+const PROVISIONAL='ffffffff-ffff-4fff-8fff-';
+/**
+ * A tap made a NEW parent for this list's session (the first item of a new sale, after
+ * Clear sale, Hold or payment): the list moves to it at once, empty, so the new rows
+ * (predicted or saved) are placed in it straight away instead of after a re-read.
+ * When the saved parent replaces the provisional one (same sale), the rows stay.
+ * Generic: any child list whose parent Object has a SessionKey (cart, basket, order...).
+ */
+export function movedSessionParent(filter:SessionParentFilter|undefined,detail:PageMutationDetail|undefined):{value:string;keepRows:boolean}|null{
+ const parent=filter?.parent;
+ if(!parent||!filter)return null;
+ const changes=detail?.recordChanges??[];
+ const made=changes.find(change=>change.operation==='create'&&change.objectApiName===parent.object
+  &&typeof change.record.Id==='string'&&change.record.Id!==filter.value
+  &&String(change.record.SessionKey??'')===parent.session);
+ if(!made)return null;
+ const replaced=filter.value.startsWith(PROVISIONAL)&&!detail?.optimistic&&changes.some(change=>change.operation==='delete'
+  &&change.objectApiName===parent.object&&change.record.Id===filter.value);
+ return {value:String(made.record.Id),keepRows:replaced};
+}

@@ -171,10 +171,16 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
  if(kind==='preview'){
   // The answer came first (a slow preview): nothing to predict any more.
   if(ledger.answered.has(tap.batch))return Promise.resolve();
-  // A row this screen still shows as provisional is changed under that Id.
+  // A row this screen still shows as provisional is changed under that Id, and a field naming
+  // it (a line's cart) names the provisional row too: the line stays in the cart on screen.
   const mapped=tap.changes.map(change=>{
-   const shown=ledger.real.get(String(change.record.Id));
-   return shown?{...change,record:{...change.record,Id:shown}}:change;
+   let moved=false;
+   const record=Object.fromEntries(Object.entries(change.record).map(([key,value])=>{
+    const shown=typeof value==='string'?ledger.real.get(value):undefined;
+    if(shown)moved=true;
+    return [key,shown??value];
+   }));
+   return moved?{...change,record:record as typeof change.record}:change;
   });
   const changes=byObject(mapped);
   const created=new Map<string,Set<string>>();
@@ -248,8 +254,9 @@ let ownUnpredicted=0;
 export function drawOwnTap(target:PageLiveTarget,update:{changes:readonly LiveTapChange[];optimistic?:string;replaces?:string},
  ledger:TapLedger,lists?:ReadonlySet<string>,now=Date.now()):Promise<unknown>{
  const own={...target,code:null};
- // Lists are told about their own Object only (totals over other Objects come from held rows).
- const changes=lists?update.changes.filter(change=>lists.has(change.objectApiName)):[...update.changes];
+ // Lists are told about their own Object only (totals over other Objects come from held rows),
+ // and about new records of any Object: a new parent (a new sale's cart) moves its child lists.
+ const changes=lists?update.changes.filter(change=>lists.has(change.objectApiName)||change.operation==='create'):[...update.changes];
  if(update.optimistic)return drawLiveTap(own,'preview',{batch:update.optimistic,ok:true,changes},ledger,now);
  // This window saved these records (every Object, a cart total too): their database notice
  // needs no second read here.

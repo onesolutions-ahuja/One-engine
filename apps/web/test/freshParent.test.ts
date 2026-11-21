@@ -42,7 +42,7 @@ test('a fresh read after another screen\'s save finds the session\'s new parent 
  server.asked.length=0;
  const page=await load(lines,{},{offset:0,limit:50,fresh:true});
  assert.deepEqual(page?.records.map(row=>row.Id),['line-1'],'the new sale\'s line shows');
- assert.deepEqual(page?.relatedFilter,{field:'Cart',value:'cart-new',related:true});
+ assert.deepEqual(page?.relatedFilter,{field:'Cart',value:'cart-new',related:true,parent:{object:'Cart',session:'s-1'}});
  assert.ok(server.asked.find(item=>item.object==='Cart')?.fresh,'the parent is looked for fresh');
 });
 
@@ -70,4 +70,14 @@ test('a fresh read never joins a request that started before the save',async()=>
  assert.deepEqual((await old).records,[{Id:'old'}]);
  await shared;
  assert.deepEqual(calls,['old','fresh']);
+});
+
+test('a session with no parent yet: an empty list that knows which parent it waits for',async()=>{
+ const server=fakeServer();
+ server.carts.length=0;
+ const load=compiledSourceLoader(objects,()=>({sessionId:'s-1'}),server.loadPage as never);
+ const page=await load(lines,{},{offset:0,limit:50});
+ assert.deepEqual(page?.records,[]);
+ assert.deepEqual(page?.relatedFilter,{field:'Cart',value:'',related:true,parent:{object:'Cart',session:'s-1'}});
+ assert.equal(server.asked.filter(item=>item.object==='CartLine').length,0,'no line read without a parent');
 });

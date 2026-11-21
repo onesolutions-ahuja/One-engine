@@ -14,7 +14,11 @@ type RecordPageLoader=(objectApiName:string,options:{limit:number;offset:number;
  sortField?:string;sortDirection?:'asc'|'desc';
  search?:string;searchPrefix?:boolean;forceRefresh?:boolean})=>
  Promise<{records:Record<string,unknown>[];total:number}>;
-type Scope={blocked:boolean;filter?:PageQueryFilter;field:string;parentId:unknown};
+type Scope={blocked:boolean;filter?:PageQueryFilter;field:string;parentId:unknown;
+ /** The list belongs to this session's parent (or waits for one): a new parent made by a tap moves it. */
+ parent?:SessionParent;waiting?:boolean};
+/** A list scoped to the session's newest parent: the parent Object and the session. */
+export type SessionParent={object:string;session:string};
 type State=Readonly<Record<string,unknown>>;
 
 /** The same permission-checked Record API read, filter and parent-scope rules
@@ -50,12 +54,21 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   const query=await pageComponentSessionRelatedQuery(fields,objects,sessionId,(target,sessionKey)=>
    loadPage(target,{limit:SESSION_PARENT_LIMIT,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false},
     ...(fresh?{forceRefresh:true}:{})}));
-  const result={...query,field:query.filter?.field??'',parentId:query.filter?.value};
+  const parentObject=query.parentObject??query.waiting?.parentObject;
+  const result:Scope={blocked:query.blocked,...(query.filter?{filter:query.filter}:{}),
+   field:query.filter?.field??query.waiting?.field??'',parentId:query.filter?.value,
+   ...(parentObject?{parent:{object:parentObject,session:sessionId}}:{}),...(query.waiting?{waiting:true}:{})};
   // Only a found parent is remembered: a cart created later is found on the next read.
   if(!query.blocked&&query.filter)sessionParents.set(cacheKey,{scope:result,
    parents:fields.filter(field=>field.relationship).map(field=>field.relationship!.targetObject)});
   return result;
  };
+ // The parent filter is checked separately (relatedFilter), so it never makes rows unpredictable.
+ // Exact when every filter must hold (AND only) and each is equal/blank: a saved
+ // or predicted row can then be placed in (or taken out of) the list without a re-read.
+ const predictable=(query:{serverFilterable?:boolean;filterLogic?:string;filters?:ReadonlyArray<{operator:string}>})=>Boolean(query.serverFilterable
+  &&(!query.filterLogic||!/\b(?:OR|NOT)\b/i.test(query.filterLogic))
+  &&(query.filters??[]).every(filter=>filter.operator==='eq'||filter.operator==='isBlank'));
  const load=async(source:CompiledDataSource,state:State,window:{offset:number;limit:number;fresh?:boolean})=>{
   const {sessionId,recordId}=context();
   const fields=objects.find(object=>object.apiName===source.objectApiName)?.fields??[];
@@ -68,6 +81,9 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
    return null;
   }
   const related=await scopeFor(source,fields,state,sessionId,Boolean(window.fresh));
+  // No parent yet for this session: an empty list that waits for the first one.
+  if(related.blocked&&related.waiting&&related.parent)return {records:[],total:0,serverFilters:query.filters,
+   relatedFilter:{field:related.field,value:'',related:true,parent:related.parent},paged:true,predictable:predictable(query)};
   if(related.blocked)return null;
   // Server-filtered queries page; a browser-side filter needs one bounded read.
   const paged=Boolean(query.filters)||!source.filters||(Array.isArray(source.filters)&&source.filters.length===0);
@@ -79,13 +95,9 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
    {pageState:state,recordId,sessionId},source.filterLogic);
   const records=related.field?filterRelatedRecords(filtered,related.parentId,related.field):filtered;
   return {records,total:paged?page.total:records.length,
-   serverFilters:query.filters,relatedFilter:related.filter,paged,
-   // The parent filter is checked separately (relatedFilter), so it never makes rows unpredictable.
-   // Exact when every filter must hold (AND only) and each is equal/blank: a saved
-   // or predicted row can then be placed in (or taken out of) the list without a re-read.
-   predictable:Boolean(query.serverFilterable
-    &&(!query.filterLogic||!/\b(?:OR|NOT)\b/i.test(query.filterLogic))
-    &&(query.filters??[]).every(filter=>filter.operator==='eq'||filter.operator==='isBlank'))};
+   serverFilters:query.filters,
+   relatedFilter:related.filter?{...related.filter,...(related.parent?{parent:related.parent}:{})}:undefined,paged,
+   predictable:predictable(query)};
  };
  // Search follows the exact same metadata filter and parent-scope rules as the
  // list loader. Never show broader results when a filter cannot run on the server.

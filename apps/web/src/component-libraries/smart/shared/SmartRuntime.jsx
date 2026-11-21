@@ -256,7 +256,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const headerNode=header&&headerHeight>0&&<div data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Card title":undefined} className="smart-card-content" style={{
      ...smartPartOffsetStyle(p,"header"),order:1,flex:horizontal&&!idCard?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
      display:"flex",alignItems:fixedGridHeader?"safe center":"center",
-     // Explicit Card Grid heights bound the title box; excess text is clipped without an inner scrollbar.
+     // Explicit Card Grid heights bound the title box; overflow remains accessible without a visible scrollbar.
      // Standalone Image captions retain intrinsic growth for large typography.
      height:headerHeight,minHeight:fixedGridHeader?0:"max-content",
      width:grid&&p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==""
@@ -278,7 +278,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
      // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
      whiteSpace:p.wrapText===false?"nowrap":"pre-line",
-     overflow:grid?"hidden":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
+     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
      // A caption can still scroll by wheel/touch, but never shows native scroll arrows.
      scrollbarWidth:fixedGridHeader||p.wrapText===false?"none":undefined,
      padding:fixedGridHeader
@@ -299,9 +299,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   border:focused&&p.focusedCardBorderColor
    ?Math.max(1,strokeWidth)+"px solid "+p.focusedCardBorderColor:cardBorder,
   // A font size entered in Design must not be silently reduced to 96px.
-  // Clip contents that exceed authored part dimensions; the grid itself is the scroller,
-  // not each individual product card.
-  borderRadius:number(p.radius,12),overflow:"hidden",position:"relative",minWidth:0,
+  // Preserve existing overflow behaviour for large authored content, but hide
+  // the unwanted card-level scrollbar in Card Grid.
+  borderRadius:number(p.radius,12),overflow:"hidden",overflowY:"auto",scrollbarWidth:grid?"none":undefined,position:"relative",minWidth:0,
   fontSize:focused&&p.focusedTextSize!==undefined&&p.focusedTextSize!==null&&p.focusedTextSize!==""
    ?number(p.focusedTextSize,16,8):number(p.textSize,16,8),
   color:focusedText||undefined,

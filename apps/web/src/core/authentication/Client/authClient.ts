@@ -424,7 +424,10 @@ export function forgetLanding() {
   sessionUserId = undefined;
   // Sign-out: the rows kept for fast page opens are deleted from this browser.
   void import('../../pages/PageCompiler/localCopy').then(copy => copy.clearLocal());
-  try { localStorage.removeItem(landingCacheKey); } catch { /* blocked storage */ }
+  try {
+    localStorage.removeItem(landingCacheKey);
+    localStorage.removeItem('une.appRuntime.v1'); // the app shell's copy (appRuntimeMetadata.ts)
+  } catch { /* blocked storage */ }
 }
 export function takeLandingPrefetch<T>(): Promise<T | undefined> | undefined {
   const prefetched = landingPrefetch as Promise<T | undefined> | undefined;

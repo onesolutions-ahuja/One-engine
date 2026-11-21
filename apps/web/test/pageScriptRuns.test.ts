@@ -114,14 +114,15 @@ test('Preview converts unsaved edits on the server; only that user can run its s
 });
 
 test('page-level display formulas from the file equal the component result',async()=>{
- const {evaluateFieldExpression}=await import('../src/component-libraries/shared/FieldExpression.js');
+ const {runFormulaText}=await import('../src/core/pages/PageCompiler/formulaText');
  const labelled={...page,components:[{id:'t',type:'Custom:smart_text',label:'T',visible:true,
   properties:{textSource:'=ROUND(@ThisPage.Input.price * 1.2, 2) & " GBP " & UPPER(@ThisPage.Session.Id)'}}]};
  const module=await load(generatePageScript(compilePage(labelled as never,objects),'js'));
  const formulas=module.createFormulas(host);
  const state={price:4.25};
  assert.equal(formulas['t:textSource']({record:{},state,sessionId:'abc'}),
-  evaluateFieldExpression('=ROUND(@ThisPage.Input.price * 1.2, 2) & " GBP " & UPPER(@ThisPage.Session.Id)',{},{pageState:state,sessionId:'abc'}));
+  runFormulaText('=ROUND(@ThisPage.Input.price * 1.2, 2) & " GBP " & UPPER(@ThisPage.Session.Id)',{},{pageState:state,sessionId:'abc'}).value);
+ assert.equal(formulas['t:textSource']({record:{},state,sessionId:'abc'}),'5.1 GBP ABC');
 });
 
 test('one collection Object is loaded once for many components, and a save clears it',async()=>{

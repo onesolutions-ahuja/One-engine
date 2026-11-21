@@ -329,7 +329,7 @@ test('shared payment orders support independent providers, retries, and verified
 });
 
 // CALLOUT / LOOP / REPEAT action formulas and payment connector manifests.
-import {compileActionPlan,executeActionPlan} from '../../src/expression-engine/ActionFormulas.ts';
+import {compileActionPlan} from '../../src/expression-engine/ActionFormulas.ts';
 import {calloutVariables,readCalloutPath,runActionCallout} from '../../src/system-support/action-formula-callout-service.ts';
 import {webhookSummary} from '../../src/system-support/inbound-webhook-routes.ts';
 
@@ -344,22 +344,6 @@ test('CALLOUT, LOOP and REPEAT compile into no-code action steps',()=>{
  assert.throws(()=>compileActionPlan("CALLOUT('NoDot','A',1)"),/Connector\.Operation/);
  assert.throws(()=>compileActionPlan("LOOP(2,AS(i),LOOP(2,AS(j),STATE(a,1)))"),/cannot be nested/);
  assert.throws(()=>compileActionPlan("REPEAT(STATE(a,1),TRUE,1)"),/REPEAT requires/);
-});
-
-test('REPEAT stops when its condition is true and LOOP runs a fixed count',async()=>{
- const calls=[];let checks=0;
- const evaluate=(node,scope)=>{
-  const ev=x=>x.kind==='literal'?x.value:x.kind==='reference'?x.value.split('.').reduce((o,k)=>o?.[k],scope)
-   :x.kind==='binary'&&x.operator==='<>'?ev(x.left)!==ev(x.right):null;
-  return ev(node);
- };
- await executeActionPlan(`ACTIONS(REPEAT(CALLOUT('Square.CheckStatus','PaymentId',"p1",AS(chk)),chk.Status<>"PENDING",1,5),
-  LOOP(2,AS(i),CREATERECORD(Task,Name,"x")))`,{},evaluate,{
-  request:async(path,init)=>{calls.push(path);
-   if(path==='/action-formulas/callout')return {Status:++checks<2?'PENDING':'COMPLETED'};
-   return {record:{Id:'00000000-0000-4000-8000-000000000001'}};}});
- assert.equal(checks,2);
- assert.equal(calls.filter(path=>path==='/records/Task').length,2);
 });
 
 test('CALLOUT values add pence and decimal helpers and read friendly replies',()=>{

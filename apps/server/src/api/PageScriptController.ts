@@ -28,7 +28,7 @@ export type PageScriptDeps={db:SqlPersistence;rbac:RbacEngine;records:RecordEngi
  verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>};
 
 const scopeKey=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
-/** Same scope rules as /api/action-formulas/execute-data. */
+/** Scope sent with a page code action: bounded, plain keys only. */
 export function validActionScope(scope:unknown):scope is Record<string,unknown>{
  return Boolean(scope&&typeof scope==='object'&&!Array.isArray(scope)
   &&Object.keys(scope).length<=80

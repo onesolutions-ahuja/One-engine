@@ -40,20 +40,22 @@ Then check kiosk (`smartkiosk`) and ServiceFlow pages.
   scheduled action in the same transaction), LOCATION/CREATEPDF (server returns `needs`, browser answers, action re-runs),
   `@state/@filter/@navigate :=`. Popups (SCREEN) open from the prediction (Cash popup 89 ms).
 - Only page issue: smart_till_customer_display column3Source `@Quantity` (owner fixes to `@CartLine.Quantity`).
-- Old engine still answers (measured live with `window.__uneOldEngine`, see `oldEngineMeter.js`):
-  1. sql-formula: SUMIFS/COUNTIFS over Objects not held as record sets (Invoice, Cart Held) on
-     smart_till_dashboard / smart_till_reports -> add a page-code server call that runs the same generated
-     display functions with the server `$` (one request for all), then delete /formulas/evaluate(-many).
-  2. field-expression: `=$tenant.name`, time/NOW labels, `BLANKVALUE($state...)` labels (cash count), row formulas
-     `@Invoice.Total` (tables/charts), filter value formulas `TODAY()`, `ADDDAYS(...)`, `BLANKVALUE("","*")`
-     -> route these call sites (SmartRuntime scopedExpression paths, smart_table/smart_chart, record filter
-     formulas) through page code functions.
-  3. collection: static `COLLECTION("Name","a","b")` option lists (tabs/filters) -> page code function.
-  Then delete FieldExpression interpreter use, /formulas/evaluate*, /action-formulas/execute-data,
-  compiled-actions routes, formulaAction.ts.
+- Old formula engine REMOVED (PR "Remove the old formula interpreter"): no FieldExpression interpreter,
+  no /formulas/evaluate(-many), no /action-formulas/execute-data, no compiled-actions, no formulaAction.ts,
+  no server action interpreter (executeActionPlan / executeServerDataAction).
+  - Every page value is page code. A formula text not in the page file (given at run time, Builder canvas,
+    FLOW() choice, quantity formula) is converted by the SAME converter in the browser:
+    `core/pages/PageCompiler/formulaText.ts` (`runFormulaText`, `formulaCompilers`; page runtime: `code.compile`).
+    Smart bundles reach it through `__formulaCode.compile` or the page global (`formulaCodeLookup.js`).
+  - Totals over rows not held: page code `$.agg` -> one batched `/page-code/aggregates` request.
+  - List sources COLLECTION()/TABLE(): `shared/collectionSource.js` builds rows from loaded records; values
+    inside run as page code. Cart summary SUM over loaded rows: `shared/rowTotals.js`.
+  - Guard: `apps/web/test/oneFormulaEngine.test.ts` (fails if an old path comes back).
+  - Every page converts: `node --import tsx scripts/check-page-formulas.mjs --url <site> --token <bearer>`
+    (or `--file pages.json`); exits 1 if any formula does not convert.
 
 ## Remaining work, in order
-1. Old engine removal (list above), small PRs, deploy each, re-run the meter on all app pages.
+1. Deploy the old engine removal; run scripts/check-page-formulas.mjs against the live site.
 2. Storage: native tables authoritative, drop EAV (owner OK: data is dummy). Suggested: rewrite the ~19
    write statements to native tables; make `md_record_values` a read view over native tables for the ~29 readers
    and SQL functions (md_record_field, policies, uniqueness), then convert readers and drop the view.

@@ -20,6 +20,8 @@ import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
 import {startTap} from './pageTimings';
+import {formulaFunction,looksLikeFormula,nodeFunction} from './formulaText';
+import type {Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,openerMirrorKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
 type Row=Record<string,unknown>;
@@ -405,6 +407,18 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(!bound){bound=(row:Row)=>run(row??{},display);formulaCache.set(key,bound);}
    return bound;
   },
+  /** A formula text that is not in the page file (given at run time): converted by the same
+   * converter and run with this page's `$` (totals over rows not held come from the server). */
+  compile(text:unknown,rowObject=''):((row:Row)=>unknown)|null{
+   if(!looksLikeFormula(text))return null;
+   const run=formulaFunction(text,rowObject);
+   return (row:Row)=>run(row??{},display);
+  },
+  /** A parsed formula part (a value inside a COLLECTION data source), same converter. */
+  compileNode(node:Expression,rowObject=''):(row:Row)=>unknown{
+   const run=nodeFunction(node,rowObject);
+   return (row:Row)=>run(row??{},display);
+  },
   /** Component property -> formula function, keyed by the formula text (what the component holds). */
   formulasFor(componentId:string):Map<string,(row:Row)=>unknown>{
    const map=new Map<string,(row:Row)=>unknown>();
@@ -604,3 +618,4 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  return api;
 }
 export type PageCodeRuntime=ReturnType<typeof createPageCodeRuntime>;
+

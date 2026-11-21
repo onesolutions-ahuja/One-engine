@@ -3,7 +3,7 @@ import {readLocal,writeLocal} from '../PageCompiler/localCopy';
 import {componentLayer,layerShows,usePageLayer} from './pageLayers';
 import {adjustNumberRecord,type AdjustNumberBinding} from '../PageRuntime/adjustNumberRecord';
 import {runtimeComponentLabel} from './smartComponentLabel';
-import {notConvertedAction} from '../PageRuntime/formulaAction';
+import {notConvertedAction} from '../PageCompiler/notConverted';
 import {nextAccessibleTabIndex} from '../PageRuntime/tabKeyboardNavigation';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
 import {isRowIndependentFormula} from '../../../component-libraries/shared/formulaKinds.js';

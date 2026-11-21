@@ -282,12 +282,14 @@ export function createPageCanvasRenderer(
         {page.layoutMode === 'free-canvas' && !nested && !isCanvasLocked(component) && <button type="button"
           className="canvas-move-grip" aria-label={`Drag to move ${component.label}`}
           title="Drag to move only this component" draggable={false}
-          onPointerDown={event => startCanvasMove(event, component)}
+          onPointerDown={event => {chooseCanvasDesignArea('Body');startCanvasMove(event, component);}}
           onPointerMove={moveCanvasPointer}
           onPointerUp={event => endCanvasMove(event)}
           onPointerCancel={event => endCanvasMove(event, true)}
           onLostPointerCapture={event => endCanvasMove(event, true)}
           onClick={event => event.stopPropagation()}><Move size={15}/></button>}
+        <button type="button" aria-label="Select whole component" title="Select whole component, rather than Image or Header"
+          onClick={() => {chooseCanvasDesignArea('Body');selectRibbonTab('Component Design 2');}}><MousePointer2 size={15}/> Whole</button>
         <button type="button" onClick={() => selectRibbonTab('Component Design 2')} title="Edit block"><Pencil size={15}/> Edit</button>
         {page.layoutMode === 'free-canvas' && <button type="button" onClick={() => selectRibbonTab('Component Layout')} title="Position and size"><Maximize2 size={15}/> Position</button>}
         <button type="button" onClick={duplicateSelected} disabled={isCanvasLocked(component)} title="Duplicate"><Copy size={16}/></button>

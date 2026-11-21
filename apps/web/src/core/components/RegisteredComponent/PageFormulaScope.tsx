@@ -5,7 +5,7 @@ import type {LibraryComponentMetadata} from '../../metadata/Definitions/metadata
 import {resolveFieldText,getAuthenticatedFormulaBindingContext} from './fieldExpressionRuntime';
 import {isSelectedSqlFormula} from '../../../component-libraries/shared/formulaKinds.js';
 import {convertedFormula} from '../../../component-libraries/shared/formulaCodeLookup.js';
-import {componentReaderKey} from '../../../component-libraries/shared/FieldExpression.js';
+import {componentReaderKey} from '../../../component-libraries/shared/formulaKeys.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
 import {componentStateName} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {pageReferencesIn,parsePageReference,withoutPageValues} from '../../../../../server/src/expression-engine/PageReferences.js';
@@ -230,7 +230,8 @@ export function PublishedFormulaProperties({id,values,rendered}:{id?:string;valu
    else try{
     value=resolveFieldText(value,record,{...getAuthenticatedFormulaBindingContext(),
      rootObjectApiName:typeof values.objectApiName==='string'?values.objectApiName:undefined,
-     pageState:values.pageState as Record<string,unknown>,readComponent:scope?.read});
+     pageState:values.pageState as Record<string,unknown>,readComponent:scope?.read,
+     compile:(values.__formulaCode as {compile?:(text:unknown)=>((row:Record<string,unknown>)=>unknown)|null}|undefined)?.compile});
    }catch{continue;}
   }
   if(typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))output[key]=value;

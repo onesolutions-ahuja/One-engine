@@ -1,10 +1,42 @@
 import {hasPageValue,withoutPageValues} from '../../../../../server/src/expression-engine/PageReferences.js';
-import {
- evaluateFieldExpressionDetailed,FieldExpressionEvaluationError,setAuthenticatedFormulaSession,
- type FormulaBindingContext
-} from '../../../component-libraries/shared/FieldExpression.js';
 import {tokenize} from '../../../../../server/src/expression-engine/FormulaTokenizer.js';
 import {isSelectedSqlFormula} from '../../../component-libraries/shared/formulaKinds.js';
+import {looksLikeFormula,runFormulaText} from '../../pages/PageCompiler/formulaText';
+
+/** A formula given at run time is converted by the page converter (formulaText.ts); this error
+ * is what a component shows when it cannot be converted or run. */
+export class FieldExpressionEvaluationError extends Error {
+  constructor(message:string){super(message);this.name='FieldExpressionEvaluationError';}
+}
+/** Signed-in values page formulas read (@ThisTenant.User.Name, CONNECTED()). */
+export type FormulaBindingContext={
+  readComponent?:(name:string,key:string)=>unknown;
+  timeZone?:string;now?:Date;
+  pageState?:Readonly<Record<string,unknown>>;
+  sessionId?:string;locale?:string;currencyIsoCode?:string|null;
+  user?:Record<string,unknown>;profile?:Record<string,unknown>;organization?:Record<string,unknown>;
+  connections?:{systemAvailable:readonly string[];systemConnected:readonly string[];customConnected:readonly string[]}|null;
+  recordType?:Record<string,unknown>;permissions?:Readonly<Record<string,boolean>>;
+  rootObjectApiName?:string;
+  /** The page's converter for a formula given at run time (page code `$`: totals come from the server). */
+  compile?:(text:unknown)=>((row:Record<string,unknown>)=>unknown)|null;
+};
+// Authenticated public identity shared by the page code and independently bundled components.
+// It contains only the allowlisted profile fields, never tokens or credentials.
+const SESSION_IDENTITY_KEY=Symbol.for('une.authenticatedFormulaIdentity');
+function setAuthenticatedFormulaSession(context:FormulaBindingContext|null):void{
+  const user=context?.user,organization=context?.organization;
+  const names=(value:unknown)=>Object.freeze((Array.isArray(value)?value:[]).map(String));
+  const connections=context?.connections;
+  (globalThis as Record<symbol,unknown>)[SESSION_IDENTITY_KEY]=user&&organization&&typeof user.Id==='string'
+    &&typeof organization.Id==='string'
+    ?Object.freeze({user:Object.freeze({Id:user.Id,Name:user.Name,Email:user.Email,
+        TimeZone:user.TimeZone,Locale:user.Locale,CurrencyIsoCode:user.CurrencyIsoCode,
+        Manager:user.Manager??'',ManagerName:user.ManagerName??''}),
+      organization:Object.freeze({Id:organization.Id,Name:organization.Name}),
+      connections:connections?Object.freeze({systemAvailable:names(connections.systemAvailable),
+        systemConnected:names(connections.systemConnected),customConnected:names(connections.customConnected)}):null}):null;
+}
 
 let authenticatedFormulaBindingContext:FormulaBindingContext|null=null;
 export function setAuthenticatedFormulaBindingContext(user:unknown):void {
@@ -52,15 +84,7 @@ export function getAuthenticatedFormulaBindingContext():FormulaBindingContext|nu
   return authenticatedFormulaBindingContext;
 }
 
-function isFieldExpression(value:string):boolean{
-  const input=value.trim().replace(/^=\s*/,'');
-  // A plain date or date-time ("2026-11-16") is a value, not a subtraction.
-  if(!value.trim().startsWith('=')&&/^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?$/.test(input))return false;
-  return /^(?:TRUE|FALSE|NULL|PI)$/i.test(input)||input.startsWith('(')||/^[+-]\d/.test(input)
-    ||input.startsWith('@')||input.startsWith('{!')||/^\$(?:component|state|session)(?:\.|$)/.test(input)||/^"(?:[^"]|"")*"\s*&/.test(input)
-    ||/^(?:\d+(?:\.\d+)?\s*[+\-*/%^<>]|"(?:[^"]|"")*"\s*(?:&|=|<>|!=|<=|>=|<|>))/.test(input)
-    ||/^(?:IF|IFERROR|CASE|AND|OR|NOT|XOR|ISBLANK|ISNULL|ISNUMBER|CONNECTED|BLANKVALUE|NULLVALUE|TEXT|VALUE|ASCII|LOWER|UPPER|PROPER|INITCAP|LEN|TRIM|LEFT|RIGHT|MID|FIND|BEGINS|CONTAINS|EXACT|ISPICKVAL|INCLUDES|CONCATENATE|SUBSTITUTE|REPT|REVERSE|ENCODEURL|URLENCODE|URLDECODE|LPAD|RPAD|FORMAT|REPLACE|CHAR|CASESAFEID|T|COLLECTION|COLLECTIONCOUNT|COLLECTIONSUM|SUM|VLOOKUP|ABS|ROUND|ROUNDUP|ROUNDDOWN|TRUNC|SIGN|MIN|MAX|MOD|SQRT|POWER|CEILING|FLOOR|MCEILING|MFLOOR|EXP|LN|LOG|SIN|COS|TAN|ASIN|ACOS|ATAN|ATAN2|SINH|COSH|TANH|DEGREES|RADIANS|DATE|DATEVALUE|DATETIMEVALUE|TODAY|NOW|DAY|MONTH|YEAR|HOUR|MINUTE|SECOND|TIMEVALUE|TIMENOW|TZOFFSET|WEEKDAY|ISOWEEK|ISOYEAR|ADDDAYS|ADDMONTHS|GEOLOCATION|DISTANCE)\s*\(/i.test(input);
-}
+const isFieldExpression=(value:string):boolean=>looksLikeFormula(value);
 
 /** Resolve text-property bindings against the already authorised record supplied to the component.
  * Never eval expressions, traverse dotted paths or fetch fields outside the runtime record. */
@@ -84,43 +108,41 @@ export function resolveFieldText(
   const source=record&&typeof record==='object'&&!Array.isArray(record)?record as Record<string,unknown>:{};
   if(/(?:@|\{!)\$Permission\./.test(expression)&&!context?.permissions)
     throw new FieldExpressionEvaluationError('Custom permissions are unavailable in page-binding context');
-  const recordType=context?.recordType??(typeof source.RecordTypeId==='string'
-    ?{Id:source.RecordTypeId}:undefined);
-  const referenceSource={
-    ...source,Record:source,'$Record':source,
-    ...(context?.user?{'$User':context.user}:{}),
-    ...(context?.profile?{'$Profile':context.profile}:{}),
-    ...(context?.organization?{'$Organization':context.organization}:{}),
-    ...(recordType?{'$RecordType':recordType}:{}),
-    ...(context?.permissions?{'$Permission':context.permissions}:{})
-  };
-  const result=evaluateFieldExpressionDetailed(expression,referenceSource,context);
+  // The page's converter (page code `$`) when the page has one, else the same converter here.
+  const page=context?.compile?.(expression);
+  const result=page?(()=>{
+    try{return {value:page(source)};}
+    catch(error){
+      if(error&&typeof error==='object'&&(error as {notHeld?:unknown}).notHeld===true)return {value:''};
+      return {value:'',error:error instanceof Error?error.message:'Formula failed'};
+    }
+  })():runFormulaText(expression,source,{pageState:context?.pageState,sessionId:context?.sessionId,
+    readComponent:context?.readComponent,rowObject:context?.rootObjectApiName,now:context?.now});
   if(result.error)throw new FieldExpressionEvaluationError(result.error);
   return result.value;
 }
 
 export function resolveRegisteredTextProperties(
  definitions:ReadonlyArray<{propertyKey:string;kind:string}>,properties:Record<string,unknown>,
- context?:FormulaBindingContext,readComponent?:FormulaBindingContext['readComponent']
+ context?:FormulaBindingContext,readComponent?:FormulaBindingContext['readComponent'],
+ compile?:FormulaBindingContext['compile']
 ):Record<string,unknown>{
   const baseContext=context??getAuthenticatedFormulaBindingContext()??undefined;
-  // Shared formula aggregation may consume only a complete, already-authorised
-  // renderer row set. Do not calculate misleading totals from a paged subset.
+  // Totals over a list's rows are page code (SUMIFS over held rows or one server request).
   const rows=Array.isArray(properties.records)?properties.records:null;
   const pagination=properties.recordPagination as {offset?:number;total?:number}|undefined;
   const completeRows=rows&&rows.length<=200&&
     (!pagination||(pagination.offset===0&&typeof pagination.total==='number'&&pagination.total<=rows.length))
     ?rows as Record<string,unknown>[]:undefined;
-  const formulaContext={...(baseContext??{}),readComponent:readComponent??baseContext?.readComponent,now:baseContext?.now??new Date(),
-    ...(completeRows?{collectionRows:completeRows}:{}),
-    ...(properties.formulaCollectionSources&&typeof properties.formulaCollectionSources==='object'
-      ?{collectionSources:properties.formulaCollectionSources as FormulaBindingContext['collectionSources']}:{}),
-    ...(properties.namedCollections&&typeof properties.namedCollections==='object'
-      ?{namedCollections:properties.namedCollections as FormulaBindingContext['namedCollections']}:{}),
+  const hasNamed=Boolean(properties.namedCollections&&typeof properties.namedCollections==='object'
+    &&Object.keys(properties.namedCollections).length);
+  const hasSources=Boolean(properties.formulaCollectionSources&&typeof properties.formulaCollectionSources==='object'
+    &&Object.values(properties.formulaCollectionSources).some(value=>Array.isArray(value)&&value.length>0));
+  const formulaContext:FormulaBindingContext={...(baseContext??{}),readComponent:readComponent??baseContext?.readComponent,
+    now:baseContext?.now??new Date(),...(compile?{compile}:{}),
     ...(typeof properties.objectApiName==='string'?{rootObjectApiName:properties.objectApiName}:{}),
     ...(properties.pageState&&typeof properties.pageState==='object'&&!Array.isArray(properties.pageState)
-      ?{pageState:properties.pageState as FormulaBindingContext['pageState'],
-        namedCollectionSelections:(properties.pageState as Record<string,unknown>).collectionSelections as FormulaBindingContext['namedCollectionSelections']}: {}),
+      ?{pageState:properties.pageState as FormulaBindingContext['pageState']}:{}),
     ...(typeof properties.sessionId==='string'?{sessionId:properties.sessionId}: {})};
   const record=properties.record??properties.currentRecord??properties.recordData;
   const hasRecord=Boolean(record&&typeof record==='object'&&!Array.isArray(record));
@@ -174,11 +196,8 @@ export function resolveRegisteredTextProperties(
     const localSum=/\bSUM\s*\(/i.test(value)&&rows?.some(row=>
       row&&typeof row==='object'&&!Array.isArray(row)&&localRefs.some(key=>Object.hasOwn(row,key)));
     if(localSum&&!completeRows)continue; // Never evaluate totals from an incomplete page.
-    const hasNamed=Boolean(formulaContext.namedCollections&&Object.keys(formulaContext.namedCollections).length);
-    const hasSources=Boolean(formulaContext.collectionSources&&Object.values(formulaContext.collectionSources)
-      .some(value=>Array.isArray(value)&&value.length>0));
     if(!hasRecord&&/@[A-Za-z]/.test(fieldText)&&!hasNamed&&!hasSources
-      &&!Array.isArray(formulaContext.collectionRows))continue;
+      &&!completeRows)continue;
     if(!resolvedContext?.timeZone&&requiresAuthenticatedTimeZone(value,record))
       throw new FieldExpressionEvaluationError('Authenticated formula time zone is unavailable');
     if(next===properties)next={...properties};

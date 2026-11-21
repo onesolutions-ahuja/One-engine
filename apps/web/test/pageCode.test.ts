@@ -6,7 +6,6 @@ import {F,O} from '../../server/src/page-compiler/code/formulaLibrary';
 import {FORMULA_DICTIONARY} from '../../server/src/page-compiler/code/formulaDictionary';
 import {buildPageCode,pageCodeModule,serverPageCode} from '../../server/src/page-compiler/code/pageCode';
 import {executePageCodeAction} from '../../server/src/system-support/page-code-runtime';
-import {evaluateFieldExpressionDetailed} from '../src/component-libraries/shared/FieldExpression.js';
 import {createPageCodeRuntime,type PageCode} from '../src/core/pages/PageCompiler/pageCodeRuntime';
 
 type Row=Record<string,unknown>;
@@ -36,12 +35,9 @@ test('display formulas become plain functions that match the formula language', 
   '=MAX(1, @Product.Price, 2) + MIN(3, 4)',
   '=NOT(ISBLANK(@Product.Name)) && TRUE'
  ];
- for(const source of formulas.slice(0,6)){
-  const compiled=fn(compileDisplayFormula(source,'Product').js)(row,display());
-  const interpreted=evaluateFieldExpressionDetailed(source,row,{rootObjectApiName:'Product'});
-  assert.equal(interpreted.error,undefined,source);
-  assert.equal(String(compiled),String(interpreted.value),source);
- }
+ const expected=['£2.50','18+','CO3','none/bad','starts with C','5.5'];
+ formulas.slice(0,6).forEach((source,index)=>
+  assert.equal(String(fn(compileDisplayFormula(source,'Product').js)(row,display())),expected[index],source));
  assert.equal(fn(compileDisplayFormula('=RIGHT("0" & TEXT(HOUR(NOW())), 2)').js)({},display()),'21');
  assert.equal(fn(compileDisplayFormula('=LPAD(7, 3, "0") & RPAD("a", 3, "-")').js)({},display()),'007a--');
  assert.equal(fn(compileDisplayFormula('=@ThisPage.Input.category & ":" & @ThisPage.Session.Id').js)({},display({category:'beer'})),'beer:s-1');

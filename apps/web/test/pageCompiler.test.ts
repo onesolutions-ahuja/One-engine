@@ -4,7 +4,8 @@ import ts from 'typescript';
 import {compilePage} from '../src/core/pages/PageCompiler/compilePage';
 import {generatePageScript} from '../src/core/pages/PageCompiler/generatePageScript';
 import {scriptFormulaOperators,scriptFormulaLibrary} from '../src/core/pages/PageCompiler/pageScriptHost';
-import {evaluateFieldExpression,evaluateFieldExpressionDetailed,evaluateCollectionFormula} from '../src/component-libraries/shared/FieldExpression.js';
+import {runFormulaNode,runFormulaText} from '../src/core/pages/PageCompiler/formulaText';
+import {buildCollectionSource} from '../src/component-libraries/shared/collectionSource.js';
 import {compileRecordFilterFormula,validateRecordFilterFormula} from '../src/core/pages/PageRuntime/recordFilterFormula';
 import {pageComponentRecordQuery} from '../src/core/pages/PageRuntime/pageComponentBindings';
 import {pageStateDependencies,applyPageSelection} from '../src/core/pages/PageRuntime/pageStateDependencies';
@@ -100,15 +101,15 @@ test('generated TS is valid TypeScript and generated JS gives the interpreter re
  const ctx={record:{Name:'Tea'},state:{},sessionId:'s'};
  for(const id of ['grid1:label','text7:textSource']){
   const formula=compiled.components.flatMap(c=>c.formulas.map(f=>({id:c.id+':'+f.property,f}))).find(x=>x.id===id)!.f;
-  assert.equal(formulas[id](ctx),evaluateFieldExpression(formula.source,ctx.record,{pageState:{},sessionId:'s'}));
+  assert.equal(formulas[id](ctx),runFormulaText(formula.source,ctx.record,{pageState:{},sessionId:'s'}).value);
  }
  assert.equal(formulas['grid1:label'](ctx),'MENU 2');
  // The converted TypeScript/JavaScript must supply the component Object context.
  assert.equal(formulas['mention:textSource']({record:{Id:'p1',Name:'Tea'},state:{},sessionId:'s'}),'Tea');
  const relationshipCtx={record:{Id:'p1',__mentionValues:{'@Product.Customer.Name':'Alice'}},
   state:{},sessionId:'s',objectApiName:'Product'};
- assert.equal(evaluateFieldExpressionDetailed('@Product.Customer.Name',relationshipCtx.record,{
-  rootObjectApiName:relationshipCtx.objectApiName}).value,'Alice');
+ assert.equal(runFormulaText('@Product.Customer.Name',relationshipCtx.record,{
+  rowObject:relationshipCtx.objectApiName}).value,'Alice');
  assert.throws(()=>formulas['broken:textSource'](ctx),/Formula error/);
 });
 
@@ -225,20 +226,19 @@ test('category filters still use complete sources, but scalar field formulas do 
 
 test('qualified scalar fields and COLLECTION datasets have different contexts',()=>{
  const products=[{Id:'p1',Name:'Tea',Price:4},{Id:'p2',Name:'Coffee',Price:6}];
- const options={rootObjectApiName:'Product',collectionSources:{Product:products},
-  collectionSourceFields:{Product:['Id','Name','Price']}};
- assert.equal(evaluateFieldExpressionDetailed('@Product.Name',products[0],options).value,'Tea');
- assert.equal(evaluateFieldExpressionDetailed('=@Product.Price * 2',products[1],options).value,'12');
- assert.equal(evaluateFieldExpressionDetailed('=SUM(@Product.Price)',products[0],options).value,'10');
- assert.match(evaluateFieldExpressionDetailed('@Name',products[0],options).error??'',/Bare @Field/);
- assert.match(evaluateFieldExpressionDetailed('@Menu',products[0],{
-  ...options,namedCollections:{Menu:{name:'Menu',items:['Tea']}}}).error??'',/named collection/);
- // @Name.state.* reads what that component (or named collection) published.
- assert.equal(evaluateFieldExpressionDetailed('@ThisPage.Menu.Selected.Value',products[0],{
-  ...options,namedCollectionSelections:{Menu:{Value:'Tea'}}}).value,'Tea');
- const result=evaluateCollectionFormula('=COLLECTION("Menu", 2, 3)',{Product:products},{
-  primaryObject:'Product',collectionSourceFields:{Product:['Id','Name','Price']}});
+ const options={rowObject:'Product'};
+ assert.equal(runFormulaText('@Product.Name',products[0],options).value,'Tea');
+ assert.equal(runFormulaText('=@Product.Price * 2',products[1],options).value,12);
+ assert.match(runFormulaText('@Name',products[0],options).error??'',/Bare @Name/);
+ // @ThisPage.Menu.Selected.Value reads what that component published.
+ assert.equal(runFormulaText('@ThisPage.Menu.Selected.Value',products[0],{
+  ...options,pageState:{collectionSelections:{Menu:{Value:'Tea'}}}}).value,'Tea');
+ // A list's COLLECTION source: rows from the loaded records; values run as page code.
+ const result=buildCollectionSource('=COLLECTION("Menu", 2, 3)',{Product:products},{Product:['Id','Name','Price']},
+  node=>runFormulaNode(node,{}).value);
  assert.equal(result.error??null,null);
+ const names=buildCollectionSource('=COLLECTION(Menu, @Product.Name)',{Product:products},{Product:['Id','Name','Price']});
+ assert.deepEqual(names.value?.items.map(item=>(item as {label:string}).label),['Tea','Coffee']);
  assert.deepEqual(result.value?.items,[2,3]);
 });
 
@@ -312,9 +312,9 @@ test('Tabs, Navigation, Toggle and Search Box values filter other components via
  assert.equal(JSON.stringify(query).includes('c2'),true,'filter panel reads the tab');
 
  // Display formulas read it too.
- assert.equal(evaluateFieldExpressionDetailed('="Showing " & @ThisPage.CategoryTabs.Selected.Name',{},
+ assert.equal(runFormulaText('="Showing " & @ThisPage.CategoryTabs.Selected.Name',{},
   {pageState:picked('CategoryTabs',{value:'c1',label:'Drinks',record:{Id:'c1',Name:'Drinks'}})}).value,'Showing Drinks');
- assert.equal(evaluateFieldExpressionDetailed('@ThisPage.CategoryTabs.Selected.Id',{},{}).value,'','nothing picked reads blank');
+ assert.equal(runFormulaText('@ThisPage.CategoryTabs.Selected.Id',{},{}).value,'','nothing picked reads blank');
 
  // Every named component is offered in the builder, and picking a parent
  // clears a child that depends on it (Category tabs → Sub-category tabs).

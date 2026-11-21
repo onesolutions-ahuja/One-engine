@@ -4,7 +4,7 @@ import {parsePageReference,pageReferencesIn,savedValueKey,isPageReference} from 
  * server filters before pagination. This intentionally accepts only expressions
  * that can be represented exactly by the existing Record API; there is NO
  * client-side filtering of a partial page and NO eval or arbitrary scripts. */
-import {componentReaderKey,type FormulaBindingContext} from '../../../component-libraries/shared/FieldExpression.js';
+import {componentReaderKey} from '../../../component-libraries/shared/formulaKeys.js';
 import {signedInValue} from '../PageCompiler/pageCodeRuntime';
 import {F,O} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
 import {formulaEntry} from '../../../../../server/src/page-compiler/code/formulaDictionary.js';
@@ -36,7 +36,7 @@ const asState=(node:Expression,state:Readonly<Record<string,unknown>>,sessionId=
  if(page?.kind==='component'){
   // A saved value first; otherwise the component's own live value.
   if(!Object.prototype.hasOwnProperty.call(state,page.key)){
-   const reader=(state as {[componentReaderKey]?:FormulaBindingContext['readComponent']})[componentReaderKey];
+   const reader=(state as {[componentReaderKey]?:(name:string,key:string)=>unknown})[componentReaderKey];
    if(reader){
     try{return reader(page.name,page.key);}
     catch(error){if(!/^Unknown component property/.test(error instanceof Error?error.message:''))throw error;}

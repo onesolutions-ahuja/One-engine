@@ -1,5 +1,4 @@
-import {convertedFormula} from "../shared/formulaCodeLookup.js";
-import {evaluateFieldExpression} from "../shared/FieldExpression.js";
+import {runComponentFormula} from "../shared/formulaCodeLookup.js";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
 
 /** Smart Paired Screens: the screens (customer displays, kitchen or order-status screens)
@@ -23,11 +22,7 @@ const SAMPLE=[{id:"a",name:"Counter",online:true},{id:"b",name:"Kitchen",online:
 
 function pageToShow(p){
  const source=p.textSource;
- const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
- const run=code&&source?convertedFormula(code,source):null;
- let value="";
- if(run){try{value=run(p.record||{});}catch{value="";}}
- else if(typeof source==="string"&&source)value=evaluateFieldExpression(source,p.record||{},{pageState:p.pageState,sessionId:p.sessionId,readComponent:p.readComponent});
+ const value=typeof source==="string"&&source?runComponentFormula(p,source,p.record||{}).value:"";
  return String(value??"").replace(/^=?"?|"?$/g,"").trim();
 }
 

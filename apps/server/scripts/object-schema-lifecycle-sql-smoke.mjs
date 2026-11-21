@@ -194,52 +194,8 @@ try{
   formula:'LOWER(@FormulaProbe__c.Name)',objectApi:formulaObject,
   recordId:'99999999-9999-4999-8999-999999999999'
  }),/unavailable|permission denied/);
- // Four accepted CRUD formulas must use the shared, permission-checked Record API.
- const {executeServerDataAction}=await import(new URL(
-  '../dist-system/system-support/formula-data-action-runtime.js',import.meta.url).href);
- const executeCrud=async formula=>{
-  const result=await executeServerDataAction(db,recordEngine,sqlActor,formula,{},1);
-  assert.equal(result.supported,true,formula);
-  assert.equal(result.error,undefined,formula);
-  return result;
- };
- const {executeServerDataAction:executeSqlDataAction}=await import(new URL(
-  '../dist-system/system-support/formula-data-action-runtime.js',import.meta.url).href);
- const roundedResult=await executeSqlDataAction(db,recordEngine,sqlActor,
-  'CREATERECORD(FormulaProbe__c,Name,"roundtrip",Total,ROUND(12.345,2))',{},1,formulaRights);
- assert.equal(roundedResult.supported,true);
- assert.equal(roundedResult.error,undefined);
- const roundedRecords=(await recordEngine.list(primary,actor,formulaObject,10,0,{
-  filters:[{field:'Name',operator:'eq',value:'roundtrip'}]
- })).records;
- assert.equal(roundedRecords.length,1);
- assert.equal(roundedRecords[0].Total,12.35);
-
- const aliasSql=await executeSqlDataAction(db,recordEngine,sqlActor,
-  'ACTIONS(GETRECORD(FormulaProbe__c,Name,"first",AS(row)),'+
-  'UPDATERECORD(FormulaProbe__c,row.Id,Total,ROUND(row.Total * 1.025,2)))',{},2,formulaRights);
- assert.equal(aliasSql.supported,true);
- assert.equal(aliasSql.error,undefined,'Existing Record aliases must execute scalar SQL');
- const firstRow=(await recordEngine.list(primary,actor,formulaObject,10,0,{
-  filters:[{field:'Name',operator:'eq',value:'first'}]
- })).records[0];
- assert.equal(firstRow.Total,10.25);
-
-
- const created=await executeCrud('CREATERECORD(FormulaProbe__c,Name,"temporary",Total,7)');
- assert.equal(created.recordChanged,true);
- const scratch=(await recordEngine.list(primary,actor,formulaObject,10,0,{
-  filters:[{field:'Name',operator:'eq',value:'temporary'}]
- })).records;
- assert.equal(scratch.length,1);
- const scratchId=scratch[0].Id;
- await executeCrud('UPDATERECORD(FormulaProbe__c,"'+scratchId+'",Name,"updated")');
- assert.equal((await recordEngine.get(primary,actor,formulaObject,scratchId)).Name,'updated');
- const retrieved=await executeCrud('GETRECORD(FormulaProbe__c,Name,"updated",AS(found))');
- assert.equal(retrieved.variables?.found?.Id,scratchId);
- await executeCrud('DELETERECORD(FormulaProbe__c,"'+scratchId+'")');
- await assert.rejects(()=>recordEngine.get(primary,actor,formulaObject,scratchId),/not found|deleted|unavailable/i);
- console.info('SQL Formula: SUM + five filtered aggregates + four Record API actions passed real PostgreSQL');
+ // Action formulas run as page code (one transaction): see page-code-runtime and record-trips-probe.
+ console.info('SQL Formula: SUM + five filtered aggregates passed real PostgreSQL');
 
  assert.equal((await lifecycle.impact(primary,'Milestone__c')).recordCount,2);
  // Declarative cross-object relationship on a different object blocks deletion.

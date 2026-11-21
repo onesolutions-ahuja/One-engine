@@ -11,7 +11,7 @@ import {resolveMetadataProperties} from '../../metadata/Definitions/metadataRefe
 import {bindPageStateProperties,resolvePageStatePath} from '../PageRuntime/pageComponentBindings';
 import {componentLayoutProps} from '../TemplatePageRuntime/pageComponentLayout';
 import {behaviorAction,behaviorValidation,pageBehaviors} from '../PageRuntime/pageBehaviorRuntime';
-import {notConvertedAction} from '../PageRuntime/formulaAction';
+import {notConvertedAction} from './notConverted';
 import {carriedPageState,pageStartKey,type CarriedPageState} from './pageStartAction';
 import {askWhichTill} from '../PageRuntime/tillPickerScreen';
 import {showScreenPairing,installPairedScreensBridge,autoOpenCustomerDisplay} from '../PageRuntime/displayPairingScreen';
@@ -42,6 +42,7 @@ import {subscribeDeviceTill,mirrorDeviceKey,tillDeviceKey} from '../../authentic
 import {PURE_ACTION_FUNCTIONS} from './generatePageScript';
 import {isCompiledStateReference,declarativeSource,COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import type {LoadedPageScript} from './serverPageScript';
+import type {Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {createPageCodeRuntime,type PageCodeRuntime,type Effect} from './pageCodeRuntime';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
@@ -489,9 +490,13 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const codeVersion=useSyncExternalStore(listener=>runtime.code?runtime.code.subscribe(listener):()=>{},
   ()=>runtime.code?.version()??0,()=>runtime.code?.version()??0);
  const formulaCode=useMemo(()=>{
-  const map=runtime.code?.formulasFor(component.id);
-  return map&&map.size?{functions:map,version:codeVersion}:null;
- },[runtime.code,component.id,codeVersion]);
+  const code=runtime.code;
+  if(!code)return null;
+  // A formula text not in the page file (given at run time) is converted by the same converter.
+  return {functions:code.formulasFor(component.id),version:codeVersion,
+   compile:(text:unknown)=>code.compile(text,objectApiName),
+   compileNode:(node:Expression)=>code.compileNode(node,objectApiName)};
+ },[runtime.code,component.id,codeVersion,objectApiName]);
  const properties=useMemo(()=>resolveMetadataProperties({...component.properties,objectApiName},runtime.objects,availableFlows),
   [component.properties,objectApiName,runtime.objects,availableFlows]);
  const actionFlows=(properties.actionFlows&&typeof properties.actionFlows==='object'&&!Array.isArray(properties.actionFlows)
@@ -581,7 +586,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    const value=(resolved as Record<string,unknown>)[property];
    if(typeof value==='string'&&value.trim()&&!functions.has(value.trim()))functions.set(value.trim(),run);
   }
-  return {functions,version:formulaCode.version};
+  return {functions,version:formulaCode.version,compile:formulaCode.compile,compileNode:formulaCode.compileNode};
  },[formulaCode,resolved,runtime.code,component.id]);
  // COLLECTION()/TABLE(): users author collections; the shared rows feed them.
  const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,runtime.objects,objectApiName,
@@ -1003,7 +1008,9 @@ export const MemoizedCompiledComponentNode=React.memo(CompiledComponentNode);
 /** Display-only components (labels, headers, logos) are drawn without the data node, but
  * their formulas still run as the page's converted code, never on the previous engine. */
 export function PageCodeFormulas({componentId,children}:{componentId:string;
- children:(formulaCode:{functions:Map<string,(row:Record<string,unknown>)=>unknown>;version:number}|null,
+ children:(formulaCode:{functions:Map<string,(row:Record<string,unknown>)=>unknown>;version:number;
+  compile:(text:unknown)=>((row:Record<string,unknown>)=>unknown)|null;
+  compileNode:(node:Expression)=>(row:Record<string,unknown>)=>unknown}|null,
   given:Record<string,unknown>)=>ReactNode}){
  const runtime=useCompiledPageRuntime();
  const code=runtime?.code??null;
@@ -1021,10 +1028,10 @@ export function PageCodeFormulas({componentId,children}:{componentId:string;
   ...(runtime?{onFormulaState}:{})};
  const version=useSyncExternalStore(listener=>code?code.subscribe(listener):()=>{},
   ()=>code?.version()??0,()=>code?.version()??0);
- const formulaCode=useMemo(()=>{
-  const map=code?.formulasFor(componentId);
-  return map&&map.size?{functions:map,version}:null;
- },[code,componentId,version]);
+ const rowObject=runtime?.byId.get(componentId)?.objectApiName??'';
+ const formulaCode=useMemo(()=>code?{functions:code.formulasFor(componentId),version,
+  compile:(text:unknown)=>code.compile(text,rowObject),
+  compileNode:(node:Expression)=>code.compileNode(node,rowObject)}:null,[code,componentId,version,rowObject]);
  return <>{children(formulaCode,given)}</>;
 }
 

@@ -1,5 +1,4 @@
-import {convertedFormula} from "../shared/formulaCodeLookup.js";
-import {evaluateFieldExpression} from "../shared/FieldExpression.js";
+import {runComponentFormula} from "../shared/formulaCodeLookup.js";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
 import {LINE_ITEMS_PREVIEW,lineItemRows,lineItemSettings} from "./lineItems.mjs";
 
@@ -14,22 +13,11 @@ const size=(value,fallback)=>Number.isFinite(Number(value))&&Number(value)>0?Mat
 export default function SmartComponent(p){
  if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const records=Array.isArray(p.records)?p.records:Array.isArray(p.items)?p.items:[];
- const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
  const read=(key,row)=>{
   const source=p[key];
   if(typeof source!=="string"||!source.trim())return undefined;
   if(typeof p.fieldAllowed==="function"&&!p.fieldAllowed(key,row))return "";
-  const run=code?convertedFormula(code,source):null;
-  try{
-   if(run)return run(row||{});
-   return evaluateFieldExpression(source,row,{
-    readComponent:p.readComponent,rootObjectApiName:p.objectApiName,
-    pageState:p.pageState,sessionId:p.sessionId,
-    collectionSources:p.formulaCollectionSources,
-    namedCollections:p.namedCollections,
-    namedCollectionSelections:p.pageState?.collectionSelections
-   });
-  }catch{return "";}
+  return runComponentFormula(p,source,row).value;
  };
  const designing=p.builderPreview===true||p.editing===true||p.designMode===true;
  const real=lineItemRows(records,read);

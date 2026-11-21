@@ -1,4 +1,6 @@
-import {convertedFormula} from "../../shared/formulaCodeLookup.js";
+import {convertedFormula,formulaConverter} from "../../shared/formulaCodeLookup.js";
+import {buildCollectionSource} from "../../shared/collectionSource.js";
+import {withRowTotals} from "../../shared/rowTotals.js";
 import SmartCart from "../../smart_cart/SmartCart.jsx";
 import SmartNumpad from "../../smart_numpad/SmartNumpad.jsx";
 import SmartScheduleCalendar from "../../smart_calendar/SmartScheduleCalendar.jsx";
@@ -9,7 +11,6 @@ import icons from "../../smart_icon/iconCatalog.json";
 import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
 import {smartPartOffsetStyle,smartPartOrderStyle} from "./SmartPartPlacement.js";
-import {evaluateFieldExpressionDetailed,evaluateCollectionFormula} from "../../shared/FieldExpression.js";
 import {isSelectedSqlFormula} from "../../shared/formulaKinds.js";
 import {useTenantImageSource} from "../../shared/TenantImage.jsx";
 import SmartIdCardFields from "../../smart_id_card/SmartIdCardFields.jsx";
@@ -35,22 +36,24 @@ const expressionResult=(v,record,pageState,objectApiName,collectionSources,named
    !/^\s*-?(?:\d+(?:\.\d*)?|\.\d+)\s*[+\-*/&]/.test(v))return {value:v};
  // Static/SSR renders cannot execute effect-backed SQL requests. Preserve
  // permission-scoped collection evaluation until a browser SQL result exists.
- if(codeLookup&&typeof window!=="undefined"){
+ // SUM over the list's own loaded rows (a cart summary): each row runs the converted code.
+ if(collectionRows!==undefined&&codeLookup&&codeLookup.rowTotals){
+  const totals=codeLookup.rowTotals(v,collectionRows,record);
+  if(totals)return totals;
+ }
+ // Page code: the page file's function, or the same converter run by the host for a
+ // formula given at run time. There is no other formula engine.
+ if(codeLookup){
   const codeResult=codeLookup(v,record);
   if(codeResult)return codeResult;
  }
- // Totals over Objects (COUNTIFS, SUMIFS) exist only as page code.
- // The Page Builder design canvas holds no page code (Preview does): a total
+ // The Page Builder design canvas holds no page totals (Preview does): a total
  // there is a blank placeholder, never an error and never another engine.
- if(typeof window!=="undefined"&&isSelectedSqlFormula(v))
-  return designCanvas?{value:''}:{value:'',error:'This formula is not converted: save the page again'};
- try{return evaluateFieldExpressionDetailed(v,record||{},{
-  readComponent,namedCollectionSelections:pageState?.collectionSelections,
-  rootObjectApiName:objectApiName,collectionSources,
-  collectionSourceFields:formulaSourceFields(objects),
-  namedCollections,collectionRows,pageState,sessionId
- });}catch{return {value:"",error:"Formula evaluation failed"};}
+ if(designCanvas&&isSelectedSqlFormula(v))return {value:''};
+ return {value:'',error:'This formula is not converted: save the page again'};
 };
+/** A fixed value inside a COLLECTION where no page code is present (a standalone preview). */
+const collectionLiteral=node=>node&&node.kind==="literal"?node.value??"":"";
 const expression=(...args)=>{
  const result=expressionResult(...args);
  // Non-display formula consumers retain their existing empty-value error contract.
@@ -439,12 +442,10 @@ function SmartSelector({p,fire}){
  // No lookup queries, new evaluator, or untrusted JSON parsing.
  const sourced=Array.isArray(p.dataCollection?.items);
  const formula=typeof p.selectorOptionsFormula==="string"?p.selectorOptionsFormula.trim():"";
- const fallback=!sourced&&formula?evaluateCollectionFormula(formula,
-   p.formulaCollectionSources??{},{
-    primaryObject:p.objectApiName,record:recordOf(p),
-    collectionSourceFields:formulaSourceFields(p.objects),
-    namedCollections:p.namedCollections,state:p.pageState,session:{id:p.sessionId}
-   }):null;
+ const fallback=!sourced&&formula?buildCollectionSource(formula,
+   p.formulaCollectionSources??{},formulaSourceFields(p.objects),
+   node=>{const converter=formulaConverter(p);
+    return converter?converter.compileNode(node)(recordOf(p)):collectionLiteral(node);}):null;
  const formulaItems=Array.isArray(fallback?.value?.items)?fallback.value.items:null;
  const rows=sourced?recordsOf(p)
   :formulaItems??(Array.isArray(p.options)&&p.options.length?p.options
@@ -940,8 +941,12 @@ export default function SmartRuntime(p){
  // Page code: the page converter turned this component's formulas into plain functions.
  // There is no other formula engine on a published page: rows still loading show blank.
  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
- const lookup=code?(v,record)=>{
-  const run=convertedFormula(code,v);
+ const converter=formulaConverter(p);
+ const compile=converter?converter.compile:null;
+ const lookup=code||compile?(v,record)=>{
+  let run;
+  try{run=(code?convertedFormula(code,v):null)??(compile?compile(v):null);}
+  catch(error){return {value:"",error:error instanceof Error?error.message:"Formula failed"};}
   if(!run)return undefined;
   try{return {value:run(record||{})};}
   catch(error){
@@ -949,6 +954,12 @@ export default function SmartRuntime(p){
    return {value:"",error:error instanceof Error?error.message:"Formula failed"};
   }
  }:undefined;
+ if(lookup&&converter)lookup.rowTotals=(v,rows,record)=>{
+  try{
+   const run=withRowTotals(v,rows,node=>converter.compileNode(node));
+   return run?{value:run(record||{})}:undefined;
+  }catch(error){return {value:"",error:error instanceof Error?error.message:"Formula failed"};}
+ };
  p={...p,__codeLookup:lookup};
  // Re-render when the tenant brand arrives so @ThisTenant.Company.Name / .Logo show without a reload.
  React.useSyncExternalStore(subscribeTenantBrand,getTenantBrand,getTenantBrand);

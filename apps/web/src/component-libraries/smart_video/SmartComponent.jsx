@@ -1,5 +1,4 @@
-import {convertedFormula} from "../shared/formulaCodeLookup.js";
-import {evaluateFieldExpression} from "../shared/FieldExpression.js";
+import {runComponentFormula} from "../shared/formulaCodeLookup.js";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
 import {videoList} from "./videoList.mjs";
 
@@ -17,14 +16,7 @@ export default function SmartComponent(p){
  const source=p.imageSource;
  let value=source;
  if(typeof source==="string"&&/^\s*=|^\s*@/.test(source)){
-  const code=p.__formulaCode&&p.__formulaCode.functions instanceof Map?p.__formulaCode.functions:null;
-  const run=code?convertedFormula(code,source):null;
-  try{
-   value=run?run(row):evaluateFieldExpression(source,row,{readComponent:p.readComponent,
-    rootObjectApiName:p.objectApiName,pageState:p.pageState,sessionId:p.sessionId,
-    collectionSources:p.formulaCollectionSources,namedCollections:p.namedCollections,
-    namedCollectionSelections:p.pageState?.collectionSelections});
-  }catch{value="";}
+  value=runComponentFormula(p,source,row).value;
  }
  const list=videoList(value);
  const key=list.join(";");

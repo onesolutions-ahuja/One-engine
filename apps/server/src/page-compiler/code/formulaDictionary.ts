@@ -105,7 +105,7 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  UPDATERECORD:action(4,82,'UPDATERECORD(Object, Id, Field, value, ...) -> update in the same transaction'),
  DELETERECORD:action(2,2,'DELETERECORD(Object, Id) -> delete in the same transaction'),
  FOREACH:action(3,44,'FOREACH(Object, Field, value, ..., AS(x), step) -> for each matching record'),
- SCREEN:action(1,3,'SCREEN(page, popup|current|newwindow, [recordId]): open a page (loads on first open)'),
+ SCREEN:action(1,4,'SCREEN(page, [mode], [recordId], [layer 0-9]) in any order after the page: open a page, or switch it to a layer (loads on first open)'),
  CLOSESCREEN:action(0,1,'CLOSESCREEN(["second"]): close this popup, or the second-monitor screen'),
  CONFIRMSCREEN:action(2,5,'CONFIRMSCREEN(message, actions on Yes, [actions on No], [Yes label], [No label]): Yes/No box'),
  INFOSCREEN:action(1,2,'INFOSCREEN(message, [actions after OK]): message box with OK'),

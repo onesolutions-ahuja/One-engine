@@ -32,9 +32,9 @@ test('SCREEN(page, n) opens or switches page to layer n; modes still work',()=>{
  assert.throws(()=>parseScreenAction('SCREEN(Payment, 12)'));
  // Inside ACTIONS(...) too, e.g. when a sale is complete.
  const plan=compileActionPlan('=ACTIONS(SCREEN(smart_till_customer_display, 3))') as unknown as Array<{name:string;values:Array<{value:unknown}>}>;
- assert.equal(plan[0]?.name,'SCREEN');assert.equal(plan[0]?.values[0]?.value,3);
+ assert.equal(plan[0]?.name,'SCREEN');assert.equal(plan[0]?.values[2]?.value,3);
  // Server-built page code passes the layer on to the browser, which reads it as SCREEN(page,3).
- assert.match(compileActionFormula('=SCREEN(smart_till_customer_display, 3)','').js,/\$\.ui\("SCREEN", "smart_till_customer_display", "3"\)/);
+ assert.match(compileActionFormula('=SCREEN(smart_till_customer_display, 3)','').js,/\$\.ui\("SCREEN", "smart_till_customer_display", "current", "", "3"\)/);
 });
 
 test('Upload CSV reads and writes the page layer of a component',()=>{
@@ -50,4 +50,36 @@ test('Upload CSV reads and writes the page layer of a component',()=>{
  assert.equal(result.page.components.find(item=>item.id==='b')?.properties.pageLayer,2);
  const bad=applyInventoryCsv(page as never,upload.replace(',2,',',12,'),new Map(),'Custom' as never);
  assert.equal(bad.valid,false,'layers are 0-9');
+});
+
+test('SCREEN inputs after the page come in any order, blanks allowed; old formulas unchanged',()=>{
+ const want={page:'Payment',mode:'popup',record:'ThisPage.Cart.recordId',layer:2};
+ for(const formula of ['SCREEN(Payment, popup, @ThisPage.Cart.recordId, 2)','SCREEN(Payment, 2, popup, @ThisPage.Cart.recordId)',
+  'SCREEN(Payment, @ThisPage.Cart.recordId, 2, popup)']){
+  const parsed=parseScreenAction(formula);
+  assert.deepEqual({...parsed,record:parsed.record?.replace(/^@/,'')},want,formula);
+ }
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, popup, , 2)'),{page:'Payment',mode:'popup',record:undefined,layer:2});
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, , , 2)'),{page:'Payment',mode:'current',record:undefined,layer:2});
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, second, 3)'),{page:'Payment',mode:'second',record:undefined,layer:3});
+ // Existing formulas: same result as before.
+ assert.deepEqual(parseScreenAction('SCREEN(Payment)'),{page:'Payment',mode:'current',record:undefined});
+ assert.deepEqual(parseScreenAction('SCREEN(Payment, popup)'),{page:'Payment',mode:'popup',record:undefined});
+ assert.equal(parseScreenAction('SCREEN(edit, popup, @event.recordId)').mode,'popup');
+ assert.ok(parseScreenAction('SCREEN(edit, popup, @event.recordId)').record);
+ assert.throws(()=>parseScreenAction('SCREEN(Payment, 2, 3)'),/two layer/);
+ assert.throws(()=>parseScreenAction('SCREEN(Payment, popup, second)'),/two modes/);
+ assert.throws(()=>parseScreenAction('SCREEN(Payment, 12)'),/0-9/);
+ // Server-built code passes page, mode, record, layer in that fixed order.
+ assert.match(compileActionFormula('=SCREEN(Payment, 2, popup)','').js,/\$\.ui\("SCREEN", "Payment", "popup", "", "2"\)/);
+ assert.match(compileActionFormula('=SCREEN(Payment, popup, , 2)','').js,/\$\.ui\("SCREEN", "Payment", "popup", "", "2"\)/);
+ assert.match(compileActionFormula('=SCREEN(Payment, popup)','').js,/\$\.ui\("SCREEN", "Payment", "popup"\)/);
+ const plan=compileActionPlan('=ACTIONS(SCREEN(Payment, 1, popup))') as unknown as Array<{values:Array<{value:unknown}>}>;
+ assert.deepEqual(plan[0]?.values.map(item=>item.value),['popup',null,1]);
+});
+
+test('a page opened on a layer in a new window keeps ?layer= through the address tidy',async()=>{
+ const {keepScreenParams}=await import('../src/core/workspace/Navigation/appRouting.ts');
+ assert.equal(keepScreenParams('/une/apps/X/pages/pay','?layer=2&junk=1'),'/une/apps/X/pages/pay?layer=2');
+ assert.equal(keepScreenParams('/une/apps/X/pages/pay','?layer=22'),'/une/apps/X/pages/pay');
 });

@@ -28,7 +28,10 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   const value=resolveRecord(/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)*$/.test(record)?'@'+record:record);
   recordId=value===null||value===undefined?'':String(value);
  }
- if(parsed.layer!==undefined)return openPageLayer(page,parsed.layer,context,onNavigate);
+ // SCREEN(Page, 3): switch Page where it shows, else open it here (openPageLayer).
+ if(parsed.layer!==undefined&&mode==='current')return openPageLayer(page,parsed.layer,context,onNavigate);
+ // A popup or other window opens on that layer.
+ if(parsed.layer!==undefined)rememberRequestedLayer(page,parsed.layer);
  const inScreen=mode==='popup'&&context.pages.some(item=>
   item.apiName===page&&item.pageType==='In-Screen Page'&&item.status==='Active');
  const route=inScreen?null:resolvePageActionRoute({navigationTargetType:'App Page',navigationPageApiName:page},context);
@@ -40,8 +43,12 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
   if(!handled&&window.dispatchEvent(new CustomEvent('metadrive:workspace-formula-screen',{cancelable:true,detail:{appId:context.currentAppId,screen}})))throw Error('This page has no popup host');
  }else if(route){
   if(mode==='current')onNavigate(route);
-  else if(mode==='second')void openSecondScreen(appRoutePath(route),sessionId);
-  else window.open(appRoutePath(route),'_blank','noopener');
+  else{
+   // Another window reads its layer from the address (?layer=).
+   const path=appRoutePath(route)+(parsed.layer!==undefined?(appRoutePath(route).includes('?')?'&':'?')+'layer='+parsed.layer:'');
+   if(mode==='second')void openSecondScreen(path,sessionId);
+   else window.open(path,'_blank','noopener');
+  }
  }
  return {navigated:true};
 }

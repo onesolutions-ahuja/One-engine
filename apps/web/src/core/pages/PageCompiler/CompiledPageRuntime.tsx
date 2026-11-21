@@ -746,8 +746,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   if(runtime.code?.hasAction(codeKey)&&binding.actionType==='Formula'){
    const runEffects=async(effects:Effect[])=>{
     for(const effect of effects){
-     const [first,second,third]=effect.args.map(value=>value===null||value===undefined?'':String(value));
-     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+')',navigationContext,
+     const [first,second,third,fourth]=effect.args.map(value=>value===null||value===undefined?'':String(value));
+     // SCREEN effect: page, mode, record, layer (the record goes in separately below).
+     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+(fourth?','+fourth:'')+')',navigationContext,
       onNavigate as never,runtime.pageSessionKey,session,third||String(payload.recordId??runtime.store.get().recordId??record?.Id??''));
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);

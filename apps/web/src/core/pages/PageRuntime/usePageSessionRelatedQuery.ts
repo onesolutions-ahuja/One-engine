@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import type {FieldMetadata,ObjectMetadata} from '../../metadata/Definitions/metadata';
 import {filtersByDevice} from '../PageCompiler/compilePage';
-import {pageComponentSessionRelatedQuery,pageComponentRelatedQuery,
+import {pageComponentSessionRelatedQuery,SESSION_PARENT_LIMIT,pageComponentRelatedQuery,
  pageComponentActiveRecordQuery,hasPageActiveRecordSelection,
  type PageQueryFilter} from './pageComponentBindings';
 
@@ -35,7 +35,7 @@ export function usePageSessionRelatedQuery(
   let active=true;
   void pageComponentSessionRelatedQuery(fields,objects,sessionId,
    (objectApiName,sessionKey)=>load(objectApiName,{
-    limit:2,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false}
+    limit:SESSION_PARENT_LIMIT,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false}
    })).then(query=>{if(active)setResult({scopeKey,query});});
   return()=>{active=false;};
  },[requestKey]);

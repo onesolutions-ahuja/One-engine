@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {LiveFrameParser,isOwnBatch,isOwnEcho,noteOwnBatch} from '../src/core/pages/PageCompiler/liveChanges.ts';
-import {drawLiveTap,newTapLedger,type PageLiveTarget} from '../src/core/pages/PageCompiler/pageLiveWiring.ts';
+import {drawLiveTap,newTapLedger,waitingFor,withoutWaiting,TAP_WAIT_MS,type PageLiveTarget} from '../src/core/pages/PageCompiler/pageLiveWiring.ts';
 import {LiveChangeHub,readLiveRelay,relayChanges,MAX_RELAY_BYTES} from '../../server/src/system-support/live-changes.ts';
 import {actionTurnKey} from '../../server/src/system-support/page-code-runtime.ts';
 
@@ -104,4 +104,55 @@ test('one page\'s taps take turns on the server; other pages and devices do not 
  assert.notEqual(actionTurnKey(actor,{sessionId:'sale-1'}),actionTurnKey({tenant_id:'T2',user_id:'u'},{sessionId:'sale-1'}));
  assert.equal(actionTurnKey(actor,{sessionId:'',deviceKey:'dev-1234567890abcdef'}),'page-action:T:device:dev-1234567890abcdef');
  assert.equal(actionTurnKey(actor,{sessionId:''}),'');
+});
+
+test('fast taps: an older answer never draws over a newer tap still waiting (1, 2, 3 never shows 1, 2, 1)',async()=>{
+ const {target,saved,applied,changed}=fakeTarget();
+ const ledger=newTapLedger();
+ const line=(qty:number)=>[{objectApiName:'CartLine',operation:'update' as const,record:{Id:'line-1',Qty:qty}}];
+ await drawLiveTap(target,'preview',{batch:'0000000a',ok:true,changes:line(1)},ledger);
+ await drawLiveTap(target,'preview',{batch:'0000000b',ok:true,changes:line(2)},ledger);
+ await drawLiveTap(target,'settled',{batch:'0000000a',ok:true,changes:line(1)},ledger);
+ assert.deepEqual((saved[2] as {recordChanges:unknown[]}).recordChanges,[],'tap 1\'s saved row waits for tap 2');
+ assert.deepEqual(applied[2],['CartLine',[],[]]);
+ assert.equal(changed.length,0,'no server totals while a tap on the Object waits');
+ // A database notice of the same line now is left to tap 2's answer; other rows still draw.
+ const notice=[{object:'CartLine',ids:new Set(['line-1','line-9']),count:2,operation:'update',
+  rows:new Map([['line-1',{Id:'line-1',Qty:1}],['line-9',{Id:'line-9',Qty:7}]]),created:new Set<string>()}];
+ const kept=withoutWaiting(notice,waitingFor(ledger));
+ assert.deepEqual([...kept[0].ids],['line-9']);
+ assert.deepEqual([...kept[0].rows!.keys()],['line-9']);
+ assert.equal(kept[0].count,1);
+ assert.equal(withoutWaiting([{...notice[0],ids:new Set(['line-1']),rows:new Map([['line-1',{Id:'line-1'}]])}],waitingFor(ledger)).length,0);
+ await drawLiveTap(target,'settled',{batch:'0000000b',ok:true,changes:line(2)},ledger);
+ assert.deepEqual(applied[3],['CartLine',[{Id:'line-1',Qty:2}],[]],'the last answer draws the saved row');
+ assert.deepEqual(changed[0],[['CartLine'],[]]);
+ // A tap whose answer never comes stops holding its rows.
+ await drawLiveTap(target,'preview',{batch:'0000000c',ok:true,changes:line(3)},ledger,1000);
+ assert.equal(waitingFor(ledger,1000+TAP_WAIT_MS+1).ids.size,0);
+});
+
+test('a session with several carts (after Clear sale or Hold) uses its newest one, never a guess',async()=>{
+ const {newestSessionParent,pageComponentSessionRelatedQuery}=await import('../src/core/pages/PageRuntime/pageComponentBindings.ts');
+ assert.deepEqual(newestSessionParent([{Id:'a'}]),{Id:'a'});
+ assert.equal(newestSessionParent([{Id:'old',CreatedAt:'2026-11-21T10:00:00Z'},{Id:'new',CreatedAt:'2026-11-21T11:00:00Z'}])?.Id,'new');
+ assert.equal(newestSessionParent([{Id:'a',CreatedAt:'2026-11-21T10:00:00Z'},{Id:'b'}]),null,'no time to tell them apart');
+ assert.equal(newestSessionParent([{Id:'a',CreatedAt:'2026-11-21T10:00:00Z'},{Id:'b',CreatedAt:'2026-11-21T10:00:00Z'}]),null,'a tie');
+ const fields=[{apiName:'Cart',relationship:{targetObject:'Cart'},dataType:'reference',type:'reference'}] as never;
+ const objects=[{apiName:'Cart',fields:[{apiName:'SessionKey',dataType:'text',type:'text'}]}] as never;
+ const query=await pageComponentSessionRelatedQuery(fields,objects,'sale-1',async()=>({total:2,records:[
+  {Id:'cleared',CreatedAt:'2026-11-21T10:00:00Z'},{Id:'current',CreatedAt:'2026-11-21T10:05:00Z'}]}));
+ assert.equal(query.blocked,false);
+ assert.equal(query.filter?.value,'current');
+});
+
+test('a new row of another parent makes a parent-scoped list read again (its parent may be new)',async()=>{
+ const {applySavedRecordMutations}=await import('../src/core/pages/PageRuntime/pageMutationScope.ts');
+ const scope={total:1,offset:0,pageSize:2,readObjectApiNames:['CartLine'],relatedFilter:{field:'Cart',value:'old',related:true}} as never;
+ const rows=[{Id:'l1',Cart:'old',Qty:1}];
+ assert.equal(applySavedRecordMutations(rows,'CartLine',{objectApiNames:['CartLine'],
+  recordChanges:[{objectApiName:'CartLine',operation:'create',record:{Id:'l2',Cart:'new',Qty:1}}]},scope),null);
+ const same=applySavedRecordMutations(rows,'CartLine',{objectApiNames:['CartLine'],
+  recordChanges:[{objectApiName:'CartLine',operation:'create',record:{Id:'l2',Cart:'old',Qty:1}}]},scope);
+ assert.deepEqual(same?.records.map(row=>row.Id),['l1','l2'],'same parent: drawn in place');
 });

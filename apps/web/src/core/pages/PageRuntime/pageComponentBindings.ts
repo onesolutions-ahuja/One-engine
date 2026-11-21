@@ -165,6 +165,19 @@ export function hasPageActiveRecordSelection(
  * must themselves expose a readable SessionKey field. All reads use the normal
  * tenant- and OneEngine-permission-checked Record API.
  */
+/** Parents one page session may own (a cleared or held sale keeps its cart in the session). */
+export const SESSION_PARENT_LIMIT=20;
+/** The session's current parent: the only one, else the newest (a new sale after Clear sale or
+ * Hold). Without creation times to tell them apart nothing is picked (never a guess). */
+export function newestSessionParent(rows:ReadonlyArray<Record<string,unknown>>):{Id:string}|null{
+ const valid=rows.filter((row):row is Record<string,unknown>&{Id:string}=>typeof row?.Id==='string'&&Boolean(row.Id));
+ if(valid.length!==rows.length||!valid.length)return null;
+ if(valid.length===1)return valid[0];
+ const at=(row:Record<string,unknown>)=>typeof row.CreatedAt==='string'?Date.parse(row.CreatedAt):NaN;
+ if(valid.some(row=>!Number.isFinite(at(row))))return null;
+ const sorted=[...valid].sort((a,b)=>at(b)-at(a));
+ return at(sorted[0])===at(sorted[1])?null:sorted[0];
+}
 export async function pageComponentSessionRelatedQuery(
  fields:ReadonlyArray<FieldMetadata>,
  objects:ReadonlyArray<{apiName:string;fields:ReadonlyArray<FieldMetadata>}>,
@@ -185,10 +198,10 @@ export async function pageComponentSessionRelatedQuery(
   try{
    const page=await load(target,sessionId);
    if(!page||!Array.isArray(page.records)||!Number.isSafeInteger(page.total)
-     ||page.total<0||page.total>1||page.records.length>1)return {blocked:true};
+     ||page.total<0||page.total>SESSION_PARENT_LIMIT||page.records.length!==page.total)return {blocked:true};
    if(page.total===0)continue;
-   const row=page.records[0];
-   if(!row||typeof row.Id!=='string'||!row.Id)return {blocked:true};
+   const row=newestSessionParent(page.records);
+   if(!row)return {blocked:true};
    matches.push({field:field.apiName,value:row.Id,related:true});
   }catch{return {blocked:true};}
  }

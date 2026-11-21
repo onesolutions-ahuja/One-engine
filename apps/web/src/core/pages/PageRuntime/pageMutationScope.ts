@@ -154,6 +154,10 @@ export function applySavedRecordMutations(
   if(columns&&!detail?.optimistic&&columns.some(field=>!Object.hasOwn(record,field)))return null;
   const fits=matches(record);
   if(fits===null)return null;
+  // A new row of ANOTHER parent (a new cart in this session after Clear sale or Hold): the
+  // list's parent may have changed, so it is read again rather than leaving the row out.
+  if(!fits&&index<0&&change.operation==='create'&&scope.relatedFilter
+   &&String(record[scope.relatedFilter.field]??'')!==scope.relatedFilter.value)return null;
   if(index>=0){
    if(fits)next[index]={...next[index],...record};
    else{next.splice(index,1);total--;}

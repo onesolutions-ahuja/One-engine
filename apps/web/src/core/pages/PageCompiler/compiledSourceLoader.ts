@@ -1,6 +1,6 @@
 import type {FieldMetadata,ObjectMetadata} from '../../metadata/Definitions/metadata';
 import {pageComponentRecordQuery,filterPageComponentRecords,pageComponentRelatedQuery,
- pageComponentActiveRecordQuery,hasPageActiveRecordSelection,pageComponentSessionRelatedQuery,
+ pageComponentActiveRecordQuery,hasPageActiveRecordSelection,pageComponentSessionRelatedQuery,SESSION_PARENT_LIMIT,
  type PageQueryFilter} from '../PageRuntime/pageComponentBindings';
 import {filterRelatedRecords} from '../PageRuntime/filterRelatedRecords.mjs';
 import type {CompiledDataSource} from './compilePage';
@@ -45,7 +45,7 @@ export function compiledSourceLoader(objects:readonly ObjectMetadata[],context:(
   const cached=sessionParents.get(cacheKey);
   if(cached)return cached.scope;
   const query=await pageComponentSessionRelatedQuery(fields,objects,sessionId,(target,sessionKey)=>
-   loadPage(target,{limit:2,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false}}));
+   loadPage(target,{limit:SESSION_PARENT_LIMIT,offset:0,filter:{field:'SessionKey',value:sessionKey,related:false}}));
   const result={...query,field:query.filter?.field??'',parentId:query.filter?.value};
   // Only a found parent is remembered: a cart created later is found on the next read.
   if(!query.blocked&&query.filter)sessionParents.set(cacheKey,{scope:result,

@@ -40,13 +40,24 @@ BEGIN
  PERFORM pg_notify('md_live_changes',json_build_object('k','screen','t',NEW.tenant_id,'d',NEW.device_key)::text);
  RETURN NULL;
 END $fn$;
+CREATE OR REPLACE FUNCTION md_live_page_changes() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+ PERFORM pg_notify('md_live_changes',json_build_object('k','page','t',NEW.tenant_id,
+  'a',(SELECT api_name FROM md_page_definitions WHERE tenant_id=NEW.tenant_id AND id=NEW.page_id),
+  'v',NEW.variant,'d',NEW.draft_version,'p',NEW.published_version)::text);
+ RETURN NULL;
+END $fn$;
+DROP TRIGGER IF EXISTS md_live_page_layout ON md_page_layout_heads;
+CREATE TRIGGER md_live_page_layout AFTER INSERT OR UPDATE OF draft_version,published_version ON md_page_layout_heads
+ FOR EACH ROW EXECUTE FUNCTION md_live_page_changes();
 DROP TRIGGER IF EXISTS md_live_screen_device ON md_screen_devices;
 CREATE TRIGGER md_live_screen_device AFTER INSERT OR UPDATE OF session_key,page_layers ON md_screen_devices
  FOR EACH ROW EXECUTE FUNCTION md_live_screen_changes();
 `;
 
 type Actor={tenant_id:string;user_id:string};
-export type LiveMessage={k:'record';t:string;o:string;n:number;ids:string[];op:string}|{k:'screen';t:string;d:string};
+export type LiveMessage={k:'record';t:string;o:string;n:number;ids:string[];op:string}|{k:'screen';t:string;d:string}
+ |{k:'page';t:string;a:string|null;v:string;d:number|null;p:number|null};
 type Subscriber={userId:string;send:(event:string,data:unknown)=>void;readable:Map<string,{ok:boolean;at:number}>};
 type Row=Record<string,unknown>;
 /** Reads saved rows as one user (the normal record API: sharing and field permissions). */
@@ -111,6 +122,17 @@ export class LiveChangeHub{
   subscribers.add(subscriber);this.tenants.set(actor.tenant_id,subscribers);
   return ()=>{subscribers.delete(subscriber);if(!subscribers.size)this.tenants.delete(actor.tenant_id);};
  }
+ /** Page Builder co-editing: pass a designer's live edits (or presence) to the tenant's
+  * other designers who may read pages. Not stored: Save stores. */
+ async pageEdit(actor:Actor,edit:Record<string,unknown>):Promise<number>{
+  const subscribers=this.tenants.get(actor.tenant_id);
+  if(!subscribers?.size)return 0;
+  let sent=0;
+  await Promise.all([...subscribers].map(async subscriber=>{
+   if(await this.canRead(actor.tenant_id,subscriber,'PageDefinition')){subscriber.send('page-edit',edit);sent++;}
+  }));
+  return sent;
+ }
  /** How many screens are connected now (diagnostics and tests). */
  count(tenant?:string):number{
   return tenant?this.tenants.get(tenant)?.size??0:[...this.tenants.values()].reduce((total,set)=>total+set.size,0);
@@ -121,6 +143,14 @@ export class LiveChangeHub{
   if(!subscribers?.size)return;
   if(message.k==='screen'){
    for(const subscriber of subscribers)subscriber.send('screen',{device:message.d});
+   return;
+  }
+  if(message.k==='page'){
+   // A page layout was saved or published: Page Builders (co-design) and open pages hear it.
+   if(!message.a)return;
+   const page={page:message.a,variant:message.v,draft:message.d,published:message.p};
+   for(const subscriber of subscribers)void this.canRead(message.t,subscriber,'PageDefinition')
+    .then(ok=>{if(ok)subscriber.send('page',page);}).catch(()=>undefined);
    return;
   }
   const change={object:message.o,ids:message.ids??[],count:message.n,operation:message.op};
@@ -148,7 +178,35 @@ export class LiveChangeHub{
  }
 }
 
-export function registerLiveChangeRoutes(app:Express,hub:LiveChangeHub){
+const pageName=/^[A-Za-z][A-Za-z0-9_]{0,79}$/,clientPattern=/^[A-Za-z0-9-]{8,64}$/;
+/** A designer's live edit, checked: page, layout, client, at most 200 components and 500 removals. */
+export function readPageEdit(body:unknown):Record<string,unknown>{
+ const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
+ if(typeof raw.page!=='string'||!pageName.test(raw.page))throw Error('Choose the page');
+ if(!['Mobile','Desktop','Tablet','Custom'].includes(String(raw.variant)))throw Error('Choose the layout');
+ if(typeof raw.clientId!=='string'||!clientPattern.test(raw.clientId))throw Error('Invalid editor');
+ const ops=(raw.ops&&typeof raw.ops==='object'&&!Array.isArray(raw.ops)?raw.ops:{}) as Record<string,unknown>;
+ const upsert=Array.isArray(ops.upsert)?ops.upsert:[];
+ const remove=Array.isArray(ops.remove)?ops.remove:[];
+ if(upsert.length>200||remove.length>500||upsert.some(item=>!item||typeof item!=='object'||typeof (item as {id?:unknown}).id!=='string')
+  ||remove.some(id=>typeof id!=='string'))throw Error('Invalid page edit');
+ const selection=Array.isArray(raw.selection)?raw.selection.filter((id):id is string=>typeof id==='string').slice(0,50):[];
+ return {page:raw.page,variant:raw.variant,clientId:raw.clientId,ops:{upsert,remove},selection};
+}
+
+export function registerLiveChangeRoutes(app:Express,hub:LiveChangeHub,rbac?:Pick<RbacEngine,'require'>,
+ nameOf?:(actor:Actor)=>Promise<string>){
+ // Page Builder co-editing: live edits and presence between designers (not saved).
+ app.post('/api/page-edits',(req:Request,res:Response,next:NextFunction)=>{
+  const actor=(req as Request&{actor?:Actor}).actor;
+  void (async()=>{
+   if(!actor?.tenant_id||!actor.user_id)throw Object.assign(Error('Authenticated tenant required'),{status:401});
+   await rbac?.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+   const edit=readPageEdit(req.body);
+   const name=nameOf?await nameOf(actor).catch(()=>''):'';
+   res.json({sent:await hub.pageEdit(actor,{...edit,user:actor.user_id,name})});
+  })().catch(next);
+ });
  app.get('/api/live-changes',(req:Request,res:Response,next:NextFunction)=>{
   const actor=(req as Request&{actor?:Actor}).actor;
   if(!actor?.tenant_id||!actor.user_id){next(Object.assign(Error('Authenticated tenant required'),{status:401}));return;}

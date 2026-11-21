@@ -24,3 +24,6 @@
 .page-layer-move select{height:30px;border:1px solid #d0d5dd;border-radius:6px;padding:0 6px;font:inherit}
 /* Designing a layer other than 0: layer 0 shows faded underneath and cannot be picked. */
 .canvas-layer-base-faded{position:absolute;inset:0;opacity:.35;pointer-events:none}
+.page-layer-editors{display:inline-flex;gap:4px;align-items:center}
+.page-layer-editor{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+  color:#fff;font-weight:700;font-size:12px}

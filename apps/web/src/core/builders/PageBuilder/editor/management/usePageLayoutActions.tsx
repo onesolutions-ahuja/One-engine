@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { isCanvasLocked, ungroupCanvasComponent } from '../../canvasInteractions';
 import {
 canvasGroupKey, groupCanvasSelection, ungroupCanvasSelection, moveCanvasLayer, shiftCanvasLayer,
@@ -10,6 +10,7 @@ import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../
 import type { PageBuilderProps } from '../PageBuilderTypes';
 import {takePrefetchedPageEditorDraft} from '../../../../authentication/Client/authClient';
 import type { usePageEditorState } from '../usePageEditorState';
+import { applyOps, coEditorsStore, diffComponents, updateEditors, type CoEditOps, type CoEditor } from './pageCoEditing';
 import type { usePageComponentProperties } from '../inspector/usePageComponentProperties';
 
 export function usePageLayoutActions(
@@ -52,6 +53,86 @@ export function usePageLayoutActions(
       .catch(error => {if(active)onNotify(error instanceof Error?error.message:'Unable to load page draft');});
     return ()=>{active=false;};
   },[editorMode,page.apiName,initialLayoutVariant]);
+  // Co-design: another person saved this layout. With no edits here it loads at once;
+  // with edits here they are kept, and Save asks before replacing the newer revision.
+  const dirtyRef=useRef(false);
+  dirtyRef.current=undoStack.length>0;
+  const shownRevision=useRef<number|undefined>(undefined);
+  shownRevision.current=typeof page.draftRevision==='number'?page.draftRevision:undefined;
+  useEffect(()=>{
+   if(!editorMode)return;
+   const variant=page.layoutVariant??'Desktop';
+   let stopped=false;
+   let stop:()=>void=()=>undefined;
+   void import('../../../../pages/PageCompiler/liveChanges').then(live=>{
+    if(stopped)return;
+    stop=live.subscribeLiveChanges(event=>{
+     if(event.kind!=='page'||event.page.page!==page.apiName||event.page.variant!==variant)return;
+     const draft=event.page.draft;
+     const newer=()=>typeof draft==='number'&&(shownRevision.current===undefined||draft>shownRevision.current);
+     if(!newer())return;
+     // Our own Save announces itself too: give its answer a moment to arrive first.
+     setTimeout(()=>{if(!stopped&&newer())react();},1500);
+    });
+    function react(){
+     if(dirtyRef.current){onNotify('Someone else saved this page. Your edits are kept; Save will ask before replacing their version.');return;}
+     void request<{page:LightningPageMetadata}>(`/metadata/pages/${encodeURIComponent(page.apiName)}/layouts/${variant}/editor`)
+      .then(result=>{if(!stopped&&!dirtyRef.current){onChange(result.page);onNotify('Updated: someone else saved this page');}})
+      .catch(()=>undefined);
+    }
+   });
+   return ()=>{stopped=true;stop();};
+  },[editorMode,page.apiName,page.layoutVariant]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Co-editing: edits made here go to other designers of this page and layout as they
+  // happen, and theirs arrive here (applied without touching this designer's undo list).
+  const coClient=useRef(typeof crypto!=='undefined'&&'randomUUID' in crypto?crypto.randomUUID():String(Math.random()).slice(2,14)+'-editor');
+  const coSent=useRef(new Map<string,string>());
+  const coPage=useRef(page);coPage.current=page;
+  const coSelection=useRef<string[]>([]);coSelection.current=editorState.selectionIds;
+  const [coEditors,setCoEditors]=React.useState<CoEditor[]>([]);
+  useEffect(()=>{coEditorsStore.set(coEditors);},[coEditors]);
+  useEffect(()=>()=>coEditorsStore.set([]),[]);
+  const coVariant=page.layoutVariant??'Desktop';
+  useEffect(()=>{
+   // A freshly loaded layout is the shared starting point: nothing to send for it.
+   coSent.current=diffComponents(new Map(),page.components).next;
+  },[page.apiName,coVariant,page.draftRevision]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{
+   if(!editorMode)return;
+   let stopped=false,stop:()=>void=()=>undefined;
+   const send=(ops:CoEditOps)=>void request('/page-edits',{method:'POST',body:JSON.stringify({page:coPage.current.apiName,
+    variant:coVariant,clientId:coClient.current,ops,selection:coSelection.current})}).catch(()=>undefined);
+   void import('../../../../pages/PageCompiler/liveChanges').then(live=>{
+    if(stopped)return;
+    stop=live.subscribeLiveChanges(event=>{
+     if(event.kind!=='page-edit')return;
+     const edit=event.edit;
+     if(edit.page!==coPage.current.apiName||edit.variant!==coVariant||edit.clientId===coClient.current)return;
+     setCoEditors(current=>updateEditors(current,{clientId:edit.clientId,name:edit.name||'Another designer',selection:edit.selection,seenAt:Date.now()}));
+     if(!edit.ops.upsert.length&&!edit.ops.remove.length)return;
+     const components=applyOps(coPage.current.components,edit.ops as CoEditOps);
+     // Remember their edits as already shared, so they are not sent back.
+     coSent.current=diffComponents(new Map(),components).next;
+     onChange({...coPage.current,components});
+    });
+   });
+   // Presence: who is here and what they have selected, every 10 s.
+   const heartbeat=setInterval(()=>{if(!document.hidden)send({upsert:[],remove:[]});setCoEditors(current=>updateEditors(current,null));},10_000);
+   send({upsert:[],remove:[]});
+   return ()=>{stopped=true;stop();clearInterval(heartbeat);};
+  },[editorMode,page.apiName,coVariant]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Local edits: sent ~100 ms after they settle.
+  useEffect(()=>{
+   if(!editorMode)return;
+   const timer=setTimeout(()=>{
+    const {ops,next}=diffComponents(coSent.current,page.components);
+    if(!ops.upsert.length&&!ops.remove.length)return;
+    coSent.current=next;
+    void request('/page-edits',{method:'POST',body:JSON.stringify({page:page.apiName,variant:coVariant,
+     clientId:coClient.current,ops,selection:coSelection.current})}).catch(()=>undefined);
+   },100);
+   return ()=>clearTimeout(timer);
+  },[editorMode,page.components]); // eslint-disable-line react-hooks/exhaustive-deps
   const switchLayoutVariant=async(variant:'Mobile'|'Desktop'|'Tablet'|'Custom'):Promise<boolean>=>{
     if((page.layoutVariant??'Desktop')===variant)return true;
     if(switchingLayout)return false;

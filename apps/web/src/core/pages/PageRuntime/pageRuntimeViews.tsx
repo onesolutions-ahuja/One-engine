@@ -1175,6 +1175,7 @@ function LightningAppRuntime({
     error:string;
     loading:boolean;
   }>({routeKey:'',identity:'',appId:'',page:null,error:'',loading:true});
+  const [publishedTick,setPublishedTick]=useState(0);
   const pageLoadRef=useRef(pageLoad);
   pageLoadRef.current=pageLoad;
   const routePending=pageLoad.routeKey!==routeKey;
@@ -1300,7 +1301,25 @@ function LightningAppRuntime({
       });
     });
     return ()=>{active=false;};
-  },[routeKey,pageIdentity,appId,pageApiName,inScreenPage,requestedLayout,viewportWidth,pageDefinitionCache,cacheKey,previewPage]);
+  },[routeKey,pageIdentity,appId,pageApiName,inScreenPage,requestedLayout,viewportWidth,pageDefinitionCache,cacheKey,previewPage,publishedTick]);
+  // A new version of this page was published: the open page switches to it (its page
+  // state is carried over), without the user reopening it.
+  useEffect(()=>{
+    if(previewPage||!pageApiName)return;
+    let stop:()=>void=()=>undefined;let stopped=false;
+    void import('../PageCompiler/liveChanges').then(live=>{
+      if(stopped)return;
+      let lastPublished:number|null=null;
+      stop=live.subscribeLiveChanges(event=>{
+        if(event.kind!=='page'||event.page.page!==pageApiName||event.page.published===null)return;
+        if(lastPublished===event.page.published)return;
+        lastPublished=event.page.published;
+        pageDefinitionCache.delete(cacheKey);
+        setPublishedTick(tick=>tick+1);
+      });
+    });
+    return ()=>{stopped=true;stop();};
+  },[pageApiName,previewPage,cacheKey,pageDefinitionCache]);
   useEffect(() => {
     setActiveTabs({});
   }, [page?.apiName]);

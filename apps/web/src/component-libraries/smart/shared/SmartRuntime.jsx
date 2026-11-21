@@ -312,7 +312,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{...smartPartOffsetStyle(p,"image"),order:["right","bottom"].includes(imagePlacement)?2:0,
     flex:horizontal?(imageWidth!==null?"0 0 "+imageWidth+"px":idCard?"0 0 34%":"1 1 50%"):
       single?(hasImageHeight?"0 1 "+imageHeight+"px":"1 1 auto"):
-      grid?"1 1 "+imageHeight+"px":undefined,
+      grid?(hasImageHeight?"0 0 "+imageHeight+"px":"1 1 "+imageHeight+"px"):undefined,
     // A user-defined side image cannot squeeze adjacent text to zero. A
     // captionless standalone Image can still use its full component width.
     maxWidth:horizontal&&imageWidth!==null
@@ -367,6 +367,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
      minHeight:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
       ?number(p.footerHeight,0,0,1200):undefined,
+     width:p.footerWidth!==undefined&&p.footerWidth!==null&&p.footerWidth!==""
+      ?number(p.footerWidth,0,0,1200)+"px":undefined,
+     maxWidth:"100%",
      justifyContent:p.footerAlignment==="center"?"center":p.footerAlignment==="right"?"flex-end":
       p.footerAlignment==="left"?"flex-start":undefined}}>
     {value&&<strong data-md-bind={p.builderPreview?"cardValue":undefined} data-md-bind-titles={p.builderPreview?"Card value":undefined} className="smart-card-value"
@@ -374,7 +377,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        focusedText||p.footerTextColor||undefined,
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
-        ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
+        ?number(p.footerTextSize,19,8,96):undefined,
+       whiteSpace:"nowrap"}}>{value}</strong>}
     {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
       disabled={!onButtonClick} aria-label={buttonText}
       style={{

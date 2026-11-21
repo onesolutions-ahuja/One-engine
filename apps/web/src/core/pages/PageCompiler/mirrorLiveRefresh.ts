@@ -133,13 +133,7 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
  const follow=async()=>{
   if(stopped||following)return;
   following=true;
-  try{
-   await target.followSale?.().catch(()=>undefined);
-   // Hold/Resume can restore rows without changing the followed session id.
-   // A screen notification must re-read the authorised rows too: the device
-   // stream does not guarantee an Object mutation event for that transition.
-   if(!stopped&&Date.now()-last>=MIRROR_REFRESH_MS)await refresh();
-  }finally{following=false;}
+  try{await target.followSale?.().catch(()=>undefined);}finally{following=false;}
  };
  const unsubscribeLive=target.subscribeLive?.(kind=>{if(kind==='screen'&&target.followSale)void follow();else tick();});
  return ()=>{stopped=true;if(retry)clearTimeout(retry);clock.clearInterval(timer);unlisten();unsubscribe?.();unsubscribeLive?.();};

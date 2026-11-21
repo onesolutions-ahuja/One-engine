@@ -10,6 +10,7 @@ import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageS
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
+import {readLiveRelay,relayChanges,type LiveRelay} from '../system-support/live-changes.js';
 import type {ScreenPairingService} from '../system-support/screen-pairing-service.js';
 
 /**
@@ -25,7 +26,10 @@ import type {ScreenPairingService} from '../system-support/screen-pairing-servic
 import {stampDeviceCarts,validDeviceKey,DEVICE_OFFLINE_AT} from '../system-support/device-presence-service.js';
 export type PageScriptDeps={db:SqlPersistence;rbac:RbacEngine;records:RecordEngine;pages:PageRuntime;
  definitions:ObjectDefinitionService;scripts:PageScriptService;screens?:ScreenPairingService;
- verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>};
+ verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>;
+ /** Live stream hub: a tap's predicted change and its saved answer reach the same login's
+  * other screens at once (set once the hub exists). */
+ live?:{relay(actor:{tenant_id:string;user_id:string},event:'preview'|'settled',data:LiveRelay):Promise<number>}};
 
 const scopeKey=/^[A-Za-z][A-Za-z0-9_]{0,79}$/;
 /** Scope sent with a page code action: bounded, plain keys only. */
@@ -138,11 +142,21 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    if(!build||!compiledActionKeyPattern.test(key)){res.json({ok:false,stale:true,error:'This page was republished; reload it'});return;}
    const started=performance.now();
    const source=build.pageCode.actions.find(item=>item.key===key)?.js??'';
+   // The tap's prediction goes to the same login's other screens (a customer display) now,
+   // before the save: they show it as fast as the till itself.
+   const live=deps.live?readLiveRelay(body.live):null;
+   if(live?.changes?.length)void deps.live!.relay(actor,'preview',{batch:live.batch,changes:live.changes}).catch(()=>undefined);
    // @ThisPage.Device.Ip / Agent: what the server itself saw, never what the browser says.
    const result=await executePageCodeAction(deps,actor,build.serverCode,key,
     parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent')}),source);
    res.setHeader('Server-Timing','action;dur='+(performance.now()-started).toFixed(1));
    res.json(result);
+   // The answer replaces the prediction there (saved rows, or ok false: it is taken back).
+   // A device step (result.needs) is not an answer yet: the browser sends the action again.
+   if(live&&!result.needs){
+    const saved=result.ok?relayChanges(result.changes)??[]:[];
+    void deps.live!.relay(actor,'settled',{batch:live.batch,ok:Boolean(result.ok),changes:saved}).catch(()=>undefined);
+   }
   }));
   app.post(prefix+'/page-code/aggregates',wrap(async(req,res)=>{
    const actor=authenticated(req);

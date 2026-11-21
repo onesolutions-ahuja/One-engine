@@ -13,8 +13,13 @@ export type LivePage={page:string;variant:string;draft:number|null;published:num
 /** Another designer's live edit or presence on a page layout (Page Builder co-editing). */
 export type LivePageEdit={page:string;variant:string;clientId:string;name:string;selection:string[];
  ops:{upsert:Array<{id:string}&Record<string,unknown>>;remove:string[]}};
+/** A tap on another screen of this login: its predicted record changes ('preview'), then the
+ * save's answer ('settled': the saved rows, or ok false when nothing was saved). `batch` names
+ * the tap: its predicted new rows carry provisional Ids of that batch. */
+export type LiveTapChange={objectApiName:string;operation:'create'|'update'|'delete';record:Record<string,unknown>};
+export type LiveTap={batch:string;ok:boolean;changes:LiveTapChange[]};
 export type LiveEvent={kind:'change';change:LiveChange}|{kind:'screen';device:string}|{kind:'page';page:LivePage}
- |{kind:'page-edit';edit:LivePageEdit}|{kind:'resync'};
+ |{kind:'page-edit';edit:LivePageEdit}|{kind:'preview';tap:LiveTap}|{kind:'settled';tap:LiveTap}|{kind:'resync'};
 type Listener=(event:LiveEvent)=>void;
 
 const listeners=new Set<Listener>();
@@ -41,6 +46,21 @@ export function liveRetryDelay(failed:number,random=Math.random):number{
 const OWN_WRITE_MS=3_000;
 /** Records this window saved a moment ago: it already shows them, so their echo is skipped. */
 const ownWrites=new Map<string,number>();
+
+/** Taps made in this window: their preview and answer come back on the stream and are skipped. */
+const ownBatches=new Set<string>();
+export function noteOwnBatch(batch:string):void{
+ ownBatches.add(batch);
+ if(ownBatches.size>200)ownBatches.delete(ownBatches.values().next().value as string);
+}
+export const isOwnBatch=(batch:string):boolean=>ownBatches.has(batch);
+const tapChanges=(value:unknown):LiveTapChange[]=>Array.isArray(value)?value.filter((item):item is LiveTapChange=>{
+ if(!item||typeof item!=='object')return false;
+ const change=item as Record<string,unknown>;
+ return typeof change.objectApiName==='string'&&['create','update','delete'].includes(String(change.operation))
+  &&Boolean(change.record)&&typeof change.record==='object'&&!Array.isArray(change.record)
+  &&typeof (change.record as {Id?:unknown}).Id==='string';
+}):[];
 
 export function isLiveConnected():boolean{return connected;}
 /** Note records this window just saved (their live echo needs no re-read here). */
@@ -83,6 +103,10 @@ export class LiveFrameParser{
    }
    else if(name==='page'&&typeof data.page==='string')this.push({kind:'page',page:{page:data.page,variant:String(data.variant??''),
     draft:typeof data.draft==='number'?data.draft:null,published:typeof data.published==='number'?data.published:null}});
+   else if((name==='preview'||name==='settled')&&typeof data.batch==='string'&&/^[0-9a-f]{8}$/.test(data.batch)){
+    const tap={batch:data.batch,ok:name==='preview'||data.ok===true,changes:tapChanges(data.changes)};
+    this.push(name==='preview'?{kind:'preview',tap}:{kind:'settled',tap});
+   }
    else if(name==='change'&&typeof data.object==='string')this.push({kind:'change',change:{
     object:data.object,ids:Array.isArray(data.ids)?data.ids.filter((id):id is string=>typeof id==='string'):[],
     count:typeof data.count==='number'?data.count:0,operation:String(data.operation??''),
@@ -114,6 +138,7 @@ async function connect():Promise<void>{
     return;
    }
    if(event.kind==='change'&&isOwnEcho(event.change))return;
+   if((event.kind==='preview'||event.kind==='settled')&&isOwnBatch(event.tap.batch))return;
    emit(event);
   });
   try{

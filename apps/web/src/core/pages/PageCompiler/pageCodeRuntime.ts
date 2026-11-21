@@ -20,6 +20,7 @@ import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js
 import {USER_FIELDS,type PageReference} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
 import {startTap} from './pageTimings';
+import {noteOwnBatch} from './liveChanges';
 import {formulaFunction,looksLikeFormula,nodeFunction} from './formulaText';
 import type {Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,openerMirrorKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
@@ -574,7 +575,11 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    // A popup (SCREEN) the prediction opens is opened at once, not after the save;
    // other UI steps (PRINT, ...) still wait for the saved rows.
    const early=predicted?tap.effects.filter(effect=>effect.name==='SCREEN'):[];
-   const saving=post<ServerResult>('/page-code/execute',{...host.build,key,request:requestFor(event,rowObject)});
+   // The prediction goes with the save: the server shows it at once on this login's other
+   // screens (a customer display), then replaces it with the saved rows.
+   noteOwnBatch(batch);
+   const saving=post<ServerResult>('/page-code/execute',{...host.build,key,request:requestFor(event,rowObject),
+    live:predicted&&tap.changes.length?{batch,changes:tap.changes}:{batch}});
    if(predicted){
     applyOverlay(tap);changed();
     io.show({changes:tap.changes,state:{...tap.stateChanges},optimistic:batch});
@@ -591,7 +596,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     for(let round=0;result.needs&&round<5;round++){
      if(!io.device)throw Error(result.needs.name+' is not available here');
      device[result.needs.key]=await io.device(result.needs);
-     result=await post<ServerResult>('/page-code/execute',{...host.build,key,request:{...requestFor(event,rowObject),device}});
+     result=await post<ServerResult>('/page-code/execute',{...host.build,key,request:{...requestFor(event,rowObject),device},live:{batch}});
     }
     if(result.needs)throw Error('Too many device steps in one action');
    }

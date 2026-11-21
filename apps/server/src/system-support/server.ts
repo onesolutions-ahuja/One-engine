@@ -3140,6 +3140,8 @@ export function createSystemServer(db:SqlPersistence) {
   registerPlatformEventStreamRoutes(app,db,rbac);
   // One live stream per open page: saved records reach other screens at once.
   const liveChanges=new LiveChangeHub(db,rbac,recordRowReader(records));
+  // Page actions pass a tap's prediction and saved answer to the same login's other screens.
+  (pageScriptDeps as {live?:LiveChangeHub}).live=liveChanges;
   registerLiveChangeRoutes(app,liveChanges,rbac,async actor=>{
     const {rows}=await db.query<{name:string}>(`SELECT COALESCE(NULLIF(display_name,''),email,'') AS name FROM md_users WHERE id=$1 AND tenant_id=$2`,[actor.user_id,actor.tenant_id]);
     return rows[0]?.name??'';

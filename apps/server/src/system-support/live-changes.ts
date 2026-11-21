@@ -154,6 +154,29 @@ export class LiveChangeHub{
   }));
   return sent;
  }
+ /**
+  * Instant taps on other screens: a page's predicted change ('preview', sent with its save)
+  * and then the save's answer ('settled': the saved rows, or ok false) go at once to the SAME
+  * login's other open screens (shops share one login across tills, kiosks and displays), only
+  * for Objects that login may read. Screens of other logins get the saved rows as before
+  * (database notice). Nothing is stored. Returns how many screens it was sent to.
+  */
+ async relay(actor:Actor,event:'preview'|'settled',data:LiveRelay):Promise<number>{
+  const subscribers=this.tenants.get(actor.tenant_id);
+  if(!subscribers?.size)return 0;
+  const mine=[...subscribers].filter(subscriber=>!subscriber.closed&&subscriber.userId===actor.user_id);
+  if(!mine.length)return 0;
+  const objects=[...new Set(data.changes.map(change=>change.objectApiName))];
+  const readable=new Set<string>();
+  await Promise.all(objects.map(async object=>{if(await this.canRead(actor.tenant_id,mine[0],object))readable.add(object);}));
+  const changes=data.changes.filter(change=>readable.has(change.objectApiName));
+  // A preview of nothing readable is not worth sending; a settled answer always goes
+  // (screens drop the batch's predicted rows on it).
+  if(event==='preview'&&!changes.length)return 0;
+  const payload={...data,changes};
+  for(const subscriber of mine)this.deliver(subscriber,event,payload);
+  return mine.length;
+ }
  /** How many screens are connected now (diagnostics and tests). */
  count(tenant?:string):number{
   return tenant?this.tenants.get(tenant)?.size??0:[...this.tenants.values()].reduce((total,set)=>total+set.size,0);
@@ -198,6 +221,36 @@ export class LiveChangeHub{
   subscriber.readable.set(object,{ok,at:Date.now()});
   return ok;
  }
+}
+
+/** A page's predicted or saved record changes, passed to the same login's other screens. */
+export type LiveRelay={batch:string;ok?:boolean;
+ changes:Array<{objectApiName:string;operation:'create'|'update'|'delete';record:Row}>};
+const objectName=/^[A-Za-z][A-Za-z0-9_]{0,79}$/,batchPattern=/^[0-9a-f]{8}$/;
+/** Largest relayed change (one tap's rows); a bigger one is not relayed (the saved rows still go). */
+export const MAX_RELAY_BYTES=65_536;
+/** Reads the `live` part of a page action save: the tap's batch and, on the first send, its
+ * predicted changes. Anything malformed or too large gives no relay (the save is unaffected). */
+export function readLiveRelay(body:unknown):{batch:string;changes:LiveRelay['changes']|null}|null{
+ const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:null) as Record<string,unknown>|null;
+ if(!raw||typeof raw.batch!=='string'||!batchPattern.test(raw.batch))return null;
+ if(raw.changes===undefined)return {batch:raw.batch,changes:null};
+ return {batch:raw.batch,changes:relayChanges(raw.changes)};
+}
+/** Record changes checked: at most 100, each an Object, an operation and a flat row with an Id. */
+export function relayChanges(value:unknown):LiveRelay['changes']|null{
+ if(!Array.isArray(value)||value.length>100)return null;
+ const out:LiveRelay['changes']=[];
+ for(const item of value){
+  if(!item||typeof item!=='object'||Array.isArray(item))return null;
+  const {objectApiName,operation,record}=item as Record<string,unknown>;
+  if(typeof objectApiName!=='string'||!objectName.test(objectApiName))return null;
+  if(operation!=='create'&&operation!=='update'&&operation!=='delete')return null;
+  if(!record||typeof record!=='object'||Array.isArray(record)||typeof (record as Row).Id!=='string')return null;
+  out.push({objectApiName,operation,record:record as Row});
+ }
+ try{if(JSON.stringify(out).length>MAX_RELAY_BYTES)return null;}catch{return null;}
+ return out;
 }
 
 const pageName=/^[A-Za-z][A-Za-z0-9_]{0,79}$/,clientPattern=/^[A-Za-z0-9-]{8,64}$/;

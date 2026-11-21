@@ -255,6 +255,16 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   res.setHeader('Cache-Control','private, no-store');
   res.json(await screens().currentSession(actor,(req.body??{}).mirrorKey));
  }));
+ // Only a server-verified Paid Invoice can switch the customer's screen to success.
+ app.post('/api/screens/paid-invoice',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  const body=(req.body??{}) as Record<string,unknown>;
+  const device=await pairingDevice(deps.records,actor,body.deviceKey);
+  const invoice=await deps.records.get(actor.tenant_id,actor.user_id,'Invoice',
+   String(body.invoiceId??'')) as Record<string,unknown>;
+  res.json(await screens().showPaidInvoice(actor,device.deviceKey,invoice));
+ }));
  // SCREEN(page, n): the screens following this device that show page switch to layer n.
  app.post('/api/screens/layer',wrap(async(req,res)=>{
   const actor=authenticated(req);

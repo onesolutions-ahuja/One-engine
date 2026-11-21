@@ -175,7 +175,13 @@ export class ScreenPairingService{
   if(typeof sessionId!=='string'||!uuid.test(sessionId))fail('Invalid page session');
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,session_key,session_at,seen_at,offline)
    VALUES($1,$2,$3,now(),now(),false) ON CONFLICT(tenant_id,device_key) DO UPDATE
-   SET session_key=EXCLUDED.session_key,session_at=now(),seen_at=now(),offline=false`,[actor.tenant_id,deviceKey,sessionId]);
+   SET page_layers=CASE WHEN md_screen_devices.session_key IS DISTINCT FROM EXCLUDED.session_key
+     THEN COALESCE(md_screen_devices.page_layers,'{}'::jsonb)
+       ||jsonb_build_object('smart_till_customer_display',0)
+     ELSE md_screen_devices.page_layers END,
+    payment_confirmation=CASE WHEN md_screen_devices.session_key IS DISTINCT FROM EXCLUDED.session_key
+     THEN NULL ELSE md_screen_devices.payment_confirmation END,
+    session_key=EXCLUDED.session_key,session_at=now(),seen_at=now(),offline=false`,[actor.tenant_id,deviceKey,sessionId]);
   return {ok:true};
  }
  /** Device presence (the app open on that device, or closed). */
@@ -186,11 +192,36 @@ export class ScreenPairingService{
  }
  /** The sale the mirrored device is on now ('' = none reported), and the layer each page
   * should show on its screens (SCREEN(page, n) run on that device). */
- async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string;layers:Record<string,number>}>{
-  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:'',layers:{}};
-  const {rows}=await this.db.query<{session_key:string|null;page_layers:Record<string,number>|null}>(
-   'SELECT session_key,page_layers FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',[actor.tenant_id,mirrorKey]);
-  return {sessionId:rows[0]?.session_key??'',layers:rows[0]?.page_layers??{}};
+ async currentSession(actor:Actor,mirrorKey:unknown):Promise<{sessionId:string;layers:Record<string,number>;payment:Record<string,unknown>|null}>{
+  if(typeof mirrorKey!=='string'||!deviceKeyPattern.test(mirrorKey))return {sessionId:'',layers:{},payment:null};
+  const {rows}=await this.db.query<{session_key:string|null;page_layers:Record<string,number>|null;
+   payment_confirmation:Record<string,unknown>|null}>(
+   'SELECT session_key,page_layers,payment_confirmation FROM md_screen_devices WHERE tenant_id=$1 AND device_key=$2',
+   [actor.tenant_id,mirrorKey]);
+  return {sessionId:rows[0]?.session_key??'',layers:rows[0]?.page_layers??{},
+   payment:rows[0]?.payment_confirmation??null};
+ }
+ /** Only a server-paid Invoice the current user can read is displayed as completed.
+  * Ignore client-supplied amount, method and change; get all from the saved invoice. */
+ async showPaidInvoice(actor:Actor,deviceKey:unknown,invoice:Record<string,unknown>):
+   Promise<{amount:number;method:string;change:number;invoiceId:string}>{
+  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))fail('Invalid till device');
+  if(typeof invoice.Id!=='string'||!uuid.test(invoice.Id)||String(invoice.Status)!=='Paid')
+   fail('Only a completed invoice can be shown as paid');
+  const amount=Number(invoice.Total);
+  if(!Number.isFinite(amount)||amount<0||amount>100000000)fail('Invalid completed invoice total');
+  const method=String(invoice.PaymentMethod??invoice.PaymentType??'');
+  const changeRaw=Number(invoice.ChangeAmount??0);
+  const change=Number.isFinite(changeRaw)&&changeRaw>=0?changeRaw:0;
+  const payment={invoiceId:invoice.Id,amount,method,change};
+  await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,page_layers,payment_confirmation)
+   VALUES($1,$2,jsonb_build_object('smart_till_customer_display',1),$3::jsonb)
+   ON CONFLICT(tenant_id,device_key) DO UPDATE SET
+    page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)
+      ||jsonb_build_object('smart_till_customer_display',1),
+    payment_confirmation=EXCLUDED.payment_confirmation`,
+   [actor.tenant_id,deviceKey,JSON.stringify(payment)]);
+  return payment;
  }
  /** SCREEN(page, n) on a device: the screens that follow it and show that page switch to layer n.
   * Returns how many paired screens show that page (0: nobody follows it with that page). */
@@ -321,6 +352,7 @@ CREATE TABLE IF NOT EXISTS md_screen_devices (
  PRIMARY KEY(tenant_id,device_key)
 );
 ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS page_layers jsonb;
+ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS payment_confirmation jsonb;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_mirror ON md_screen_pairings(tenant_id,mirror_key) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_code ON md_screen_pairings(code) WHERE approved_at IS NULL AND revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS md_screen_pairings_device ON md_screen_pairings(tenant_id,device_record_id) WHERE revoked_at IS NULL;

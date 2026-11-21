@@ -1,6 +1,6 @@
 import type {CompiledDataSource} from './compilePage';
 import type {CompiledDataLayer} from './compiledPageStore';
-import {subscribeLiveChanges,type LiveChange,type LiveEvent} from './liveChanges';
+import {noteOwnWrites,subscribeLiveChanges,type LiveChange,type LiveEvent,type LiveTap,type LiveTapChange} from './liveChanges';
 import {noteLiveDrawn,timingNow} from './pageTimings';
 
 /**
@@ -81,6 +81,67 @@ export function drawLiveChanges(target:PageLiveTarget,changes:readonly Pending[]
  return Promise.all(work);
 }
 
+/** Taps of this login's other screens: the provisional (predicted) new rows of each tap
+ * still waiting for its answer, per Object, and the taps already answered. */
+export type TapLedger={waiting:Map<string,Map<string,Set<string>>>;answered:Set<string>};
+export const newTapLedger=():TapLedger=>({waiting:new Map(),answered:new Set()});
+const LEDGER_LIMIT=200;
+const remember=<T>(map:Map<string,T>|Set<string>,key:string,value?:T)=>{
+ if(map instanceof Set)map.add(key);else map.set(key,value as T);
+ if(map.size>LEDGER_LIMIT)map.delete(map.keys().next().value as string);
+};
+const byObject=(changes:readonly LiveTapChange[])=>{
+ const out=new Map<string,LiveTapChange[]>();
+ for(const change of changes)out.set(change.objectApiName,[...out.get(change.objectApiName)??[],change]);
+ return out;
+};
+/**
+ * Another screen of this login tapped (a till this display follows, another kiosk window).
+ * - preview: its predicted change is drawn at once, the same way that screen draws it
+ *   (lists take it only where they can show it exactly; held rows and totals over them too);
+ * - settled: the saved rows replace the prediction (provisional rows go, saved rows come);
+ *   the database's own notice of the same rows is then skipped here (already drawn), and
+ *   the server totals over those Objects are read again. ok false: nothing was saved, the
+ *   page reads again what the prediction touched.
+ */
+export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:LiveTap,ledger:TapLedger):Promise<unknown>{
+ const work:Promise<unknown>[]=[];
+ const changes=byObject(tap.changes);
+ const session=target.pageSessionKey;
+ if(kind==='preview'){
+  // The answer came first (a slow preview): nothing to predict any more.
+  if(ledger.answered.has(tap.batch))return Promise.resolve();
+  const created=new Map<string,Set<string>>();
+  for(const [object,list] of changes){
+   work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:list,optimistic:tap.batch,live:true}).catch(()=>undefined));
+   target.code?.applyLiveRows(object,list.filter(change=>change.operation!=='delete').map(change=>change.record),
+    list.filter(change=>change.operation==='delete').map(change=>String(change.record.Id)));
+   created.set(object,new Set(list.filter(change=>change.operation==='create').map(change=>String(change.record.Id))));
+  }
+  remember(ledger.waiting,tap.batch,created);
+  return Promise.all(work);
+ }
+ const predicted=ledger.waiting.get(tap.batch);
+ ledger.waiting.delete(tap.batch);
+ remember(ledger.answered,tap.batch);
+ if(!tap.ok){
+  // Not saved: what the prediction showed goes back to what SQL has.
+  return predicted?resyncPage(target):Promise.resolve();
+ }
+ const objects=new Set([...changes.keys(),...predicted?.keys()??[]]);
+ // These rows are drawn now: the database notice of the same rows needs no second read.
+ noteOwnWrites(tap.changes.filter(change=>change.operation!=='delete').map(change=>change.record.Id));
+ for(const object of objects){
+  const list=changes.get(object)??[];
+  work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:list,replacesOptimistic:tap.batch,live:true}).catch(()=>undefined));
+  target.code?.applyLiveRows(object,list.filter(change=>change.operation!=='delete').map(change=>change.record),
+   [...predicted?.get(object)??[],...list.filter(change=>change.operation==='delete').map(change=>String(change.record.Id))]);
+ }
+ // Server totals over these Objects (display formulas over rows the page does not hold).
+ if(target.code&&objects.size)work.push(target.code.liveChanged([...objects],[]).catch(()=>undefined));
+ return Promise.all(work);
+}
+
 /** Read everything the page shows again (the stream was down: anything may have changed). */
 export function resyncPage(target:PageLiveTarget):Promise<unknown>{
  return Promise.all([
@@ -104,8 +165,16 @@ export function connectPageLive(target:PageLiveTarget,
   queueMicrotask(()=>noteLiveDrawn(target.apiName,at,changes.map(change=>change.object).join(',')));
   void drawLiveChanges(target,changes);
  };
+ const ledger=newTapLedger();
  const stop=subscribe(event=>{
   if(event.kind==='resync'){void resyncPage(target);return;}
+  if(event.kind==='preview'||event.kind==='settled'){
+   // Drawn at once (not merged): this is the fastest path from a till to its display.
+   const at=timingNow();
+   void drawLiveTap(target,event.kind,event.tap,ledger);
+   queueMicrotask(()=>noteLiveDrawn(target.apiName,at,event.kind+':'+[...new Set(event.tap.changes.map(change=>change.objectApiName))].join(',')));
+   return;
+  }
   if(event.kind!=='change')return;
   const key=event.change.object.toLowerCase();
   pending.set(key,mergeLiveChange(pending.get(key),event.change));

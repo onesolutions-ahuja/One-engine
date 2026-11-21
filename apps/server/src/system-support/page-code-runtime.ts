@@ -612,6 +612,12 @@ function shownRows(value:unknown):Record<string,string[]>|undefined{
 export const needsIdentity=(source:string)=>/@ThisTenant\.(?:User|Company)\.|\$\.session\(\s*["'](?:user|tenant)\.|\$\.tenant\(/i.test(source);
 
 /** Run one page action: ONE transaction; all steps or none. */
+/** Taps of one page session (one sale on one screen) take turns; without a session, those of
+ * one device; without either, nothing is waited for. */
+export function actionTurnKey(actor:Actor,request:Pick<PageCodeRequest,'sessionId'|'deviceKey'>):string{
+ const own=request.sessionId?'session:'+request.sessionId:request.deviceKey?'device:'+request.deviceKey:'';
+ return own?'page-action:'+actor.tenant_id+':'+own:'';
+}
 export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPageCode,actionKey:string,
  request:PageCodeRequest,source:string):Promise<PageCodeResult>{
  const action=code.actions[actionKey];
@@ -622,6 +628,10 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
   connections:/\bCONNECTED\s*\(/i.test(source)});
  try{
   const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{
+   // One page's taps save one at a time, in the order they arrive: a tap reads what the tap
+   // before it saved (fast taps on +1 never lose one). Other pages and devices run alongside.
+   const turn=actionTurnKey(actor,request);
+   if(turn)await deps.db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[turn]);
    await scope.loadEventRecord();
    await action.run(scope);
    await scope.flush();

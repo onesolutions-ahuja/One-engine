@@ -392,7 +392,13 @@ export function prefetchLandingBootstrap() {
 // only (no records); the server still checks every permission on every request.
 const landingCacheKey = 'une.landing.v1';
 let sessionUserId: string | undefined;
-export function setSessionUserId(id: string | undefined) { sessionUserId = id || undefined; }
+export function setSessionUserId(id: string | undefined) {
+  // Another user signs in on this browser: the previous user's local copy goes.
+  if (sessionUserId && id && id !== sessionUserId) void import('../../pages/PageCompiler/localCopy').then(copy => copy.clearLocal());
+  sessionUserId = id || undefined;
+}
+/** The signed-in user's Id (owner of the browser's local copy of rows). */
+export function currentSessionUserId(): string | undefined { return sessionUserId; }
 export function cachedLanding<T>(): T | undefined {
   try {
     const raw = sessionUserId ? localStorage.getItem(landingCacheKey) : null;
@@ -405,12 +411,15 @@ export function rememberLanding(landing: unknown) {
   try {
     const userId = (landing as { user?: { id?: string } } | undefined)?.user?.id;
     if (!userId) return;
+    if (sessionUserId && sessionUserId !== userId) void import('../../pages/PageCompiler/localCopy').then(copy => copy.clearLocal());
     sessionUserId = userId;
     localStorage.setItem(landingCacheKey, JSON.stringify({ userId, landing }));
   } catch { /* storage full or blocked: the page simply waits for the server */ }
 }
 export function forgetLanding() {
   sessionUserId = undefined;
+  // Sign-out: the rows kept for fast page opens are deleted from this browser.
+  void import('../../pages/PageCompiler/localCopy').then(copy => copy.clearLocal());
   try { localStorage.removeItem(landingCacheKey); } catch { /* blocked storage */ }
 }
 export function takeLandingPrefetch<T>(): Promise<T | undefined> | undefined {

@@ -65,10 +65,30 @@ export function mergeLiveChange(before:Pending|undefined,change:LiveChange):Pend
  return pending;
 }
 
+/** Objects in drawing order: a parent before its children (an Object whose changed rows are
+ * pointed at by another Object's rows: a new cart before its first line). A list scoped to
+ * "this session's cart" then looks for the cart again before it places the line. */
+export function parentsFirst(groups:ReadonlyArray<[string,ReadonlyArray<Row>]>):number[]{
+ const ids=groups.map(([,rows])=>new Set(rows.map(row=>String(row.Id??'')).filter(Boolean)));
+ const pointsAt=(child:number,parent:number)=>child!==parent&&groups[child][1].some(row=>
+  Object.entries(row).some(([field,value])=>field!=='Id'&&typeof value==='string'&&ids[parent].has(value)));
+ const order:number[]=[],placed=new Set<number>();
+ const place=(index:number,path:Set<number>)=>{
+  if(placed.has(index)||path.has(index))return;
+  path.add(index);
+  for(let parent=0;parent<groups.length;parent++)if(pointsAt(index,parent))place(parent,path);
+  placed.add(index);order.push(index);
+ };
+ groups.forEach((_,index)=>place(index,new Set()));
+ return order;
+}
+
 /** Draw merged changes on the page. Returns the work (for tests and timings). */
 export function drawLiveChanges(target:PageLiveTarget,changes:readonly Pending[]):Promise<unknown>{
  const work:Promise<unknown>[]=[];
- for(const change of changes){
+ const ordered=parentsFirst(changes.map(change=>[change.object,change.rows?[...change.rows.values()]:[]] as [string,Row[]]))
+  .map(index=>changes[index]);
+ for(const change of ordered){
   const ids=[...change.ids];
   if(change.rows){
    const rows=[...change.rows.values()];
@@ -91,8 +111,11 @@ export function drawLiveChanges(target:PageLiveTarget,changes:readonly Pending[]
  * provisional new rows per Object, every record it touched, and when it was seen. Answered
  * taps are remembered so a late preview draws nothing. */
 type Waiting={created:Map<string,Set<string>>;ids:Set<string>;objects:Set<string>;at:number};
-export type TapLedger={waiting:Map<string,Waiting>;answered:Set<string>};
-export const newTapLedger=():TapLedger=>({waiting:new Map(),answered:new Set()});
+/** waiting: taps still waiting for their answer. answered: taps answered (a late preview draws
+ * nothing). real: a saved row's Id -> the provisional row still shown for it, while a later
+ * tap (predicted on the provisional Id) waits; that tap's answer swaps them. */
+export type TapLedger={waiting:Map<string,Waiting>;answered:Set<string>;real:Map<string,string>};
+export const newTapLedger=():TapLedger=>({waiting:new Map(),answered:new Set(),real:new Map()});
 const LEDGER_LIMIT=200;
 /** A tap whose answer never came (stream dropped) stops holding its records after this. */
 export const TAP_WAIT_MS=10_000;
@@ -100,19 +123,28 @@ const remember=<T>(map:Map<string,T>|Set<string>,key:string,value?:T)=>{
  if(map instanceof Set)map.add(key);else map.set(key,value as T);
  if(map.size>LEDGER_LIMIT)map.delete(map.keys().next().value as string);
 };
+const inOrder=(changes:Map<string,LiveTapChange[]>):Array<[string,LiveTapChange[]]>=>{
+ const groups=[...changes];
+ return parentsFirst(groups.map(([object,list])=>[object,list.map(change=>change.record)] as [string,Row[]])).map(index=>groups[index]);
+};
 const byObject=(changes:readonly LiveTapChange[])=>{
  const out=new Map<string,LiveTapChange[]>();
  for(const change of changes)out.set(change.objectApiName,[...out.get(change.objectApiName)??[],change]);
  return out;
 };
 /** Records and Objects (lower case) that taps still waiting for their answer will change
- * again: an older answer or database notice must not draw over their newer prediction. */
+ * again: an older answer or database notice must not draw over their newer prediction.
+ * A saved row and the provisional row shown for it count as one record. */
 export function waitingFor(ledger:TapLedger,now=Date.now()):{ids:Set<string>;objects:Set<string>}{
  const ids=new Set<string>(),objects=new Set<string>();
  for(const [batch,tap] of ledger.waiting){
   if(now-tap.at>TAP_WAIT_MS){ledger.waiting.delete(batch);continue;}
   for(const id of tap.ids)ids.add(id);
   for(const object of tap.objects)objects.add(object);
+ }
+ for(const [real,provisional] of ledger.real){
+  if(ids.has(provisional))ids.add(real);
+  else if(ids.has(real))ids.add(provisional);
  }
  return {ids,objects};
 }
@@ -122,29 +154,38 @@ export function waitingFor(ledger:TapLedger,now=Date.now()):{ids:Set<string>;obj
  *   (lists take it only where they can show it exactly; held rows and totals over them too);
  * - settled: the saved rows replace the prediction (provisional rows go, saved rows come),
  *   except rows a later tap still waiting will change again (fast taps: 1, 2, 3 never shows
- *   1, 2, 1, 3). The database's own notice of the same rows is then skipped here (already
- *   drawn), and the server totals over those Objects are read again once no later tap waits.
+ *   1, 2, 1, 3). A new row a later tap already changed stays as its provisional row until
+ *   that tap's answer (the saved row would show the older value). The database's own notice
+ *   of the same rows is then skipped here (already drawn), and the server totals over those
+ *   Objects are read again once no later tap waits.
  *   ok false: nothing was saved, the page reads again what the prediction touched.
  */
 export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:LiveTap,ledger:TapLedger,now=Date.now()):Promise<unknown>{
  const work:Promise<unknown>[]=[];
- const changes=byObject(tap.changes);
  const session=target.pageSessionKey;
  const rowsOf=(list:readonly LiveTapChange[])=>list.filter(change=>change.operation!=='delete').map(change=>change.record);
  const deletedOf=(list:readonly LiveTapChange[])=>list.filter(change=>change.operation==='delete').map(change=>String(change.record.Id));
  if(kind==='preview'){
   // The answer came first (a slow preview): nothing to predict any more.
   if(ledger.answered.has(tap.batch))return Promise.resolve();
+  // A row this screen still shows as provisional is changed under that Id.
+  const mapped=tap.changes.map(change=>{
+   const shown=ledger.real.get(String(change.record.Id));
+   return shown?{...change,record:{...change.record,Id:shown}}:change;
+  });
+  const changes=byObject(mapped);
   const created=new Map<string,Set<string>>();
-  for(const [object,list] of changes){
+  for(const [object,list] of inOrder(changes)){
    work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:list,optimistic:tap.batch,live:true}).catch(()=>undefined));
    target.code?.applyLiveRows(object,rowsOf(list),deletedOf(list));
    created.set(object,new Set(list.filter(change=>change.operation==='create').map(change=>String(change.record.Id))));
   }
-  remember(ledger.waiting,tap.batch,{created,at:now,ids:new Set(tap.changes.map(change=>String(change.record.Id))),
+  remember(ledger.waiting,tap.batch,{created,at:now,
+   ids:new Set([...tap.changes,...mapped].map(change=>String(change.record.Id))),
    objects:new Set([...changes.keys()].map(object=>object.toLowerCase()))});
   return Promise.all(work);
  }
+ const changes=byObject(tap.changes);
  const predicted=ledger.waiting.get(tap.batch)?.created;
  ledger.waiting.delete(tap.batch);
  remember(ledger.answered,tap.batch);
@@ -152,21 +193,40 @@ export function drawLiveTap(target:PageLiveTarget,kind:'preview'|'settled',tap:L
   // Not saved: what the prediction showed goes back to what SQL has.
   return predicted?resyncPage(target):Promise.resolve();
  }
+ // This tap's new rows, saved, in the order they were predicted: saved Id <-> provisional Id.
+ for(const [object,list] of changes){
+  const own=[...predicted?.get(object)??[]];
+  const saved=list.filter(change=>change.operation==='create').map(change=>String(change.record.Id));
+  if(own.length&&own.length===saved.length)saved.forEach((id,index)=>remember(ledger.real,id,own[index]));
+ }
  const later=waitingFor(ledger,now);
- const objects=new Set([...changes.keys(),...predicted?.keys()??[]]);
+ const provisionalOf=(id:string)=>ledger.real.get(id);
+ const objects=new Set([...inOrder(changes).map(([object])=>object),...predicted?.keys()??[],
+  ...tap.changes.filter(change=>provisionalOf(String(change.record.Id))).map(change=>change.objectApiName)]);
  // These rows are drawn now (or by the later tap's answer): their database notice needs no second read.
  noteOwnWrites(tap.changes.filter(change=>change.operation!=='delete').map(change=>change.record.Id));
  for(const object of objects){
   const all=changes.get(object)??[];
+  // Left to a later tap's answer: rows it changes again (by saved or provisional Id).
   const list=all.filter(change=>change.operation==='delete'||!later.ids.has(String(change.record.Id)));
-  const provisional=[...predicted?.get(object)??[]];
-  // Everything here is left to a later tap's answer and no provisional row to take away:
-  // nothing to draw (a re-read now would show the older saved value for a moment).
-  if(!list.length&&!provisional.length)continue;
-  // Provisional rows go with this answer: the lists take the saved rows in the same step.
-  const shown=list.length?list:all;
-  work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges:shown,replacesOptimistic:tap.batch,live:true}).catch(()=>undefined));
-  target.code?.applyLiveRows(object,rowsOf(list),[...provisional,...deletedOf(list)]);
+  // Provisional rows to take away now: this tap's own and earlier taps' handed on to it,
+  // unless a later tap still changes them (then they stay until its answer).
+  const takeAway:string[]=[],swapped=new Set<string>();
+  for(const id of predicted?.get(object)??[])if(!later.ids.has(id))takeAway.push(id);
+  for(const change of list){
+   const shown=provisionalOf(String(change.record.Id));
+   if(shown){takeAway.push(shown);swapped.add(String(change.record.Id));ledger.real.delete(String(change.record.Id));}
+  }
+  for(const [real,shown] of ledger.real)if(!later.ids.has(shown)&&!later.ids.has(real)&&takeAway.includes(shown))ledger.real.delete(real);
+  // Nothing to draw and nothing to take away: no step at all (a re-read now would show
+  // an older saved value for a moment).
+  if(!list.length&&!takeAway.length)continue;
+  const gone=[...new Set(takeAway)];
+  // A saved row that replaces a provisional one is new to the lists (placed in the same step).
+  const recordChanges=[...gone.map(id=>({objectApiName:object,operation:'delete' as const,record:{Id:id}})),
+   ...list.map(change=>swapped.has(String(change.record.Id))?{...change,operation:'create' as const}:change)];
+  work.push(target.data.saved({pageSessionKey:session,objectApiNames:[object],recordChanges,replacesOptimistic:tap.batch,live:true}).catch(()=>undefined));
+  target.code?.applyLiveRows(object,rowsOf(list),[...gone,...deletedOf(list)]);
  }
  // Server totals over these Objects (display formulas over rows the page does not hold),
  // once the last waiting tap on them has answered.
@@ -224,11 +284,11 @@ export function connectPageLive(target:PageLiveTarget,
   void drawLiveChanges(target,changes);
  };
  const stop=subscribe(event=>{
-  if(event.kind==='resync'){ledger.waiting.clear();void resyncPage(target);return;}
+  if(event.kind==='resync'){ledger.waiting.clear();ledger.real.clear();void resyncPage(target);return;}
   if(event.kind==='preview'||event.kind==='settled'){
    // The device this display follows tapped on a sale the display is not on yet (a new
    // sale): it moves to that sale first, then the tap draws there.
-   if(event.tap.device&&event.tap.session&&target.follow?.(event.tap.device,event.tap.session))ledger.waiting.clear();
+   if(event.tap.device&&event.tap.session&&target.follow?.(event.tap.device,event.tap.session)){ledger.waiting.clear();ledger.real.clear();}
    // Drawn at once (not merged): this is the fastest path from a till to its display.
    const at=timingNow();
    void drawLiveTap(target,event.kind,event.tap,ledger);

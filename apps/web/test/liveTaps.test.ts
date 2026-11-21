@@ -195,3 +195,38 @@ test('database notices wait while another screen\'s taps wait, then draw once (n
  assert.equal(cart[0].recordChanges[0].record.Total,2.5,'the newest value');
  stop();
 });
+
+test('a new cart is drawn before its first line (the list finds the new cart, then the line)',async()=>{
+ const {parentsFirst}=await import('../src/core/pages/PageCompiler/pageLiveWiring.ts');
+ assert.deepEqual(parentsFirst([['CartLine',[{Id:'l1',Cart:'c2'}]],['Cart',[{Id:'c2'}]]]),[1,0]);
+ assert.deepEqual(parentsFirst([['Cart',[{Id:'c2'}]],['CartLine',[{Id:'l1',Cart:'c2'}]]]),[0,1]);
+ assert.deepEqual(parentsFirst([['A',[{Id:'a',B:'b'}]],['B',[{Id:'b',A:'a'}]]]),[1,0],'a loop still draws each once');
+ const {target,saved}=fakeTarget();
+ const ledger=newTapLedger();
+ await drawLiveTap(target,'settled',{batch:'0000c0de',ok:true,changes:[
+  {objectApiName:'CartLine',operation:'create',record:{Id:'l1',Cart:'c2'}},
+  {objectApiName:'Cart',operation:'create',record:{Id:'c2'}}]},ledger);
+ assert.deepEqual(saved.map(item=>(item as {objectApiNames:string[]}).objectApiNames[0]),['Cart','CartLine']);
+});
+
+test('fast taps on a NEW line: the line counts 1, 2, 3, 4 on the display, never back',async()=>{
+ const {target,saved,applied}=fakeTarget();
+ const ledger=newTapLedger();
+ const p=provisional('000000b1');
+ // Tap 1 creates the line (provisional on the till); taps 2-3 change it before tap 1 is saved.
+ await drawLiveTap(target,'preview',{batch:'000000b1',ok:true,changes:[{objectApiName:'CartLine',operation:'create',record:{Id:p,Qty:1}}]},ledger);
+ await drawLiveTap(target,'preview',{batch:'000000b2',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:p,Qty:2}}]},ledger);
+ await drawLiveTap(target,'settled',{batch:'000000b1',ok:true,changes:[{objectApiName:'CartLine',operation:'create',record:{Id:'real',Qty:1}}]},ledger);
+ assert.equal(saved.length,2,'tap 1\'s answer leaves the line (still provisional, qty 2) alone');
+ // Tap 3 was predicted on the saved Id: drawn on the provisional row still shown.
+ await drawLiveTap(target,'preview',{batch:'000000b3',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'real',Qty:3}}]},ledger);
+ assert.equal((saved[2] as {recordChanges:Array<{record:{Id:string}}>}).recordChanges[0].record.Id,p);
+ await drawLiveTap(target,'settled',{batch:'000000b2',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'real',Qty:2}}]},ledger);
+ assert.equal(saved.length,3,'tap 2\'s answer waits for tap 3');
+ await drawLiveTap(target,'settled',{batch:'000000b3',ok:true,changes:[{objectApiName:'CartLine',operation:'update',record:{Id:'real',Qty:3}}]},ledger);
+ const last=saved[3] as {recordChanges:Array<{operation:string;record:{Id:string;Qty?:number}}>};
+ assert.deepEqual(last.recordChanges,[{objectApiName:'CartLine',operation:'delete',record:{Id:p}},
+  {objectApiName:'CartLine',operation:'create',record:{Id:'real',Qty:3}}],'the saved line takes the provisional one\'s place');
+ assert.deepEqual(applied.at(-1),['CartLine',[{Id:'real',Qty:3}],[p]]);
+ assert.equal(ledger.real.size,0);
+});

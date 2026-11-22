@@ -10,10 +10,12 @@ test('property parity upgrade registers all 26 smart components and stays idempo
  const calls=[];
  await applySmartBuilderPropertyParity({query:async(sql,params)=>{calls.push({sql,params});}});
  const statements=calls.map(call=>call.sql);
+ const registered=statements.find(sql=>sql.includes('INSERT INTO md_builder_ribbon_components(component_api)'));
+ assert.ok(registered);
  assert.equal(BUILDER_SMART_APIS.length,26);
  assert.equal(new Set(BUILDER_SMART_APIS).size,26);
  for(const api of BUILDER_SMART_APIS)
-  assert.ok(statements[1].includes("'"+api+"'"),'missing '+api);
+  assert.ok(registered.includes("'"+api+"'"),'missing '+api);
  assert.ok(statements.every(sql=>/ON CONFLICT|UPDATE md_builder_ribbon_component_rules|DELETE FROM md_builder_design2_slot_rules/.test(sql)),
   'all upgrade writes must be repeatable');
  assert.match(statements.join('\n'),/WHERE property_key='shapeFill'/);
@@ -33,6 +35,11 @@ test('a single selected-part key is written for each SQL slot, with no duplicate
  }
  for(const [api,area,slot,key] of [
   ['smart_card_grid','Header','width','headerBoxWidth'],
+  ['smart_card_grid','Grid','border','gridBorderColor'],
+  ['smart_card_grid','Grid','radius','gridRadius'],
+  ['smart_card_grid','Footer','radius','footerRadius'],
+  ['smart_cart','Row','shadow','rowShadow'],
+  ['smart_numpad','Focused','bold','numpadFocusedBold'],
   ['smart_image','Image','width','imageWidth'],
   ['smart_card_grid','Body','fill','gridBackgroundColor'],
   ['smart_id_card','Body','fill','gridBackgroundColor'],
@@ -72,10 +79,10 @@ test('selected-part styles are actually consumed by the correct component render
  for(const key of ['headerBoxWidth','headerWrapText','headerShadow','imageRadius','imageShadow',
   'badgeShadow','badgeWrapText','badgeTextAlignment','gridBorderColor','gridRadius','gridShadow',
   'supportingBoxWidth','supportingBoxHeight','supportingRadius','supportingShadow',
-  'cardButtonShadow','focusedCardHeight','focusedCardWidth'])
+  'cardButtonShadow','footerRadius','footerShadow','focusedCardHeight','focusedCardWidth'])
   assert.ok(card.includes('p.'+key),'Card Grid missing '+key);
  for(const key of ['headerBoxWidth','headerShadow','supportingBoxWidth','supportingShadow',
-  'imageWidth','imageRadius','imageShadow','footerRadius','footerShadow'])
+  'imageWidth','imageRadius','imageShadow','footerRadius','footerShadow','rowShadow'])
   assert.ok(cart.includes('p.'+key),'Cart missing '+key);
  for(const key of ['headerShadow','rowShadow','footerAlignment'])
   assert.ok(table.includes('p.'+key),'Table missing '+key);

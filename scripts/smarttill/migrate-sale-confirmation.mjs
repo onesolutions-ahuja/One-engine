@@ -58,18 +58,37 @@ export function customerLayerComponents(page,variant){
  assert(page.layoutMode==='free-canvas','Customer display must be a free canvas');
  const w=Number(page.canvasWidth),h=Number(page.canvasHeight);
  assert(Number.isFinite(w)&&w>=320&&Number.isFinite(h)&&h>=320,'Missing customer-display canvas');
- const center=(width)=>(w-width)/2;
- const font=Math.min(58,Math.max(24,Math.round(w/24)));
- const y=Math.max(25,Math.round((h-450)/2));
+ // Scale all six visual elements to fit short tablet/mobile canvases as well
+ // as a full-size second monitor. Never crop the final confirmation caption.
+ const gap=Math.max(5,Math.min(18,Math.floor(h/45)));
+ const iconSize=Math.max(40,Math.min(90,Math.floor(h*0.14)));
+ const titleH=Math.max(34,Math.min(60,Math.floor(h*0.14)));
+ const amountH=Math.max(50,Math.min(80,Math.floor(h*0.19)));
+ const detailH=Math.max(27,Math.min(42,Math.floor(h*0.095)));
+ const thankH=Math.max(30,Math.min(56,Math.floor(h*0.13)));
+ const all=[iconSize,titleH,amountH,detailH,detailH,thankH];
+ const total=all.reduce((sum,size)=>sum+size,0)+gap*(all.length-1);
+ assert(total<=h,'Payment confirmation cannot fit the current display');
+ let cursor=Math.floor((h-total)/2);
+ const position=(height)=>{const at=cursor;cursor+=height+gap;return rect(24,at,w-48,height);};
+ const font=Math.min(58,Math.max(22,Math.round(w/24)));
+ const iconRect=position(iconSize);
  return [
-  node('stcd-paid-icon','smart_icon','Payment received',rect(center(90),y,90,90),
-   {iconId:'check',iconFillColor:colours.green,backgroundColor:colours.pale,radius:45},1),
-  label('stcd-paid-title','Payment complete',rect(24,y+120,w-48,60),
+  node('stcd-paid-icon','smart_icon','Payment received',
+   {...iconRect,x:(w-iconSize)/2,width:iconSize},
+   {iconId:'check',iconFillColor:colours.green,backgroundColor:colours.pale,radius:iconSize/2},1),
+  label('stcd-paid-title','Payment complete',position(titleH),
    'Payment complete',Math.min(38,font),true,1),
-  label('stcd-paid-amount','Paid amount',rect(24,y+197,w-48,80),
-   '=FORMAT(@ThisPage.Input.paymentAmount, "£0.00")',font+9,true,1),
-  label('stcd-paid-message','Thank you',rect(24,y+303,w-48,56),
-   'Thank you for shopping with us',Math.max(18,font-7),false,1)
+  label('stcd-paid-amount','Paid amount',position(amountH),
+   '=FORMAT(@ThisPage.Input.paymentAmount, "£0.00")',Math.min(64,font+9),true,1),
+  label('stcd-paid-method','Payment method',position(detailH),
+   '=IF(ISBLANK(@ThisPage.Input.paymentMethod), "", "Payment method: " & @ThisPage.Input.paymentMethod)',
+   Math.min(19,Math.max(14,font-9)),false,1),
+  label('stcd-paid-change','Change returned',position(detailH),
+   '=IF(ISBLANK(@ThisPage.Input.changeAmount), "", "Change returned: " & FORMAT(@ThisPage.Input.changeAmount, "£0.00"))',
+   Math.min(19,Math.max(14,font-9)),false,1),
+  label('stcd-paid-message','Thank you',position(thankH),
+   'Thank you for shopping with us',Math.min(28,Math.max(17,font-7)),false,1)
  ];
 }
 export function customerDraft(current,variant){

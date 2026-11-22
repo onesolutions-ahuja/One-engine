@@ -33,6 +33,7 @@ export default function SmartComponent(p){
   style={{background:colour(p.backgroundColor,"transparent"),
    border:p.borderColor?"1px solid "+p.borderColor:undefined,
    borderRadius:size(p.radius,0),color:textColour,fontSize:textSize,
+   boxShadow:p.shadow==='large'?'0 8px 20px #0003':p.shadow==='medium'?'0 3px 9px #0003':p.shadow==='small'?'0 1px 4px #0002':undefined,
    fontFamily:settings.monospace?"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace":undefined}}>
   {heading&&<div className="smart-line-items-heading" data-design-area={designing?"Header":undefined}
    style={{color:colour(p.headerTextColor,textColour),fontSize:size(p.headerTextSize,textSize),

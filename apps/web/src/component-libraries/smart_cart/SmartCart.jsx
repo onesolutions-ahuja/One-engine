@@ -5,7 +5,7 @@ import {smartCustomButtonAppearance} from '../smart/shared/SmartCustomButtonAppe
 import {smartPartOffsetStyle,smartPartOrderStyle,smartPartSide} from '../smart/shared/SmartPartPlacement.js';
 
 const n=(v,f,min=0,max=2000)=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):f;
-const shadow=v=>v==="large"?"0 8px 20px #0003":v==="medium"?"0 3px 9px #0003":"none";
+const shadow=v=>v==="large"?"0 8px 20px #0003":v==="medium"?"0 3px 9px #0003":v==="small"?"0 1px 4px #0002":"none";
 const border=v=>v?"1px solid "+v:"1px solid transparent";
 const align=v=>["left","center","right"].includes(v)?v:"left";
 const summaryJustify=v=>v==="left"?"flex-start":v==="center"?"center":v==="right"?"flex-end":undefined;

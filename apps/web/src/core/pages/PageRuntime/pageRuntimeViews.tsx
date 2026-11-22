@@ -105,7 +105,7 @@ import {scopedFieldAllows} from './fieldScopedRecordFilters';
 import {resolveSmartToggleFieldBinding,updateSmartToggleField} from './smartToggleFieldBinding';
 import {usePageComponentRelatedScope} from '../PageRuntime/usePageSessionRelatedQuery';
 import {filterRelatedRecords} from './filterRelatedRecords.mjs';
-import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import {resolveMentionProperties,referencedMentionPaths,resolveComponentMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import { explicitMentionRecordId, useRelationshipMentionContext } from '../../records/RecordFormDialog/useRelationshipMentionContext';
 import { childrenOf, canNest, componentLayoutProps, hasPageComponentAppearance, pageAppearanceTarget, pageAppearanceStyleKeys, isLayoutContainer, rawLayoutParentId, reparentComponent, resolvePageComponentStyle, type LayoutDevice } from '../TemplatePageRuntime/pageComponentLayout';
 import {GlobalRecordSearch} from '../../../component-libraries/shared/primitives/GlobalRecordSearch/GlobalRecordSearch';
@@ -597,15 +597,25 @@ function MetadataBoundPageComponent({
   const visibleRecords=relatedField?filterRelatedRecords(filteredRecords,selectedId,relatedField):filteredRecords;
   // Hydrate metadata-validated parent references on individual list rows.
   // Never turn a paged Grid/Table/Cart into a full-Object read.
-  const rowMentionKey=JSON.stringify([recordQueryKey,recordOffset,revision,objectApiName,
-    visibleRecords.map(row=>row.Id),Object.entries(properties).filter(([,value])=>
+  const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,objects,
+    objectApiName,visibleRecords,recordTotal,revision,pageState,sessionId,pageSessionKey,component.id);
+  // A typed Collection replaces the component's queried rows. Hydrate lookup
+  // references on that exact data source as well; otherwise CartLine rows from
+  // a named collection render before Product.ImageUrl has been resolved.
+  const dataCollection=properties.recordPresenterApiName?null:namedSource.collection;
+  const dataCollectionRows=dataCollection?namedCollectionRows(dataCollection):null;
+  const componentRows=dataCollectionRows??visibleRecords;
+  const rowMentionRoot=objectApiName||dataCollection?.objectApiName||'';
+  const rowMentionPaths=referencedMentionPaths(properties,objects,rowMentionRoot);
+  const rowMentionKey=JSON.stringify([recordQueryKey,recordOffset,revision,rowMentionRoot,
+    componentRows.map(row=>[row.Id,...rowMentionPaths.flatMap(path=>
+     path.steps.map(step=>row[step.lookupField]))]),Object.entries(properties).filter(([,value])=>
      typeof value==='string'&&value.includes('@'))]);
   const [rowMentions,setRowMentions]=useState<{key:string;rows:Record<string,unknown>[]} |null>(null);
   useEffect(()=>{
    let active=true;
    setRowMentions(null);
-   if(!objectApiName||!visibleRecords.length||
-     !referencedMentionPaths(properties,objects,objectApiName).some(path=>path.steps.length))
+   if(!rowMentionRoot||!componentRows.length||!rowMentionPaths.some(path=>path.steps.length))
     return()=>{active=false};
    const getRecord=async(target:string,id:string)=>{
     const result=await apiRequest<{record:Record<string,unknown>}>(
@@ -614,20 +624,13 @@ function MetadataBoundPageComponent({
    };
    const getRecords=async(target:string,ids:readonly string[])=>
     (await loadFlowScreenRecordPage(target,{limit:100,filters:[{field:'Id',operator:'in',value:[...ids]}]})).records;
-   void Promise.all(Array.from({length:Math.ceil(visibleRecords.length/100)},(_,i)=>
-    resolveCollectionMentionRows(objects,objectApiName,visibleRecords.slice(i*100,(i+1)*100),
-     properties,getRecord,getRecords))).then(parts=>{
-     if(active)setRowMentions({key:rowMentionKey,rows:parts.flat()});
+   void resolveComponentMentionRows(objects,rowMentionRoot,visibleRecords,dataCollectionRows,
+    properties,getRecord,getRecords).then(rows=>{
+     if(active)setRowMentions({key:rowMentionKey,rows});
     }).catch(()=>{if(active)setRowMentions(null)});
    return()=>{active=false};
-  },[rowMentionKey,properties,objects,objectApiName]);
-  const displayRows=rowMentions?.key===rowMentionKey?rowMentions.rows:visibleRecords;
-  const namedSource=usePageCollectionFormula(properties.collectionFormula,properties,objects,
-    objectApiName,visibleRecords,recordTotal,revision,pageState,sessionId,pageSessionKey,component.id);
-  // A configured record presenter may enforce additional channel visibility.
-  // Never replace its authorised projection with raw formula collection rows.
-  const dataCollection=properties.recordPresenterApiName?null:namedSource.collection;
-  const dataCollectionRows=dataCollection?namedCollectionRows(dataCollection):null;
+  },[rowMentionKey,properties,objects,rowMentionRoot]);
+  const displayRows=rowMentions?.key===rowMentionKey?rowMentions.rows:componentRows;
   const mentionContext = useRelationshipMentionContext(objects, mentionRootObjectApiName,
     recordId || explicitMentionRecordId(properties), properties, apiRequest, revision);
   const resolvedProperties = bindPageStateProperties(resolveMentionProperties(properties, mentionContext.records, mentionContext.fields, objects, mentionRootObjectApiName),pageState);
@@ -971,11 +974,10 @@ function MetadataBoundPageComponent({
       // Only bind scalar expressions when one authorised record is in scope.
       // Multi-row components resolve their per-row values inside their own renderer.
       ...(displayRows.length===1 ? {record:displayRows[0]} : {}),
-      ...(objectApiName ? { records: displayRows } : {}),
+      ...((objectApiName||dataCollectionRows) ? { records: displayRows } : {}),
       ...presented,
       // A typed collection is the Data Source; presenter defaults must not
-      // overwrite its permission-checked, formula-filtered rows.
-      ...(dataCollectionRows?{records:dataCollectionRows}:{}),
+      // replace the selected rows after lookup mentions have been hydrated.
       ...(!dataCollectionRows&&objectApiName ? {recordPagination:{
         limit:recordPageSize,offset:recordOffset,total:recordTotal,
         hasPrevious:recordOffset>0,hasNext:recordOffset+recordPageSize<recordTotal,

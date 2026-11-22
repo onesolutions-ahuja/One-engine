@@ -326,3 +326,21 @@ export async function resolveCollectionMentionRows(
   }));
   return resolved;
 }
+
+/** Hydrate lookup mentions on the exact records a page component will render.
+ * A named Collection can replace the component's ordinary queried rows; callers
+ * must pass that selected collection here or row-bound images and formulas lose
+ * the relationship values that the regular query path hydrates.
+ */
+export async function resolveComponentMentionRows(
+  objects: readonly ObjectMetadata[], root: string,
+  queriedRows: readonly DataRecord[], collectionRows: readonly DataRecord[] | null,
+  properties: Readonly<Record<string, unknown>>,
+  getRecord: (objectApiName: string, id: string) => Promise<DataRecord | undefined>,
+  getRecords?: (objectApiName: string, ids: readonly string[]) => Promise<readonly DataRecord[]>
+): Promise<DataRecord[]> {
+  const rows=collectionRows??queriedRows;
+  const parts=await Promise.all(Array.from({length:Math.ceil(rows.length/100)},(_,index)=>
+    resolveCollectionMentionRows(objects,root,rows.slice(index*100,(index+1)*100),properties,getRecord,getRecords)));
+  return parts.flat();
+}

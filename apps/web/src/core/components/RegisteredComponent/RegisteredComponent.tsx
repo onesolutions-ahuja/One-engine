@@ -280,7 +280,11 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
     : null;
   if(!hydratedDefinition)return <div role="alert" className="registered-component-error">Bundled renderer is unavailable.</div>;
   return <div {...accessibility} style={layoutTransparent?{display:'contents'}:undefined}>{published}<ComponentRenderBoundary key={`${definition.apiName}-${definition.version}`}>
-    <RegisteredComponentBody definition={hydratedDefinition} props={{...effectiveProps,readComponent:formulaScope?.read,onFormulaDisplay:setRendered,
+    <RegisteredComponentBody definition={hydratedDefinition} props={{...effectiveProps,
+      // Host-provided tenant media access is runtime capability, not a saved
+      // component setting. Keep it attached to every trusted Smart renderer.
+      loadAsset:props.loadAsset,
+      readComponent:formulaScope?.read,onFormulaDisplay:setRendered,
       __formulaCode:formulaCodeProp}} appearanceProps={props} layoutTransparent={layoutTransparent} />
   </ComponentRenderBoundary></div>;
 }

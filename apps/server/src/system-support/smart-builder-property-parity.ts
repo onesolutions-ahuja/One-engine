@@ -67,15 +67,26 @@ const grid=['smart_card_grid','smart_id_card'].flatMap(api=>[
   ['fill','BackgroundColor'],['border','BorderColor'],['radius','Radius'],
   ['shadow','Shadow'],['height','Height'],['width','Width']]),
  ...part(api,'Header','header',[
-  ['fill','BodyColor'],['border','BorderColor'],['height','BoxHeight'],
-  ['width','BoxWidth'],['shadow','Shadow'],['wrap','WrapText']]),
+  ['fill','BodyColor'],['border','BorderColor'],['radius','Radius'],
+  ['height','BoxHeight'],['width','BoxWidth'],['shadow','Shadow'],
+  ['text','TextColor'],['alignment','Alignment'],['bold','Bold'],
+  ['wrap','WrapText'],['size','TextSize']]),
  ...part(api,'Header Supporting','supporting',[
   ['fill','BackgroundColor'],['border','BorderColor'],['radius','Radius'],
   ['height','BoxHeight'],['width','BoxWidth'],['shadow','Shadow'],['wrap','WrapText']]),
  ...part(api,'Badge','badge',[
   ['fill','BodyColor'],['border','BorderColor'],['radius','Radius'],
   ['height','Height'],['width','Width'],['shadow','Shadow'],
-  ['wrap','WrapText'],['alignment','TextAlignment']]),
+  ['text','TextColor'],['alignment','TextAlignment'],['bold','Bold'],
+  ['wrap','WrapText'],['size','TextSize']]),
+ ...part(api,'Footer','footer',[
+  ['fill','BackgroundColor'],['border','BorderColor'],['radius','Radius'],
+  ['height','Height'],['width','Width'],['shadow','Shadow'],
+  ['text','TextColor'],['alignment','Alignment'],['bold','Bold'],
+  ['wrap','WrapText'],['size','TextSize']]),
+ ...part(api,'Grid','grid',[
+  ['fill','BackgroundColor'],['border','BorderColor'],
+  ['radius','Radius'],['shadow','Shadow']]),
  ...part(api,'Focused','focused',[
   ['height','CardHeight'],['width','CardWidth'],['border','CardBorderColor'],
   ['shadow','CardShadow'],['text','TextColor'],['bold','TextBold'],['size','TextSize']]),
@@ -119,6 +130,8 @@ const special:Mapping[]=[
   ['radius','Radius'],['shadow','Shadow'],['width','Width']]),
  ...part('smart_cart','Footer','footer',[
   ['alignment','Alignment'],['radius','Radius'],['shadow','Shadow']]),
+ map('smart_cart','Row','shadow','rowShadow'),
+ map('smart_cart','Focused','fill','selectedRowColor'),
  ...part('smart_table','Header','header',[['shadow','Shadow']]),
  ...part('smart_table','Row','row',[['shadow','Shadow']]),
  map('smart_table','Footer','alignment','footerAlignment'),
@@ -158,6 +171,15 @@ const rows=(values:readonly (readonly string[])[])=>values.map(row=>
 /** One catalog for current tenants and fresh installations; never rewrites page properties. */
 export async function applySmartBuilderPropertyParity(client:Query){
  await addSharedProperties(client,PROPERTIES);
+ // The Grid is a real independently selectable canvas area, not a Body alias.
+ // Clone the fixed Body glyph positions, then use Grid-specific SQL bindings.
+ await client.query(`INSERT INTO md_builder_design2_slots
+  (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
+  SELECT 'Grid',COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area='Grid'),8),
+   slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key
+  FROM md_builder_design2_slots WHERE area='Body' AND row_no BETWEEN 1 AND 3
+   AND slot_key NOT LIKE 'extra_%'
+  ON CONFLICT(area,slot_key) DO NOTHING`);
  await client.query(`INSERT INTO md_builder_ribbon_components(component_api)
   VALUES ${rows(BUILDER_SMART_APIS.map(api=>[api]))}
   ON CONFLICT(component_api) DO NOTHING`);

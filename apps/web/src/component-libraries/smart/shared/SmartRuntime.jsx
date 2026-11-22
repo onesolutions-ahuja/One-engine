@@ -1106,6 +1106,11 @@ export default function SmartRuntime(p){
    </span>
    <div data-design-area={p.builderPreview?"Header":undefined} className="smart-textbox-value-panel" style={{
     ...smartPartOffsetStyle(p,"header"),backgroundColor:p.headerBodyColor||"#fff",color:p.headerTextColor||"#1e293b",
+    border:p.headerBorderColor?'1px solid '+p.headerBorderColor:undefined,
+    height:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==''?number(p.headerBoxHeight,0,0,1200):undefined,
+    minHeight:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==''?number(p.headerBoxHeight,0,0,1200):undefined,
+    width:p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==''?number(p.headerBoxWidth,0,0,1200):undefined,
+    maxWidth:'100%',
     borderRadius:p.headerRadius!==undefined&&p.headerRadius!==null&&p.headerRadius!==""
      ?number(p.headerRadius,0,0,128):undefined,
     fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
@@ -1124,10 +1129,12 @@ export default function SmartRuntime(p){
         ?number(p.supportingRadius,0,0,128):undefined,
        height:p.supportingBoxHeight!==undefined&&p.supportingBoxHeight!==null&&p.supportingBoxHeight!==""
         ?number(p.supportingBoxHeight,24,12,600):undefined,
+       width:p.supportingBoxWidth!==undefined&&p.supportingBoxWidth!==null&&p.supportingBoxWidth!==''?number(p.supportingBoxWidth,0,0,1200):undefined,
+       boxShadow:p.supportingShadow==='large'?'0 8px 20px #0003':p.supportingShadow==='medium'?'0 3px 9px #0003':p.supportingShadow==='small'?'0 1px 4px #0002':undefined,
        fontSize:p.supportingTextSize!==undefined&&p.supportingTextSize!==null&&p.supportingTextSize!==""
         ?number(p.supportingTextSize,14,8,96):undefined,
        textAlign:align(p.supportingAlignment||p.headerAlignment),
-       whiteSpace:p.wrapText===false?"nowrap":"pre-wrap",
+       whiteSpace:(p.supportingWrapText??p.wrapText)===false?"nowrap":"pre-wrap",
        textOverflow:p.wrapText===false?"ellipsis":undefined}}>
       {text(value)|| (p.builderPreview?"Text Here":"")}
     </div>

@@ -1362,12 +1362,6 @@ export class RecordEngine {
   }
   private async insertPrepared(client:PoolClient,tenantId:string,userId:string,objectApi:string,
     prepared:Map<string,Storable>,isClone=false) {
-    if(objectApi==='CashLedger'){
-      const proof=await client.query<{allowed:string|null}>(
-        "SELECT current_setting('metadrive.cash_ledger_guarded',true) AS allowed");
-      if(proof.rows[0]?.allowed!=='yes')
-        throw Error('CashLedger records can only be created through an authorised posting Flow');
-    }
     const selectedType=prepared.get('__RecordTypeId__')?.value_text??null;
     const selectedOwner=prepared.get('__OwnerId__')?.value_text??userId,queue=prepared.get('__OwnerQueue__')?.value_text==='true';
     const {rows}=await client.query<{id:string}>(

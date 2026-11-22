@@ -1,11 +1,17 @@
 import type {PoolClient} from 'pg';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
-import {paymentPence} from './record-payment-service.js';
+/** Whole pence; rejects negative, non-finite, >2 decimals and absurd values. */
+export function paymentPence(value:unknown,label='Payment amount'):number{
+ const n=typeof value==='string'&&value.trim()!==''?Number(value):value;
+ if(typeof n!=='number'||!Number.isFinite(n)||n<0||n>100000000
+  ||Math.abs(n*100-Math.round(n*100))>0.00001)throw Error('Invalid '+label.toLowerCase());
+ return Math.round(n*100);
+}
 
 /** CASHMOVE(Direction, Amount, Reason, TillSession, [AS(x)]): cash put into ("IN") or taken out
  * of ("OUT") a till drawer during a session, outside a sale (float top-up, paid-out, bank drop).
- * Posts ONE CashLedger row in a server transaction, the same way RECORDPAYMENT posts a receipt:
+ * Posts ONE CashLedger row in a server transaction, like the invoice payment API posts a receipt:
  * pages cannot write CashLedger directly. The user's normal CashLedger create permission
  * applies; the session must be an Opening cash count the user can read. */
 export type CashMoveInput={direction:unknown;amount:unknown;reason:unknown;session:unknown;reference:unknown};
@@ -37,15 +43,12 @@ export async function recordCashMovement({db,records}:Engines,tenantId:string,us
   // Reading the session through RecordEngine applies the user's own record permissions.
   const session=await records.get(tenantId,userId,'cash_count__c',m.session,tx) as Record<string,unknown>;
   if(session.count_type__c!=='Opening')throw Error('Cash in/out needs the till session (its opening count)');
-  // Transaction-local proof consumed by the RecordEngine CashLedger insert guard.
-  await tx.query("SELECT set_config('metadrive.cash_ledger_guarded','yes',true)");
   const ledgerId=await records.createInTransaction(tx,tenantId,userId,'CashLedger',{
    Name:(m.direction==='IN'?'Cash in: ':'Cash out: ')+m.reason.slice(0,60),
    TransactionType:m.direction==='IN'?'Adjustment':'Payout',Direction:m.direction,Amount:m.amount/100,
    Method:'Cash',TillSession:m.session,User:userId,SourceApp:'ActionFormula',
    TransactionDate:new Date().toISOString(),Reference:m.reference,Notes:m.reason,Status:'Posted'
   });
-  await tx.query("SELECT set_config('metadrive.cash_ledger_guarded','',true)");
   return {ledgerId:String(ledgerId),direction:m.direction,amount:m.amount/100,session:m.session};
  };
  return client?run(client):db.transaction(run);

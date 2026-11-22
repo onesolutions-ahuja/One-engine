@@ -110,6 +110,28 @@ export function customerDraft(current,variant){
  return {changed:newBlocks.length>0,added:newBlocks.map(c=>c.id),
   draft:{...current,components:[...current.components,...newBlocks]}};
 }
+/** Reconcile a device variant after Desktop changes its inherited components.
+ * Preserve every pre-existing authored block. Only newly introduced receipt
+ * blocks may be rebased to their own variant-specific position/size.
+ */
+export function applyCustomerMigrationPlan(latest,original,planned){
+ const originalById=new Map(original.components.map(c=>[c.id,c]));
+ const additions=new Map(planned.components.filter(c=>!originalById.has(c.id)).map(c=>[c.id,c]));
+ for(const [id,component] of originalById)
+  assert.deepEqual(latest.components.find(c=>c.id===id),component,
+   'Original customer display component changed during migration: '+id);
+ const seen=new Set();
+ const updated=latest.components.map(c=>{
+  const wanted=additions.get(c.id);
+  if(!wanted)return c;
+  seen.add(c.id);
+  return {...c,position:wanted.position,properties:wanted.properties};
+ });
+ for(const [id,c] of additions)if(!seen.has(id))updated.push(c);
+ const draft={...latest,components:updated};
+ validateVisualDraft(original,draft);
+ return {changed:additions.size>0,draft};
+}
 export function validateVisualDraft(current,next){
  assert.equal(current.apiName,next.apiName);
  assert.equal(current.components.length<=next.components.length,true);
@@ -191,15 +213,18 @@ async function run(){
      ...(createdNow?{canvasWidth:w,canvasHeight:h}:{}),
      components:createdNow?wanted:[...editor.components,...missing]},actor);
    }
-   if(publish)await runtime.publishLayout(tenant,POPUP,variant,undefined,actor);
   }
   for(const job of jobs){
-   if(job.changed){
-    const latest=await runtime.editor(tenant,job.page,job.variant);
-    assert.deepEqual(latest,job.current,'Customer display changed during migration');
-    await runtime.saveLayoutDraft(tenant,job.page,job.variant,job.draft,actor);
-   }
-   if(publish)await runtime.publishLayout(tenant,job.page,job.variant,undefined,actor);
+   // A Desktop save changes the inherited device snapshot. Reconcile against
+   // this variant's own original components, never compare whole page objects.
+   const latest=await runtime.editor(tenant,job.page,job.variant);
+   const plan=applyCustomerMigrationPlan(latest,job.current,job.draft);
+   if(plan.changed)await runtime.saveLayoutDraft(tenant,job.page,job.variant,plan.draft,actor);
+  }
+  // Publish only after every variant's draft has been saved successfully.
+  if(publish){
+   for(const variant of variants)await runtime.publishLayout(tenant,POPUP,variant,undefined,actor);
+   for(const job of jobs)await runtime.publishLayout(tenant,job.page,job.variant,undefined,actor);
   }
   console.log('SmartTill confirmation page and customer display layer saved; publish requested: '+publish);
  }finally{await db.close();}

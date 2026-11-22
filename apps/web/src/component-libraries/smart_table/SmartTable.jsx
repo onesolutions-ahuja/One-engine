@@ -72,12 +72,13 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   // Default Value Color is retired for Smart Table; Header Label Color owns this.
   color:colour(p.headerTextColor,ios?"#6e6e73":"#172a45"),
   borderBottom:border(p.headerBorderColor),
+   boxShadow:shadow(p.headerShadow),
   textAlign:p.headerAlignment||p.labelAlignment||"left",
   fontSize:finite(p.headerTextSize??p.textSize,13,9,96),
   height:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==""
    ?finite(p.headerBoxHeight,0,0,2000):undefined,
   fontWeight:p.headerBold===false?400:ios?600:700,
-  whiteSpace:p.wrapText===false?"nowrap":"pre-line"
+  whiteSpace:(p.headerWrapText??p.wrapText)===false?"nowrap":"pre-line"
  };
  const rowHeight=finite(p.rowHeight,40,22,300);
  const rowStyle=row=>({
@@ -85,6 +86,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
   color:colour(p.rowLabelColor,"#27374d"),
   fontSize:finite(p.rowTextSize,13,8,96),
   fontWeight:p.rowBold===true?700:undefined,
+   boxShadow:shadow(p.rowShadow),
   textAlign:p.rowAlignment||undefined,
   whiteSpace:p.rowWrapText===false?"nowrap":undefined,
   // A selected row keeps its selected colour; otherwise the Row fill applies.

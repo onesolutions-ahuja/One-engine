@@ -194,7 +194,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const preview=p.previewOnly===true||p.builderPreview===true||p.preview===true;
  const sample=Boolean(p.builderPreview===true&&record?.__builderSample===true);
  const headerResult=scopedDisplayExpression(p,"textSource",p.textSource??p.title??p.label??"",record);
- const header=text(headerResult.value)||(sample?"Product Name":isGridKind(p.kind)&&preview?"Text here":"");
+ const header=text(headerResult.value)||(sample?"Product Name":preview?"Text here":"");
  const badgeResult=scopedDisplayExpression(p,"badgeText",p.badgeText??"",record);
  const badge=text(badgeResult.value);
  // Card Grid uses the same record-scoped, permission-aware formula evaluation as other Data fields.
@@ -205,7 +205,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const value=gridText(p,"cardValue",record);
  const buttonText=gridText(p,"cardButtonText",record);
  const customButtons=["customButton1","customButton2"].filter(key=>
-  p[key+"Visible"]!==false&&Boolean(p.actionFlows?.[key]||
+  p[key+"Visible"]!==false&&Boolean(p.builderPreview||p.actionFlows?.[key]||
    typeof p[key+"Label"]==="string"&&p[key+"Label"].trim()));
  const single=p.kind==="smart_image";
  const grid=isGridKind(p.kind);
@@ -253,13 +253,14 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ?p.focusedCardShadow:p.shadow;
  const cardBorder=single?"none":strokeWidth===0?"none":
   (strokeWidth+"px solid "+(p.borderColor||"#e2e8f0"));
+ const headerWrap=p.headerWrapText??p.wrapText;
  const headerNode=header&&headerHeight>0&&<div data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Card title":undefined} className="smart-card-content" style={{
      ...smartPartOffsetStyle(p,"header"),order:1,flex:horizontal&&!idCard?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
      display:"flex",alignItems:fixedGridHeader?"safe center":"center",
      // Explicit Card Grid heights bound the title box; overflow remains accessible without a visible scrollbar.
      // Standalone Image captions retain intrinsic growth for large typography.
      height:headerHeight,minHeight:fixedGridHeader?0:"max-content",
-     width:grid&&p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==""
+     width:(grid||single)&&p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==""
        ?"min(100%, "+number(p.headerBoxWidth,0,0,1200)+"px)":undefined,
      maxHeight:fixedGridHeader?headerHeight:undefined,
      alignSelf:horizontal&&!idCard?"safe center":undefined,flexShrink:0,
@@ -272,14 +273,16 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
        ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
      border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,
+     borderRadius:p.headerRadius!==undefined?number(p.headerRadius,0,0,600):undefined,
+     boxShadow:p.headerShadow==="large"?"0 8px 20px #0003":p.headerShadow==="medium"?"0 3px 9px #0003":p.headerShadow==="small"?"0 1px 4px #0002":undefined,
      backgroundColor:p.headerBodyColor||undefined,
      color:headerResult.error?formulaDisplayErrorColor:
       focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
      // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
-     whiteSpace:p.wrapText===false?"nowrap":"pre-line",
-     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
+     whiteSpace:headerWrap===false?"nowrap":"pre-line",
+     overflow:fixedGridHeader?"auto":headerWrap===false?"auto":"visible",overflowWrap:"anywhere",
      // A caption can still scroll by wheel/touch, but never shows native scroll arrows.
-     scrollbarWidth:fixedGridHeader||p.wrapText===false?"none":undefined,
+     scrollbarWidth:fixedGridHeader||headerWrap===false?"none":undefined,
      padding:fixedGridHeader
        ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
        :cardPadding===null?"4px 10px":cardPadding+"px"
@@ -304,7 +307,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   fontSize:focused&&p.focusedTextSize!==undefined&&p.focusedTextSize!==null&&p.focusedTextSize!==""
    ?number(p.focusedTextSize,16,8):number(p.textSize,16,8),
   color:focusedText||undefined,
-  boxShadow:activeShadow==="large"?"0 8px 20px #0003":activeShadow==="medium"?"0 3px 9px #0003":"none",
+  boxShadow:activeShadow==="large"?"0 8px 20px #0003":activeShadow==="medium"?"0 3px 9px #0003":activeShadow==="small"?"0 1px 4px #0002":"none",
   ...(single?{height:"100%",minHeight:0}:{}),
   ...(grid?{height:"100%",minHeight:0}:{}),
   ...(focused&&focusedWidth>0?{width:"min(100%, "+focusedWidth+"px)"}:{}),
@@ -322,7 +325,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     minWidth:0,minHeight:0,
     ...(single?{display:"flex"}:{}),
     ...(grid?{overflow:"hidden",maxHeight:horizontal?undefined:imageHeight,
-      backgroundColor:p.imageBackgroundColor||undefined}:{} )}}>
+      backgroundColor:p.imageBackgroundColor||undefined}:{} ),
+    borderRadius:p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
+    boxShadow:p.imageShadow==="large"?"0 8px 20px #0003":p.imageShadow==="medium"?"0 3px 9px #0003":p.imageShadow==="small"?"0 1px 4px #0002":undefined}}>
    {imageError?<span role="alert" style={{color:formulaDisplayErrorColor,padding:8}}>FORMULAERROR</span>
     :single&&p.builderPreview&&!image
      ?<div className="smart-image-empty smart-editor-image-placeholder" aria-label={missingImageLabel}
@@ -341,7 +346,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       style={{height:single||grid?"100%":imageHeight,width:"100%",display:"block",
        maxHeight:grid?"100%":undefined,
        objectFit:p.imageFill==="fit"?"contain":p.imageFill==="stretch"?"fill":"cover",
-       boxSizing:"border-box",borderRadius:single?number(p.radius,12):undefined,
+       boxSizing:"border-box",borderRadius:single?number(p.imageRadius??p.radius,12):p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
        border:nativeImageBorder}}/>}
   </div>}
   {idCard?<div className="smart-id-card-body" style={{order:1,flex:"1 1 auto",minWidth:0,minHeight:0,
@@ -352,10 +357,10 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     offsetStyle={key=>smartPartOffsetStyle(p,key)}
     padding={cardPadding} focusedText={focusedText} errorColor={formulaDisplayErrorColor}/>
   </div>:headerNode}
-  {grid&&!idCard&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
+  {grid&&!idCard&&(description||value||buttonText||customButtons.length>0||p.builderPreview)&&<div className="smart-card-details"
    // After the title (order 1): name first, then price / description / buttons.
    style={{order:2,...(cardPadding===null?{}:{padding:cardPadding+"px"})}}>
-   {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
+   {(description||p.builderPreview)&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
      style={{...smartPartOffsetStyle(p,"supporting"),color:description==='FORMULAERROR'?formulaDisplayErrorColor:
       focusedText||p.supportingTextColor||undefined,
       backgroundColor:p.supportingBackgroundColor||undefined,
@@ -363,10 +368,18 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       fontWeight:focusedWeight??(typeof p.supportingBold==="boolean"?(p.supportingBold?700:400):undefined),
       fontSize:p.supportingTextSize!==undefined&&p.supportingTextSize!==null&&p.supportingTextSize!==""
        ?number(p.supportingTextSize,14,8,96):undefined,
-      textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description}</span>}
-   {(value||buttonText||customButtons.length>0)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
+      width:p.supportingBoxWidth!==undefined&&p.supportingBoxWidth!==null&&p.supportingBoxWidth!==""?number(p.supportingBoxWidth,0,0,1200)+"px":undefined,
+      minHeight:p.supportingBoxHeight!==undefined&&p.supportingBoxHeight!==null&&p.supportingBoxHeight!==""?number(p.supportingBoxHeight,0,0,1200)+"px":undefined,
+      borderRadius:p.supportingRadius!==undefined?number(p.supportingRadius,0,0,600):undefined,
+      boxShadow:p.supportingShadow==="large"?"0 8px 20px #0003":p.supportingShadow==="medium"?"0 3px 9px #0003":p.supportingShadow==="small"?"0 1px 4px #0002":undefined,
+      whiteSpace:p.supportingWrapText===false?"nowrap":p.supportingWrapText===true?"pre-line":undefined,
+      textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description||(p.builderPreview?"Supporting text":"")}</span>}
+   {(value||buttonText||customButtons.length>0||p.builderPreview)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
     style={{...smartPartOffsetStyle(p,"footer"),backgroundColor:p.footerBackgroundColor||undefined,
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
+     borderRadius:p.footerRadius!==undefined?number(p.footerRadius,0,0,600):undefined,
+     boxShadow:p.footerShadow==="large"?"0 8px 20px #0003":p.footerShadow==="medium"?"0 3px 9px #0003":p.footerShadow==="small"?"0 1px 4px #0002":undefined,
+     whiteSpace:p.footerWrapText===false?"nowrap":p.footerWrapText===true?"normal":undefined,
      height:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
       ?number(p.footerHeight,0,0,1200):undefined,
      minHeight:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
@@ -376,14 +389,15 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      maxWidth:"100%",
      justifyContent:p.footerAlignment==="center"?"center":p.footerAlignment==="right"?"flex-end":
       p.footerAlignment==="left"?"flex-start":undefined}}>
+    {!value&&!buttonText&&!customButtons.length&&p.builderPreview&&<strong className="smart-card-value" style={{fontSize:12,opacity:.65}}>Footer</strong>}
     {value&&<strong data-md-bind={p.builderPreview?"cardValue":undefined} data-md-bind-titles={p.builderPreview?"Card value":undefined} className="smart-card-value"
       style={{color:value==='FORMULAERROR'?formulaDisplayErrorColor:
        focusedText||p.footerTextColor||undefined,
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
         ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
-    {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
-      disabled={!onButtonClick} aria-label={buttonText}
+    {(buttonText||p.builderPreview)&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
+      disabled={!onButtonClick||p.builderPreview} aria-label={buttonText||"Button"}
       style={{
        ...smartPartOrderStyle(p.cardButtonPlacement,"right"),
        ...smartPartOffsetStyle(p,"cardButton"),
@@ -395,6 +409,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
          :p.cardButtonShape==="shape:rectangle"?0:8),
        color:readableText(p.cardButtonFill||p.accentColor||SMART_BLUE,p.cardButtonTextColor)||"#fff",
        fontSize:number(p.cardButtonTextSize,14,8,48),
+       boxShadow:p.cardButtonShadow==="large"?"0 8px 20px #0003":p.cardButtonShadow==="medium"?"0 3px 9px #0003":p.cardButtonShadow==="small"?"0 1px 4px #0002":undefined,
        width:p.cardButtonWidth!==undefined&&p.cardButtonWidth!==null&&p.cardButtonWidth!==""
         ?number(p.cardButtonWidth,0,0,1200)+"px":undefined,
        height:p.cardButtonHeight!==undefined&&p.cardButtonHeight!==null&&p.cardButtonHeight!==""
@@ -409,7 +424,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
         p.cardButtonAlignment==="right"?"flex-end":
         p.cardButtonAlignment==="center"?"center":undefined
       }}
-      onClick={event=>{event.stopPropagation();onButtonClick?.();}}>{buttonText}</button>}
+      onClick={event=>{event.stopPropagation();onButtonClick?.();}}>{buttonText||(p.builderPreview?"Button":"")}</button>}
     {customButtons.map(key=>{
      const label=gridText(p,key+"Label",record)||(key==="customButton1"?"+":"−");
      return <button key={key} data-md-bind={p.builderPreview?(key+"Label"):undefined} data-design-area={p.builderPreview?(key==="customButton1"?"Button":"Button 2"):undefined} type="button" className="smart-card-button smart-card-custom-action"
@@ -419,7 +434,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     })}
    </div>}
   </div>}
-  {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
+  {(Boolean(badge)||p.builderPreview)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{...smartPartOffsetStyle(p,"badge"),fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
    color:badgeResult.error?formulaDisplayErrorColor:readableText(p.badgeBodyColor||SMART_BLUE,p.badgeTextColor)||"#fff",
    background:badgeResult.error?"#fff":p.badgeBodyColor||SMART_BLUE,
@@ -430,11 +445,14 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     ?number(p.badgeWidth,0,0,1200)+"px":undefined,
    height:p.badgeHeight!==undefined&&p.badgeHeight!==null&&p.badgeHeight!==""
     ?number(p.badgeHeight,0,0,1200)+"px":undefined,
+   boxShadow:p.badgeShadow==="large"?"0 8px 20px #0003":p.badgeShadow==="medium"?"0 3px 9px #0003":p.badgeShadow==="small"?"0 1px 4px #0002":undefined,
+   textAlign:p.badgeTextAlignment||undefined,
+   whiteSpace:p.badgeWrapText===false?"nowrap":p.badgeWrapText===true?"normal":undefined,
    boxSizing:"border-box",
    ...(p.badgeWidth!==undefined&&p.badgeWidth!==null&&p.badgeWidth!==""||
        p.badgeHeight!==undefined&&p.badgeHeight!==null&&p.badgeHeight!==""
-       ?{display:"inline-flex",alignItems:"center",justifyContent:"center"}:{})
-   }}>{badge}</span>}
+       ?{display:"inline-flex",alignItems:"center",justifyContent:p.badgeTextAlignment==="left"?"flex-start":p.badgeTextAlignment==="right"?"flex-end":"center"}:{})
+   }}>{badge||(p.builderPreview?"Badge":"")}</span>}
  </article>;
 }
 /**
@@ -489,7 +507,7 @@ function SmartSelector({p,fire}){
     border:p.borderColor?"1px solid "+p.borderColor:"1px solid #b8c7d7",
     ...smartShapeAppearance(p.shapeId,number(p.radius,12)),
     boxShadow:p.shadow==="large"?"0 8px 20px #0003":
-     p.shadow==="medium"?"0 3px 9px #0003":"none"}}
+     p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none"}}
    value={selected<0?"":String(selected)} data-empty={selected<0?"true":undefined}
    onChange={event=>{
     const index=Number(event.target.value),item=options[index];
@@ -601,7 +619,8 @@ function SmartLookup({p,style,fire}){
    aria-expanded={opened&&matches.length>0} aria-controls={listId}
    placeholder={text(placeholder||"Search records…")}
    style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16),color:p.labelColor||undefined,
-    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
     background:p.backgroundColor||"#fff",borderColor:p.borderColor||undefined,
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}
    value={query} onFocus={()=>setOpened(true)}
@@ -799,7 +818,7 @@ function SmartTabs({p,record,fire}){
      // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
      maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
      borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||SMART_BLUE):"transparent"):undefined,
-     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
+     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
      background:selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",
     borderColor:p.borderColor||undefined}}
     tabIndex={selectedTabIndex===index||selectedTabIndex<0&&index===0?0:-1}
@@ -831,7 +850,7 @@ function SmartToggle({p,fire}){
   <span className="smart-switch-track" style={{background:checked?(p.backgroundColor||"#34c759"):"#e5e5ea",
    border:p.borderColor?"1px solid "+p.borderColor:undefined,
    ...smartShapeAppearance(p.shapeId,p.shapeId==='shape:rectangle'?0:number(p.radius,999)),
-   boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none"}}>
+   boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none"}}>
    <span className="smart-switch-thumb"/></span></label>;
 }
 // An editable Smart Input stays focused while its authorised formula/default
@@ -1027,7 +1046,7 @@ export default function SmartRuntime(p){
   window.addEventListener("resize",measureGridViewport);
   return ()=>window.removeEventListener("resize",measureGridViewport);
  },[name]);
- const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",borderRadius:number(p.radius,12)};
+ const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",borderRadius:number(p.radius,12)};
  const fieldRule=useFieldRule(p,name);
  const fire=(event,value)=>{if(p.previewOnly||p.builderPreview)return;
   if(isDisabled&&name==="smart_button")return;
@@ -1083,7 +1102,7 @@ export default function SmartRuntime(p){
   content=<div className="smart-textbox-pair" role="group" aria-label={caption||"Smart Textbox"}
    style={{borderColor:p.borderColor||"#d2dbe5",borderWidth:number(p.borderWidth,1,0,24),
     borderRadius:number(p.radius,6,0,128),
-    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
     fontSize:number(p.textSize,14,8,96)}}>
    <span data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Textbox caption":undefined} className="smart-textbox-caption" style={{backgroundColor:p.backgroundColor||"#f1f5f9",
      color:p.labelColor||"#334155",textAlign:align(p.labelAlignment),
@@ -1092,6 +1111,11 @@ export default function SmartRuntime(p){
    </span>
    <div data-design-area={p.builderPreview?"Header":undefined} className="smart-textbox-value-panel" style={{
     ...smartPartOffsetStyle(p,"header"),backgroundColor:p.headerBodyColor||"#fff",color:p.headerTextColor||"#1e293b",
+    border:p.headerBorderColor?'1px solid '+p.headerBorderColor:undefined,
+    height:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==''?number(p.headerBoxHeight,0,0,1200):undefined,
+    minHeight:p.headerBoxHeight!==undefined&&p.headerBoxHeight!==null&&p.headerBoxHeight!==''?number(p.headerBoxHeight,0,0,1200):undefined,
+    width:p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==''?number(p.headerBoxWidth,0,0,1200):undefined,
+    maxWidth:'100%',
     borderRadius:p.headerRadius!==undefined&&p.headerRadius!==null&&p.headerRadius!==""
      ?number(p.headerRadius,0,0,128):undefined,
     fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
@@ -1110,10 +1134,12 @@ export default function SmartRuntime(p){
         ?number(p.supportingRadius,0,0,128):undefined,
        height:p.supportingBoxHeight!==undefined&&p.supportingBoxHeight!==null&&p.supportingBoxHeight!==""
         ?number(p.supportingBoxHeight,24,12,600):undefined,
+       width:p.supportingBoxWidth!==undefined&&p.supportingBoxWidth!==null&&p.supportingBoxWidth!==''?number(p.supportingBoxWidth,0,0,1200):undefined,
+       boxShadow:p.supportingShadow==='large'?'0 8px 20px #0003':p.supportingShadow==='medium'?'0 3px 9px #0003':p.supportingShadow==='small'?'0 1px 4px #0002':undefined,
        fontSize:p.supportingTextSize!==undefined&&p.supportingTextSize!==null&&p.supportingTextSize!==""
         ?number(p.supportingTextSize,14,8,96):undefined,
        textAlign:align(p.supportingAlignment||p.headerAlignment),
-       whiteSpace:p.wrapText===false?"nowrap":"pre-wrap",
+       whiteSpace:(p.supportingWrapText??p.wrapText)===false?"nowrap":"pre-wrap",
        textOverflow:p.wrapText===false?"ellipsis":undefined}}>
       {text(value)|| (p.builderPreview?"Text Here":"")}
     </div>
@@ -1193,7 +1219,7 @@ export default function SmartRuntime(p){
    placeholder={text(scopedExpression(p,"label",p.placeholder??p.label??"Search",recordOf(p)))}
    style={{background:p.backgroundColor||(ios?"#e9e9ee":"#fff"),borderColor:p.borderColor||"transparent",
     color:p.labelColor||undefined,fontSize:number(p.textSize,16),
-    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}/>;
  else if(name==="smart_lookup")content=<SmartLookup p={p} fire={fire}
    style={{...style,backgroundColor:p.backgroundColor||undefined,borderColor:p.borderColor||undefined,
@@ -1213,6 +1239,10 @@ export default function SmartRuntime(p){
   // The requested column count remains exact, but cards never collapse below
   // a usable minimum width. Excess columns scroll horizontally in this grid.
   const minimumCardWidth=number(p.cardMinWidth??p.cardWidth,180,96,1200);
+  const authoredCardHeight=p.cardBodyHeight!==undefined&&p.cardBodyHeight!==null&&p.cardBodyHeight!==''
+   ?number(p.cardBodyHeight,96,24,1200):null;
+  const authoredCardWidth=p.cardBodyWidth!==undefined&&p.cardBodyWidth!==null&&p.cardBodyWidth!==''
+   ?number(p.cardBodyWidth,180,96,1200):null;
   const boundRows=recordsOf(p);
   const selection=p.selectedCardColor||p.focusedCardWidth||p.focusedCardHeight||p.focusedCardBorderColor||p.focusedCardShadow||
    p.focusedTextColor||p.focusedTextBold!==undefined||p.focusedTextSize
@@ -1235,6 +1265,9 @@ export default function SmartRuntime(p){
    style={{
    boxSizing:"border-box",width:"100%",height:"100%",minHeight:0,minWidth:0,
    overflowY:"auto",overflowX:"auto",
+   border:p.gridBorderColor?"1px solid "+p.gridBorderColor:undefined,
+   borderRadius:p.gridRadius!==undefined?number(p.gridRadius,0,0,600):undefined,
+   boxShadow:p.gridShadow==="large"?"0 8px 20px #0003":p.gridShadow==="medium"?"0 3px 9px #0003":p.gridShadow==="small"?"0 1px 4px #0002":undefined,
    // Contain sideways swipes only: a vertical swipe that reaches the end of the
    // grid must keep scrolling the page on phones.
    overscrollBehaviorX:"contain",overscrollBehaviorY:"auto",
@@ -1242,12 +1275,15 @@ export default function SmartRuntime(p){
    // published pages and the Page Builder (all Cards/Rows settings).
    padding:4,scrollPadding:4,
    gap,
-   gridTemplateColumns:"repeat("+columns+",minmax("+minimumCardWidth+"px,1fr))",
+   gridTemplateColumns:authoredCardWidth!==null
+    ?"repeat("+columns+","+authoredCardWidth+"px)"
+    :"repeat("+columns+",minmax("+minimumCardWidth+"px,1fr))",
    // Keep every authorised record; 'Rows' controls the *visible* viewport only.
    // A measured pixel row height avoids percentage tracks shrinking to their
    // min-content size and painting a second row within a one-row viewport.
    gridAutoRows:"max("+minimumCardHeight+"px, calc((100% - 8px - "+(rows-1)*gap+"px) / "+rows+"))",
-   ...(gridViewportHeight>0?{
+   ...(authoredCardHeight!==null?{gridAutoRows:authoredCardHeight+"px"}:{}),
+   ...(gridViewportHeight>0&&authoredCardHeight===null?{
     gridAutoRows:Math.max(minimumCardHeight,(gridViewportHeight-(rows-1)*gap)/rows)+"px"
    }:{}),
    alignContent:"start",backgroundColor:p.gridBackgroundColor||undefined
@@ -1329,17 +1365,22 @@ export default function SmartRuntime(p){
         style={{flex:"0 0 auto",height:p.wrapText===true?"auto":32,maxHeight:"100%",minHeight:p.wrapText===true?32:0,
           width:p.wrapText===true?number(p.tabWidth,140):undefined,maxWidth:p.wrapText===true?number(p.tabWidth,140):undefined,
           color:p.labelColor||undefined,background:p.backgroundColor||(ios?"rgb(255 255 255 / .82)":"#fff"),
-          boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
-          borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16)}}
+          boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
+          borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16),
+          fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>
         {safeSrc&&<img data-design-area={p.builderPreview?"Image":undefined} src={safeSrc} alt="" style={{
          width:number(p.imageWidth,22,8,200),height:number(p.imageHeight,22,8,200),objectFit:fit,
-         border:p.imageBorderColor?"1px solid "+p.imageBorderColor:undefined,boxSizing:"border-box"}}/>}{label}
+         border:p.imageBorderColor?"1px solid "+p.imageBorderColor:undefined,
+         backgroundColor:p.imageBackgroundColor||undefined,
+         borderRadius:p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
+         boxShadow:p.imageShadow==="large"?"0 8px 20px #0003":p.imageShadow==="medium"?"0 3px 9px #0003":undefined,
+         boxSizing:"border-box"}}/>}{label}
       </button>;
     })}
   </nav>;
  }else content=<div className="smart-container" style={{
-    background:p.imageBackgroundColor??p.backgroundColor??"transparent",
+    background:p.backgroundColor??p.imageBackgroundColor??"transparent",
     border:p.borderColor?"1px solid "+p.borderColor:0,
     borderRadius:number(p.radius,12),...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12))
  }}>{p.children||(p.builderPreview?<span className="smart-editor-container-placeholder">Drop components here</span>:null)}</div>;

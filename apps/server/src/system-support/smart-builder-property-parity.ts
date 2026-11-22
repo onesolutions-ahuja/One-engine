@@ -180,7 +180,8 @@ export async function applySmartBuilderPropertyParity(client:Query){
  await client.query(`INSERT INTO md_builder_design2_slots
   (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
   SELECT 'Grid',COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area='Grid'),8),
-   slot_key,row_no,order_no+100,width_px,height_px,property_key,fallback_key
+   slot_key,row_no,100+ROW_NUMBER() OVER(ORDER BY row_no,order_no,slot_key),
+   width_px,height_px,property_key,fallback_key
   FROM md_builder_design2_slots WHERE area='Body' AND row_no BETWEEN 1 AND 3
    AND slot_key NOT LIKE 'extra_%'
   ON CONFLICT(area,slot_key) DO NOTHING`);

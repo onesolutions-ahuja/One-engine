@@ -10,6 +10,8 @@ import {pathToFileURL} from 'node:url';
  */
 export const POPUP='smart_till_sale_confirmation';
 export const CUSTOMER='smart_till_customer_display';
+// Reserve a distinct screen: the active customer Cart already uses layer 1.
+export const PAID_LAYER=9;
 const variants=['Desktop','Tablet','Mobile','Custom'];
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const api=(value)=>String(value??'').toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -76,24 +78,30 @@ export function customerLayerComponents(page,variant){
  return [
   node('stcd-paid-icon','smart_icon','Payment received',
    {...iconRect,x:(w-iconSize)/2,width:iconSize},
-   {iconId:'check',iconFillColor:colours.green,backgroundColor:colours.pale,radius:iconSize/2},1),
+   {iconId:'check',iconFillColor:colours.green,backgroundColor:colours.pale,radius:iconSize/2},PAID_LAYER),
   label('stcd-paid-title','Payment complete',position(titleH),
-   'Payment complete',Math.min(38,font),true,1),
+   'Payment complete',Math.min(38,font),true,PAID_LAYER),
   label('stcd-paid-amount','Paid amount',position(amountH),
-   '=FORMAT(@ThisPage.Input.paymentAmount, "£0.00")',Math.min(64,font+9),true,1),
+   '=FORMAT(@ThisPage.Input.paymentAmount, "£0.00")',Math.min(64,font+9),true,PAID_LAYER),
   label('stcd-paid-method','Payment method',position(detailH),
    '=IF(ISBLANK(@ThisPage.Input.paymentMethod), "", "Payment method: " & @ThisPage.Input.paymentMethod)',
-   Math.min(19,Math.max(14,font-9)),false,1),
+   Math.min(19,Math.max(14,font-9)),false,PAID_LAYER),
   label('stcd-paid-change','Change returned',position(detailH),
    '=IF(ISBLANK(@ThisPage.Input.changeAmount), "", "Change returned: " & FORMAT(@ThisPage.Input.changeAmount, "£0.00"))',
-   Math.min(19,Math.max(14,font-9)),false,1),
+   Math.min(19,Math.max(14,font-9)),false,PAID_LAYER),
   label('stcd-paid-message','Thank you',position(thankH),
-   'Thank you for shopping with us',Math.min(28,Math.max(17,font-7)),false,1)
+   'Thank you for shopping with us',Math.min(28,Math.max(17,font-7)),false,PAID_LAYER)
  ];
 }
 export function customerDraft(current,variant){
  const wanted=customerLayerComponents(current,variant);
  const byId=new Map(current.components.map(c=>[c.id,c]));
+ const generated=new Set(wanted.map(c=>c.id));
+ // Fail closed if a tenant already uses layer 9; never overlay another screen.
+ const occupied=current.components.filter(c=>!generated.has(c.id)&&
+  c?.properties?.pageLayer!==undefined&&Number(c.properties.pageLayer)===PAID_LAYER);
+ assert.equal(occupied.length,0,'Layer '+PAID_LAYER+' is already used by customer display components: '+
+  occupied.map(c=>c.id).join(', '));
  const newBlocks=wanted.filter(c=>!byId.has(c.id));
  for(const c of wanted){
   const existing=byId.get(c.id);

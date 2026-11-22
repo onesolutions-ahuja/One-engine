@@ -28,7 +28,7 @@ export default function SmartComponent(p){
  const caption=typeof p.label==="string"?p.label:"";
  // Nothing to encode: hidden at runtime (e.g. no payment link yet), a hint in the builder.
  if(!matrix&&!(p.editing||p.designMode||p.builderPreview))return null;
- if(!matrix)return <div className="smart-qr smart-qr-empty" style={{background:light,borderRadius:p.radius}}>
+ if(!matrix)return <div className="smart-qr smart-qr-empty" style={{background:light,borderRadius:p.radius,border:p.borderColor?'1px solid '+p.borderColor:undefined,boxShadow:p.shadow==='large'?'0 8px 20px #0003':p.shadow==='medium'?'0 3px 9px #0003':p.shadow==='small'?'0 1px 4px #0002':undefined}}>
   <span>QR: set Text Source</span></div>;
  const size=matrix.length,quiet=4,view=size+quiet*2;
  let path="";

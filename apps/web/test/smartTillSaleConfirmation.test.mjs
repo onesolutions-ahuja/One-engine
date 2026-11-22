@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {confirmationPage,customerDraft,validateVisualDraft,
+import {confirmationPage,customerDraft,applyCustomerMigrationPlan,validateVisualDraft,
  POPUP,CUSTOMER,PAID_LAYER} from '../../../scripts/smarttill/migrate-sale-confirmation.mjs';
 
 test('confirmation popup is one editable In-Screen Page with its Done action',()=>{
@@ -68,4 +68,22 @@ test('mobile popup has its own authored dimensions rather than inherited Desktop
  assert.notEqual(desktop.canvasWidth,mobile.canvasWidth);
  assert.notEqual(desktop.canvasHeight,mobile.canvasHeight);
  assert.notDeepEqual(desktop.components[0].position,mobile.components[0].position);
+});
+
+test('per-device migration rebases only new receipt positions after Desktop inheritance',()=>{
+ const original={apiName:CUSTOMER,layoutMode:'free-canvas',canvasWidth:360,canvasHeight:520,
+  components:[{id:'cart',type:'Custom:smart_cart',label:'Active cart',
+    properties:{pageLayer:1},position:{x:0,y:0,width:350,height:400}}]};
+ const plan=customerDraft(original,'Mobile').draft;
+ const desktop={...original,components:[...original.components,
+  ...customerDraft({...original,canvasWidth:1440,canvasHeight:900},'Desktop').draft.components.slice(1)]};
+ const result=applyCustomerMigrationPlan(desktop,original,plan);
+ assert.equal(result.changed,true);
+ assert.deepEqual(result.draft.components[0],original.components[0]);
+ assert.equal(new Set(result.draft.components.map(c=>c.id)).size,7);
+ for(const expected of plan.components.slice(1))
+  assert.deepEqual(result.draft.components.find(c=>c.id===expected.id)?.position,expected.position);
+ // Any concurrent edit to an original authored block must abort, not be overwritten.
+ const edited={...desktop,components:[{...original.components[0],label:'Changed'},...desktop.components.slice(1)]};
+ assert.throws(()=>applyCustomerMigrationPlan(edited,original,plan),/Original customer display component changed/);
 });

@@ -1,3 +1,4 @@
+import {appRoutePath} from '../../workspace/Navigation/appRouting';
 import TenantGovernance from './TenantGovernance';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import {refreshTenantBrand} from '../../branding/tenantBrandLoader';
@@ -486,6 +487,8 @@ function CompanySettings({ canManage, section = 'general' }: { canManage: boolea
   const [companyError,setCompanyError]=useState('');
   const [companyNotice,setCompanyNotice]=useState('');
   const [logoReading,setLogoReading]=useState(false);
+  // The Company record these details are saved on (Object Manager fields, receipts …).
+  const [companyRecordId,setCompanyRecordId]=useState<string|null>(null);
   const contactFieldKeys=['website','phone','email','addressLine1','addressLine2','city','postcode','country'];
   const brandFieldKeys=['tradingName','website'];
   const visibleCompanyFields=companyFields.filter(field=>section==='contacts'?contactFieldKeys.includes(field.key)
@@ -513,8 +516,8 @@ function CompanySettings({ canManage, section = 'general' }: { canManage: boolea
   };
   const reloadCompany=async()=>{
     setCompanyLoading(true);setCompanyReady(false);setCompanyError('');
-    try{const value=await apiRequest<{profile:CompanyProfile|null}>('/tenant/company-profile');
-      setCompany({...blankCompanyProfile,...(value.profile??{})});setCompanyReady(true);}
+    try{const value=await apiRequest<{profile:CompanyProfile|null;companyRecordId?:string|null}>('/tenant/company-profile');
+      setCompany({...blankCompanyProfile,...(value.profile??{})});setCompanyRecordId(value.companyRecordId??null);setCompanyReady(true);}
     catch(error){setCompanyReady(false);setCompanyError(companyFailureMessage(error));}
     finally{setCompanyLoading(false);}
   };
@@ -669,6 +672,8 @@ function CompanySettings({ canManage, section = 'general' }: { canManage: boolea
       description={section==='currency'?'Review your corporate currency, VAT and exchange rates.':section==='contacts'?'Manage how customers and partners contact your organisation.':section==='branding'?'Review and update your organisation logo and public identity.':'Manage your organisation details.'} />
     {section!=='currency'&&<section className="surface permission-section company-profile-section" aria-label={sectionTitle}>
       <div className="section-toolbar"><div><h2>{sectionTitle}</h2><p>{section==='branding'?'Upload a PNG, JPG or WebP logo (up to 128 KB). Preview the current logo below.':'Organisation, contact and regional information.'}</p></div>
+      {section==='general'&&companyRecordId&&!companyEditing&&<a className="btn" href={appRoutePath({kind:'record-detail',objectApiName:'Company',recordId:companyRecordId})}
+        title="Every field of the Company record, including fields added in Object Manager (receipts …)">All company fields</a>}
       {canManage&&companyReady&&!companyEditing&&!companyLoading&&<button type="button" className="btn" onClick={()=>{setCompanyBeforeEdit({...company});setCompanyEditing(true);}}>{section === 'branding' ? 'Edit logo' : section === 'contacts' ? contactsConfigured?'Edit contacts':'Add contact details' : 'Edit details'}</button>}</div>
       {companyError&&!companyEditing&&<button type="button" className="btn" disabled={companyLoading} onClick={()=>void reloadCompany()}>Retry loading company details</button>}
       {companyLoading?<p>Loading company details…</p>:companyReady?<>{!companyEditing&&section==='contacts'&&!contactsConfigured&&<p className="company-contacts-empty">No contact details configured yet. Select Add contact details to enter an email, telephone, website or address.</p>}

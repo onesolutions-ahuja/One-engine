@@ -16,12 +16,13 @@ import {PRODUCT_IMAGE_FIELD,seedFreshProductImageField} from './product-image-fi
 import {SMART_COMPONENTS,seedFreshSmartComponents} from './smart-components.js';
 import {deactivateUnavailableBundledComponents} from './bundled-components.js';
 import {reconcileCoreObjectDefaults} from './core-object-defaults.js';
+import {COMPANY_OBJECT,seedCompanyObject} from './core-company.js';
 
 /** System Objects: the platform's own Objects (identity, access, metadata, devices, webhooks,
  * payments ledger, communication log). They can never be deleted (database trigger). */
 export const SYSTEM_OBJECTS=['User','Tenant','Role','PermissionSet','PermissionAssignment','AppExchange',
  'FieldDefinition','ComponentDefinition','PageDefinition','FlowDefinition',
- 'NamedDevice','IncomingWebhook','CashLedger','Communication'] as const;
+ 'NamedDevice','IncomingWebhook','CashLedger','Communication','Company'] as const;
 /** Standard Objects: the shared business catalogue every app uses. */
 export const STANDARD_OBJECTS=['Product','ProductCategory','ProductOptionGroup','ProductOption',
  'Customer','Contact','Vendor','Invoice','InvoiceLine','Quotation','QuotationLine','Purchase','PurchaseLine',
@@ -57,6 +58,8 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  await seedFreshSmartComponents(client,tenantId);
  // After Location, Cart, Invoice and CashLedger: adds to them, then the starter Location/Till.
  await seedTillNumbering(client,tenantId);
+ // The tenant's own company details (one record): Company Settings and @ThisTenant.Company.*.
+ await seedCompanyObject(client,tenantId);
  await markCoreObjectKinds(client,tenantId);
 }
 
@@ -71,13 +74,14 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // migrated once, TillId repointed); Order, ProductLine, Account, Lead and Case retired from Core;
 // System Objects (never deletable) and Standard Objects marked. v14: smart_line_items. v15: smart_id_card.
 // v16: smart_paired_screens (screens paired with a device, for any app's settings page).
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v16';
+// v17: Company (one record per tenant: company details, receipts; read as @ThisTenant.Company.*).
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v17';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
  LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,CATALOGUE_OBJECTS,
  CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,
- TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,SYSTEM_OBJECTS,STANDARD_OBJECTS
+ TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,SYSTEM_OBJECTS,STANDARD_OBJECTS,COMPANY_OBJECT
 ];
 
 /** One upgrade-safe reconciliation for all shared Core metadata. Existing

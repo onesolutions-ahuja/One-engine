@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {parsePageReference} from '../../server/src/expression-engine/PageReferences.ts';
 import {compileDisplayFormula} from '../../server/src/page-compiler/code/generateCode.ts';
 import {permissionNames} from '../../server/src/system-support/tenant-formula-values.ts';
-import {receiptSettingError} from '../../server/src/system-support/company-receipt-settings.ts';
+import {PROFILE_TO_COMPANY_FIELD,COMPANY_OBJECT} from '../../server/src/app-seeders/core-company.ts';
 import {runFormulaText} from '../src/core/pages/PageCompiler/formulaText';
 import {setTenantBrand} from '../src/component-libraries/shared/TenantBrand.js';
 import {setAuthenticatedFormulaBindingContext} from '../src/core/components/RegisteredComponent/fieldExpressionRuntime';
@@ -42,12 +42,12 @@ test('browser formulas show company values, user limits and permissions',()=>{
  setAuthenticatedFormulaBindingContext(null);
 });
 
-test('Receipts settings are typed',()=>{
- assert.equal(receiptSettingError('receiptAutoPrint',true),null);
- assert.match(String(receiptSettingError('receiptAutoPrint','yes')),/Yes or No/);
- assert.equal(receiptSettingError('cashRoundingStep',0.05),null);
- assert.match(String(receiptSettingError('cardSurchargePercent',150)),/number/);
- assert.match(String(receiptSettingError('nope','x')),/Unknown/);
+test('Company Settings keys map onto the one Company object',()=>{
+ assert.equal(PROFILE_TO_COMPANY_FIELD.get('tradingName'),'Name');
+ assert.equal(PROFILE_TO_COMPANY_FIELD.get('vatNumber'),'VatNumber');
+ assert.equal(PROFILE_TO_COMPANY_FIELD.get('receiptAutoPrint'),'ReceiptAutoPrint');
+ assert.equal(PROFILE_TO_COMPANY_FIELD.has('logoUrl'),false);
+ assert.equal(COMPANY_OBJECT.fields.find(f=>f.api==='CashRoundingStep')?.type,'number');
 });
 
 test('server actions check limits and permissions from SQL, not the browser',async()=>{

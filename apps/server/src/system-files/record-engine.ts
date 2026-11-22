@@ -1017,6 +1017,10 @@ export class RecordEngine {
       tenantId,userId,objectApi,values,true,existingClient,undefined,true);
     const save=async(client:PoolClient)=>{
       await this.lockObjectForWrite(client,tenantId,objectApi);
+      // Company holds the tenant's own details: exactly one record (under the write lock).
+      if(objectApi==='Company'&&(await client.query(
+        `SELECT 1 FROM md_records WHERE tenant_id=$1 AND object_api='Company' AND is_deleted=false LIMIT 1`,[tenantId])).rowCount)
+        throw new Error('There is only one Company record: edit it instead');
       const defaults=await this.fields(tenantId,objectApi,client);
       // A newly defined Object may not have been activated yet. Activate before
       // inserting md_records so its trigger creates the native row for this save.

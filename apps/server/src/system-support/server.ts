@@ -1,5 +1,6 @@
 import {recordInvoicePayment} from './record-payment-service.js';
-import {loadCompanyValues} from './tenant-formula-values.js';
+import {loadCompanyValues,companyRecord} from './tenant-formula-values.js';
+import {PROFILE_TO_COMPANY_FIELD} from '../app-seeders/core-company.js';
 import {registerRevolutCheckoutRoutes} from './revolut-checkout-service.js';
 import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
@@ -1015,13 +1016,38 @@ export function createSystemServer(db:SqlPersistence) {
       throw error;
     }
   }));
+  // Company Settings (Setup) shows and saves the tenant's ONE Company record; only the logo
+  // stays in the company-profile setting (an uploaded image). The form keeps its keys.
+  const companyProfile=async(actor:Actor)=>{
+    const setting=await platformTenants.getSetting(actor.tenant_id,actor.user_id,'company-profile') as Record<string,unknown>|null;
+    const record=await companyRecord(db,actor.tenant_id);
+    const profile:Record<string,unknown>={logoUrl:typeof setting?.logoUrl==='string'?setting.logoUrl:''};
+    for(const [key,field] of PROFILE_TO_COMPANY_FIELD)profile[key]=record?.[field]??'';
+    return {profile,companyRecordId:record?.Id??null};
+  };
   app.get('/api/tenant/company-profile',route(async(req,res)=>{
-    const actor=req.actor!;
-    res.json({profile:await platformTenants.getSetting(actor.tenant_id,actor.user_id,'company-profile')});
+    res.json(await companyProfile(req.actor!));
   }));
   app.put('/api/tenant/company-profile',route(async(req,res)=>{
     const actor=req.actor!;
-    res.json({profile:await platformTenants.saveSetting(actor.tenant_id,actor.user_id,'company-profile',req.body)});
+    await rbac.require(actor.tenant_id,actor.user_id,'TenantSettings','manage');
+    const body=req.body&&typeof req.body==='object'&&!Array.isArray(req.body)?req.body as Record<string,unknown>:null;
+    if(!body)throw new Error('Invalid company profile');
+    const values:Record<string,unknown>={};
+    for(const [key,value] of Object.entries(body)){
+      if(key==='logoUrl')continue;
+      const field=PROFILE_TO_COMPANY_FIELD.get(key);
+      if(!field)throw new Error('Invalid company profile');
+      values[field]=value===''?null:value;
+    }
+    if(Object.hasOwn(body,'logoUrl'))
+      await platformTenants.saveSetting(actor.tenant_id,actor.user_id,'company-profile',{logoUrl:body.logoUrl});
+    if(Object.keys(values).length){
+      const record=await companyRecord(db,actor.tenant_id);
+      if(record)await records.update(actor.tenant_id,actor.user_id,'Company',record.Id,values);
+      else await records.create(actor.tenant_id,actor.user_id,'Company',values);
+    }
+    res.json(await companyProfile(actor));
   }));
   /** Company values for page formulas (@ThisTenant.Company.Name / .Logo / .VatNumber / .Currency …).
    * Every signed-in user of the tenant (kiosk and app users) may read them: receipts and tills

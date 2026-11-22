@@ -194,7 +194,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const preview=p.previewOnly===true||p.builderPreview===true||p.preview===true;
  const sample=Boolean(p.builderPreview===true&&record?.__builderSample===true);
  const headerResult=scopedDisplayExpression(p,"textSource",p.textSource??p.title??p.label??"",record);
- const header=text(headerResult.value)||(sample?"Product Name":isGridKind(p.kind)&&preview?"Text here":"");
+ const header=text(headerResult.value)||(sample?"Product Name":preview?"Text here":"");
  const badgeResult=scopedDisplayExpression(p,"badgeText",p.badgeText??"",record);
  const badge=text(badgeResult.value);
  // Card Grid uses the same record-scoped, permission-aware formula evaluation as other Data fields.

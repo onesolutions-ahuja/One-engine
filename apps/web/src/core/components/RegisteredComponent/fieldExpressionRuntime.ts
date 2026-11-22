@@ -17,6 +17,7 @@ export type FormulaBindingContext={
   user?:Record<string,unknown>;profile?:Record<string,unknown>;organization?:Record<string,unknown>;
   connections?:{systemAvailable:readonly string[];systemConnected:readonly string[];customConnected:readonly string[]}|null;
   recordType?:Record<string,unknown>;permissions?:Readonly<Record<string,boolean>>;
+  customPermissions?:Readonly<{names:Readonly<Record<string,boolean>>;others:boolean}>|null;
   rootObjectApiName?:string;
   /** The page's converter for a formula given at run time (page code `$`: totals come from the server). */
   compile?:(text:unknown)=>((row:Record<string,unknown>)=>unknown)|null;
@@ -24,6 +25,20 @@ export type FormulaBindingContext={
 // Authenticated public identity shared by the page code and independently bundled components.
 // It contains only the allowlisted profile fields, never tokens or credentials.
 const SESSION_IDENTITY_KEY=Symbol.for('une.authenticatedFormulaIdentity');
+const scalars=(value:unknown):Record<string,unknown>=>{
+  const out:Record<string,unknown>=Object.create(null);
+  if(value&&typeof value==='object'&&!Array.isArray(value))for(const [key,item] of Object.entries(value).slice(0,200))
+    if(/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key)&&(item===null||['string','number','boolean'].includes(typeof item)))out[key]=item;
+  return out;
+};
+function sessionPermissions(value:unknown):FormulaBindingContext['customPermissions']{
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const source=value as {names?:unknown;others?:unknown};
+  const names:Record<string,boolean>=Object.create(null);
+  if(source.names&&typeof source.names==='object'&&!Array.isArray(source.names))
+    for(const [key,item] of Object.entries(source.names))if(typeof item==='boolean')names[key.toLowerCase()]=item;
+  return Object.freeze({names:Object.freeze(names),others:source.others===true});
+}
 function setAuthenticatedFormulaSession(context:FormulaBindingContext|null):void{
   const user=context?.user,organization=context?.organization;
   const names=(value:unknown)=>Object.freeze((Array.isArray(value)?value:[]).map(String));
@@ -32,8 +47,12 @@ function setAuthenticatedFormulaSession(context:FormulaBindingContext|null):void
     &&typeof organization.Id==='string'
     ?Object.freeze({user:Object.freeze({Id:user.Id,Name:user.Name,Email:user.Email,
         TimeZone:user.TimeZone,Locale:user.Locale,CurrencyIsoCode:user.CurrencyIsoCode,
-        Manager:user.Manager??'',ManagerName:user.ManagerName??''}),
+        Manager:user.Manager??'',ManagerName:user.ManagerName??'',
+        // Custom User fields (@ThisTenant.User.RefundLimit): numbers, text and Yes/No only.
+        Fields:Object.freeze(scalars(user.Fields))}),
       organization:Object.freeze({Id:organization.Id,Name:organization.Name}),
+      // @ThisTenant.Permission.<Name>: TRUE/FALSE per name, `others` for names no rule mentions.
+      customPermissions:context?.customPermissions??null,
       connections:connections?Object.freeze({systemAvailable:names(connections.systemAvailable),
         systemConnected:names(connections.systemConnected),customConnected:names(connections.customConnected)}):null}):null;
 }
@@ -60,14 +79,16 @@ export function setAuthenticatedFormulaBindingContext(user:unknown):void {
       Id:session.id,Name:session.displayName,Email:session.email,TimeZone:session.timeZone,
       Locale:session.locale,CurrencyIsoCode:session.currencyIsoCode??null,
       Manager:typeof session.managerId==='string'?session.managerId:'',
-      ManagerName:typeof session.managerName==='string'?session.managerName:''
+      ManagerName:typeof session.managerName==='string'?session.managerName:'',
+      Fields:scalars(session.customFields)
     }),
     profile:Object.freeze({
       Id:session.profileId??null,Name:session.profileName??null,
       DeveloperName:session.profileApi??null
     }),
     organization:Object.freeze({Id:session.tenantId,Name:session.tenantName}),
-    connections:sessionConnections(session.connections)
+    connections:sessionConnections(session.connections),
+    customPermissions:sessionPermissions(session.customPermissions)
   });
   setAuthenticatedFormulaSession(authenticatedFormulaBindingContext);
 }

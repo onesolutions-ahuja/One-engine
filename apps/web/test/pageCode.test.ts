@@ -303,7 +303,8 @@ test('page and tenant values convert to page code calls', ()=>{
  assert.match(code('=@ThisTenant.Company.Id'),/\$\.session\("tenant\.id"\)/);
  assert.match(code('=@ThisTenant.Company.Name & @ThisTenant.Company.Logo'),/\$\.tenant\("name"\)[\s\S]*\$\.tenant\("logo"\)/);
  assert.throws(()=>code('=@ThisPage.Session.Name'),/use @ThisPage\.Session\.Id/);
- assert.throws(()=>code('=@ThisTenant.Company.Secret'),/Unknown tenant value/);
+ assert.match(code('=@ThisTenant.Company.VatNumber'),/\$\.tenant\("vatnumber"\)/);
+ assert.throws(()=>code('=@ThisTenant.Other.Secret'),/Unknown tenant value/);
 });
 
 test('old $ spellings are refused; the one-time rewrite gives the same code', ()=>{

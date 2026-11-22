@@ -21,7 +21,7 @@ import {USER_FIELDS,type PageReference} from '../../../../../server/src/expressi
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
 import {startTap} from './pageTimings';
 import {noteOwnBatch} from './liveChanges';
-import {formulaFunction,looksLikeFormula,nodeFunction} from './formulaText';
+import {formulaFunction,looksLikeFormula,nodeFunction,sessionValue,tenantValue,permissionValue} from './formulaText';
 import type {Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,openerMirrorKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
@@ -55,10 +55,12 @@ export function signedInValue(page:PageReference,state:Readonly<Record<string,un
  if(page.kind==='till')return deviceTillValue(page.field);
  if(page.kind==='device')return page.field==='Key'?tillDeviceKey():page.field==='MirrorKey'?mirrorDeviceKey():'';
  if(page.kind==='user')return who?.user?.[sessionUser[USER_FIELDS[page.field]]]??'';
+ if(page.kind==='userField')return sessionValue('user.field.'+page.field,state);
+ if(page.kind==='permission')return permissionValue(page.name);
  if(page.kind==='company'){
   if(page.field==='Id')return who?.organization?.Id??'';
-  const brand=getTenantBrand();
-  return (page.field==='Name'?brand.name||who?.organization?.Name:brand.logo)??'';
+  if(page.field==='Name')return getTenantBrand().name||who?.organization?.Name||'';
+  return tenantValue(page.field);
  }
  return '';
 }
@@ -203,14 +205,10 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   }
   session(path:string){
    if(path==='cartId'){const id=this.state('activeCartId');return typeof id==='string'?id:'';}
-   const user=identity()?.user,org=identity()?.organization;
-   if(path.startsWith('user.')&&sessionUser[path.slice(5)])return user?.[sessionUser[path.slice(5)]]??'';
-   if(path==='tenant.id')return org?.Id??'';
-   if(path==='tenant.name')return getTenantBrand().name||org?.Name||'';
-   if(path==='tenant.logo')return getTenantBrand().logo??'';
-   throw Error('Unsupported tenant value: '+path);
+   return sessionValue(path,host.state());
   }
-  tenant(name:string){const brand=getTenantBrand();return (name==='name'?brand.name:brand.logo)??'';}
+  tenant(name:string){return tenantValue(name);}
+  permission(name:string){return permissionValue(name);}
   /** @ThisPage.Till.*: known once this device's Till has loaded; the server decides on save. */
   till(field:string){
    const known=deviceTillState().status;

@@ -26,7 +26,7 @@ function loadTenantBrand(force:boolean):Promise<void>{
   const work=(async()=>{
     for(let attempt=0;attempt<3;attempt++){
       try{
-        const brand=await apiRequest<{name?:unknown;logo?:unknown}>('/tenant/brand');
+        const brand=await apiRequest<{name?:unknown;logo?:unknown;company?:unknown}>('/tenant/brand');
         if(requestGeneration===generation&&loadedFor===token&&(getAccessToken()??'')===token){
           setTenantBrand(brand);
           loaded=true;

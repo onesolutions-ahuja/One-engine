@@ -19,6 +19,7 @@ import {COMPONENT_PROPERTIES,readComponentProperty,uiProperty,uiPropertyValue,wi
 import {isConnected,type ConnectionSnapshot} from '../expression-engine/FormulaConnections.js';
 import type {ServerPageCode} from '../page-compiler/code/pageCode.js';
 import {trustedFormulaSession,type TrustedFormulaSession} from './formula-data-action-runtime.js';
+import {permissionNames} from './tenant-formula-values.js';
 import {loadConnectionSnapshot} from './tenant-connections.js';
 import {withRecordReadScope} from './record-read-scope.js';
 import {randomUUID} from 'node:crypto';
@@ -169,10 +170,16 @@ class ServerScope{
    'user.managerId':user?.managerId,'user.managerName':user?.managerName,
    'tenant.id':tenant?.id,'tenant.name':tenant?.name,'tenant.logo':tenant?.logo};
   if(path==='cartId'){const id=this.state('activeCartId');return typeof id==='string'&&uuid.test(id)?id:'';}
+  // @ThisTenant.User.RefundLimit: the user's own value from SQL (a limit the server enforces).
+  if(path.startsWith('user.field.'))return namedValue(user?.fields,path.slice(11));
   if(!Object.prototype.hasOwnProperty.call(map,path))throw Error('Unsupported tenant value: '+path);
   return map[path]??'';
  }
- tenant(name:string){return name==='name'?this.identity?.tenant.name??'':this.identity?.tenant.logo??'';}
+ /** @ThisTenant.Company.<Field>: any Company Settings value (blank when not set). */
+ tenant(name:string){return namedValue(this.identity?.tenant.company,name);}
+ /** @ThisTenant.Permission.<Name>: read once before the action runs (RBAC CustomPermission:<Name>). */
+ permission(name:string){return this.permissions.get(name.toLowerCase())===true;}
+ permissions=new Map<string,boolean>();
  private tillRow:Row|null=null;
  /** Read once before the code runs (page values are plain, synchronous reads). */
  async loadTill(){
@@ -516,13 +523,26 @@ async function loadSets(scope:ServerScope,code:ServerPageCode,only?:ReadonlySet<
 
 type Deps={db:Sql;records:Records;verifyPin?:(actor:Actor,pin:unknown,userId?:unknown)=>Promise<boolean>;
  rbac?:RbacEngine;namedCredentials?:NamedCredentialService};
-async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{identity:boolean;connections:boolean}){
+/** A value by name, ignoring case ('' when absent). */
+function namedValue(values:Record<string,unknown>|undefined,name:string):unknown{
+ if(!values)return '';
+ const key=Object.keys(values).find(item=>item.toLowerCase()===name.toLowerCase());
+ const value=key===undefined?undefined:values[key];
+ return value===undefined||value===null?'':value;
+}
+async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{identity:boolean;connections:boolean;permissions?:string[]}){
  const [identity,connections]=await Promise.all([
   needs.identity?trustedFormulaSession(deps.db,actor):Promise.resolve(null),
   needs.connections?loadConnectionSnapshot(deps.db,actor.tenant_id):Promise.resolve(null)]);
  const scope=new ServerScope(deps.records,actor,request,identity,connections as ConnectionSnapshot|null,
   deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null,
   {db:deps.db as SqlPersistence,rbac:deps.rbac,namedCredentials:deps.namedCredentials});
+ if(needs.permissions?.length){
+  if(!deps.rbac)throw Error('Permissions are unavailable for this action');
+  const allowed=await deps.rbac.allowedMany(actor.tenant_id,actor.user_id,
+   needs.permissions.map(name=>({resource:'CustomPermission:'+name,action:'read'})));
+  needs.permissions.forEach((name,i)=>scope.permissions.set(name.toLowerCase(),allowed[i]===true));
+ }
  // Only a request from a page that reads @ThisPage.Till/Device carries a device key.
  if(request.deviceKey)await scope.loadTill();
  return scope;
@@ -625,7 +645,7 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
  // The source is the generated action code: user/company values appear as $.session("user.…"),
  // $.session("tenant.id") or $.tenant(…), not as @ThisTenant mentions.
  const scope=await scopeFor(deps,actor,request,{identity:needsIdentity(source),
-  connections:/\bCONNECTED\s*\(/i.test(source)});
+  connections:/\bCONNECTED\s*\(/i.test(source),permissions:permissionNames(source)});
  try{
   const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{
    // One page's taps save one at a time, in the order they arrive: a tap reads what the tap

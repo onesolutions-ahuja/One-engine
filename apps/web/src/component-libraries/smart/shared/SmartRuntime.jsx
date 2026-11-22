@@ -205,7 +205,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  const value=gridText(p,"cardValue",record);
  const buttonText=gridText(p,"cardButtonText",record);
  const customButtons=["customButton1","customButton2"].filter(key=>
-  p[key+"Visible"]!==false&&Boolean(p.actionFlows?.[key]||
+  p[key+"Visible"]!==false&&Boolean(p.builderPreview||p.actionFlows?.[key]||
    typeof p[key+"Label"]==="string"&&p[key+"Label"].trim()));
  const single=p.kind==="smart_image";
  const grid=isGridKind(p.kind);
@@ -396,8 +396,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
         ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
-    {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
-      disabled={!onButtonClick} aria-label={buttonText}
+    {(buttonText||p.builderPreview)&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
+      disabled={!onButtonClick||p.builderPreview} aria-label={buttonText||"Button"}
       style={{
        ...smartPartOrderStyle(p.cardButtonPlacement,"right"),
        ...smartPartOffsetStyle(p,"cardButton"),
@@ -424,7 +424,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
         p.cardButtonAlignment==="right"?"flex-end":
         p.cardButtonAlignment==="center"?"center":undefined
       }}
-      onClick={event=>{event.stopPropagation();onButtonClick?.();}}>{buttonText}</button>}
+      onClick={event=>{event.stopPropagation();onButtonClick?.();}}>{buttonText||(p.builderPreview?"Button":"")}</button>}
     {customButtons.map(key=>{
      const label=gridText(p,key+"Label",record)||(key==="customButton1"?"+":"−");
      return <button key={key} data-md-bind={p.builderPreview?(key+"Label"):undefined} data-design-area={p.builderPreview?(key==="customButton1"?"Button":"Button 2"):undefined} type="button" className="smart-card-button smart-card-custom-action"

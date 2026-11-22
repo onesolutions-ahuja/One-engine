@@ -55,8 +55,7 @@ const standard=['smart_numpad','smart_button','smart_toggle','smart_lookup','sma
 const body=standard.flatMap(api=>[
  map(api,'Body','fill','backgroundColor'),
  map(api,'Body','border','borderColor'),map(api,'Body','radius','radius'),
- ...(['smart_qr','smart_video','smart_line_items','smart_paired_screens'].includes(api)
-   ?[]:[map(api,'Body','shadow','shadow')])
+ map(api,'Body','shadow','shadow')
 ]);
 const geometry=BUILDER_SMART_APIS.flatMap(api=>[
  map(api,'Body','width','width'),map(api,'Body','height','height')
@@ -139,6 +138,11 @@ const special:Mapping[]=[
   ['radius','Radius'],['shadow','Shadow']]),
  map('smart_tabs','Focused','fill','selectedTabColor'),
  map('smart_tabs','Focused','text','selectedTextColor'),
+ map('smart_numpad','Focused','border','numpadFocusedBorderColor'),
+ map('smart_numpad','Focused','radius','numpadFocusedRadius'),
+ map('smart_numpad','Focused','shadow','numpadFocusedShadow'),
+ map('smart_numpad','Focused','bold','numpadFocusedBold'),
+ map('smart_numpad','Focused','size','numpadFocusedTextSize'),
  map('smart_calendar','Focused','fill','defaultValueColor'),
  ...['smart_numpad','smart_keyboard','smart_dock'].flatMap(api=>[
   map(api,'Focused','fill','numpadFocusedFill'),

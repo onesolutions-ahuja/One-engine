@@ -24,7 +24,8 @@ export default function SmartComponent(p){
  if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const design=p.editing||p.designMode||p.builderPreview;
  const box={borderRadius:p.radius,border:p.borderColor?"1px solid "+p.borderColor:undefined,
-  background:p.backgroundColor||undefined};
+  background:p.backgroundColor||undefined,
+  boxShadow:p.shadow==='large'?'0 8px 20px #0003':p.shadow==='medium'?'0 3px 9px #0003':p.shadow==='small'?'0 1px 4px #0002':undefined};
  if(!list.length)return design?<div className="smart-video smart-video-empty" style={box}>
   <span>Video: set Image Source to a video URL or field</span></div>:null;
  const current=list[Math.min(index,list.length-1)];

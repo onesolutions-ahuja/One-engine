@@ -615,6 +615,7 @@ function SmartLookup({p,style,fire}){
    aria-expanded={opened&&matches.length>0} aria-controls={listId}
    placeholder={text(placeholder||"Search records…")}
    style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16),color:p.labelColor||undefined,
+    fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,
     boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
     background:p.backgroundColor||"#fff",borderColor:p.borderColor||undefined,
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}
@@ -1354,7 +1355,8 @@ export default function SmartRuntime(p){
           width:p.wrapText===true?number(p.tabWidth,140):undefined,maxWidth:p.wrapText===true?number(p.tabWidth,140):undefined,
           color:p.labelColor||undefined,background:p.backgroundColor||(ios?"rgb(255 255 255 / .82)":"#fff"),
           boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
-          borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16)}}
+          borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16),
+          fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>
         {safeSrc&&<img data-design-area={p.builderPreview?"Image":undefined} src={safeSrc} alt="" style={{
          width:number(p.imageWidth,22,8,200),height:number(p.imageHeight,22,8,200),objectFit:fit,

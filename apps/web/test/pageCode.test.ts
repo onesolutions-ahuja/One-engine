@@ -263,12 +263,12 @@ test('browser: a tap shows at once from held rows, then the server confirms', as
  assert.deepEqual(posts.filter(path=>path.endsWith('/execute')).length,1);
 });
 
-test('messages and payments run on the server; device steps stay with the action engine', ()=>{
+test('messages run on the server; device steps stay with the action engine', ()=>{
  const email=compileActionFormula('=EMAIL(Mailer, "a@b.co", "Receipt", "Thanks")','Cart');
  assert.equal(email.data,true);
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", "a@b\.co", "Receipt", "Thanks"\]\)/);
- const pay=compileActionFormula('=RECORDPAYMENT(@recordId, 10, "Cash", AS(p))','Invoice');
- assert.deepEqual(pay.writes.sort(),['CashLedger','Invoice']);
+ // RECORDPAYMENT was removed: pages post payments with CREATERECORD(CashLedger) + UPDATERECORD(Invoice).
+ assert.throws(()=>compileActionFormula('=RECORDPAYMENT(@recordId, 10, "Cash")','Invoice'));
  const wait=compileActionFormula('=ACTIONS(@ThisPage.A.Value = 1, WAIT(1, 0), @ThisPage.B.Value = 2)','Cart');
  assert.equal(wait.data,true);
  assert.match(wait.js,/\$\.service\("WAIT", \[1, 0, 0, "=ACTIONS/);
@@ -351,9 +351,6 @@ test('new-style actions: state, filter, navigation, WAIT, LOCATION, CREATEPDF, m
  assert.match(compileActionFormula('=@ThisPage.Input.result := "ok"','Cart').js,/\$\.setState\("result", "ok"\)/);
  const whatsapp=compileActionFormula('=WHATSAPP(Chat, @ThisPage.Input.phone, "Hi")','Cart');
  assert.match(whatsapp.js,/\$\.service\("WHATSAPP", \["Chat", \$\.state\("phone"\), "Hi"\]\)/);
- const pay=compileActionFormula('=RECORDPAYMENT(@ThisPage.Input.recordId, @ThisPage.PayButton.CartTotal, "Cash", AS(p))','Invoice');
- assert.match(pay.js,/\$\.service\("RECORDPAYMENT", \[\$\.state\("recordId"\), \$\.pageValue\("PayButton", "CartTotal"\), "Cash"\]\)/);
- assert.deepEqual(pay.writes.sort(),['CashLedger','Invoice']);
  // A cart held by session ID is still page-known: the page keeps its rows.
  const add=compileActionFormula('=GETRECORD(Cart, SessionKey, @ThisPage.Session.Id, Status, "Open", AS(c))','');
  assert.equal(add.sets.length,1);

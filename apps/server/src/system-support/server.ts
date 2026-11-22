@@ -1,4 +1,3 @@
-import {recordInvoicePayment} from './record-payment-service.js';
 import {loadCompanyValues,companyRecord} from './tenant-formula-values.js';
 import {PROFILE_TO_COMPANY_FIELD} from '../app-seeders/core-company.js';
 import {registerRevolutCheckoutRoutes} from './revolut-checkout-service.js';
@@ -2157,15 +2156,6 @@ export function createSystemServer(db:SqlPersistence) {
     const valid=await new TillPinService(db).verify(actor.tenant_id,userId??actor.user_id,pin,actor.user_id);
     res.setHeader('Cache-Control','private, no-store');
     res.json({valid});
-  }));
-  app.post('/api/action-formulas/record-payment',route(async(req,res)=>{
-    const actor=req.actor!;
-    const {invoiceId,amount,method,note,reference}=req.body??{};
-    // Normal Invoice edit + CashLedger create permissions apply inside the service.
-    const result=await recordInvoicePayment({db,records,query:new FlowRecordQuery(db,rbac)},
-      actor.tenant_id,actor.user_id,{invoiceId,amount,method,note,reference});
-    res.setHeader('Cache-Control','private, no-store');
-    res.json(result);
   }));
   app.get('/api/action-formulas/callouts',route(async(req,res)=>{
     const actor=req.actor!;

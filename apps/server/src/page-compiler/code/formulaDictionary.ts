@@ -115,7 +115,6 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  EMAIL:action(4,24,'EMAIL(credential, to, subject, body, ...)'),WHATSAPP:action(3,23,'WHATSAPP(credential, to, message, ...)'),
  SMS:action(3,3,'SMS(credential, to, message)'),WAIT:action(2,2,'WAIT(minutes, seconds)'),
  LOCATION:action(1,1,'LOCATION(AS(x)): device position'),
- RECORDPAYMENT:action(3,5,'RECORDPAYMENT(InvoiceId, Amount, Method, [Note], [AS(x)])'),
  CASHMOVE:action(4,5,'CASHMOVE("IN"|"OUT", Amount, Reason, TillSession, [AS(x)]): cash in/out of the till drawer'),
  CALLOUT:action(1,83,"CALLOUT('Connector.Operation', 'Field', value, ..., AS(x)): server; stops at once when the connector, credential or device is missing"),
  REPEAT:action(2,4,'REPEAT(step, until, [everySeconds], [maxTimes]): server; waits at most 55 seconds in all'),

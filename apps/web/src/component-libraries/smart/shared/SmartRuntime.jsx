@@ -145,8 +145,24 @@ const isBuilderEmpty=p=>p.builderPreview===true&&!p.loading&&recordsOf(p).length
 const boundImage=(p,record)=>{
  if(!fieldAllows(p,'imageSource',record))return '';
   const source=p.imageSource??p.src??'';
- const key=typeof source==='string'?source.replace(/^@/,''):'';
- if(key && record && Object.prototype.hasOwnProperty.call(record,key))return text(record[key]);
+ // An image binding is a row value, not a scalar formula. Resolve direct fields
+ // from the row and relationship mentions from the metadata-hydrated values
+ // before asking the general formula converter to evaluate anything.
+ const binding=typeof source==='string'?/^=?\s*@((?:[A-Za-z][A-Za-z0-9_]*\.)*[A-Za-z][A-Za-z0-9_]*)\s*$/.exec(source.trim()):null;
+ const path=binding?.[1];
+ if(path&&record){
+  if(!path.includes('.')&&Object.prototype.hasOwnProperty.call(record,path))return text(record[path]);
+  const values=record.__mentionValues;
+  if(path.includes('.')&&values&&typeof values==='object'&&!Array.isArray(values)){
+   const exact='@'+path;
+   if(Object.prototype.hasOwnProperty.call(values,exact))return text(values[exact]);
+   // Legacy row bindings may omit the current object (`@Product.ImageUrl`),
+   // while hydration stores the fully-qualified relationship path.
+   const suffix='.'+path;
+   const matches=Object.keys(values).filter(key=>key.endsWith(suffix));
+   if(matches.length===1)return text(values[matches[0]]);
+  }
+ }
  return expression(source,record,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
 };
 const gridText=(p,key,record)=>isGridKind(p.kind)
@@ -1336,7 +1352,7 @@ export default function SmartRuntime(p){
   const complete=!pagination||(pagination.offset===0&&pagination.total<=rows.length);
   return expression(formula,row,p.pageState,p.objectApiName,p.formulaCollectionSources,p.namedCollections,
    complete&&rows.length<=200?rows:undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
- }}
+ }} resolveImage={(row)=>boundImage(p,row)}
     fieldAllowed={(key,row)=>fieldAllows(p,key,row)} fire={fire}/>;
  else if(name==="smart_calendar")content=<SmartScheduleCalendar p={p} fire={fire}
    records={recordsOf(p)} resolve={(key,source,row)=>scopedExpression(p,key,source,row)}/>;

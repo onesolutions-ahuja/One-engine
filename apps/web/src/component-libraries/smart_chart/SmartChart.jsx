@@ -104,7 +104,10 @@ export default function SmartChart({p,records,labelOf,valueOf}){
    style={{color:colour(p.headerTextColor,"#1d1d1f"),fontSize:finite(p.headerTextSize,15,9,72),
     fontWeight:p.headerBold===false?500:700}}>{title}</header>}
   <div className={"smart-chart-body"+(settings.showGrid&&(settings.type==="bar"||settings.type==="line")
-   ?" smart-chart-with-grid":"")} data-design-area={p.builderPreview?"Body":undefined}>
+   ?" smart-chart-with-grid":"")} data-design-area={p.builderPreview?"Body":undefined}
+    style={{background:p.plotBackgroundColor||undefined,border:p.plotBorderColor?"1px solid "+p.plotBorderColor:undefined,
+     borderRadius:p.plotRadius!==undefined?finite(p.plotRadius,0,0,600):undefined,
+     boxShadow:shadow(p.plotShadow)}}>
    {settings.showGrid&&(settings.type==="bar"||settings.type==="line")&&
     <div className="smart-chart-grid" aria-hidden="true">{[1,0.5,0].map(f=>
      <div key={f} className="smart-chart-grid-line" style={{bottom:f*100+"%"}}>

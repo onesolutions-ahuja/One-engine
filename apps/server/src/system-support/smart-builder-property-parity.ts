@@ -163,7 +163,11 @@ const special:Mapping[]=[
 ];
 // A later, more-specific part binding replaces a generic Body binding. PostgreSQL
 // must never receive duplicate (component,area,slot) UPSERT input rows.
+// ID Card renders fields instead of Card Grid's supporting/footer DOM. Never expose
+// a control with no actual target, even if Card Grid shares the underlying engine.
 const mappings=[...new Map([...body,...geometry,...grid,...actions,...special]
+ .filter(item=>!(item[0]==='smart_id_card'&&
+   (item[1]==='Header Supporting'||item[1]==='Footer')))
  .map(item=>[item.slice(0,3).join(':'),item] as const)).values()];
 const rows=(values:readonly (readonly string[])[])=>values.map(row=>
  '('+row.map(v=>"'"+v.replaceAll("'","''")+"'").join(',')+')').join(',\n');

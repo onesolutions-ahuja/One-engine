@@ -175,9 +175,12 @@ export class ScreenPairingService{
   if(typeof sessionId!=='string'||!uuid.test(sessionId))fail('Invalid page session');
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,session_key,session_at,seen_at,offline)
    VALUES($1,$2,$3,now(),now(),false) ON CONFLICT(tenant_id,device_key) DO UPDATE
+   -- Preserve Cart on its selected layer across Hold/Resume.
    SET page_layers=CASE WHEN md_screen_devices.session_key IS DISTINCT FROM EXCLUDED.session_key
+      AND (md_screen_devices.page_layers->>'smart_till_customer_display')::int=9
      THEN COALESCE(md_screen_devices.page_layers,'{}'::jsonb)
-       ||jsonb_build_object('smart_till_customer_display',0)
+       ||jsonb_build_object('smart_till_customer_display',
+         COALESCE((md_screen_devices.payment_confirmation->>'returnLayer')::int,0))
      ELSE md_screen_devices.page_layers END,
     payment_confirmation=CASE WHEN md_screen_devices.session_key IS DISTINCT FROM EXCLUDED.session_key
      THEN NULL ELSE md_screen_devices.payment_confirmation END,
@@ -218,12 +221,19 @@ export class ScreenPairingService{
   const change=invoice.ChangeAmount!==undefined&&invoice.ChangeAmount!==null
    &&invoice.ChangeAmount!==''&&Number.isFinite(changeRaw)&&changeRaw>=0?changeRaw:null;
   const payment={invoiceId:invoice.Id,amount,method,change};
+  // Isolate the receipt on a dedicated layer 9, never on the tenant's Cart
+  // layer 1. Save the previously visible layer in the server-generated receipt.
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,page_layers,payment_confirmation)
-   VALUES($1,$2,jsonb_build_object('smart_till_customer_display',1),$3::jsonb)
+   VALUES($1,$2,jsonb_build_object('smart_till_customer_display',9),
+    $3::jsonb || jsonb_build_object('returnLayer',0))
    ON CONFLICT(tenant_id,device_key) DO UPDATE SET
     page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)
-      ||jsonb_build_object('smart_till_customer_display',1),
-    payment_confirmation=EXCLUDED.payment_confirmation,
+      ||jsonb_build_object('smart_till_customer_display',9),
+    payment_confirmation=EXCLUDED.payment_confirmation
+      || jsonb_build_object('returnLayer',
+        CASE WHEN (md_screen_devices.page_layers->>'smart_till_customer_display')::int=9
+         THEN COALESCE((md_screen_devices.payment_confirmation->>'returnLayer')::int,0)
+         ELSE COALESCE((md_screen_devices.page_layers->>'smart_till_customer_display')::int,0) END),
     layer_revision=md_screen_devices.layer_revision+1`,
    [actor.tenant_id,deviceKey,JSON.stringify(payment)]);
   return payment;
@@ -238,7 +248,7 @@ export class ScreenPairingService{
   await this.db.query(`INSERT INTO md_screen_devices(tenant_id,device_key,page_layers) VALUES($1,$2,jsonb_build_object($3::text,$4::int))
    ON CONFLICT(tenant_id,device_key) DO UPDATE SET
     page_layers=COALESCE(md_screen_devices.page_layers,'{}'::jsonb)||jsonb_build_object($3::text,$4::int),
-    payment_confirmation=CASE WHEN $3='smart_till_customer_display' AND $4::int=0
+    payment_confirmation=CASE WHEN $3='smart_till_customer_display' AND $4::int<>9
      THEN NULL ELSE md_screen_devices.payment_confirmation END,
     layer_revision=md_screen_devices.layer_revision+1`,
   [actor.tenant_id,deviceKey,key,layer]);

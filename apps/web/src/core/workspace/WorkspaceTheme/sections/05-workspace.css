@@ -322,6 +322,12 @@
    every device: users are assigned the app, they don't switch from inside it. */
 .lightning.md-app-runtime > .salesforce-header { display: none !important; }
 .lightning.md-app-runtime > .setup-layout { height: 100vh; height: 100dvh; min-height: 100vh; min-height: 100dvh; }
+@media (min-width: 1024px) {
+  /* Keep canvas width independent of whether its scaled height needs scrolling. */
+  .lightning.md-app-runtime > .setup-layout > .workspace-records:has(> .page-responsive-canvas-frame) {
+    scrollbar-gutter: stable;
+  }
+}
 
 .object-subnav a{display:inline-flex;align-items:center;text-decoration:none}
 .object-manager-mobile-row{text-decoration:none}

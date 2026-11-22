@@ -377,6 +377,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
    {(value||buttonText||customButtons.length>0||p.builderPreview)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
     style={{...smartPartOffsetStyle(p,"footer"),backgroundColor:p.footerBackgroundColor||undefined,
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
+     borderRadius:p.footerRadius!==undefined?number(p.footerRadius,0,0,600):undefined,
+     boxShadow:p.footerShadow==="large"?"0 8px 20px #0003":p.footerShadow==="medium"?"0 3px 9px #0003":p.footerShadow==="small"?"0 1px 4px #0002":undefined,
+     whiteSpace:p.footerWrapText===false?"nowrap":p.footerWrapText===true?"normal":undefined,
      height:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
       ?number(p.footerHeight,0,0,1200):undefined,
      minHeight:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
@@ -386,6 +389,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      maxWidth:"100%",
      justifyContent:p.footerAlignment==="center"?"center":p.footerAlignment==="right"?"flex-end":
       p.footerAlignment==="left"?"flex-start":undefined}}>
+    {!value&&!buttonText&&!customButtons.length&&p.builderPreview&&<strong className="smart-card-value" style={{fontSize:12,opacity:.65}}>Footer</strong>}
     {value&&<strong data-md-bind={p.builderPreview?"cardValue":undefined} data-md-bind-titles={p.builderPreview?"Card value":undefined} className="smart-card-value"
       style={{color:value==='FORMULAERROR'?formulaDisplayErrorColor:
        focusedText||p.footerTextColor||undefined,

@@ -68,7 +68,7 @@ test('Page Builder loads current frame geometry from position, not stale instanc
  assert.match(ribbon,/const canvasValue=kind==='position'&&useCanvasPosition&&position/);
  assert.match(ribbon,/canvasValue\?\?properties\[key\]/);
  assert.match(ribbon,/onPositionChange\(\{\.\.\.position,\[property\.id\]:v\}/);
- assert.match(ribbon,/height:'cardMinHeight',width:'cardMinWidth'/);
+ assert.match(ribbon,/height:'cardBodyHeight',width:'cardBodyWidth'/);
 });
 
 test('selected-part styles are actually consumed by the correct component renderers',()=>{
@@ -80,7 +80,7 @@ test('selected-part styles are actually consumed by the correct component render
  for(const key of ['headerBoxWidth','headerWrapText','headerShadow','imageRadius','imageShadow',
   'badgeShadow','badgeWrapText','badgeTextAlignment','gridBorderColor','gridRadius','gridShadow',
   'supportingBoxWidth','supportingBoxHeight','supportingRadius','supportingShadow',
-  'cardButtonShadow','footerRadius','footerShadow','focusedCardHeight','focusedCardWidth'])
+  'cardButtonShadow','footerRadius','footerShadow','cardBodyHeight','cardBodyWidth','focusedCardHeight','focusedCardWidth'])
   assert.ok(card.includes('p.'+key),'Card Grid missing '+key);
  for(const key of ['headerBoxWidth','headerShadow','supportingBoxWidth','supportingShadow',
   'imageWidth','imageRadius','imageShadow','footerRadius','footerShadow','rowShadow'])

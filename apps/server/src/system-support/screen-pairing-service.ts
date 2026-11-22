@@ -238,6 +238,23 @@ export class ScreenPairingService{
    [actor.tenant_id,deviceKey,JSON.stringify(payment)]);
   return payment;
  }
+ /** Hold/Resume or New sale: clear completed payment without changing an authored
+  * active customer Cart layer. This action also bumps the version to refresh
+  * the display even when the active layer remains the same. */
+ async restoreSaleLayer(actor:Actor,deviceKey:unknown):Promise<{layer:number}>{
+  if(typeof deviceKey!=='string'||!deviceKeyPattern.test(deviceKey))fail('Invalid till device');
+  const {rows}=await this.db.query<{layer:number}>(`UPDATE md_screen_devices
+   SET page_layers=CASE WHEN (page_layers->>'smart_till_customer_display')::int=9
+      THEN COALESCE(page_layers,'{}'::jsonb)
+       ||jsonb_build_object('smart_till_customer_display',
+        COALESCE((payment_confirmation->>'returnLayer')::int,0))
+      ELSE page_layers END,
+    payment_confirmation=NULL,layer_revision=layer_revision+1
+   WHERE tenant_id=$1 AND device_key=$2
+   RETURNING COALESCE((page_layers->>'smart_till_customer_display')::int,0) AS layer`,
+   [actor.tenant_id,deviceKey]);
+  return {layer:Number(rows[0]?.layer??0)};
+ }
  /** SCREEN(page, n) on a device: the screens that follow it and show that page switch to layer n.
   * Returns how many paired screens show that page (0: nobody follows it with that page). */
  async showLayer(actor:Actor,deviceKey:unknown,page:unknown,layer:unknown):Promise<{screens:number}>{

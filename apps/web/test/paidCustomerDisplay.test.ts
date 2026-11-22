@@ -30,6 +30,12 @@ test('paid display accepts only a server-recorded Paid Invoice, not a claimed pa
  await service.showLayer(user,device,'smart_till_customer_display',1);
  assert.ok(queries.some(query=>query.sql.includes("AND $4::int<>9")),
   'Switching back to Cart must clear stale payment receipt');
+ const restored=await service.restoreSaleLayer(user,device);
+ assert.equal(restored.layer,0,'Empty mocked device returns no active customer screen');
+ assert.match(queries.at(-1)!.sql,/payment_confirmation->>'returnLayer'/);
+ assert.match(queries.at(-1)!.sql,/layer_revision=layer_revision\+1/);
+ assert.ok(!/jsonb_build_object\('smart_till_customer_display',0\)/.test(queries.at(-1)!.sql),
+  'A Resume must not force an authored layer-1 Cart to layer zero');
 });
 test('customer display restores new session, then applies verified payment values and layer',async()=>{
  setFollowingSale(false);

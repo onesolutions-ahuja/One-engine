@@ -256,7 +256,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
   return design2TemplateSlots.map(template=>{
    const actual=areaSlots.find(slot=>slot.slotKey===template.slotKey);
    const cardBodyKey=area==='Card Body'&&['smart_card_grid','smart_id_card'].includes(api)
-     ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow'} as Record<string,string>)[template.slotKey]
+     ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow',height:'cardMinHeight',width:'cardMinWidth'} as Record<string,string>)[template.slotKey]
      :undefined;
    const bodyImagePlacement=area==='Body'&&template.slotKey==='placement'&&
     ['smart_card_grid','smart_id_card','smart_image','smart_cart'].includes(api);
@@ -277,6 +277,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
          ?(slot.slotKey==='width'?'tabWidth':'tabHeight'):
        slot.area==='Body'&&slot.slotKey==='placement'&&imageApi?'imagePlacement':
        slot.area==='Image'&&imageApi&&slot.slotKey==='height'?'imageHeight':
+        slot.area==='Image'&&imageApi&&slot.slotKey==='width'?'imageWidth':
        slot.area==='Image'&&imageApi&&slot.slotKey==='placement'?'imagePlacement':
        slot.area==='Image'&&['smart_card_grid','smart_id_card','smart_image','smart_cart','smart_navigation'].includes(api)&&
          slot.slotKey==='imageFill'?'imageFill':
@@ -490,7 +491,10 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    const legacyGap=property.id==='gap'&&
      ['smart_numpad','smart_keyboard','smart_dock'].includes(api)
        ?properties.numpadGap:undefined;
-   const value=mixedPropertyIds?.includes(property.id)?'':properties[key]??legacyGap??
+   const canvasValue=kind==='position'&&useCanvasPosition&&position&&
+      (property.id==='x'||property.id==='y'||property.id==='width'||property.id==='height')
+      ?position[property.id as keyof Position]:undefined;
+    const value=mixedPropertyIds?.includes(property.id)?'':canvasValue??properties[key]??legacyGap??
     (property.id==='visualStyle'?'Classic':property.defaultsOverrides?.[api]??property.default??'');
    const write=(v:unknown)=>{
     if(!enabled)return;

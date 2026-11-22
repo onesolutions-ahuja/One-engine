@@ -1360,7 +1360,7 @@ export default function SmartRuntime(p){
     {entries.map((item,i)=>{
       const label=labelOf(item);
       const src=item&&typeof item==="object"?item.imageSrc??item.imageUrl:null;
-      const safeSrc=typeof src==="string"&&/^https:\/\//i.test(src)?src:null;
+      const imageSrc=typeof src==="string"?src:"";
       return <button data-md-bind={p.builderPreview&&p.textSource&&!(item&&typeof item==="object"&&item.label)?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Navigation item text":undefined} key={item?.id??i} type="button" className="smart-navigation-item"
         style={{flex:"0 0 auto",height:p.wrapText===true?"auto":32,maxHeight:"100%",minHeight:p.wrapText===true?32:0,
           width:p.wrapText===true?number(p.tabWidth,140):undefined,maxWidth:p.wrapText===true?number(p.tabWidth,140):undefined,
@@ -1369,13 +1369,14 @@ export default function SmartRuntime(p){
           borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16),
           fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>
-        {safeSrc&&<img data-design-area={p.builderPreview?"Image":undefined} src={safeSrc} alt="" style={{
+        {imageSrc&&<span data-design-area={p.builderPreview?"Image":undefined}><SmartPicture
+         src={imageSrc} alt={label} loadAsset={p.loadAsset} style={{
          width:number(p.imageWidth,22,8,200),height:number(p.imageHeight,22,8,200),objectFit:fit,
          border:p.imageBorderColor?"1px solid "+p.imageBorderColor:undefined,
          backgroundColor:p.imageBackgroundColor||undefined,
          borderRadius:p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
          boxShadow:p.imageShadow==="large"?"0 8px 20px #0003":p.imageShadow==="medium"?"0 3px 9px #0003":undefined,
-         boxSizing:"border-box"}}/>}{label}
+         boxSizing:"border-box"}}/></span>}{label}
       </button>;
     })}
   </nav>;

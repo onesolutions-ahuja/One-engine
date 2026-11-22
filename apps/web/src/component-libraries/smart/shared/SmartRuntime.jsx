@@ -1380,7 +1380,7 @@ export default function SmartRuntime(p){
     })}
   </nav>;
  }else content=<div className="smart-container" style={{
-    background:p.imageBackgroundColor??p.backgroundColor??"transparent",
+    background:p.backgroundColor??p.imageBackgroundColor??"transparent",
     border:p.borderColor?"1px solid "+p.borderColor:0,
     borderRadius:number(p.radius,12),...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12))
  }}>{p.children||(p.builderPreview?<span className="smart-editor-container-placeholder">Drop components here</span>:null)}</div>;

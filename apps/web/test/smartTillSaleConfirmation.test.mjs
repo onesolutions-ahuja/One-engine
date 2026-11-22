@@ -9,6 +9,11 @@ test('confirmation popup is one editable In-Screen Page with its Done action',()
   assert.equal(popup.apiName,POPUP);
   assert.equal(popup.pageType,'In-Screen Page');
   assert.equal(popup.canvasHeight>=320,true);
+  assert.ok(popup.components.every(c=>
+   c.position.x>=0&&c.position.y>=0&&
+   c.position.x+c.position.width<=popup.canvasWidth&&
+   c.position.y+c.position.height<=popup.canvasHeight),
+   variant+' popup components must fit their authored device canvas');
   assert.equal(popup.components.every(c=>c.properties.libraryComponentId),true);
   assert.deepEqual(popup.components.filter(c=>c.properties.actionFlows)
    .map(c=>c.properties.actionFlows.click.formula),['=CLOSESCREEN()']);
@@ -56,4 +61,11 @@ test('receipt layer cannot overwrite the already-designed customer cart or anoth
  const occupied={...page,components:[...page.components,
   {id:'some-other-screen',type:'Custom:smart_image',properties:{pageLayer:9}}]};
  assert.throws(()=>customerDraft(occupied,'Desktop'),/Layer 9 is already used/);
+});
+
+test('mobile popup has its own authored dimensions rather than inherited Desktop coordinates',()=>{
+ const desktop=confirmationPage('Desktop'),mobile=confirmationPage('Mobile');
+ assert.notEqual(desktop.canvasWidth,mobile.canvasWidth);
+ assert.notEqual(desktop.canvasHeight,mobile.canvasHeight);
+ assert.notDeepEqual(desktop.components[0].position,mobile.components[0].position);
 });

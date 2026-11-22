@@ -11,6 +11,9 @@ test('paid display accepts only a server-recorded Paid Invoice, not a claimed pa
  const queries:Array<{sql:string;args:unknown[]}>=[]; 
  const db={query:async(sql:string,args:unknown[] = [])=>{
   queries.push({sql,args});
+  // Simulate a device whose live Cart is already on layer 1.
+  if(sql.includes('UPDATE md_screen_devices')&&sql.includes('RETURNING COALESCE'))
+   return {rows:[{layer:1}]};
   return {rows:[]};
  }};
  const service=new ScreenPairingService(db as never,{} as never);
@@ -31,7 +34,7 @@ test('paid display accepts only a server-recorded Paid Invoice, not a claimed pa
  assert.ok(queries.some(query=>query.sql.includes("AND $4::int<>9")),
   'Switching back to Cart must clear stale payment receipt');
  const restored=await service.restoreSaleLayer(user,device);
- assert.equal(restored.layer,0,'Empty mocked device returns no active customer screen');
+ assert.equal(restored.layer,1,'Resume must keep the authored Cart layer instead of returning to blank layer 0');
  assert.match(queries.at(-1)!.sql,/payment_confirmation->>'returnLayer'/);
  assert.match(queries.at(-1)!.sql,/layer_revision=layer_revision\+1/);
  assert.ok(!/jsonb_build_object\('smart_till_customer_display',0\)/.test(queries.at(-1)!.sql),

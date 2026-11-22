@@ -144,7 +144,10 @@ const special:Mapping[]=[
   map(api,'Focused','fill','numpadFocusedFill'),
   map(api,'Focused','text','numpadFocusedTextColor')])
 ];
-const mappings=[...body,...geometry,...grid,...actions,...special];
+// A later, more-specific part binding replaces a generic Body binding. PostgreSQL
+// must never receive duplicate (component,area,slot) UPSERT input rows.
+const mappings=[...new Map([...body,...geometry,...grid,...actions,...special]
+ .map(item=>[item.slice(0,3).join(':'),item] as const)).values()];
 const rows=(values:readonly (readonly string[])[])=>values.map(row=>
  '('+row.map(v=>"'"+v.replaceAll("'","''")+"'").join(',')+')').join(',\n');
 

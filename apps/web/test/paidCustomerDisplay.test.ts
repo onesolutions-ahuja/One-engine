@@ -21,7 +21,15 @@ test('paid display accepts only a server-recorded Paid Invoice, not a claimed pa
  assert.deepEqual(receipt,{invoiceId:id,amount:15,method:'Cash',change:null});
  assert.equal(queries.filter(query=>/INSERT INTO md_screen_devices/i.test(query.sql)).length,1);
  assert.match(queries.at(-1)!.sql,/smart_till_customer_display/);
+ assert.match(queries.at(-1)!.sql,/jsonb_build_object\('smart_till_customer_display',9\)/);
+ assert.match(queries.at(-1)!.sql,/returnLayer/);
  assert.match(String(queries.at(-1)!.args[2]),/"amount":15/);
+ await service.reportSession(user,device,id);
+ assert.match(queries.at(-1)!.sql,/payment_confirmation->>'returnLayer'/);
+ assert.match(queries.at(-1)!.sql,/ELSE md_screen_devices.page_layers END/);
+ await service.showLayer(user,device,'smart_till_customer_display',1);
+ assert.ok(queries.some(query=>query.sql.includes("AND $4::int<>9")),
+  'Switching back to Cart must clear stale payment receipt');
 });
 test('customer display restores new session, then applies verified payment values and layer',async()=>{
  setFollowingSale(false);

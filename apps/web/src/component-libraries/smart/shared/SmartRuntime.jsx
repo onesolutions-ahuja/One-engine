@@ -451,7 +451,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
    boxSizing:"border-box",
    ...(p.badgeWidth!==undefined&&p.badgeWidth!==null&&p.badgeWidth!==""||
        p.badgeHeight!==undefined&&p.badgeHeight!==null&&p.badgeHeight!==""
-       ?{display:"inline-flex",alignItems:"center",justifyContent:"center"}:{})
+       ?{display:"inline-flex",alignItems:"center",justifyContent:p.badgeTextAlignment==="left"?"flex-start":p.badgeTextAlignment==="right"?"flex-end":"center"}:{})
    }}>{badge||(p.builderPreview?"Badge":"")}</span>}
  </article>;
 }

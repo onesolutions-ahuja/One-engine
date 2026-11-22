@@ -2,4 +2,15 @@ pageapi,component_type,component_name,propertyid,value,layout
 servicedesk,smart_card_grid,PartsGrid,objectApiName,Product,Desktop
 servicedesk,smart_card_grid,PartsGrid,textSource,@Product.Name,Desktop
 servicedesk,smart_card_grid,PartsGrid,cardValue,"=""£"" & FORMAT(@Product.Price, ""0.00"")",Desktop
-servicedesk,smart_card_grid,PartsGrid,backgroundColor,#eef5ef,Desktop
+servicedesk,smart_card_grid,PartsGrid,backgroundColor,#ffffff,Desktop
+servicedesk,smart_card_grid,PartsGrid,cardsPerRow,2,Desktop
+servicedesk,smart_card_grid,PartsGrid,cardsPerColumn,1,Desktop
+servicedesk,smart_card_grid,PartsGrid,gap,18,Desktop
+servicedesk,smart_card_grid,PartsGrid,imageSource,@Product.Photo,Desktop
+servicedesk,smart_card_grid,PartsGrid,cardDescription,@Product.Category,Desktop
+servicedesk,smart_card_grid,PartsGrid,imageHeight,200,Desktop
+servicedesk,smart_card_grid,PartsGrid,cardButtonText,Add part,Desktop
+servicedesk,smart_card_grid,PartsGrid,customButton1Visible,false,Desktop
+servicedesk,smart_card_grid,PartsGrid,customButton2Visible,false,Desktop
+servicedesk,smart_card_grid,PartsGrid,badgeText,In stock,Desktop
+servicedesk,smart_card_grid,PartsGrid,gridBackgroundColor,#edf2ee,Desktop

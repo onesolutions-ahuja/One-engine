@@ -11,7 +11,7 @@ import {COMPONENT_STATE_FIELDS,type ComponentStateField} from './FormulaComponen
  *   @ThisTenant.User.Name / .CartId          the logged-in user
  *   @ThisTenant.User.RefundLimit             any custom field on the User object (Object Manager)
  *   @ThisTenant.Company.Name / .Logo / .Id   the company (tenant)
- *   @ThisTenant.Company.VatNumber / .Currency  any Company Settings value (receipts, VAT, currency)
+ *   @ThisTenant.Company.VatNumber / .Currency  any field of the Company record, plus Currency / VatRate
  *   @ThisTenant.Permission.Till.Refund       TRUE when the user's profile / permission sets allow
  *                                            the custom permission (rule CustomPermission:Till.Refund)
  *
@@ -30,11 +30,11 @@ export const USER_FIELDS={
  Manager:'managerId',ManagerName:'managerName'
 } as const;
 export type UserField=keyof typeof USER_FIELDS;
-/** Company values builders can pick (Company Settings). Any other saved Company Settings
- * value is read by its own name too (@ThisTenant.Company.<Field>). */
-export const COMPANY_FIELDS=['Id','Name','Logo','LegalName','TradingName','Description',
+/** Company values builders can pick: fields of the Company record (one per tenant) plus Logo,
+ * Currency and VatRate. Any field added to Company in Object Manager is read by its own name too. */
+export const COMPANY_FIELDS=['Id','Name','Logo','LegalName','Description',
  'Phone','Email','Website','AddressLine1','AddressLine2','City','Postcode','Country','Timezone','Locale',
- 'Currency','VatRate','ReceiptDisplayName','VatNumber','ReceiptMessage','RefundDays','ReceiptShowVat',
+ 'Currency','VatRate','VatNumber','ReceiptDisplayName','ReceiptMessage','RefundDays','ReceiptShowVat',
  'ReceiptAskChoice','ReceiptAutoPrint','ReceiptShowBarcode','ReceiptQrLink','ReceiptQrCaption','ReceiptTipLine',
  'CardSurchargeOn','CardSurchargePercent','CashRoundingOn','CashRoundingStep'] as const;
 export type CompanyField=string;

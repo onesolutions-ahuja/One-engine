@@ -7,13 +7,12 @@ import OfflineBriefcaseSettings from '../../platform/OfflineBriefcaseSettings/Of
 import MetadataPackageManager from '../../applications/MetadataPackages/MetadataPackageManager';
 import { apiRequest } from '../../authentication/Client/authClient';
 import PaymentDefaults from '../../integrations/NamedDevices/PaymentDefaults';
-import ReceiptSettings from './ReceiptSettings';
 import './CompanySettingsWorkspace.css';
-type Section = 'general'|'currency'|'branding'|'business'|'payments'|'receipts'|'contacts'|'mobile'|'integrations'|'security'|'developer';
+type Section = 'general'|'currency'|'branding'|'business'|'payments'|'contacts'|'mobile'|'integrations'|'security'|'developer';
 type DeveloperDestination = {label:string;workspace:string;description:string;allowed:boolean};
 const sections:ReadonlyArray<{id:Section;label:string}>=[
 {id:'general',label:'General'},{id:'currency',label:'Currency & Locale'},
-{id:'branding',label:'Branding'},{id:'business',label:'Business Settings'},{id:'payments',label:'Payments'},{id:'receipts',label:'Receipts'},
+{id:'branding',label:'Branding'},{id:'business',label:'Business Settings'},{id:'payments',label:'Payments'},
 {id:'contacts',label:'Contacts'},{id:'mobile',label:'Mobile & Offline'},{id:'integrations',label:'Integrations'},
 {id:'security',label:'Security & Recovery'},{id:'developer',label:'Developer'}];
 /** Presentation only: retains existing OneEngine-protected runtime controls and slots. */
@@ -96,7 +95,6 @@ recovery:ReactNode;mfa:ReactNode;emailRecovery:ReactNode;locks:ReactNode;session
        {usage}
      </div>}
      {currentSection==='payments'&&<PaymentDefaults request={apiRequest} />}
-     {currentSection==='receipts'&&<ReceiptSettings request={apiRequest} />}
      {currentSection==='mobile'&&<OfflineBriefcaseSettings request={apiRequest} permitted objects={objects} />}
      {currentSection==='developer'&&<><section className="company-workspace-card" aria-label="Developer tools"><h2>Developer tools</h2><p>Build and manage your apps with OneEngine-controlled access.</p><div className="company-developer-links">{available.map(item=><button type="button" key={item.workspace} onClick={()=>onNavigateDeveloper?.(item.workspace)} disabled={!onNavigateDeveloper}><strong>{item.label}</strong><span>{item.description}</span><span aria-hidden="true">›</span></button>)}</div></section>
        <MetadataPackageManager request={apiRequest} permitted={!!rights?.metadata} canManage={!!(rights?.packages??rights?.apps)} /></>}

@@ -1,5 +1,4 @@
 import {isDeepStrictEqual} from 'node:util';
-import {RECEIPT_SETTINGS,receiptSettingError} from '../system-support/company-receipt-settings.js';
 import type {SqlPersistence} from './sql-persistence.js';
 import type {RbacEngine} from './rbac-engine.js';
 import {TenantProvisioning} from './tenant-provisioning.js';
@@ -98,12 +97,8 @@ export class PlatformTenantService {
   const data=payload as Record<string,unknown>;
   if(key==='company-profile') {
     const fields=['logoUrl','legalName','tradingName','website','phone','email','addressLine1','addressLine2','city','postcode','country','timezone','locale','description'];
-    // Receipts settings (Company Settings → Receipts) may be Yes/No or numbers; the rest are text.
-    for(const [k,v] of Object.entries(data)){
-      if(RECEIPT_SETTINGS.some(item=>item.key===k)){const error=receiptSettingError(k,v);if(error)throw new Error(error);continue;}
-      if(!fields.includes(k)||typeof v!=='string'||(k==='logoUrl'?v.length>180000:v.length>2048))
-        throw new Error('Invalid company profile');
-    }
+    if(Object.keys(data).some(k=>!fields.includes(k))||Object.entries(data).some(([k,v])=>typeof v!=='string'||(k==='logoUrl'?v.length>180000:v.length>2048)))
+      throw new Error('Invalid company profile');
     const logo=data.logoUrl;
     if(typeof logo==='string'&&logo){
       if(logo.startsWith('https://')){

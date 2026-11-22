@@ -151,7 +151,9 @@ export function referencedMentionPaths(
       // same metadata path used by the picker (@CartLine.Product.ImageUrl).
       const path = validateMentionPath(match[2], objects, root)
         ?? validateMentionPath(root + '.' + match[2], objects, root);
-      if (path) distinct.set(path.path, path);
+      // One entry per field, not per relation: @CartLine.Product.ImageUrl and
+      // @CartLine.Product.AgeRestricted are both needed on the same row.
+      if (path) distinct.set(path.path + '.' + path.field.apiName, path);
       if (distinct.size >= MAX_REFERENCES) return [...distinct.values()];
     }
   }

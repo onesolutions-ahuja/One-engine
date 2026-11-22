@@ -3,6 +3,14 @@ import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import {isStandalonePagePresentation,pageCanvasPresentationStyle} from './pageRuntimePresentation';
 import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth} from './runtimeCanvasSizing';
 import {flowPrintCanvas} from './printTemplateFlow';
+import {openerMirrorKey} from '../../authentication/TillDevice/deviceTill';
+import {onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
+
+/** A display screen (customer display, kitchen screen...) shows the whole page with no
+ * scrolling: it scales to fit the window's height as well as its width. */
+function shownAsScreen():boolean{
+  try{return typeof window!=='undefined'&&(Boolean(openerMirrorKey())||onPairedScreenPage());}catch{return false;}
+}
 
 /**
  * Published pages and compiled Builder Preview use the same width-first layout.
@@ -21,6 +29,8 @@ export default function ResponsivePageCanvas({
 }) {
   const frame=useRef<HTMLDivElement>(null);
   const [availableWidth,setAvailableWidth]=useState(page.canvasWidth);
+  const [screen]=useState(shownAsScreen);
+  const [availableHeight,setAvailableHeight]=useState(0);
   // Last small width step (a scrollbar appearing/disappearing), to stop a loop:
   // new width -> new scale -> new height -> scrollbar toggles -> width flips back.
   const lastStep=useRef<{from:number;at:number}|null>(null);
@@ -35,11 +45,17 @@ export default function ResponsivePageCanvas({
       setAvailableWidth(previous=>settleCanvasWidth(previous,next,lastStep.current,
         typeof performance!=='undefined'?performance.now():Date.now(),step=>{lastStep.current=step;}));
     };
-    update();
-    const observer=new ResizeObserver(update);
+    const updateHeight=()=>{
+      if(!screen)return;
+      const top=Math.max(0,target.getBoundingClientRect().top+window.scrollY);
+      setAvailableHeight(Math.max(1,window.innerHeight-top));
+    };
+    update();updateHeight();
+    const observer=new ResizeObserver(()=>{update();updateHeight();});
     observer.observe(target);
-    return()=>observer.disconnect();
-  },[page.canvasWidth]);
+    if(screen)window.addEventListener('resize',updateHeight);
+    return()=>{observer.disconnect();window.removeEventListener('resize',updateHeight);};
+  },[page.canvasWidth,screen]);
 
   // Print templates fit their content (see printTemplateFlow): lists grow or shrink to their rows.
   const printTemplate=page.pageType==='Print Template';
@@ -61,15 +77,20 @@ export default function ResponsivePageCanvas({
   },[printTemplate]);
   const canvasHeight=printTemplate&&fittedHeight?fittedHeight:page.canvasHeight;
   const standalone=isStandalonePagePresentation(page);
-  const scale=standalone?1:runtimeCanvasWidthScale(page.canvasWidth,availableWidth);
-  const extra=standalone?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
+  const widthScale=standalone?1:runtimeCanvasWidthScale(page.canvasWidth,availableWidth);
+  const scale=screen&&!standalone&&!printTemplate&&availableHeight>0
+    ?Math.min(widthScale,runtimeCanvasWidthScale(canvasHeight,availableHeight)):widthScale;
+  const heightFitted=scale<widthScale;
+  const extra=standalone||heightFitted?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
   const canvasStyle: CSSProperties & { '--md-runtime-canvas-extra': string }={
     ...pageCanvasPresentationStyle(page),
     ...(printTemplate&&fittedHeight?{height:fittedHeight}:{}),
     ...(!standalone && extra > 0 ? {width:'100%'} : {}),
     '--md-runtime-canvas-extra':extra+'px',
     transform:scale<1?`scale(${scale})`:undefined,
-    transformOrigin:'top left'
+    transformOrigin:'top left',
+    // Fitted to a screen's height: centre the page across the spare width.
+    ...(heightFitted?{marginLeft:Math.max(0,Math.floor((availableWidth-page.canvasWidth*scale)/2))}:{})
   };
 
   return <div ref={frame} className="page-responsive-canvas-frame" style={{

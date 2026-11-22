@@ -23,37 +23,66 @@ const when=(iso:string|null)=>{
 export async function showScreenPairing(request:Request,appId:string,pageApiName:string):Promise<void>{
  if(typeof document==='undefined')return;
  ensureTillDialogStyles();
- const dialog=document.createElement('dialog');
- dialog.className='une-till-picker';
+ const make=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',className='')=>{
+  const node=document.createElement(tag);if(text)node.textContent=text;if(className)node.className=className;return node;
+ };
+ const button=(text:string,className='')=>{const node=make('button',text,className);node.type='button';return node;};
+ const dialog=make('dialog','','une-till-picker une-pair-screens');
  dialog.setAttribute('aria-modal','true');
  dialog.setAttribute('aria-labelledby','une-pair-screen-title');
- const title=document.createElement('h2');title.id='une-pair-screen-title';title.textContent='Pair a screen';
- const help=document.createElement('p');
- help.textContent='On the other screen open '+window.location.host+'/display, then type the code it shows.';
- const input=document.createElement('input');
- input.className='une-pair-input';input.inputMode='numeric';input.maxLength=4;input.autocomplete='off';
- input.setAttribute('aria-label','4-digit code from the screen');
- const list=document.createElement('ul');
- const footer=document.createElement('footer');
- const close=document.createElement('button');close.type='button';close.textContent='Close';
- const pair=document.createElement('button');pair.type='button';pair.textContent='Pair';
- footer.append(close,pair);
+ const title=make('h2','Customer displays');title.id='une-pair-screen-title';
+ const help=make('p','On the other screen open '+window.location.host+'/display, then type the code it shows.');
+ const input=make('input','','une-pair-input');input.inputMode='numeric';input.maxLength=4;input.autocomplete='off';
+ input.placeholder='0000';input.setAttribute('aria-label','4-digit code from the screen');
+ const name=make('input','','une-pair-name');name.maxLength=60;name.placeholder='Name, e.g. Counter';
+ name.setAttribute('aria-label','Screen name (optional)');
+ const pair=button('Pair','une-primary');
+ const addRow=make('div','','une-pair-add');addRow.append(input,name,pair);
+ // This device only: open the display on this computer's second monitor when the till opens.
+ const auto=make('label','','une-pair-auto');
+ const autoBox=make('input');autoBox.type='checkbox';autoBox.checked=autoOpenPage(appId)===pageApiName;
+ auto.append(autoBox,make('span',"Open on this computer's second screen"));
+ autoBox.addEventListener('change',()=>{
+  setAutoOpen(appId,autoBox.checked?pageApiName:'');
+  if(autoBox.checked)void openCustomerDisplay(pageApiName,'');
+ });
+ const list=make('ul','','une-pair-list');
+ const footer=make('footer');
+ const close=button('Close');
+ footer.append(close);
  const say=(text:string,error=false)=>{help.className=error?'une-till-error':'';help.textContent=text;};
 
  const refresh=async()=>{
-  list.replaceChildren();
   try{
    const answer=await post<{screens:Screen[]}>(request,'/screens/list',{});
+   list.replaceChildren();
+   if(!answer.screens.length)list.append(make('li','No displays paired yet.','une-pair-empty'));
    for(const screen of answer.screens){
-    const item=document.createElement('li');
-    const unpair=document.createElement('button');unpair.type='button';
-    unpair.textContent='Unpair '+screen.name+' ('+(screen.online?'online':when(screen.lastSeenAt))+')';
+    const item=make('li');
+    const dot=make('span','',screen.online?'une-dot une-online':'une-dot');dot.setAttribute('aria-hidden','true');
+    const label=make('span',screen.name,'une-pair-screen-name');
+    const status=make('span',screen.online?'Online':when(screen.lastSeenAt),'une-pair-status');
+    const rename=button('Rename');
+    const unpair=button('Unpair','une-danger');
+    rename.addEventListener('click',()=>{
+     const box=make('input','','une-pair-name');box.maxLength=60;box.value=screen.name;
+     box.setAttribute('aria-label','New name for '+screen.name);
+     const save=button('Save','une-primary');
+     const done=async()=>{
+      save.disabled=true;
+      try{await post(request,'/screens/rename',{id:screen.id,name:box.value});void refresh();}
+      catch(error){say(reason(error,'The screen could not be renamed'),true);save.disabled=false;}
+     };
+     save.addEventListener('click',()=>void done());
+     box.addEventListener('keydown',event=>{if(event.key==='Enter')void done();if(event.key==='Escape')void refresh();});
+     label.replaceWith(box);rename.replaceWith(save);box.focus();box.select();
+    });
     unpair.addEventListener('click',async()=>{
      unpair.disabled=true;
-     try{await post(request,'/screens/revoke',{id:screen.id});say('Screen unpaired. It shows a new code now.');void refresh();}
+     try{await post(request,'/screens/revoke',{id:screen.id});say(screen.name+' unpaired. It shows a new code now.');void refresh();}
      catch(error){say(reason(error,'The screen could not be unpaired'),true);unpair.disabled=false;}
     });
-    item.appendChild(unpair);list.appendChild(item);
+    item.append(dot,label,status,rename,unpair);list.appendChild(item);
    }
   }catch(error){say(reason(error,'Set this device up first'),true);}
  };
@@ -62,15 +91,18 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
   if(!/^\d{4}$/.test(code)){say('Type the 4 digits shown on the screen',true);input.focus();return;}
   pair.disabled=true;
   try{
-   await post(request,'/screens/approve',{code,appId,pageApiName});
-   input.value='';say('Paired. The screen opens in a moment.');void refresh();
+   await post(request,'/screens/approve',{code,name:name.value.trim(),appId,pageApiName});
+   input.value='';name.value='';say('Paired. The screen opens in a moment.');void refresh();
   }catch(error){say(reason(error,'That code did not work'),true);input.select();}
   finally{pair.disabled=false;}
  });
  input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,4);});
  input.addEventListener('keydown',event=>{if(event.key==='Enter')pair.click();});
- close.addEventListener('click',()=>{dialog.close();dialog.remove();});
- dialog.append(title,help,input,list,footer);
+ name.addEventListener('keydown',event=>{if(event.key==='Enter')pair.click();});
+ const shut=()=>{dialog.close();dialog.remove();};
+ close.addEventListener('click',shut);
+ dialog.addEventListener('cancel',shut);
+ dialog.append(title,help,addRow,auto,list,footer);
  document.body.appendChild(dialog);
  dialog.showModal();
  input.focus();

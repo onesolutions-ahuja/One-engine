@@ -61,13 +61,9 @@ function topLevelArguments(source:string,name:string):string[]|null{
  }
  return null;
 }
-/** CONFIRMSCREEN(message, yes, [no], [yesLabel], [noLabel]) / INFOSCREEN(message, [then]). */
+/** INFOSCREEN(message, [then]). (CONFIRMSCREEN was removed: a popup page asks instead.) */
 export function messageScreenParts(source:string){
- const confirm=topLevelArguments(source,'CONFIRMSCREEN');
- if(confirm){
-  if(confirm.length<2||confirm.length>5)throw new FormulaCodeError('CONFIRMSCREEN needs a message, actions on Yes, and optional actions on No and button labels');
-  return {kind:'CONFIRM',message:confirm[0],yes:confirm[1],no:confirm[2]??'',yesLabel:confirm[3]??'',noLabel:confirm[4]??''};
- }
+ if(topLevelArguments(source,'CONFIRMSCREEN'))throw new FormulaCodeError('CONFIRMSCREEN was removed: open your own popup page with SCREEN(page, popup)');
  const info=topLevelArguments(source,'INFOSCREEN');
  if(info){
   if(info.length<1||info.length>2)throw new FormulaCodeError('INFOSCREEN needs a message and optional actions after OK');

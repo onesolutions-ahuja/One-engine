@@ -569,7 +569,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
  const dataCollectionRows=dataCollection?namedCollectionRows(dataCollection):null;
  // Record presenters (inboxes) and contact choices.
  const channelAccess=useChannelAccess(runtime.request,properties.channelAccessPath,source.version);
- const presented=presentPageRecords(properties.recordPresenterApiName,source.records as never,channelAccess,properties);
+ // Present the rows that already carry their related values (a cart line's
+ // Product image); raw source rows here would wipe those values off every row.
+ const presented=presentPageRecords(properties.recordPresenterApiName,displayRows as never,channelAccess,properties);
  const contactChoices=useContactChoices(properties,source.version);
  const stateChannel=useFlowStateChannel(properties,sessionId,runtime.request,false);
  // Two-way toggle bound to one Boolean field of one authorised record.
@@ -795,7 +797,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     for(const effect of effects){
      const [first,second,third,fourth]=effect.args.map(value=>value===null||value===undefined?'':String(value));
      // SCREEN effect: page, mode, record, layer (the record goes in separately below).
-     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+(fourth?','+fourth:'')+')',navigationContext,
+     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+(fourth?','+fourth:'')
+      +(fourth&&effect.args[4]!==undefined&&effect.args[4]!==null&&effect.args[4]!==''?','+String(effect.args[4]):'')+')',navigationContext,
       onNavigate as never,runtime.pageSessionKey,session,third||String(payload.recordId??runtime.store.get().recordId??record?.Id??''));
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);

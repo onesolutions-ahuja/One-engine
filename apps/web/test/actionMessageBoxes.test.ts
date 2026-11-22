@@ -28,22 +28,24 @@ test('INFOSCREEN inside IF: shown after the save, no STATE needed for an error m
  assert.equal(cart.Status,'Paid');
 });
 
-test('CONFIRMSCREEN inside IF: its Yes/No steps become their own actions, run after the tap',()=>{
- const code=page('=IF(@ThisPage.Session.Id = "", "", CONFIRMSCREEN("Clear the sale?", UPDATERECORD(Cart, "'+cartId+'", Status, "Cleared"), "", "Clear", "Keep"))');
+test('INFOSCREEN with steps after OK inside IF: the OK steps become their own action',()=>{
+ const code=page('=IF(@ThisPage.Session.Id = "", "", INFOSCREEN("Sale cleared", UPDATERECORD(Cart, "'+cartId+'", Status, "Cleared")))');
  assert.deepEqual(code.issues,[]);
- const keys=code.actions.map(action=>action.key).sort();
- assert.deepEqual(keys,['btn:click','btn:click__box1__yes']);
- const main=code.actions.find(action=>action.key==='btn:click')!;
- assert.match(main.js,/\$\.ui\("CONFIRM", "Clear the sale\?", "btn:click__box1__yes", "", "Clear", "Keep"\)/);
- assert.equal(code.actions.find(action=>action.key==='btn:click__box1__yes')!.data,true);
+ assert.deepEqual(code.actions.map(action=>action.key).sort(),['btn:click','btn:click__box1__yes']);
+ assert.match(code.actions.find(action=>action.key==='btn:click')!.js,/\$\.ui\("INFO", "Sale cleared", "btn:click__box1__yes"/);
+});
+
+test('CONFIRMSCREEN was removed: a popup page asks instead',()=>{
+ assert.match(page('=CONFIRMSCREEN("Clear?", CLOSESCREEN())').issues[0]?.error??'',/removed|Unknown|not/i);
+ assert.match(page('=IF(TRUE, CONFIRMSCREEN("Clear?", CLOSESCREEN()), "")').issues[0]?.error??'',/removed|Unknown|not/i);
 });
 
 test('clear errors instead of surprises',()=>{
  // Steps after a box with answers would run before the answer.
- assert.match(page('=ACTIONS(CONFIRMSCREEN("Sure?", CLOSESCREEN()), CLOSESCREEN())').issues[0]?.error??'',/inside the box/);
+ assert.match(page('=ACTIONS(INFOSCREEN("Sure?", CLOSESCREEN()), CLOSESCREEN())').issues[0]?.error??'',/inside the box/);
  // The answer runs later as a new action: values read before the box are gone by then.
- assert.match(page('=ACTIONS(GETRECORD(Cart, Id, "'+cartId+'", AS(sc)), CONFIRMSCREEN("Pay?", UPDATERECORD(Cart, sc.Id, Status, "Paid")))').issues[0]?.error??'',/cannot use sc/);
+ assert.match(page('=ACTIONS(GETRECORD(Cart, Id, "'+cartId+'", AS(sc)), INFOSCREEN("Pay?", UPDATERECORD(Cart, sc.Id, Status, "Paid")))').issues[0]?.error??'',/cannot use sc/);
  // ...unless the answer reads it itself.
- assert.deepEqual(page('=ACTIONS(CONFIRMSCREEN("Pay?", ACTIONS(GETRECORD(Cart, Id, "'+cartId+'", AS(sc)), UPDATERECORD(Cart, sc.Id, Status, "Paid"))))').issues,[]);
+ assert.deepEqual(page('=ACTIONS(INFOSCREEN("Pay?", ACTIONS(GETRECORD(Cart, Id, "'+cartId+'", AS(sc)), UPDATERECORD(Cart, sc.Id, Status, "Paid"))))').issues,[]);
  assert.match(page('=FOREACH(Cart, Status, "Open", AS(c), INFOSCREEN("x"))').issues[0]?.error??'',/inside FOREACH/);
 });

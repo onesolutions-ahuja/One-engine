@@ -23,7 +23,6 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'DEVICE',parameters:['DeviceType','Command','Text']},
  {name:'CALLOUT',parameters:['Connector.Operation','Field1','Value1','AS(variable)']},
  {name:'CLOSESCREEN',parameters:[]},
- {name:'CONFIRMSCREEN',parameters:['Message','ActionsOnYes','ActionsOnNo','YesLabel','NoLabel']},
  {name:'INFOSCREEN',parameters:['Message','ActionsAfterOk']},
  {name:'LOCKSCREEN',parameters:[]},
  {name:'PAIRDISPLAY',parameters:['Page']},

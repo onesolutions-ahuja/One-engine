@@ -641,7 +641,8 @@ function MetadataBoundPageComponent({
   const rowResolvedProperties = {...resolvedProperties,...Object.fromEntries(
     Object.entries(properties).filter(([,value])=>typeof value==='string'&&
       /@[A-Za-z][A-Za-z0-9_]*\.[A-Za-z]/.test(value)))};
-  const presented = presentPageRecords(properties.recordPresenterApiName, visibleRecords, channelAccess, properties);
+  // Present the hydrated rows: raw rows would drop resolved lookup values (images).
+  const presented = presentPageRecords(properties.recordPresenterApiName, properties.recordPresenterApiName?visibleRecords:displayRows, channelAccess, properties);
   // A record page already fetched its exact authorised record by ID. Use it
   // even when the record is beyond the first page of the Object list.
   const boundRecordId=recordId||explicitMentionRecordId(properties);
@@ -1429,7 +1430,12 @@ function LightningAppRuntime({
             label: runtimeComponentLabel(component, component.properties.label),
             properties: component.properties,
             pageSessionKey: runtimeSessionKey, componentId: component.id,
-            device: layoutDevice, children: nestedChildren, ...given
+            device: layoutDevice, children: nestedChildren,
+            // Uploaded pictures (asset:<id>) on components with no data source,
+            // e.g. a display's promo image: same tenant media loader as data components.
+            loadAsset: (id:string) => requestPageMediaAsset<{contentType:string;contentBase64:string}>(
+              apiRequest,id,getAccessToken()??''),
+            ...given
           }} />}</PageCodeFormulas>;
       const rendered = nestedChildren?.length && definition.trustedBundled !== true
         ? <div className="metadata-nested-host" data-nested-host={component.id}>{content}{nestedChildren}</div>

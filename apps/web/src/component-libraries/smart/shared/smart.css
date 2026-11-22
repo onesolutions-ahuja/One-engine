@@ -256,6 +256,12 @@
 .smart-runtime.smart_tabs>.smart-tabs-shell::-webkit-scrollbar{display:none}
 .smart-tabs-arrow{position:absolute;top:0;bottom:0;z-index:2;width:48px;border:0;padding:0;cursor:pointer;
  display:flex;align-items:center;color:#1d1d1f;font-size:28px;line-height:1}
+/* Always a narrow edge: general Smart button sizing (width:100%) must never stretch it,
+   or its fade paints over half the tabs. */
+.smart-runtime.smart_tabs>.smart-tabs-arrow{width:44px!important;min-width:0!important;max-width:44px!important;
+ height:auto!important;min-height:0!important;margin:0!important;border-radius:0!important;box-shadow:none!important}
+.smart-runtime.smart_tabs>.smart-tabs-arrow.is-left{left:0!important;right:auto!important}
+.smart-runtime.smart_tabs>.smart-tabs-arrow.is-right{right:0!important;left:auto!important}
 .smart-tabs-arrow.is-left{left:0;justify-content:flex-start;padding-left:6px}
 .smart-tabs-arrow.is-right{right:0;justify-content:flex-end;padding-right:6px}
 

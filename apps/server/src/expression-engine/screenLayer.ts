@@ -18,16 +18,24 @@ const modeOf=(node:Expression)=>{
  * mode, a single number 0-9 is the layer, anything else is the record it opens with.
  *   SCREEN(Payment, popup, @ThisPage.Cart.recordId, 2) = SCREEN(Payment, 2, popup, ...)
  *   SCREEN(Payment, popup, , 2)  SCREEN(Payment, 3)
+ * A second number after the layer is seconds: show that layer for so many seconds (1-60),
+ * then go back to layer 0, unless another SCREEN for that page comes first:
+ *   SCREEN(CustomerDisplay, 5, 4)
  */
-export function screenArguments(args:readonly Expression[]):{mode:string;modeGiven:boolean;record?:Expression;layer?:number}{
- if(args.length>3)throw Error('SCREEN takes the page and up to 3 more: mode, record and layer');
- let mode:string|undefined,record:Expression|undefined,layer:number|undefined;
+export function screenArguments(args:readonly Expression[]):{mode:string;modeGiven:boolean;record?:Expression;layer?:number;seconds?:number}{
+ if(args.length>4)throw Error('SCREEN takes the page and up to 4 more: mode, record, layer and seconds');
+ let mode:string|undefined,record:Expression|undefined,layer:number|undefined,seconds:number|undefined;
  for(const arg of args){
   if(arg.kind==='literal'&&arg.value===null)continue;
   const asLayer=screenLayerArg(arg);
   const asMode=asLayer===null?modeOf(arg):null;
-  if(asLayer!==null){
-   if(layer!==undefined)throw Error('SCREEN has two layer numbers');
+  const number=arg.kind==='literal'?typeof arg.value==='number'?arg.value
+   :typeof arg.value==='string'&&/^\d{1,2}$/.test(arg.value)?Number(arg.value):NaN:NaN;
+  if(layer!==undefined&&Number.isFinite(number)){
+   if(seconds!==undefined)throw Error('SCREEN has too many numbers: layer, then seconds');
+   if(!Number.isInteger(number)||number<1||number>60)throw Error('SCREEN seconds are 1-60');
+   seconds=number;
+  }else if(asLayer!==null){
    layer=asLayer;
   }else if(asMode){
    if(mode)throw Error('SCREEN has two modes');
@@ -38,5 +46,7 @@ export function screenArguments(args:readonly Expression[]):{mode:string;modeGiv
    record=arg;
   }
  }
- return {mode:mode??'current',modeGiven:Boolean(mode),...(record?{record}:{}),...(layer!==undefined?{layer}:{})};
+ if(seconds!==undefined&&(mode&&mode!=='current'))throw Error('SCREEN seconds only switch a layer where the page shows');
+ return {mode:mode??'current',modeGiven:Boolean(mode),...(record?{record}:{}),...(layer!==undefined?{layer}:{}),
+  ...(seconds!==undefined?{seconds}:{})};
 }

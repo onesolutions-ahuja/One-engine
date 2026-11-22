@@ -23,7 +23,7 @@
  .smart-grid-action,.smart-numpad-key,.smart-calendar-header button,.smart-calendar-date-strip button,
  .smart-calendar-grid button,.smart-cart-qty-button,.smart-lookup-menu button,.smart-switch-track,
  .smart-switch-thumb,.smart-dock-item,.smart-keyboard-key){
- transition:transform .18s var(--smart-ios-ease),filter .18s var(--smart-ios-ease),
+ transition:transform .18s var(--smart-ios-ease),box-shadow .18s ease,
   background-color .18s ease,color .18s ease,opacity .18s ease;
  -webkit-tap-highlight-color:transparent;
 }
@@ -33,12 +33,12 @@
 @media (hover:hover){
  .smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-button,.smart-card-button,.smart-numpad-key,
   .smart-calendar-date-strip button,.smart-cart-qty-button):not(:disabled):hover{
-  transform:translateY(-1px);
-  filter:brightness(1.04) drop-shadow(0 4px 10px rgb(0 0 0 / .12));
+  /* No transform/filter: they move text onto a GPU layer, so labels
+     re-render blurred or a different size and flicker on hover. */
+  box-shadow:0 4px 12px rgb(0 0 0 / .12);
  }
  .smart-runtime.smart-ios:not([data-builder-preview]) .smart-grid-action:hover>.smart-card{
-  transform:translateY(-2px);
-  filter:drop-shadow(0 8px 18px rgb(0 0 0 / .12));
+  box-shadow:0 8px 18px rgb(0 0 0 / .12);
  }
  .smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-navigation-item,.smart-tabs button,
   .smart-calendar-grid button,.smart-calendar-header button):not(:disabled):hover{
@@ -46,7 +46,7 @@
  }
 }
 .smart-runtime.smart-ios .smart-grid-action>.smart-card{
- transition:transform .2s var(--smart-ios-ease),filter .2s var(--smart-ios-ease);
+ transition:transform .2s var(--smart-ios-ease),box-shadow .2s ease;
 }
 .smart-runtime.smart-ios:not([data-builder-preview]) :is(.smart-button,.smart-navigation-item,.smart-tabs button,
  .smart-card-button,.smart-numpad-key,.smart-calendar-header button,.smart-calendar-date-strip button,

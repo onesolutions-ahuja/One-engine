@@ -58,7 +58,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|CONFIRMSCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|RECORDPAYMENT|FOREACH|CLOSESCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source)).parse();
@@ -74,7 +74,6 @@ export type ActionStep={
  guards?:readonly {condition:Expression;expected:boolean}[];
  /** FOREACH: the loop body, and a TABLE()/COLLECTION() source instead of record criteria. */
  body?:ActionStep[];source?:Expression;
- /** CONFIRMSCREEN: the steps run when the user answers No. */
  elseBody?:ActionStep[]
 };
 const reservedAliases=['state','event','session','constructor','prototype','repeat'];
@@ -131,19 +130,15 @@ export function compileActionPlan(source:string):ActionStep[] {
    steps.push({name:node.name,object:second?'second':'',fields:new Map(),guards});
    return;
   }
-  if(node.name==='CONFIRMSCREEN'||node.name==='INFOSCREEN'){
-   // CONFIRMSCREEN(Message, ActionsOnYes, [ActionsOnNo], [YesLabel], [NoLabel]): a Yes/No box;
+  // A Yes/No question is the builder's own popup page: SCREEN(page, popup).
+  if(node.name==='CONFIRMSCREEN')throw Error('CONFIRMSCREEN was removed: open your own popup page with SCREEN(page, popup)');
+  if(node.name==='INFOSCREEN'){
    // INFOSCREEN(Message, [ActionsAfterOk]): a message with OK. The box closes itself.
-   const confirm=node.name==='CONFIRMSCREEN';
-   if(confirm?args.length<2||args.length>5:args.length<1||args.length>2)
-    throw Error(confirm?'CONFIRMSCREEN requires a message, actions on Yes, and optional actions on No and button labels'
-     :'INFOSCREEN requires a message and optional actions after OK');
-   const labels=confirm?[args[0],...args.slice(3)]:[args[0]];
-   labels.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
-   const body:ActionStep[]=[],elseBody:ActionStep[]=[];
+   if(args.length<1||args.length>2)throw Error('INFOSCREEN requires a message and optional actions after OK');
+   validateFormulaFunctions(args[0],'ribbon_binding');
+   const body:ActionStep[]=[];
    if(args[1])add(body,args[1],[],loop);
-   if(confirm&&args[2])add(elseBody,args[2],[],loop);
-   steps.push({name:node.name,object:'',values:labels,fields:new Map(),guards,body,elseBody});
+   steps.push({name:node.name,object:'',values:[args[0]],fields:new Map(),guards,body,elseBody:[]});
    return;
   }
   if(node.name==='WAIT'){
@@ -273,16 +268,17 @@ export function compileActionPlan(source:string):ActionStep[] {
    return;
   }
   if(['EMAIL','WHATSAPP','SMS','FLOW','SCREEN'].includes(node.name)){
-   const bounds:Record<string,[number,number]>={EMAIL:[3,23],WHATSAPP:[2,22],SMS:[2,2],FLOW:[0,0],SCREEN:[0,3]};
+   const bounds:Record<string,[number,number]>={EMAIL:[3,23],WHATSAPP:[2,22],SMS:[2,2],FLOW:[0,0],SCREEN:[0,4]};
    const [min,max]=bounds[node.name];
    if(args.length<min||args.length>max)throw Error('Invalid '+node.name+' arguments');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
    if(node.name==='SCREEN'){
     // Any order after the page; kept as [mode, record, layer] (blank = not given).
-    const {mode,modeGiven,record:screenRecord,layer}=screenArguments(args);
+    const {mode,modeGiven,record:screenRecord,layer,seconds}=screenArguments(args);
     const none:Expression={kind:'literal',value:null};
     steps.push({name:node.name,object,fields:new Map(),guards,values:[
-     modeGiven?{kind:'reference',value:mode}:none,screenRecord??none,layer!==undefined?{kind:'literal',value:layer}:none]});
+     modeGiven?{kind:'reference',value:mode}:none,screenRecord??none,layer!==undefined?{kind:'literal',value:layer}:none,
+     ...(seconds!==undefined?[{kind:'literal' as const,value:seconds}]:[])]});
     return;
    }
    steps.push({name:node.name,object,values:args,fields:new Map(),guards});
@@ -367,13 +363,13 @@ export function parseScreenAction(source:string){
   throw Error('SCREEN requires a page API name, then optional mode, record and layer (any order)');
  const page=nameOf(node.args[0],'page API name');
  // After the page: mode, record and layer in any order (see screenArguments).
- const {mode,modeGiven,record:recordNode,layer}=screenArguments(node.args.slice(1));
+ const {mode,modeGiven,record:recordNode,layer,seconds}=screenArguments(node.args.slice(1));
  // The record the screen opens with, e.g. SCREEN(Payment,popup,@ThisPage.Cart2.recordId).
  // The caller evaluates it.
  if(recordNode)validateFormulaFunctions(recordNode,'ribbon_binding');
  const record=recordNode?serializeFormulaSqlExpression(recordNode):undefined;
  // modeGiven only matters with a layer: SCREEN(page, n) switches, SCREEN(page, current, n) may also open.
- return {page,mode,record,...(layer!==undefined?{layer,modeGiven}:{})};
+ return {page,mode,record,...(layer!==undefined?{layer,modeGiven}:{}),...(seconds!==undefined?{seconds}:{})};
 }
 
 const stepNodes=(step:ActionStep):Expression[]=>[...(step.id?[step.id]:[]),...step.fields.values(),

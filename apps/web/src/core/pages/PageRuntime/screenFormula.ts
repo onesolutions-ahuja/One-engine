@@ -31,7 +31,16 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
  // SCREEN(Page, 3): switch Page where it shows (this window, second screen, paired or
  // mirroring displays); this window never leaves for it. SCREEN(Page, current, 3) also
  // opens Page here when it shows nowhere (openPageLayer).
- if(parsed.layer!==undefined&&mode==='current')return openPageLayer(page,parsed.layer,context,onNavigate,parsed.modeGiven!==false);
+ if(parsed.layer!==undefined&&mode==='current')
+  return openPageLayer(page,parsed.layer,context,onNavigate,parsed.modeGiven!==false).then(shown=>{
+   // SCREEN(Page, n, seconds): back to layer 0 after that long (a newer SCREEN cancels it).
+   const seconds=parsed.seconds;
+   if(seconds)layerReturns.set(page.toLowerCase(),setTimeout(()=>{
+    layerReturns.delete(page.toLowerCase());
+    void openPageLayer(page,0,context,onNavigate,false).catch(()=>undefined);
+   },seconds*1000));
+   return shown;
+  });
  // A popup or other window opens on that layer.
  if(parsed.layer!==undefined)rememberRequestedLayer(page,parsed.layer);
  const inScreen=mode==='popup'&&context.pages.some(item=>
@@ -59,8 +68,11 @@ export function openFormulaScreen(source:string,context:PageActionRoutingContext
  * second screen, or screens that follow this device) it switches there. Only SCREEN(Page,
  * current, n) (`openHere`) opens Page in this window when it shows nowhere: a till telling
  * its customer display to change must never leave the till itself. */
+const layerReturns=new Map<string,ReturnType<typeof setTimeout>>();
 async function openPageLayer(page:string,layer:number,context:PageActionRoutingContext,
  onNavigate:(route:PageActionRoute)=>void,openHere:boolean):Promise<{navigated:true}>{
+ const pending=layerReturns.get(page.toLowerCase());
+ if(pending!==undefined){clearTimeout(pending);layerReturns.delete(page.toLowerCase());}
  if(showPageLayer(page,layer))return {navigated:true};
  let second=false;
  try{

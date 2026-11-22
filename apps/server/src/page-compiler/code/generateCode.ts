@@ -251,7 +251,6 @@ export const ACTION_KEY_MARK='@@ACTION_KEY@@';
 function hasAnsweredBox(node:Expression):boolean{
  if(node.kind!=='call')return false;
  if(node.name==='INFOSCREEN')return Boolean(node.args[1]&&!blankStep(node.args[1]));
- if(node.name==='CONFIRMSCREEN')return true;
  if(node.name==='IF'||node.name==='ACTIONS')return node.args.some(hasAnsweredBox);
  return false;
 }
@@ -366,12 +365,12 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    // After the page: mode, record and layer in any order, blanks allowed (screenArguments).
    let parsed:ReturnType<typeof screenArguments>;
    try{parsed=screenArguments(args.slice(1));}catch(error){fail(error instanceof Error?error.message:String(error));}
-   const {mode,modeGiven,record,layer}=parsed!;
+   const {mode,modeGiven,record,layer,seconds}=parsed!;
    scope.ui.add('SCREEN');
    // $.ui("SCREEN", page, mode, record, layer): the browser opens it (CompiledPageRuntime).
    // A layer switch keeps "no mode" blank: SCREEN(page, n) only switches page where it shows.
    return ['await $.ui("SCREEN", '+q(page)+', '+q(modeGiven||layer===undefined?mode:'')+(record||layer!==undefined?', '+(record?value(record):'""'):'')
-    +(layer!==undefined?', '+q(String(layer)):'')+');'];
+    +(layer!==undefined?', '+q(String(layer)):'')+(seconds!==undefined?', '+q(String(seconds)):'')+');'];
   }
   case 'PAIRDISPLAY':{
    // PAIRDISPLAY(Page): pair a /display screen with this device; it shows Page of this app.
@@ -392,9 +391,10 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   }
   // A message box anywhere in an action (e.g. inside IF): shown after the save; its
   // answer steps are separate actions, run when the user taps.
-  case 'CONFIRMSCREEN':case 'INFOSCREEN':{
+  case 'CONFIRMSCREEN':return fail('CONFIRMSCREEN was removed: open your own popup page with SCREEN(page, popup)');
+  case 'INFOSCREEN':{
    if(scope.loop)fail(node.name+' cannot run inside FOREACH');
-   const confirm=node.name==='CONFIRMSCREEN';
+   const confirm=false as boolean;
    const yes=args[1]&&!blankStep(args[1])?args[1]:null;
    const no=confirm&&args[2]&&!blankStep(args[2])?args[2]:null;
    const own=(node:Expression,into=new Set<string>()):Set<string>=>{

@@ -19,7 +19,23 @@ dialog.une-till-picker::backdrop{background:rgba(15,23,42,.35)}
 .une-till-picker footer button+button{border-left:1px solid rgba(60,60,67,.18);font-weight:600}
 .une-till-picker .une-pair-code{margin:4px 20px 8px;text-align:center;font:600 44px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.18em}
 .une-till-picker input.une-pair-input{display:block;box-sizing:border-box;width:calc(100% - 40px);margin:4px 20px 14px;min-height:52px;
- border:1px solid rgba(60,60,67,.3);border-radius:10px;text-align:center;font:600 28px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.3em}`;
+ border:1px solid rgba(60,60,67,.3);border-radius:10px;text-align:center;font:600 28px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.3em}
+dialog.une-pair-screens{width:min(520px,94vw)}
+.une-pair-screens .une-pair-add{display:flex;gap:8px;padding:0 20px 10px;align-items:center}
+.une-pair-screens .une-pair-add input.une-pair-input{width:120px;margin:0;min-height:44px;font-size:22px;flex:0 0 auto}
+.une-pair-screens input.une-pair-name{flex:1;min-width:0;min-height:36px;box-sizing:border-box;border:1px solid rgba(60,60,67,.3);
+ border-radius:8px;padding:0 10px;font:inherit}
+.une-pair-screens button.une-primary{min-height:44px;padding:0 16px;border:0;border-radius:10px;background:#007aff;color:#fff;font:600 15px/1 inherit;cursor:pointer}
+.une-pair-screens .une-pair-auto{display:flex;gap:8px;align-items:center;padding:0 20px 10px;color:#3a3a3c}
+.une-pair-screens li{display:flex;gap:8px;align-items:center;padding:6px 8px;border-top:1px solid rgba(60,60,67,.12)}
+.une-pair-screens li button{width:auto;min-height:32px;margin:0;padding:4px 10px;font-size:13px;text-align:center}
+.une-pair-screens li button.une-primary{min-height:32px;font-size:13px}
+.une-pair-screens li button.une-danger{color:#d70015}
+.une-pair-screens .une-pair-screen-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.une-pair-screens .une-pair-status{color:#8e8e93;font-size:12px}
+.une-pair-screens .une-pair-empty{color:#8e8e93;justify-content:center}
+.une-pair-screens .une-dot{width:8px;height:8px;border-radius:50%;background:#c7c7cc;flex:0 0 auto}
+.une-pair-screens .une-dot.une-online{background:#34c759}`;
 /** The till's small dialogs (which till, display pairing) share one look. */
 export function ensureTillDialogStyles(){
  if(typeof document==='undefined'||document.getElementById('une-till-picker-styles'))return;

@@ -71,7 +71,7 @@ test('SCREEN inputs after the page come in any order, blanks allowed; old formul
  assert.deepEqual(parseScreenAction('SCREEN(Payment, popup)'),{page:'Payment',mode:'popup',record:undefined});
  assert.equal(parseScreenAction('SCREEN(edit, popup, @event.recordId)').mode,'popup');
  assert.ok(parseScreenAction('SCREEN(edit, popup, @event.recordId)').record);
- assert.throws(()=>parseScreenAction('SCREEN(Payment, 2, 3)'),/two layer/);
+ assert.equal(parseScreenAction('SCREEN(Payment, 2, 3)').seconds,3); // layer, then seconds
  assert.throws(()=>parseScreenAction('SCREEN(Payment, popup, second)'),/two modes/);
  assert.throws(()=>parseScreenAction('SCREEN(Payment, 12)'),/0-9/);
  // Server-built code passes page, mode, record, layer in that fixed order.
@@ -86,4 +86,12 @@ test('a page opened on a layer in a new window keeps ?layer= through the address
  const {keepScreenParams}=await import('../src/core/workspace/Navigation/appRouting.ts');
  assert.equal(keepScreenParams('/une/apps/X/pages/pay','?layer=2&junk=1'),'/une/apps/X/pages/pay?layer=2');
  assert.equal(keepScreenParams('/une/apps/X/pages/pay','?layer=22'),'/une/apps/X/pages/pay');
+});
+
+test('SCREEN(page, layer, seconds): show the layer that long, then layer 0',()=>{
+ assert.equal(parseScreenAction('SCREEN(Disp, 5, 4)').seconds,4);
+ assert.equal(parseScreenAction('SCREEN(Disp, 5, 4)').layer,5);
+ assert.equal(parseScreenAction('SCREEN(Disp, 5)').seconds,undefined);
+ assert.throws(()=>parseScreenAction('SCREEN(Disp, 5, 99)'),/1-60/);
+ assert.throws(()=>parseScreenAction('SCREEN(Disp, popup, 5, 4)'),/seconds/);
 });

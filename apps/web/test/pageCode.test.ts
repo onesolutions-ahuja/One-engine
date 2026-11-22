@@ -80,6 +80,32 @@ test('row-relative lookup image references load and resolve through the canonica
   'asset:00000000-0000-4000-8000-000000000001');
 });
 
+test('two fields of the same related record both resolve (image + age flag on a cart line)',async()=>{
+ const objects:ObjectMetadata[]=[
+  {apiName:'CartLine',label:'Cart Line',pluralLabel:'Cart Lines',kind:'Custom Object',description:'',fields:[
+   {apiName:'Id',label:'Id',dataType:'Id',required:true,unique:true},
+   {apiName:'Name',label:'Name',dataType:'text',required:false,unique:false},
+   {apiName:'Quantity',label:'Quantity',dataType:'number',required:false,unique:false},
+   {apiName:'Product',label:'Product',dataType:'reference',required:false,unique:false,
+    relationship:{type:'Lookup',targetObject:'Product',relationshipName:'Product',childRelationshipName:'CartLines'}}
+  ]},
+  {apiName:'Product',label:'Product',pluralLabel:'Products',kind:'Custom Object',description:'',fields:[
+   {apiName:'Id',label:'Id',dataType:'Id',required:true,unique:true},
+   {apiName:'ImageUrl',label:'Image URL',dataType:'text',required:false,unique:false},
+   {apiName:'AgeRestricted',label:'Age restricted',dataType:'text',required:false,unique:false}
+  ]}
+ ];
+ const rows=await resolveCollectionMentionRows(objects,'CartLine',[{Id:'l1',Name:'Cola',Quantity:2,Product:'p1'}],
+  {imageSource:'@Product.ImageUrl',rowSupportingSource:'=IF(@CartLine.Product.AgeRestricted, "18+", "")',
+   textSource:'@CartLine.Name',column3Source:'@CartLine.Quantity'},
+  async(_object,id)=>({Id:id,ImageUrl:'asset:00000000-0000-4000-8000-000000000002',AgeRestricted:'yes'}));
+ const values=rows[0].__mentionValues as Row;
+ assert.equal(values['@CartLine.Product.ImageUrl'],'asset:00000000-0000-4000-8000-000000000002');
+ assert.equal(values['@CartLine.Product.AgeRestricted'],'yes');
+ assert.equal(values['@CartLine.Name'],'Cola');
+ assert.equal(values['@CartLine.Quantity'],2);
+});
+
 test('named Collection CartLine rows hydrate related image values before rendering',async()=>{
  const objects:ObjectMetadata[]=[
   {apiName:'CartLine',label:'Cart Line',pluralLabel:'Cart Lines',kind:'Custom Object',description:'',fields:[

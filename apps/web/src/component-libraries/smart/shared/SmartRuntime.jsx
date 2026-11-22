@@ -1075,7 +1075,7 @@ export default function SmartRuntime(p){
  const iconSide=buttonIcon&&label?(p.labelAlignment==="left"?"end":p.labelAlignment==="right"?"start":"inline"):"inline";
  if(name==="smart_button")content=<button data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Button text":undefined} type="button" className={"smart-button"+(p.wrapText===true?" is-wrapped":"")+(isDisabled?" is-disabled":"")}
    disabled={isDisabled} aria-disabled={isDisabled||undefined}
-   title={label||"Button"} aria-label={label||buttonIcon?.label||"Button"}
+   title={label&&label.length>18?label:!label&&buttonIcon?.label?buttonIcon.label:undefined} aria-label={label||buttonIcon?.label||"Button"}
    onClick={()=>fire("click",record)} data-icon-side={iconSide==="inline"?undefined:iconSide}
    style={{...style,...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12)),
     padding:buttonIcon&&!label?"4px":undefined,

@@ -784,6 +784,7 @@ function SmartTabs({p,record,fire}){
   if(el)el.scrollBy({left:direction*Math.max(120,el.clientWidth*0.7),behavior:"smooth"});
  };
  const fade=p.backgroundColor&&p.backgroundColor!=="transparent"?p.backgroundColor:"#F2F2F7";
+ const hasOverflowArrows=!vertical&&!p.builderPreview&&(tabEdges.left||tabEdges.right);
  const arrow=side=><button type="button" className={"smart-tabs-arrow is-"+side} aria-label={side==="left"?"More tabs left":"More tabs right"}
   tabIndex={-1} onClick={()=>scrollTabs(side==="left"?-1:1)}
   style={{background:"linear-gradient(to "+(side==="left"?"right":"left")+", "+fade+" 55%, transparent)"}}>
@@ -793,8 +794,8 @@ function SmartTabs({p,record,fire}){
  <div ref={tabsScroller} data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,
    display:"flex",flexDirection:"column",height:"100%",minHeight:0,
     // Reserve real space for arrow controls, never overlay category text.
-    width:vertical?"100%":"calc(100% - 96px)",
-    marginLeft:vertical?0:48,marginRight:vertical?0:48}}>
+    width:hasOverflowArrows?"calc(100% - 96px)":"100%",
+    marginLeft:hasOverflowArrows?48:0,marginRight:hasOverflowArrows?48:0}}>
   <nav className={"smart-tabs"+(p.backgroundColor?"":" is-segmented")} role="tablist" aria-label="Tabs"
    aria-orientation={vertical?"vertical":"horizontal"} style={{
     width:"100%",height:"100%",flex:"1 1 auto",minHeight:0,

@@ -1,13 +1,14 @@
 import {modernizeFormula} from '../../server/src/expression-engine/PageReferences.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {compileDisplayFormula,compileActionFormula} from '../../server/src/page-compiler/code/generateCode';
 import {F,O} from '../../server/src/page-compiler/code/formulaLibrary';
 import {FORMULA_DICTIONARY} from '../../server/src/page-compiler/code/formulaDictionary';
 import {buildPageCode,pageCodeModule,serverPageCode} from '../../server/src/page-compiler/code/pageCode';
 import {executePageCodeAction} from '../../server/src/system-support/page-code-runtime';
 import {createPageCodeRuntime,type PageCode} from '../src/core/pages/PageCompiler/pageCodeRuntime';
-import {resolveCollectionMentionRows} from '../src/component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import {resolveCollectionMentionRows,resolveComponentMentionRows} from '../src/component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import type {ObjectMetadata} from '../src/core/metadata/Definitions/metadata';
 
 type Row=Record<string,unknown>;
@@ -77,6 +78,33 @@ test('row-relative lookup image references load and resolve through the canonica
  const image=compileDisplayFormula('=@Product.ImageUrl','CartLine');
  assert.equal(fn(image.js)(rows[0],{...display(),m:(row:Row,path:string)=>(row.__mentionValues as Row)['@'+path]}),
   'asset:00000000-0000-4000-8000-000000000001');
+});
+
+test('named Collection CartLine rows hydrate related image values before rendering',async()=>{
+ const objects:ObjectMetadata[]=[
+  {apiName:'CartLine',label:'Cart Line',pluralLabel:'Cart Lines',kind:'Custom Object',description:'',fields:[
+   {apiName:'Id',label:'Id',dataType:'Id',required:true,unique:true},
+   {apiName:'Product',label:'Product',dataType:'reference',required:false,unique:false,
+    relationship:{type:'Lookup',targetObject:'Product',relationshipName:'Product',childRelationshipName:'CartLines'}}
+  ]},
+  {apiName:'Product',label:'Product',pluralLabel:'Products',kind:'Custom Object',description:'',fields:[
+   {apiName:'Id',label:'Id',dataType:'Id',required:true,unique:true},
+   {apiName:'ImageUrl',label:'Image URL',dataType:'text',required:false,unique:false}
+  ]}
+ ];
+ const fetchedRows=[{Id:'queried-line',Product:'missing-product'}];
+ const collectionRows=[{Id:'cart-line',Product:'product-1'}];
+ const renderedRows=await resolveComponentMentionRows(objects,'CartLine',fetchedRows,collectionRows,
+  {imageSource:'@Product.ImageUrl'},
+  async(_object,id)=>({Id:id,ImageUrl:'https://cdn.example.test/product.png'}));
+ assert.deepEqual(renderedRows.map(row=>row.Id),['cart-line']);
+ assert.equal((renderedRows[0].__mentionValues as Row)['@CartLine.Product.ImageUrl'],
+  'https://cdn.example.test/product.png');
+});
+
+test('trusted registered components receive the host tenant asset loader',()=>{
+ const source=readFileSync(new URL('../src/core/components/RegisteredComponent/RegisteredComponent.tsx',import.meta.url),'utf8');
+ assert.match(source,/loadAsset:props\.loadAsset/);
 });
 
 test('unknown functions are save errors, not run-time interpretation', ()=>{

@@ -10,6 +10,8 @@ const setting=(key:string,label:string,kind:string,area:string,min:number|null=n
  [key,label,'Design2',area,kind,null,
   kind==='align'?'["left","center","right"]':kind==='shadow'?'["none","small","medium","large"]':'[]',min,max];
 const PROPERTIES:Spec[]=[
+ setting('cardBodyHeight','Card height','number','Card Body',24,1200),
+ setting('cardBodyWidth','Card width','number','Card Body',96,1200),
  setting('imageRadius','Image radius','number','Image',0,600),
  setting('imageShadow','Image shadow','shadow','Image'),
  setting('headerShadow','Header shadow','shadow','Header'),
@@ -216,7 +218,7 @@ export async function applySmartBuilderPropertyParity(client:Query){
  await client.query(`INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
   SELECT c.api,p.property_key,true FROM
    (VALUES ('smart_id_card'),('smart_card_grid')) c(api)
-  CROSS JOIN (VALUES ('cardMinHeight'),('cardMinWidth')) v(property_key)
+  CROSS JOIN (VALUES ('cardBodyHeight'),('cardBodyWidth')) v(property_key)
   JOIN md_builder_shared_properties p ON p.property_key=v.property_key
   ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true`);
  await client.query(`UPDATE md_builder_ribbon_component_rules SET enabled=false

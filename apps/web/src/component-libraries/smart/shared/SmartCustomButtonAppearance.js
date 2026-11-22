@@ -17,6 +17,10 @@ export function smartCustomButtonAppearance(properties,key){
  if(shape)Object.assign(style,smartShapeAppearance(shape,hasRadius?Math.max(0,Math.min(600,Number(radius))):8));
  else if(hasRadius)style.borderRadius=Math.max(0,Math.min(600,Number(radius)));
  if(color!==undefined&&color!==null&&color!=='')style.color=color;
+ const shadow=p[key+'Shadow'];
+ if(shadow!==undefined&&shadow!==null&&shadow!=='')style.boxShadow=
+  shadow==='large'?'0 8px 20px #0003':shadow==='medium'?'0 3px 9px #0003':
+   shadow==='small'?'0 1px 4px #0002':'none';
  // Bold is optional: absent keeps the button's CSS weight.
  const bold=p[key+'Bold'];
  if(bold===true)style.fontWeight=700;

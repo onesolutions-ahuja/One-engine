@@ -172,20 +172,24 @@ async function run(){
    confirmationPage:POPUP,popupExists:Boolean(existingPopup.length),
    customerDrafts:jobs.map(job=>({variant:job.variant,added:job.added}))},null,2));
   if(!apply)return;
-  if(!existingPopup.length)await runtime.save(tenant,POPUP,confirmationPage(),true);
-  // Preserve every existing component, including all existing payment actions.
-  // Popup uses the server-proven payment data sent in SCREEN's input state.
+  const createdNow=!existingPopup.length;
+  if(createdNow)await runtime.save(tenant,POPUP,confirmationPage(),true);
+  // A newly created page has a Desktop baseline inherited by Mobile/Tablet.
+  // Explicitly save EACH layout rather than treating its inherited component IDs
+  // as proof that its positions and dimensions are already correct.
+  // Existing tenant-authored layouts are never overwritten.
   for(const variant of variants){
    const editor=await runtime.editor(tenant,POPUP,variant);
    const wanted=confirmationComponents(variant),prior=new Map(editor.components.map(c=>[c.id,c]));
    for(const c of wanted)if(prior.has(c.id))
     assert.equal(prior.get(c.id).type,c.type,'Unexpected popup component collision');
    const missing=wanted.filter(c=>!prior.has(c.id));
-   if(missing.length){
+   if(createdNow||missing.length||(publish&&!editor.draftRevision)){
     const {w,h}=layout(variant);
     await runtime.saveLayoutDraft(tenant,POPUP,variant,{
-     ...editor,layoutMode:'free-canvas',canvasWidth:w,canvasHeight:h,
-     components:[...editor.components,...missing]},actor);
+     ...editor,layoutMode:'free-canvas',
+     ...(createdNow?{canvasWidth:w,canvasHeight:h}:{}),
+     components:createdNow?wanted:[...editor.components,...missing]},actor);
    }
    if(publish)await runtime.publishLayout(tenant,POPUP,variant,undefined,actor);
   }

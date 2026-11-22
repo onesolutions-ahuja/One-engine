@@ -15,7 +15,7 @@ import type {Expression} from '../../../../../server/src/expression-engine/Formu
 import {formulaEntry} from '../../../../../server/src/page-compiler/code/formulaDictionary.js';
 import {readComponentState,readComponentProperty,uiProperty} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {isConnected} from '../../../../../server/src/expression-engine/FormulaConnections.js';
-import {getTenantBrand} from '../../../component-libraries/shared/TenantBrand.js';
+import {getTenantBrand,tenantCompanyValue} from '../../../component-libraries/shared/TenantBrand.js';
 import {componentReaderKey} from '../../../component-libraries/shared/formulaKeys.js';
 import {deviceTillValue,mirrorDeviceKey,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
@@ -38,18 +38,35 @@ export class FormulaNotHere extends Error { readonly notHeld=true; }
 
 const identityKey=Symbol.for('une.authenticatedFormulaIdentity');
 const identity=()=>(globalThis as Record<symbol,unknown>)[identityKey] as undefined|{
- user?:Row;organization?:Row;connections?:unknown};
+ user?:Row;organization?:Row;connections?:unknown;customPermissions?:{names:Record<string,boolean>;others:boolean}|null};
 const sessionUser:Record<string,string>={id:'Id',name:'Name',email:'Email',timeZone:'TimeZone',locale:'Locale',
  currencyIsoCode:'CurrencyIsoCode',managerId:'Manager',managerName:'ManagerName'};
 /** @ThisTenant / signed-in user values, read the same way by page code and here. */
 export function sessionValue(path:string,state:Readonly<Row>):unknown{
  if(path==='cartId'){const id=state.activeCartId;return typeof id==='string'?id:'';}
  const user=identity()?.user,org=identity()?.organization;
+ // @ThisTenant.User.RefundLimit: a custom User field ('' when not set). Actions re-read it on the server.
+ if(path.startsWith('user.field.')){
+  const fields=(user?.Fields??{}) as Row,name=path.slice(11).toLowerCase();
+  const key=Object.keys(fields).find(item=>item.toLowerCase()===name);
+  const value=key===undefined?undefined:fields[key];
+  return value===undefined||value===null?'':value;
+ }
  if(path.startsWith('user.')&&sessionUser[path.slice(5)])return user?.[sessionUser[path.slice(5)]]??'';
  if(path==='tenant.id')return org?.Id??'';
  if(path==='tenant.name')return getTenantBrand().name||org?.Name||'';
  if(path==='tenant.logo')return getTenantBrand().logo??'';
  throw Error('Unsupported tenant value: '+path);
+}
+
+/** @ThisTenant.Company.<Field> in the browser (same values the server reads). */
+export const tenantValue=(name:string):unknown=>tenantCompanyValue(name);
+/** @ThisTenant.Permission.<Name> in the browser: for showing and hiding. Actions are checked on the server. */
+export function permissionValue(name:string):boolean{
+ const known=identity()?.customPermissions;
+ if(!known)return false;
+ const value=known.names[name.toLowerCase()];
+ return value===undefined?known.others:value;
 }
 
 /** The `$` a converted display formula reads, for a run outside a page file. */
@@ -61,7 +78,8 @@ class StandaloneScope{
  timeZone(){return String(identity()?.user?.TimeZone||'UTC');}
  state(name:string){const value=this.pageState[name];return value===undefined||value===null?'':value;}
  session(path:string){return sessionValue(path,this.pageState);}
- tenant(name:string){const brand=getTenantBrand();return (name==='name'?brand.name:brand.logo)??'';}
+ tenant(name:string){return tenantValue(name);}
+ permission(name:string){return permissionValue(name);}
  till(field:string){return deviceTillValue(field);}
  device(field:string){return field==='Key'?tillDeviceKey():field==='MirrorKey'?mirrorDeviceKey():'';}
  private reader(){

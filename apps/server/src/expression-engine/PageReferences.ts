@@ -9,7 +9,11 @@ import {COMPONENT_STATE_FIELDS,type ComponentStateField} from './FormulaComponen
  *   @ThisPage.PayButton.CartTotal            a value saved by that component's action
  *   @ThisPage.Tabs1.Selected.Id              what the user picked in that component
  *   @ThisTenant.User.Name / .CartId          the logged-in user
+ *   @ThisTenant.User.RefundLimit             any custom field on the User object (Object Manager)
  *   @ThisTenant.Company.Name / .Logo / .Id   the company (tenant)
+ *   @ThisTenant.Company.VatNumber / .Currency  any Company Settings value (receipts, VAT, currency)
+ *   @ThisTenant.Permission.Till.Refund       TRUE when the user's profile / permission sets allow
+ *                                            the custom permission (rule CustomPermission:Till.Refund)
  *
  * Every engine (browser, server, SQL, compiler) reads references through
  * parsePageReference, so the rules live in exactly one place. */
@@ -26,8 +30,16 @@ export const USER_FIELDS={
  Manager:'managerId',ManagerName:'managerName'
 } as const;
 export type UserField=keyof typeof USER_FIELDS;
-export const COMPANY_FIELDS=['Id','Name','Logo'] as const;
-export type CompanyField=typeof COMPANY_FIELDS[number];
+/** Company values builders can pick (Company Settings). Any other saved Company Settings
+ * value is read by its own name too (@ThisTenant.Company.<Field>). */
+export const COMPANY_FIELDS=['Id','Name','Logo','LegalName','TradingName','Description',
+ 'Phone','Email','Website','AddressLine1','AddressLine2','City','Postcode','Country','Timezone','Locale',
+ 'Currency','VatRate','ReceiptDisplayName','VatNumber','ReceiptMessage','RefundDays','ReceiptShowVat',
+ 'ReceiptAskChoice','ReceiptAutoPrint','ReceiptShowBarcode','ReceiptQrLink','ReceiptQrCaption','ReceiptTipLine',
+ 'CardSurchargeOn','CardSurchargePercent','CashRoundingOn','CashRoundingStep'] as const;
+export type CompanyField=string;
+/** Company Settings key for @ThisTenant.Company.<Field> (VatNumber -> vatnumber; matched without case). */
+export const companyKey=(field:string)=>field.toLowerCase();
 /** @ThisPage.Till.Id …: the Till this device is set up as (the server looks it up by device key). */
 export const TILL_FIELDS=['Id','Name','Code','Location','LocationCode'] as const;
 export type TillField=typeof TILL_FIELDS[number];
@@ -41,8 +53,10 @@ export type PageReference=
  |{kind:'component';name:string;key:string}
  |{kind:'selected';name:string;field:ComponentStateField}
  |{kind:'user';field:UserField}
+ |{kind:'userField';field:string}
  |{kind:'cart'}
  |{kind:'company';field:CompanyField}
+ |{kind:'permission';name:string}
  |{kind:'till';field:TillField}
  |{kind:'device';field:DeviceField};
 
@@ -75,12 +89,15 @@ export function parsePageReference(raw:string):PageReference|null{
    if(same(third,'CartId'))return {kind:'cart'};
    const field=pick(Object.keys(USER_FIELDS) as UserField[],third);
    if(field)return {kind:'user',field};
+   // Any other name: a custom field on the User object (RefundLimit, DiscountLimit …).
+   return {kind:'userField',field:third};
   }
-  if(second&&same(second,'Company')&&parts.length===3){
-   const field=pick(COMPANY_FIELDS,third);
-   if(field)return {kind:'company',field};
-  }
-  throw Error('Unknown tenant value @'+reference+' (use @ThisTenant.User.Name or @ThisTenant.Company.Name)');
+  if(second&&same(second,'Company')&&parts.length===3)
+   return {kind:'company',field:pick(COMPANY_FIELDS,third)??third};
+  // Dotted names group permissions by app: @ThisTenant.Permission.Till.Refund.
+  if(second&&same(second,'Permission')&&parts.length>=3&&parts.length<=5)
+   return {kind:'permission',name:parts.slice(2).join('.')};
+  throw Error('Unknown tenant value @'+reference+' (use @ThisTenant.User.Name, @ThisTenant.Company.Name or @ThisTenant.Permission.Name)');
  }
  if(parts.length<3)throw Error('Incomplete page value @'+reference+' (e.g. @ThisPage.MyBox1.value)');
  if(same(second,'Session')){

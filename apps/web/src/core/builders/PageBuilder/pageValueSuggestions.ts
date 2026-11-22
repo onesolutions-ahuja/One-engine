@@ -40,11 +40,14 @@ export function pageValueSuggestions(query:string,components:readonly PageValueC
  if(/^ThisTenant$/i.test(match[1])){
   if(parts.length===1)return [
    {reference:'@ThisTenant.User.',label:'The logged-in user',drill:true},
-   {reference:'@ThisTenant.Company.',label:'Your company (Company Settings)',drill:true}
+   {reference:'@ThisTenant.Company.',label:'Your company (Company Settings)',drill:true},
+   // Custom permissions (TRUE/FALSE) from profiles / permission sets: type the name, e.g. Till.Refund.
+   {reference:'@ThisTenant.Permission.',label:'A custom permission (TRUE/FALSE), e.g. Till.Refund'}
   ].filter(item=>has(item.reference.split('.')[1],last));
   if(parts.length===2&&/^User$/i.test(parts[0]))return [
    ...Object.keys(USER_FIELDS).map(field=>({reference:'@ThisTenant.User.'+field,label:'User '+field})),
-   {reference:'@ThisTenant.User.CartId',label:'The user\'s active cart'}
+   {reference:'@ThisTenant.User.CartId',label:'The user\'s active cart'},
+   {reference:'@ThisTenant.User.',label:'Or type a custom User field, e.g. RefundLimit'}
   ].filter(item=>has(item.reference.split('.')[2],last));
   if(parts.length===2&&/^Company$/i.test(parts[0]))
    return COMPANY_FIELDS.map(field=>({reference:'@ThisTenant.Company.'+field,label:'Company '+field}))

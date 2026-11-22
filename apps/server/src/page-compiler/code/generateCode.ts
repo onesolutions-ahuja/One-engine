@@ -91,7 +91,15 @@ function pageValueCode(page:PageReference):string{
   case 'till':return '$.till('+q(page.field)+')';
   case 'device':return '$.device('+q(page.field)+')';
   case 'user':return '$.session('+q('user.'+USER_FIELDS[page.field])+')';
-  case 'company':return page.field==='Id'?'$.session("tenant.id")':'$.tenant('+q(page.field.toLowerCase())+')';
+  case 'userField':
+   if(!key.test(page.field))fail('Invalid user value @ThisTenant.User.'+page.field);
+   return '$.session('+q('user.field.'+page.field)+')';
+  case 'company':
+   if(!key.test(page.field))fail('Invalid company value @ThisTenant.Company.'+page.field);
+   return page.field==='Id'?'$.session("tenant.id")':'$.tenant('+q(page.field.toLowerCase())+')';
+  case 'permission':
+   if(!/^[A-Za-z_][A-Za-z0-9_.]{0,79}$/.test(page.name))fail('Invalid permission @ThisTenant.Permission.'+page.name);
+   return '$.permission('+q(page.name)+')';
   case 'selected':return '$.componentState('+q(page.name)+', '+q(page.field)+')';
   case 'input':
    if(!key.test(page.key))fail('Invalid page value @ThisPage.Input.'+page.key);

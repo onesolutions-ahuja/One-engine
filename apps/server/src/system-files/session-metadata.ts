@@ -2,6 +2,18 @@ import type {SqlPersistence} from './sql-persistence.js';
 import {RbacEngine, type PermissionCheck} from './rbac-engine.js';
 import {systemPermissionBindings} from '../system-support/permission-resource-map.js';
 import {loadConnectionSnapshot} from '../system-support/tenant-connections.js';
+import {loadUserCustomFields} from '../system-support/tenant-formula-values.js';
+
+/** Custom permissions named in this tenant's permission rules (CustomPermission:<Name>), each
+ * TRUE/FALSE for this user. `others`: the answer for a name no rule mentions (full access = TRUE). */
+async function customPermissionSnapshot(db:SqlPersistence,rbac:RbacEngine,tenantId:string,userId:string){
+  const {rows}=await db.query<{name:string}>(`SELECT DISTINCT substr(resource,18) AS name FROM md_permission_rules
+    WHERE tenant_id=$1 AND resource LIKE 'CustomPermission:%' ORDER BY 1 LIMIT 500`,[tenantId]);
+  const names=rows.map(row=>row.name).filter(name=>/^[A-Za-z_][A-Za-z0-9_.]{0,79}$/.test(name));
+  const allowed=await rbac.allowedMany(tenantId,userId,[...names,'__NoRuleNamesThis__']
+    .map(name=>({resource:'CustomPermission:'+name,action:'read'})));
+  return {names:Object.fromEntries(names.map((name,i)=>[name,allowed[i]===true])),others:allowed[names.length]===true};
+}
 
 /** Session capabilities are derived exclusively from the shared OneEngine RBAC evaluator. */
 const capabilities:readonly (PermissionCheck&{capability:string})[]=[
@@ -43,6 +55,10 @@ export async function sessionMetadata(db:SqlPersistence,tenantId:string,userId:s
   const sessionUser=identity.rows[0];
   // Connector/callout names for CONNECTED() in page formulas. Names only, never secrets.
   const connections=await loadConnectionSnapshot(db,tenantId);
+  // @ThisTenant.User.<custom field> and @ThisTenant.Permission.<Name> in page formulas (display).
+  // Page actions re-read both on the server, so a changed browser copy cannot pass a limit.
+  const [customFields,customPermissions]=await Promise.all([
+    loadUserCustomFields(db,tenantId,userId),customPermissionSnapshot(db,rbac,tenantId,userId)]);
   if(!sessionUser)throw new Error('Authenticated formula context is unavailable');
   const checks:PermissionCheck[]=[
     ...capabilities,
@@ -74,6 +90,6 @@ export async function sessionMetadata(db:SqlPersistence,tenantId:string,userId:s
     // @ThisTenant.User.Manager / ManagerName: the user's manager (Reports To).
     managerId:sessionUser.manager_id??'',managerName:sessionUser.manager_name??'',
     landingAppApi:landing.rows[0]?.landing_app_api??'Setup',permissions,fieldAccess,recordTypeAccess,
-    connections
+    connections,customFields,customPermissions
   }};
 }

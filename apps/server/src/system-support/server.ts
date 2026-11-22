@@ -1,4 +1,5 @@
 import {recordInvoicePayment} from './record-payment-service.js';
+import {loadCompanyValues} from './tenant-formula-values.js';
 import {registerRevolutCheckoutRoutes} from './revolut-checkout-service.js';
 import {FlowRecordQuery} from '../system-files/flow-record-query.js';
 import {registerMcpRoutes} from './mcp-routes.js';
@@ -1022,22 +1023,15 @@ export function createSystemServer(db:SqlPersistence) {
     const actor=req.actor!;
     res.json({profile:await platformTenants.saveSetting(actor.tenant_id,actor.user_id,'company-profile',req.body)});
   }));
-  /** Tenant name and logo for page formulas (@ThisTenant.Company.Name / .Logo).
-   * Every signed-in user of the tenant (kiosk and app users) may read these two
-   * public brand values; the full company profile still needs TenantSettings read. */
+  /** Company values for page formulas (@ThisTenant.Company.Name / .Logo / .VatNumber / .Currency …).
+   * Every signed-in user of the tenant (kiosk and app users) may read them: receipts and tills
+   * print them. Editing still needs TenantSettings manage. */
   app.get('/api/tenant/brand',route(async(req,res)=>{
     const actor=req.actor!;
-    const [profile,tenant]=await Promise.all([
-      db.query<{properties:unknown}>(
-        "SELECT properties FROM md_tenant_settings WHERE tenant_id=$1 AND setting_key='company-profile'",[actor.tenant_id]),
-      db.query<{name:string}>('SELECT name FROM md_tenants WHERE id=$1',[actor.tenant_id])
-    ]);
-    const settings=profile.rows[0]?.properties;
-    const values=settings&&typeof settings==='object'&&!Array.isArray(settings)?settings as Record<string,unknown>:{};
-    const text=(value:unknown)=>typeof value==='string'?value.trim():'';
+    // Company Settings values (no secrets are stored there) for @ThisTenant.Company.<Field>.
+    const company=await loadCompanyValues(db,actor.tenant_id);
     res.setHeader('Cache-Control','private, no-store');
-    res.json({name:text(values.tradingName)||text(values.legalName)||text(tenant.rows[0]?.name),
-      logo:text(values.logoUrl)});
+    res.json({name:company.name,logo:company.logo,company});
   }));
   app.get('/api/tenant/business-calendar',route(async(req,res)=>{
     const actor=req.actor!;
@@ -2534,9 +2528,46 @@ export function createSystemServer(db:SqlPersistence) {
   }));
 
   // The User object is a secure view of md_users, never a second md_records copy.
-  const userRecord=async(row:{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null},actor:Actor)=>{
+  // Custom fields added to User in Object Manager (RefundLimit, DiscountLimit …): values are kept
+  // in md_users.custom_fields; field security (User.<Field>) applies like any other field.
+  const STANDARD_USER_FIELDS=new Set(['Id','Name','Email','Username','Enabled','IsActive','Password','Tenant','LandingApp','ReportsToId',
+    'CreatedAt','LastModifiedDate','OwnerId','RecordTypeId']);
+  const customUserFieldDefs=async(tenantId:string)=>(await db.query<{api_name:string;data_type:string}>(
+    `SELECT api_name,data_type FROM md_field_definitions
+     WHERE tenant_id=$1 AND object_api='User' AND deleted_at IS NULL`,[tenantId])).rows
+    .filter(row=>!STANDARD_USER_FIELDS.has(row.api_name));
+  /** Checks typed custom User values: numbers for number/currency/percent, Yes/No for checkboxes, text otherwise. */
+  const customUserValues=async(tenantId:string,input:Record<string,unknown>)=>{
+    const keys=Object.keys(input).filter(key=>!STANDARD_USER_FIELDS.has(key));
+    if(!keys.length)return {} as Record<string,unknown>;
+    const defs=new Map((await customUserFieldDefs(tenantId)).map(row=>[row.api_name,row]));
+    const out:Record<string,unknown>={};
+    for(const key of keys){
+      const def=defs.get(key);
+      if(!def)throw new Error('Unknown field: '+key);
+      const value=input[key];
+      if(value===null||value===''){out[key]=null;continue;}
+      if(['number','currency','percent'].includes(def.data_type)){
+        const number=typeof value==='string'&&value.trim()!==''?Number(value):value;
+        if(typeof number!=='number'||!Number.isFinite(number))throw new Error(key+' must be a number');
+        out[key]=number;
+      }else if(def.data_type==='boolean'||def.data_type==='checkbox'){
+        if(typeof value!=='boolean')throw new Error(key+' must be true or false');
+        out[key]=value;
+      }else if(['text','textarea','email','phone','url','picklist'].includes(def.data_type)){
+        if(typeof value!=='string'||value.length>1000)throw new Error('Invalid value for '+key);
+        out[key]=value;
+      }else throw new Error(key+': this field type is not supported on User');
+    }
+    return out;
+  };
+  const userRecord=async(row:{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null;custom_fields?:unknown},actor:Actor)=>{
+    const stored=row.custom_fields&&typeof row.custom_fields==='object'&&!Array.isArray(row.custom_fields)
+      ?row.custom_fields as Record<string,unknown>:{};
+    const custom=(await customUserFieldDefs(actor.tenant_id)).map(def=>def.api_name);
     const fields={Name:row.display_name||row.email,Email:row.email,Username:row.email,
-      IsActive:row.enabled,Enabled:row.enabled,Tenant:actor.tenant_id,ReportsToId:row.reports_to_user_id};
+      IsActive:row.enabled,Enabled:row.enabled,Tenant:actor.tenant_id,ReportsToId:row.reports_to_user_id,
+      ...Object.fromEntries(custom.map(name=>[name,stored[name]??null]))};
     const checks=Object.keys(fields).map(field=>({resource:'User.'+field,action:'read'}));
     const allowed=await rbac.allowedMany(actor.tenant_id,actor.user_id,checks);
     return {Id:row.id,...Object.fromEntries(Object.entries(fields).filter((_,i)=>allowed[i])),
@@ -2547,6 +2578,8 @@ export function createSystemServer(db:SqlPersistence) {
       await rbac.require(actor.tenant_id,actor.user_id,'User.'+field,action);
   };
   const userFields=(input:Record<string,unknown>,creating:boolean)=>{
+    // Other keys are custom User fields, checked by customUserValues.
+    input=Object.fromEntries(Object.entries(input).filter(([key])=>STANDARD_USER_FIELDS.has(key)));
     const allowed=new Set(['Name','Email','Username','Enabled','IsActive','Password','Tenant','LandingApp','ReportsToId']);
     for(const key of Object.keys(input))if(!allowed.has(key))throw new Error('Unknown field: '+key);
     const email=input.Email??input.Username;
@@ -2596,8 +2629,8 @@ export function createSystemServer(db:SqlPersistence) {
   }));
   const readUser=async(tenantId:string,userId:string,id:string)=>{
     await requireUserReportingScope(tenantId,userId,id);
-    const result=await db.query<{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null}>(
-      'SELECT id,email,display_name,enabled,landing_app_api,reports_to_user_id FROM md_users WHERE tenant_id=$1 AND id=$2',[tenantId,id]);
+    const result=await db.query<{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null;custom_fields:unknown}>(
+      'SELECT id,email,display_name,enabled,landing_app_api,reports_to_user_id,custom_fields FROM md_users WHERE tenant_id=$1 AND id=$2',[tenantId,id]);
     if(!result.rows[0])throw new Error('Record not found');
     return userRecord(result.rows[0],{tenant_id:tenantId,user_id:userId});
   };
@@ -2607,8 +2640,8 @@ export function createSystemServer(db:SqlPersistence) {
     const limit=Number(req.query.limit??50),offset=Number(req.query.offset??0);
     if(!Number.isInteger(limit)||!Number.isInteger(offset)||limit<1||offset<0)throw new Error('Invalid pagination');
     const [users,count]=await Promise.all([
-      db.query<{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null}>(
-        `SELECT id,email,display_name,enabled,landing_app_api,reports_to_user_id FROM md_users
+      db.query<{id:string;email:string;display_name:string;enabled:boolean;landing_app_api:string;reports_to_user_id:string|null;custom_fields:unknown}>(
+        `SELECT id,email,display_name,enabled,landing_app_api,reports_to_user_id,custom_fields FROM md_users
          WHERE tenant_id=$1 AND (md_effective_reporting_scope($1,$4,'User') IS NULL
            OR md_reporting_scope($1,$4,id,md_effective_reporting_scope($1,$4,'User')))
          ORDER BY email,id LIMIT $2 OFFSET $3`,
@@ -2677,6 +2710,7 @@ export function createSystemServer(db:SqlPersistence) {
     await rbac.require(actor.tenant_id,actor.user_id,'Security','manage');
     await requireUserFields(actor,req.body,'create');
     const values=userFields(req.body,true);
+    const custom=await customUserValues(actor.tenant_id,req.body);
     if(values.tenant&&values.tenant!==actor.tenant_id)throw new Error('Permission denied');
     if(values.landingApp&&values.landingApp!=='Setup'
       &&!(await apps.listMetadata(actor.tenant_id)).some(app=>app.apiName===values.landingApp))
@@ -2684,8 +2718,8 @@ export function createSystemServer(db:SqlPersistence) {
     const passwordHash=await auth.hashPassword(values.password!,actor.tenant_id);
     const row=await db.transaction(async client=>{
       const result=await client.query<{id:string}>(
-        'INSERT INTO md_users(tenant_id,email,display_name,password_hash,enabled,landing_app_api,reports_to_user_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-        [actor.tenant_id,values.email,values.name??'',passwordHash,values.enabled??true,values.landingApp??'Setup',values.reportingTo??null]);
+        'INSERT INTO md_users(tenant_id,email,display_name,password_hash,enabled,landing_app_api,reports_to_user_id,custom_fields) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING id',
+        [actor.tenant_id,values.email,values.name??'',passwordHash,values.enabled??true,values.landingApp??'Setup',values.reportingTo??null,JSON.stringify(custom)]);
       const profile=await client.query<{id:string}>(
         "SELECT id FROM md_profiles WHERE tenant_id=$1 AND api_name='Default'",[actor.tenant_id]);
       if(profile.rows[0])await client.query(
@@ -2704,6 +2738,7 @@ export function createSystemServer(db:SqlPersistence) {
       await rbac.require(actor.tenant_id,actor.user_id,'Security','manage');
     await requireUserFields(actor,req.body,'edit');
     const values=userFields(req.body,false);
+    const custom=await customUserValues(actor.tenant_id,req.body);
     await requireUserReportingScope(actor.tenant_id,actor.user_id,req.params.id);
     if(values.tenant&&values.tenant!==actor.tenant_id)throw new Error('Permission denied');
     if(values.landingApp&&values.landingApp!=='Setup'
@@ -2718,6 +2753,9 @@ export function createSystemServer(db:SqlPersistence) {
       await client.query(
         'UPDATE md_users SET email=COALESCE($3,email),display_name=COALESCE($4,display_name),enabled=COALESCE($5,enabled),landing_app_api=COALESCE($6,landing_app_api),reports_to_user_id=CASE WHEN $7::boolean THEN $8::uuid ELSE reports_to_user_id END WHERE tenant_id=$1 AND id=$2',
         [actor.tenant_id,req.params.id,values.email??null,values.name??null,values.enabled??null,values.landingApp??null,values.reportingTo!==undefined,values.reportingTo??null]);
+      if(Object.keys(custom).length)await client.query(
+        'UPDATE md_users SET custom_fields=custom_fields||$3::jsonb WHERE tenant_id=$1 AND id=$2',
+        [actor.tenant_id,req.params.id,JSON.stringify(custom)]);
       if(values.reportingTo!==undefined&&values.reportingTo!==updated.rows[0].reports_to_user_id)
         await client.query("INSERT INTO md_security_events(tenant_id,actor_user_id,subject_user_id,action,details) VALUES($1,$2,$3,'user.reporting.change',jsonb_build_object('previous',$4::text,'requested',$5::text))",
           [actor.tenant_id,actor.user_id,req.params.id,updated.rows[0].reports_to_user_id,values.reportingTo]);

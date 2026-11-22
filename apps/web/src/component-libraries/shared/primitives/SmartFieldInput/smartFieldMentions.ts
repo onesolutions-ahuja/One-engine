@@ -146,7 +146,11 @@ export function referencedMentionPaths(
   for (const raw of Object.values(properties)) {
     if (typeof raw !== 'string') continue;
     for (const match of raw.matchAll(REFERENCE)) {
-      const path = validateMentionPath(match[2], objects, root);
+      // Formula references commonly omit the current row object for a lookup
+      // (@Product.ImageUrl on a CartLine). Canonicalize that shorthand to the
+      // same metadata path used by the picker (@CartLine.Product.ImageUrl).
+      const path = validateMentionPath(match[2], objects, root)
+        ?? validateMentionPath(root + '.' + match[2], objects, root);
       if (path) distinct.set(path.path, path);
       if (distinct.size >= MAX_REFERENCES) return [...distinct.values()];
     }

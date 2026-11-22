@@ -129,10 +129,11 @@ function reference(path:string,scope:Scope):string{
   return '$.f(v['+q(parts[0])+'], '+q(parts.slice(1).join('.'))+')';
  }
  if(parts.length===1)fail('Bare @'+path+' is not supported; use @Object.Field');
- if(parts[0]===scope.rowObject&&parts.length<=3)return '$.f('+scope.row+', '+q(parts.slice(1).join('.'))+')';
+ if(parts[0]===scope.rowObject&&parts.length===2)return '$.f('+scope.row+', '+q(parts[1])+')';
+ if(parts[0]===scope.rowObject&&parts.length===3)return '$.m('+scope.row+', '+q(path)+')';
  // Another Object's field (@Product.ImageUrl in a cart line): the related value the
  // page already read for this row (permission-checked lookup), blank if none.
- if(parts.length===2||parts.length===3)return '$.m('+scope.row+', '+q(path)+')';
+ if(parts.length===2||parts.length===3)return '$.m('+scope.row+', '+q(scope.rowObject?scope.rowObject+'.'+path:path)+')';
  return fail('Invalid reference @'+path);
 }
 function aggregateCall(node:Extract<Expression,{kind:'call'}>,scope:Scope):string{

@@ -7,6 +7,8 @@ import {FORMULA_DICTIONARY} from '../../server/src/page-compiler/code/formulaDic
 import {buildPageCode,pageCodeModule,serverPageCode} from '../../server/src/page-compiler/code/pageCode';
 import {executePageCodeAction} from '../../server/src/system-support/page-code-runtime';
 import {createPageCodeRuntime,type PageCode} from '../src/core/pages/PageCompiler/pageCodeRuntime';
+import {resolveCollectionMentionRows} from '../src/component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
+import type {ObjectMetadata} from '../src/core/metadata/Definitions/metadata';
 
 type Row=Record<string,unknown>;
 // eslint-disable-next-line @typescript-eslint/no-implied-eval
@@ -48,7 +50,33 @@ test('event and related references convert', ()=>{
  assert.match(action.js,/\$\.event\("value"\)/);
  assert.match(action.js,/\$\.f\(\$\.event\("record"\), "Name"\)/);
  const image=compileDisplayFormula('=@Product.ImageUrl','CartLine');
- assert.equal(fn(image.js)({__mentionValues:{'@Product.ImageUrl':'a.png'}},{...display(),m:(row:Row,p:string)=>(row.__mentionValues as Row)['@'+p]}),'a.png');
+ assert.match(image.js,/\.m\(row, "CartLine\.Product\.ImageUrl"\)/);
+ assert.equal(fn(image.js)({__mentionValues:{'@CartLine.Product.ImageUrl':'a.png'}},{...display(),m:(row:Row,p:string)=>(row.__mentionValues as Row)['@'+p]}),'a.png');
+ const pickerImage=compileDisplayFormula('=@CartLine.Product.ImageUrl','CartLine');
+ assert.match(pickerImage.js,/\.m\(row, "CartLine\.Product\.ImageUrl"\)/);
+});
+
+test('row-relative lookup image references load and resolve through the canonical metadata path',async()=>{
+ const objects:ObjectMetadata[]=[
+  {apiName:'CartLine',label:'Cart Line',pluralLabel:'Cart Lines',kind:'Custom Object',description:'',fields:[
+   {apiName:'Id',label:'Id',dataType:'Id',required:true,unique:true},
+   {apiName:'Product',label:'Product',dataType:'reference',required:false,unique:false,
+    relationship:{type:'Lookup',targetObject:'Product',relationshipName:'Product',childRelationshipName:'CartLines'}}
+  ]},
+  {apiName:'Product',label:'Product',pluralLabel:'Products',kind:'Custom Object',description:'',fields:[
+   {apiName:'Id',label:'Id',dataType:'Id',required:true,unique:true},
+   {apiName:'ImageUrl',label:'Image URL',dataType:'text',required:false,unique:false}
+  ]}
+ ];
+ const rows=await resolveCollectionMentionRows(objects,'CartLine',
+  [{Id:'line-1',Product:'product-1'}],{imageSource:'@Product.ImageUrl'},
+  async(_object,id)=>({Id:id,ImageUrl:'asset:00000000-0000-4000-8000-000000000001'}));
+ assert.equal(rows[0].__mentionValues&&
+  (rows[0].__mentionValues as Row)['@CartLine.Product.ImageUrl'],
+  'asset:00000000-0000-4000-8000-000000000001');
+ const image=compileDisplayFormula('=@Product.ImageUrl','CartLine');
+ assert.equal(fn(image.js)(rows[0],{...display(),m:(row:Row,path:string)=>(row.__mentionValues as Row)['@'+path]}),
+  'asset:00000000-0000-4000-8000-000000000001');
 });
 
 test('unknown functions are save errors, not run-time interpretation', ()=>{

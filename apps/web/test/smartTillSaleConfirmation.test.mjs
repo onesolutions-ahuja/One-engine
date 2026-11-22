@@ -28,3 +28,21 @@ test('customer display layer is independent, defaults to hidden, and idempotent'
  assert.deepEqual(customerDraft(first.draft,'Desktop').added,[]);
  assert.equal(customerDraft(first.draft,'Desktop').changed,false);
 });
+
+test('customer receipt shows paid amount, method and optional change without cropping short canvases',()=>{
+ for(const [width,height] of [[320,320],[360,480],[620,320],[1440,900],[1920,1080]]){
+  const existing={apiName:CUSTOMER,layoutMode:'free-canvas',canvasWidth:width,canvasHeight:height,components:[]};
+  const {draft}=customerDraft(existing,'Desktop');
+  assert.equal(draft.components.length,6);
+  const sources=draft.components.map(c=>String(c.properties.textSource??''));
+  assert.ok(sources.some(source=>source.includes('@ThisPage.Input.paymentAmount')));
+  assert.ok(sources.some(source=>source.includes('@ThisPage.Input.paymentMethod')));
+  assert.ok(sources.some(source=>source.includes('@ThisPage.Input.changeAmount')));
+  for(const c of draft.components){
+   assert.equal(c.properties.pageLayer,1);
+   assert.ok(c.position.x>=0&&c.position.y>=0,c.id+' starts off canvas '+width+'x'+height);
+   assert.ok(c.position.x+c.position.width<=width,c.id+' exceeds width '+width);
+   assert.ok(c.position.y+c.position.height<=height,c.id+' exceeds height '+height);
+  }
+ }
+});

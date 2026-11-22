@@ -19,7 +19,7 @@ const numericType=/^(Number|Currency|Percent|Integer|Decimal|Double|Float|Long|S
 const directField=source=>/^=?\s*@(?:[A-Za-z][A-Za-z0-9_]*\.)?([A-Za-z][A-Za-z0-9_]*)$/.exec(typeof source==="string"?source.trim():"")?.[1]??null;
 const display=value=>value===null||value===undefined||value===""?"—":String(value);
 
-export default function SmartCart({p,records,Picture,expression,fieldAllowed,fire}){
+export default function SmartCart({p,records,Picture,expression,resolveImage,fieldAllowed,fire}){
  const allows=(key,row)=>typeof fieldAllowed!=='function'||fieldAllowed(key,row);
  const fieldExpression=(key,source,row)=>allows(key,row)?expression(source,row):'';
  const demo=p.builderPreview===true&&!records.length;
@@ -266,7 +266,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
       {String(displayFormula('emptyText',p.emptyText,'No items yet')||'No items yet')}</p>}
      {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
-      const src=p.imageSource?fieldExpression('imageSource',p.imageSource,record):"";
+      const src=p.imageSource?(typeof resolveImage==='function'?resolveImage(record):fieldExpression('imageSource',p.imageSource,record)):"";
       const rowSupporting=!demo&&p.rowSupportingSource
        ?fieldExpression('rowSupportingSource',p.rowSupportingSource,record):"";
       const itemId=record?.Id??record?.id??null;

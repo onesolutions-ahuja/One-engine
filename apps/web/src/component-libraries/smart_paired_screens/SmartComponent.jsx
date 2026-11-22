@@ -63,7 +63,8 @@ export default function SmartComponent(p){
  };
  const title=typeof p.label==="string"&&p.label?p.label:"Screens";
  return <section className="smart-paired-screens" aria-label={title}
-  style={{background:p.backgroundColor,color:p.labelColor,borderRadius:p.radius,border:p.borderColor?"1px solid "+p.borderColor:undefined}}>
+  style={{background:p.backgroundColor,color:p.labelColor,borderRadius:p.radius,border:p.borderColor?"1px solid "+p.borderColor:undefined,
+   boxShadow:p.shadow==='large'?'0 8px 20px #0003':p.shadow==='medium'?'0 3px 9px #0003':p.shadow==='small'?'0 1px 4px #0002':undefined}}>
   <header>
    <h3 style={{color:p.headerTextColor,fontSize:p.headerTextSize}}>{title}</h3>
    {!adding&&<button type="button" className="sps-add" onClick={()=>{setAdding(true);setMessage("");}}>+ Add display</button>}

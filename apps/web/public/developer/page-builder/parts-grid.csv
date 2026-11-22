@@ -1,5 +1,5 @@
 pageapi,component_type,component_name,propertyid,value,layout
-ServiceDesk,smart_card_grid,PartsGrid,objectApiName,Product,Desktop
-ServiceDesk,smart_card_grid,PartsGrid,textSource,@Product.Name,Desktop
-ServiceDesk,smart_card_grid,PartsGrid,cardValue,"=""£"" & FORMAT(@Product.Price, ""0.00"")",Desktop
-ServiceDesk,smart_card_grid,PartsGrid,backgroundColor,#eef5ef,Desktop
+servicedesk,smart_card_grid,PartsGrid,objectApiName,Product,Desktop
+servicedesk,smart_card_grid,PartsGrid,textSource,@Product.Name,Desktop
+servicedesk,smart_card_grid,PartsGrid,cardValue,"=""£"" & FORMAT(@Product.Price, ""0.00"")",Desktop
+servicedesk,smart_card_grid,PartsGrid,backgroundColor,#eef5ef,Desktop

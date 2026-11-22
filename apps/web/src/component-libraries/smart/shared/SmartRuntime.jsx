@@ -1281,8 +1281,8 @@ export default function SmartRuntime(p){
    // Keep every authorised record; 'Rows' controls the *visible* viewport only.
    // A measured pixel row height avoids percentage tracks shrinking to their
    // min-content size and painting a second row within a one-row viewport.
-   gridAutoRows:authoredCardHeight!==null?authoredCardHeight+"px"
-    :"max("+minimumCardHeight+"px, calc((100% - 8px - "+(rows-1)*gap+"px) / "+rows+"))",
+   gridAutoRows:"max("+minimumCardHeight+"px, calc((100% - 8px - "+(rows-1)*gap+"px) / "+rows+"))",
+   ...(authoredCardHeight!==null?{gridAutoRows:authoredCardHeight+"px"}:{}),
    ...(gridViewportHeight>0&&authoredCardHeight===null?{
     gridAutoRows:Math.max(minimumCardHeight,(gridViewportHeight-(rows-1)*gap)/rows)+"px"
    }:{}),

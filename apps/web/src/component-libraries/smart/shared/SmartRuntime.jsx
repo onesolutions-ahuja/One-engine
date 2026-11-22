@@ -267,9 +267,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
      fontWeight:focusedWeight??(p.headerBold===false?400:700),
      // Standalone Image's visible caption is edited by the shared Typography
      // Label Alignment control; Card Grid retains its prior Header precedence.
-     textAlign:(p.headerAlignment||p.labelAlignment)||"left",
-     justifyContent:(p.headerAlignment||p.labelAlignment)==="right"?"flex-end":
-       (p.headerAlignment||p.labelAlignment)==="center"?"center":"flex-start",
+     textAlign:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)||"left",
+     justifyContent:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="right"?"flex-end":
+       (single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="center"?"center":"flex-start",
      fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
        ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
      border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,

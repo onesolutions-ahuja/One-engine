@@ -268,6 +268,14 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    throw Error('This Invoice belongs to a different till');
   res.json(await screens().showPaidInvoice(actor,device.deviceKey,invoice));
  }));
+ // After Hold/Resume/New sale, return to the customer's pre-payment layer.
+ // Only the authenticated user operating this till may change its display.
+ app.post('/api/screens/restore-sale-layer',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  res.setHeader('Cache-Control','private, no-store');
+  const device=await pairingDevice(deps.records,actor,(req.body??{}).deviceKey);
+  res.json(await screens().restoreSaleLayer(actor,device.deviceKey));
+ }));
  // SCREEN(page, n): the screens following this device that show page switch to layer n.
  app.post('/api/screens/layer',wrap(async(req,res)=>{
   const actor=authenticated(req);

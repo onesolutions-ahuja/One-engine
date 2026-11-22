@@ -25,7 +25,10 @@ export const NAMED_DEVICE_OBJECTS=[
   {api:'DeviceSetUpBy',label:'Device Set Up By',type:'reference',related:'User'},
   {api:'DeviceIp',label:'Device IP Address',type:'text'},
   {api:'DeviceAgent',label:'Device Browser / App',type:'text'},
-  {api:'CustomerDisplayKey',label:'Customer Display (device key)',type:'text'}
+  {api:'CustomerDisplayKey',label:'Customer Display (device key)',type:'text'},
+  // A drawer, printer or scanner fixed to one Till: an installed app that sees it attached
+  // (USB/Bluetooth/serial ID in Address or Device ID) knows which Till it is on.
+  {api:'AttachedTill',label:'Attached to Till',type:'reference',related:'NamedDevice'}
  ]},
  // Payment hand-off between the till and the customer screen (card prompt, PayPal QR).
  {object:'Cart',label:'Cart',fields:[

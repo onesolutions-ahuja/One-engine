@@ -5,6 +5,10 @@
  *    a browser makes a random key once and keeps it here. It is not a secret.
  *  - The server maps the key to a Till (Till.DeviceKey). Until a device is set up, the
  *    till page asks once "Which till is this?".
+ *  - Attached devices: the installed app (Android/Windows) also sets
+ *    window.__uneAttachedDevices = ['<USB/Bluetooth/serial id>', ...] at start-up. A drawer or
+ *    printer fixed to one Till (Named Device "Attached to Till") then sets the device up with
+ *    no question. See docs/APP-BUILD-CHECKLIST.md.
  */
 export type DeviceTill={Id:string;Name:string;Code:string;Location:string;LocationCode:string};
 export type DeviceTillChoice={Id:string;Name:string;Code:string;Location:string};
@@ -20,6 +24,12 @@ let state:DeviceTillState={status:'unknown',till:null,tills:[]};
 const listeners=new Set<()=>void>();
 const publish=(next:DeviceTillState)=>{state=next;listeners.forEach(listener=>listener());};
 let loading:Promise<DeviceTillState>|null=null;
+
+/** IDs of devices the installed app sees attached (empty in a browser). */
+export function attachedDevices():string[]{
+ const injected=typeof window==='undefined'?undefined:(window as {__uneAttachedDevices?:unknown}).__uneAttachedDevices;
+ return Array.isArray(injected)?injected.filter((id):id is string=>typeof id==='string'&&id.length>=3&&id.length<=128).slice(0,20):[];
+}
 
 export function tillDeviceKey():string{
  const injected=typeof window==='undefined'?undefined:(window as {__uneDeviceKey?:unknown}).__uneDeviceKey;
@@ -71,7 +81,7 @@ export function loadDeviceTill(request:Request,force=false):Promise<DeviceTillSt
  const deviceKey=tillDeviceKey();
  publish({...state,status:'loading'});
  loading=request<{till:DeviceTill|null;tills?:DeviceTillChoice[];mirrorKey?:string}>('/till-device/current',
-  {method:'POST',body:JSON.stringify({deviceKey})})
+  {method:'POST',body:JSON.stringify({deviceKey,attachedDevices:attachedDevices()})})
   .then(answer=>{publish({status:answer.till?'set':'unset',till:answer.till,tills:answer.tills??[],
    mirrorKey:typeof answer.mirrorKey==='string'&&pattern.test(answer.mirrorKey)?answer.mirrorKey:undefined});return state;})
   .catch(error=>{publish({status:'error',till:null,tills:[],error:error instanceof Error?error.message:'Till unavailable'});return state;})

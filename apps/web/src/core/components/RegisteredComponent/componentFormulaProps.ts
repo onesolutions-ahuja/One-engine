@@ -5,7 +5,7 @@ import {ID_CARD_ROW_PROPERTIES} from '../../../component-libraries/smart_id_card
 /** Configuration and data, not scalar display formulas. Keep the original bindings. */
 const nonDisplayProperties=new Set([
  'html','properties','record','records','items','pageState','sessionId','__formulaCode',
- 'actionFlows','componentId','pageSessionKey','collectionFormula','selectorOptionsFormula','filterFormula'
+ 'actionFlows','componentId','pageSessionKey','collectionFormula','selectorOptionsFormula','selectorPicklistField','filterFormula'
 ]);
 
 /** These properties are consumed once PER authorised row by their component renderer.

@@ -184,7 +184,8 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  app.post('/api/till-device/current',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
-  res.json(await deviceTill(deps,actor,(req.body??{}).deviceKey));
+  const body=(req.body??{}) as {deviceKey?:unknown;attachedDevices?:unknown};
+  res.json(await deviceTill(deps,actor,body.deviceKey,body.attachedDevices));
  }));
  // Device presence: open while the app is open on this device (see device-presence-service).
  app.get('/api/device-presence',wrap(async(req,res)=>{

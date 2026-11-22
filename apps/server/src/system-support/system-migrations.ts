@@ -464,6 +464,8 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
      VALUES
      ('selectorOptionsFormula','Options formula','Data','Values','expression',
       NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,1),
+     ('selectorPicklistField','Picklist field (Object.Field)','Data','Values','expression',
+      NULL::jsonb,'[]'::jsonb,NULL::integer,NULL::integer,1),
      ('calendarView','View','Design2','Body','choice',
       '"month"'::jsonb,'["month","week","day"]'::jsonb,NULL::integer,NULL::integer,2),
      ('calendarShowEvents','Show events','Design2','Body','boolean',
@@ -533,7 +535,7 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await client.query(`
     INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
     SELECT v.component_api,v.property_key,true FROM (VALUES
-     ('smart_selector','selectorOptionsFormula'),
+     ('smart_selector','selectorOptionsFormula'),('smart_selector','selectorPicklistField'),
      ('smart_calendar','calendarView'),('smart_calendar','calendarShowEvents'),
      ('smart_calendar','calendarShowHeader'),('smart_calendar','calendarShowDateStrip'),
      ('smart_calendar','calendarEventColor'),('smart_calendar','calendarBlockedColor'),

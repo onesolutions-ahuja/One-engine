@@ -307,7 +307,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   fontSize:focused&&p.focusedTextSize!==undefined&&p.focusedTextSize!==null&&p.focusedTextSize!==""
    ?number(p.focusedTextSize,16,8):number(p.textSize,16,8),
   color:focusedText||undefined,
-  boxShadow:activeShadow==="large"?"0 8px 20px #0003":activeShadow==="medium"?"0 3px 9px #0003":"none",
+  boxShadow:activeShadow==="large"?"0 8px 20px #0003":activeShadow==="medium"?"0 3px 9px #0003":activeShadow==="small"?"0 1px 4px #0002":"none",
   ...(single?{height:"100%",minHeight:0}:{}),
   ...(grid?{height:"100%",minHeight:0}:{}),
   ...(focused&&focusedWidth>0?{width:"min(100%, "+focusedWidth+"px)"}:{}),
@@ -507,7 +507,7 @@ function SmartSelector({p,fire}){
     border:p.borderColor?"1px solid "+p.borderColor:"1px solid #b8c7d7",
     ...smartShapeAppearance(p.shapeId,number(p.radius,12)),
     boxShadow:p.shadow==="large"?"0 8px 20px #0003":
-     p.shadow==="medium"?"0 3px 9px #0003":"none"}}
+     p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none"}}
    value={selected<0?"":String(selected)} data-empty={selected<0?"true":undefined}
    onChange={event=>{
     const index=Number(event.target.value),item=options[index];
@@ -620,7 +620,7 @@ function SmartLookup({p,style,fire}){
    placeholder={text(placeholder||"Search records…")}
    style={{textAlign:p.labelAlignment||"left",fontSize:number(p.textSize,16),color:p.labelColor||undefined,
     fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,
-    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
     background:p.backgroundColor||"#fff",borderColor:p.borderColor||undefined,
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}
    value={query} onFocus={()=>setOpened(true)}
@@ -818,7 +818,7 @@ function SmartTabs({p,record,fire}){
      // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
      maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
      borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||SMART_BLUE):"transparent"):undefined,
-     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
+     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
      background:selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",
     borderColor:p.borderColor||undefined}}
     tabIndex={selectedTabIndex===index||selectedTabIndex<0&&index===0?0:-1}
@@ -850,7 +850,7 @@ function SmartToggle({p,fire}){
   <span className="smart-switch-track" style={{background:checked?(p.backgroundColor||"#34c759"):"#e5e5ea",
    border:p.borderColor?"1px solid "+p.borderColor:undefined,
    ...smartShapeAppearance(p.shapeId,p.shapeId==='shape:rectangle'?0:number(p.radius,999)),
-   boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none"}}>
+   boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none"}}>
    <span className="smart-switch-thumb"/></span></label>;
 }
 // An editable Smart Input stays focused while its authorised formula/default
@@ -1046,7 +1046,7 @@ export default function SmartRuntime(p){
   window.addEventListener("resize",measureGridViewport);
   return ()=>window.removeEventListener("resize",measureGridViewport);
  },[name]);
- const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",borderRadius:number(p.radius,12)};
+ const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",borderRadius:number(p.radius,12)};
  const fieldRule=useFieldRule(p,name);
  const fire=(event,value)=>{if(p.previewOnly||p.builderPreview)return;
   if(isDisabled&&name==="smart_button")return;
@@ -1102,7 +1102,7 @@ export default function SmartRuntime(p){
   content=<div className="smart-textbox-pair" role="group" aria-label={caption||"Smart Textbox"}
    style={{borderColor:p.borderColor||"#d2dbe5",borderWidth:number(p.borderWidth,1,0,24),
     borderRadius:number(p.radius,6,0,128),
-    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
     fontSize:number(p.textSize,14,8,96)}}>
    <span data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Textbox caption":undefined} className="smart-textbox-caption" style={{backgroundColor:p.backgroundColor||"#f1f5f9",
      color:p.labelColor||"#334155",textAlign:align(p.labelAlignment),
@@ -1219,7 +1219,7 @@ export default function SmartRuntime(p){
    placeholder={text(scopedExpression(p,"label",p.placeholder??p.label??"Search",recordOf(p)))}
    style={{background:p.backgroundColor||(ios?"#e9e9ee":"#fff"),borderColor:p.borderColor||"transparent",
     color:p.labelColor||undefined,fontSize:number(p.textSize,16),
-    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+    boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
     ...smartShapeAppearance(p.shapeId,number(p.radius,12))}}/>;
  else if(name==="smart_lookup")content=<SmartLookup p={p} fire={fire}
    style={{...style,backgroundColor:p.backgroundColor||undefined,borderColor:p.borderColor||undefined,
@@ -1365,7 +1365,7 @@ export default function SmartRuntime(p){
         style={{flex:"0 0 auto",height:p.wrapText===true?"auto":32,maxHeight:"100%",minHeight:p.wrapText===true?32:0,
           width:p.wrapText===true?number(p.tabWidth,140):undefined,maxWidth:p.wrapText===true?number(p.tabWidth,140):undefined,
           color:p.labelColor||undefined,background:p.backgroundColor||(ios?"rgb(255 255 255 / .82)":"#fff"),
-          boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",
+          boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",
           borderColor:p.borderColor||undefined,borderRadius:number(p.radius,ios?10:4),fontSize:number(p.textSize,16),
           fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined}}
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>

@@ -773,10 +773,10 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    else if(settings.mutatesData!==false)saved({});
    if(currentAppId.toUpperCase()==='SMARTTILL'&&
      ['AcetillResumeHeldCart','AcetillCopilotNewCart'].includes(flowApiName)){
-    // Resume and New sale are distinct from a completed payment.
-    // The display returns to its sale layer; its new/cart rows load by normal live events.
-    void runtime.request('/screens/layer',{method:'POST',body:JSON.stringify({
-     deviceKey:tillDeviceKey(),page:'smart_till_customer_display',layer:0})}).catch(()=>undefined);
+    // The customer Cart may be on layer 1 or another tenant-authored layer.
+    // Restore the prior layer, never hardcode 0 and blank out the live Cart.
+    await runtime.request('/screens/restore-sale-layer',{method:'POST',
+     body:JSON.stringify({deviceKey:tillDeviceKey()})}).catch(()=>undefined);
    }
    return {...response,completed:typeof settings.successOutput==='string'
     &&response.outputs?.[settings.successOutput]===settings.successValue};

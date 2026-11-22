@@ -214,11 +214,18 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
    backgroundColor:p.headerBodyColor??"#255d9d",
    borderRadius:n(p.headerRadius,n(p.radius,12),0,600),
    height:n(p.headerBoxHeight,52,24),minHeight:n(p.headerBoxHeight,52,24),
+   width:p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==''
+    ?Math.min(10000,Math.max(0,Number(p.headerBoxWidth)))+'px':undefined,maxWidth:'100%',
+   boxShadow:shadow(p.headerShadow),whiteSpace:p.headerWrapText===false?'nowrap':undefined,
    border:border(p.headerBorderColor),textAlign:align(p.headerAlignment),
     fontSize:n(p.headerTextSize,18,8,96),
    fontWeight:p.headerBold===false?400:700,color:p.headerTextColor||"#fff"}}><span data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Cart title":undefined}>{displayFormula("label",p.label,"Smart Cart")}</span></header>
   <div data-md-bind={p.builderPreview?"cartSupportingSource":undefined} data-md-bind-titles={p.builderPreview?"Item count or supporting text":undefined} className="smart-cart-supporting" data-design-area={p.builderPreview?"Header Supporting":undefined} style={{
    height:n(p.supportingBoxHeight,36,18),minHeight:n(p.supportingBoxHeight,36,18),
+   width:p.supportingBoxWidth!==undefined&&p.supportingBoxWidth!==null&&p.supportingBoxWidth!==''
+    ?Math.min(10000,Math.max(0,Number(p.supportingBoxWidth)))+'px':undefined,maxWidth:'100%',
+   borderRadius:n(p.supportingRadius,0,0,600),boxShadow:shadow(p.supportingShadow),
+   whiteSpace:p.supportingWrapText===false?'nowrap':p.supportingWrapText===true?'pre-line':undefined,
    backgroundColor:p.supportingBackgroundColor??undefined,
    fontSize:n(p.supportingTextSize,13,8,96),
    border:border(p.supportingBorderColor),textAlign:align(p.supportingAlignment),
@@ -295,8 +302,10 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
        {visible.map(index=>{
         if(index===0)return <div key={index} className={"smart-cart-product "+(p.imagePlacement==="right"?"image-right":"image-left")} style={columnStyle(index,false)}>
          <span data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Product image":undefined} className="smart-cart-image-binding" data-design-area={p.builderPreview?"Image":undefined} style={smartPartOffsetStyle(p,"image")}><Picture src={src} alt={String(name||"Product")} loadAsset={p.loadAsset}
-          style={{width:n(p.imageHeight,44,16),height:n(p.imageHeight,44,16),
-           border:border(p.imageBorderColor),borderRadius:4,
+          style={{width:p.imageWidth!==undefined&&p.imageWidth!==null&&p.imageWidth!==''
+           ?n(p.imageWidth,44,0,1200):n(p.imageHeight,44,16),height:n(p.imageHeight,44,16),
+           border:border(p.imageBorderColor),borderRadius:n(p.imageRadius,4,0,600),
+           boxShadow:shadow(p.imageShadow),
            backgroundColor:p.imageBackgroundColor||undefined,
            objectFit:p.imageFill==="fit"?"contain":p.imageFill==="stretch"?"fill":"cover",
            flex:"0 0 auto",overflow:"hidden"}}/></span>
@@ -381,6 +390,8 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
     backgroundColor:p.footerBackgroundColor||undefined,
     borderTopColor:p.footerBorderColor||undefined,
     whiteSpace:p.footerWrapText===false?"nowrap":undefined,
+    borderRadius:p.footerRadius!==undefined?n(p.footerRadius,0,0,600):undefined,
+    boxShadow:shadow(p.footerShadow),
     ...(p.footerWidth!==undefined&&p.footerWidth!==null&&p.footerWidth!==""
      ?{width:n(p.footerWidth,0,0,10000)+"px",maxWidth:"100%"}:{}),
     ...(p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""

@@ -253,33 +253,36 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   ?p.focusedCardShadow:p.shadow;
  const cardBorder=single?"none":strokeWidth===0?"none":
   (strokeWidth+"px solid "+(p.borderColor||"#e2e8f0"));
+ const headerWrap=p.headerWrapText??p.wrapText;
  const headerNode=header&&headerHeight>0&&<div data-md-bind={p.builderPreview?"textSource":undefined} data-md-bind-titles={p.builderPreview?"Card title":undefined} className="smart-card-content" style={{
      ...smartPartOffsetStyle(p,"header"),order:1,flex:horizontal&&!idCard?(imageVisible?"1 1 50%":"1 1 100%"):undefined,
      display:"flex",alignItems:fixedGridHeader?"safe center":"center",
      // Explicit Card Grid heights bound the title box; overflow remains accessible without a visible scrollbar.
      // Standalone Image captions retain intrinsic growth for large typography.
      height:headerHeight,minHeight:fixedGridHeader?0:"max-content",
-     width:grid&&p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==""
+     width:(grid||single)&&p.headerBoxWidth!==undefined&&p.headerBoxWidth!==null&&p.headerBoxWidth!==""
        ?"min(100%, "+number(p.headerBoxWidth,0,0,1200)+"px)":undefined,
      maxHeight:fixedGridHeader?headerHeight:undefined,
      alignSelf:horizontal&&!idCard?"safe center":undefined,flexShrink:0,
      fontWeight:focusedWeight??(p.headerBold===false?400:700),
      // Standalone Image's visible caption is edited by the shared Typography
      // Label Alignment control; Card Grid retains its prior Header precedence.
-     textAlign:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)||"left",
-     justifyContent:(single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="right"?"flex-end":
-       (single?p.labelAlignment||p.headerAlignment:p.headerAlignment||p.labelAlignment)==="center"?"center":"flex-start",
+     textAlign:(p.headerAlignment||p.labelAlignment)||"left",
+     justifyContent:(p.headerAlignment||p.labelAlignment)==="right"?"flex-end":
+       (p.headerAlignment||p.labelAlignment)==="center"?"center":"flex-start",
      fontSize:p.headerTextSize!==undefined&&p.headerTextSize!==null&&p.headerTextSize!==""
        ?number(p.headerTextSize,16,8,96):single?number(p.textSize,16,8):undefined,
      border:p.headerBorderColor?"1px solid "+p.headerBorderColor:undefined,
+     borderRadius:p.headerRadius!==undefined?number(p.headerRadius,0,0,600):undefined,
+     boxShadow:p.headerShadow==="large"?"0 8px 20px #0003":p.headerShadow==="medium"?"0 3px 9px #0003":p.headerShadow==="small"?"0 1px 4px #0002":undefined,
      backgroundColor:p.headerBodyColor||undefined,
      color:headerResult.error?formulaDisplayErrorColor:
       focusedText||p.headerTextColor||(single?p.labelColor||p.defaultValueColor||undefined:p.defaultValueColor||p.labelColor||undefined),
      // pre-line: wraps like normal, and a CHAR(10) in a formula starts a new line.
-     whiteSpace:p.wrapText===false?"nowrap":"pre-line",
-     overflow:fixedGridHeader?"auto":p.wrapText===false?"auto":"visible",overflowWrap:"anywhere",
+     whiteSpace:headerWrap===false?"nowrap":"pre-line",
+     overflow:fixedGridHeader?"auto":headerWrap===false?"auto":"visible",overflowWrap:"anywhere",
      // A caption can still scroll by wheel/touch, but never shows native scroll arrows.
-     scrollbarWidth:fixedGridHeader||p.wrapText===false?"none":undefined,
+     scrollbarWidth:fixedGridHeader||headerWrap===false?"none":undefined,
      padding:fixedGridHeader
        ?headerPaddingY+"px "+(cardPadding===null?10:cardPadding)+"px"
        :cardPadding===null?"4px 10px":cardPadding+"px"
@@ -322,7 +325,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     minWidth:0,minHeight:0,
     ...(single?{display:"flex"}:{}),
     ...(grid?{overflow:"hidden",maxHeight:horizontal?undefined:imageHeight,
-      backgroundColor:p.imageBackgroundColor||undefined}:{} )}}>
+      backgroundColor:p.imageBackgroundColor||undefined}:{} ),
+    borderRadius:p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
+    boxShadow:p.imageShadow==="large"?"0 8px 20px #0003":p.imageShadow==="medium"?"0 3px 9px #0003":p.imageShadow==="small"?"0 1px 4px #0002":undefined}}>
    {imageError?<span role="alert" style={{color:formulaDisplayErrorColor,padding:8}}>FORMULAERROR</span>
     :single&&p.builderPreview&&!image
      ?<div className="smart-image-empty smart-editor-image-placeholder" aria-label={missingImageLabel}
@@ -341,7 +346,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       style={{height:single||grid?"100%":imageHeight,width:"100%",display:"block",
        maxHeight:grid?"100%":undefined,
        objectFit:p.imageFill==="fit"?"contain":p.imageFill==="stretch"?"fill":"cover",
-       boxSizing:"border-box",borderRadius:single?number(p.radius,12):undefined,
+       boxSizing:"border-box",borderRadius:single?number(p.imageRadius??p.radius,12):p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
        border:nativeImageBorder}}/>}
   </div>}
   {idCard?<div className="smart-id-card-body" style={{order:1,flex:"1 1 auto",minWidth:0,minHeight:0,
@@ -352,10 +357,10 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     offsetStyle={key=>smartPartOffsetStyle(p,key)}
     padding={cardPadding} focusedText={focusedText} errorColor={formulaDisplayErrorColor}/>
   </div>:headerNode}
-  {grid&&!idCard&&(description||value||buttonText||customButtons.length>0)&&<div className="smart-card-details"
+  {grid&&!idCard&&(description||value||buttonText||customButtons.length>0||p.builderPreview)&&<div className="smart-card-details"
    // After the title (order 1): name first, then price / description / buttons.
    style={{order:2,...(cardPadding===null?{}:{padding:cardPadding+"px"})}}>
-   {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
+   {(description||p.builderPreview)&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
      style={{...smartPartOffsetStyle(p,"supporting"),color:description==='FORMULAERROR'?formulaDisplayErrorColor:
       focusedText||p.supportingTextColor||undefined,
       backgroundColor:p.supportingBackgroundColor||undefined,
@@ -363,8 +368,13 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       fontWeight:focusedWeight??(typeof p.supportingBold==="boolean"?(p.supportingBold?700:400):undefined),
       fontSize:p.supportingTextSize!==undefined&&p.supportingTextSize!==null&&p.supportingTextSize!==""
        ?number(p.supportingTextSize,14,8,96):undefined,
-      textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description}</span>}
-   {(value||buttonText||customButtons.length>0)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
+      width:p.supportingBoxWidth!==undefined&&p.supportingBoxWidth!==null&&p.supportingBoxWidth!==""?number(p.supportingBoxWidth,0,0,1200)+"px":undefined,
+      minHeight:p.supportingBoxHeight!==undefined&&p.supportingBoxHeight!==null&&p.supportingBoxHeight!==""?number(p.supportingBoxHeight,0,0,1200)+"px":undefined,
+      borderRadius:p.supportingRadius!==undefined?number(p.supportingRadius,0,0,600):undefined,
+      boxShadow:p.supportingShadow==="large"?"0 8px 20px #0003":p.supportingShadow==="medium"?"0 3px 9px #0003":p.supportingShadow==="small"?"0 1px 4px #0002":undefined,
+      whiteSpace:p.supportingWrapText===false?"nowrap":p.supportingWrapText===true?"pre-line":undefined,
+      textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description||(p.builderPreview?"Supporting text":"")}</span>}
+   {(value||buttonText||customButtons.length>0||p.builderPreview)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
     style={{...smartPartOffsetStyle(p,"footer"),backgroundColor:p.footerBackgroundColor||undefined,
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
      height:p.footerHeight!==undefined&&p.footerHeight!==null&&p.footerHeight!==""
@@ -395,6 +405,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
          :p.cardButtonShape==="shape:rectangle"?0:8),
        color:readableText(p.cardButtonFill||p.accentColor||SMART_BLUE,p.cardButtonTextColor)||"#fff",
        fontSize:number(p.cardButtonTextSize,14,8,48),
+       boxShadow:p.cardButtonShadow==="large"?"0 8px 20px #0003":p.cardButtonShadow==="medium"?"0 3px 9px #0003":p.cardButtonShadow==="small"?"0 1px 4px #0002":undefined,
        width:p.cardButtonWidth!==undefined&&p.cardButtonWidth!==null&&p.cardButtonWidth!==""
         ?number(p.cardButtonWidth,0,0,1200)+"px":undefined,
        height:p.cardButtonHeight!==undefined&&p.cardButtonHeight!==null&&p.cardButtonHeight!==""
@@ -419,7 +430,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     })}
    </div>}
   </div>}
-  {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
+  {(Boolean(badge)||p.builderPreview)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{...smartPartOffsetStyle(p,"badge"),fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
    color:badgeResult.error?formulaDisplayErrorColor:readableText(p.badgeBodyColor||SMART_BLUE,p.badgeTextColor)||"#fff",
    background:badgeResult.error?"#fff":p.badgeBodyColor||SMART_BLUE,
@@ -430,11 +441,14 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     ?number(p.badgeWidth,0,0,1200)+"px":undefined,
    height:p.badgeHeight!==undefined&&p.badgeHeight!==null&&p.badgeHeight!==""
     ?number(p.badgeHeight,0,0,1200)+"px":undefined,
+   boxShadow:p.badgeShadow==="large"?"0 8px 20px #0003":p.badgeShadow==="medium"?"0 3px 9px #0003":p.badgeShadow==="small"?"0 1px 4px #0002":undefined,
+   textAlign:p.badgeTextAlignment||undefined,
+   whiteSpace:p.badgeWrapText===false?"nowrap":p.badgeWrapText===true?"normal":undefined,
    boxSizing:"border-box",
    ...(p.badgeWidth!==undefined&&p.badgeWidth!==null&&p.badgeWidth!==""||
        p.badgeHeight!==undefined&&p.badgeHeight!==null&&p.badgeHeight!==""
        ?{display:"inline-flex",alignItems:"center",justifyContent:"center"}:{})
-   }}>{badge}</span>}
+   }}>{badge||(p.builderPreview?"Badge":"")}</span>}
  </article>;
 }
 /**
@@ -799,7 +813,7 @@ function SmartTabs({p,record,fire}){
      // Wrap Text: the tab keeps its set width and a long caption wraps inside it.
      maxWidth:!vertical&&p.wrapText===true?number(p.tabWidth,120):undefined,
      borderLeft:vertical?"4px solid "+(selectedTabIndex===index?(p.selectedTabColor||SMART_BLUE):"transparent"):undefined,
-     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
+     borderRadius:number(p.radius,10),fontSize:number(p.textSize,16),fontWeight:p.headerBold===true?700:p.headerBold===false?400:undefined,textAlign:p.labelAlignment||"center",boxShadow:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":"none",color:selectedTabIndex===index?selectedTabText(p.selectedTabColor||SMART_BLUE,p.selectedTextColor):readableText(p.tabColor||"#fff",p.labelColor),
      background:selectedTabIndex===index?p.selectedTabColor||SMART_BLUE:p.tabColor||"#fff",
     borderColor:p.borderColor||undefined}}
     tabIndex={selectedTabIndex===index||selectedTabIndex<0&&index===0?0:-1}
@@ -1235,6 +1249,9 @@ export default function SmartRuntime(p){
    style={{
    boxSizing:"border-box",width:"100%",height:"100%",minHeight:0,minWidth:0,
    overflowY:"auto",overflowX:"auto",
+   border:p.gridBorderColor?"1px solid "+p.gridBorderColor:undefined,
+   borderRadius:p.gridRadius!==undefined?number(p.gridRadius,0,0,600):undefined,
+   boxShadow:p.gridShadow==="large"?"0 8px 20px #0003":p.gridShadow==="medium"?"0 3px 9px #0003":p.gridShadow==="small"?"0 1px 4px #0002":undefined,
    // Contain sideways swipes only: a vertical swipe that reaches the end of the
    // grid must keep scrolling the page on phones.
    overscrollBehaviorX:"contain",overscrollBehaviorY:"auto",
@@ -1334,7 +1351,11 @@ export default function SmartRuntime(p){
         onClick={()=>{fire("click",item);if(p.onNavigate&&item?.target)p.onNavigate(item.target)}}>
         {safeSrc&&<img data-design-area={p.builderPreview?"Image":undefined} src={safeSrc} alt="" style={{
          width:number(p.imageWidth,22,8,200),height:number(p.imageHeight,22,8,200),objectFit:fit,
-         border:p.imageBorderColor?"1px solid "+p.imageBorderColor:undefined,boxSizing:"border-box"}}/>}{label}
+         border:p.imageBorderColor?"1px solid "+p.imageBorderColor:undefined,
+         backgroundColor:p.imageBackgroundColor||undefined,
+         borderRadius:p.imageRadius!==undefined?number(p.imageRadius,0,0,600):undefined,
+         boxShadow:p.imageShadow==="large"?"0 8px 20px #0003":p.imageShadow==="medium"?"0 3px 9px #0003":undefined,
+         boxSizing:"border-box"}}/>}{label}
       </button>;
     })}
   </nav>;

@@ -256,7 +256,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
   return design2TemplateSlots.map(template=>{
    const actual=areaSlots.find(slot=>slot.slotKey===template.slotKey);
    const cardBodyKey=area==='Card Body'&&['smart_card_grid','smart_id_card'].includes(api)
-     ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow',height:'cardMinHeight',width:'cardMinWidth'} as Record<string,string>)[template.slotKey]
+     ?({fill:'backgroundColor',border:'borderColor',radius:'radius',shadow:'shadow',height:'cardBodyHeight',width:'cardBodyWidth'} as Record<string,string>)[template.slotKey]
      :undefined;
    const bodyImagePlacement=area==='Body'&&template.slotKey==='placement'&&
     ['smart_card_grid','smart_id_card','smart_image','smart_cart'].includes(api);

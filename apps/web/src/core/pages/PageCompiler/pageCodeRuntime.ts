@@ -268,7 +268,19 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   /** Related value the page read for this row (@Product.ImageUrl on a cart line). */
   m(row:unknown,path:string){
    const values=(row as {__mentionValues?:Record<string,unknown>}|null)?.__mentionValues;
-   const value=values&&typeof values==='object'?values['@'+path]:undefined;
+   if(!values||typeof values!=='object')return '';
+   const exact='@'+path;
+   if(Object.prototype.hasOwnProperty.call(values,exact)){
+    const value=values[exact];
+    return value===undefined||value===null?'':value;
+   }
+   // Page scripts are cached per saved page revision. Older scripts emitted
+   // `Product.ImageUrl`; current metadata hydration stores the same validated
+   // lookup as `CartLine.Product.ImageUrl`. Match that legacy suffix only when
+   // it identifies one hydrated path on this row.
+   const suffix='.'+path;
+   const matches=Object.keys(values).filter(key=>key.endsWith(suffix));
+   const value=matches.length===1?values[matches[0]]:undefined;
    return value===undefined||value===null?'':value;
   }
   connected(name:unknown){return isConnected(identity()?.connections as never,name);}

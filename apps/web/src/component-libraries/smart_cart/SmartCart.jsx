@@ -278,7 +278,7 @@ export default function SmartCart({p,records,Picture,expression,fieldAllowed,fir
       const selected=selectedKey===rowKey;
       const selectRow=()=>setSelectedKey(rowKey);
       return <div key={rowKey} data-row-key={rowKey} className={"smart-cart-row-wrap"+(selected?" is-selected":"")}
-       style={{
+       style={{boxShadow:shadow(p.rowShadow),
         ...(p.rowWidth!==undefined&&p.rowWidth!==null&&p.rowWidth!==""
          ?{width:n(p.rowWidth,0,0,10000)+"px",maxWidth:"100%"}:{}),
         // Selected Row Border is retired: a selected row keeps its normal border.

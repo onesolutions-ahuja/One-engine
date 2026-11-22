@@ -41,6 +41,7 @@ test('a single selected-part key is written for each SQL slot, with no duplicate
   ['smart_cart','Row','shadow','rowShadow'],
   ['smart_numpad','Focused','bold','numpadFocusedBold'],
   ['smart_image','Image','width','imageWidth'],
+  ['smart_image','Header','alignment','labelAlignment'],
   ['smart_card_grid','Body','fill','gridBackgroundColor'],
   ['smart_id_card','Body','fill','gridBackgroundColor'],
   ['smart_card_grid','Button','width','customButton1Width'],
@@ -91,9 +92,9 @@ test('selected-part styles are actually consumed by the correct component render
  assert.ok(buttons.includes("p[key+'Shadow']"));
 });
 
-test('Smart Image header alignment prioritises the selected header property',()=>{
+test('Smart Image Header selection edits the rendered Label Alignment value',()=>{
  const runtime=read('../src/component-libraries/smart/shared/SmartRuntime.jsx');
- assert.match(runtime,/textAlign:\(p\.headerAlignment\|\|p\.labelAlignment\)\|\|"left"/);
+ assert.match(runtime,/textAlign:\(single\?p\.labelAlignment\|\|p\.headerAlignment:p\.headerAlignment\|\|p\.labelAlignment\)\|\|"left"/);
  assert.match(runtime,/const header=text\(headerResult\.value\)\|\|\(sample\?"Product Name":preview\?"Text here":""\)/);
  assert.match(runtime,/\(Boolean\(badge\)\|\|p\.builderPreview\)/);
 });

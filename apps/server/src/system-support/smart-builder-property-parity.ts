@@ -113,8 +113,8 @@ const special:Mapping[]=[
   ['radius','Radius'],['shadow','Shadow'],['height','Height'],['width','Width']]),
  ...part('smart_image','Header','header',[
   ['fill','BodyColor'],['border','BorderColor'],['height','BoxHeight'],
-  ['width','BoxWidth'],['shadow','Shadow'],['wrap','WrapText'],
-  ['alignment','Alignment']]),
+  ['width','BoxWidth'],['shadow','Shadow'],['wrap','WrapText']]),
+ map('smart_image','Header','alignment','labelAlignment'),
  ...part('smart_image','Badge','badge',[
   ['fill','BodyColor'],['border','BorderColor'],['height','Height'],
   ['width','Width'],['shadow','Shadow'],['wrap','WrapText'],
@@ -180,7 +180,7 @@ export async function applySmartBuilderPropertyParity(client:Query){
  await client.query(`INSERT INTO md_builder_design2_slots
   (area,area_order,slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key)
   SELECT 'Grid',COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area='Grid'),8),
-   slot_key,row_no,order_no,width_px,height_px,property_key,fallback_key
+   slot_key,row_no,order_no+100,width_px,height_px,property_key,fallback_key
   FROM md_builder_design2_slots WHERE area='Body' AND row_no BETWEEN 1 AND 3
    AND slot_key NOT LIKE 'extra_%'
   ON CONFLICT(area,slot_key) DO NOTHING`);

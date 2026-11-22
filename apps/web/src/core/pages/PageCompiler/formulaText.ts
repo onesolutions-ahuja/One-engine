@@ -102,7 +102,17 @@ class StandaloneScope{
  }
  m(row:unknown,path:string){
   const values=(row as {__mentionValues?:Row}|null)?.__mentionValues;
-  const value=values&&typeof values==='object'?values['@'+path]:undefined;
+  if(!values||typeof values!=='object')return '';
+  const exact='@'+path;
+  if(Object.prototype.hasOwnProperty.call(values,exact)){
+   const value=values[exact];
+   return value===undefined||value===null?'':value;
+  }
+  // Retain compatibility with saved page scripts compiled before lookup paths
+  // were qualified by their row object (e.g. `Product.ImageUrl` on CartLine).
+  const suffix='.'+path;
+  const matches=Object.keys(values).filter(key=>key.endsWith(suffix));
+  const value=matches.length===1?values[matches[0]]:undefined;
   return value===undefined||value===null?'':value;
  }
  connected(name:unknown){return isConnected(identity()?.connections as never,name);}

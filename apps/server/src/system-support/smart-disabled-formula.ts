@@ -1,3 +1,4 @@
+import {addSharedProperties,addOthersSlots,type Spec} from './smart-chart.js';
 /** "Disable when" formula for Smart Buttons — upgrade-safe, additive SQL metadata.
  * A formula such as  @ThisPage.Total.Value = 0  greys the button out and ignores taps while
  * it is TRUE (Pay / Hold at £0). Blank keeps today's behaviour (always enabled).
@@ -5,6 +6,9 @@
 type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>};
 export const DISABLE_WHEN_COMPONENTS=['smart_button'] as const;
 export async function applySmartDisabledFormula(client:Query){
+ const specs:Spec[]=['disabledFormula','itemDisabledWhen'].map((key,index)=>[key,index?'Item disabled when':'Disabled','Design2','Others','expression',null,'[]',null,null]);
+ await addSharedProperties(client,specs);
+ await addOthersSlots(client,specs,1800);
  await client.query(`
   WITH last_order AS (SELECT COALESCE(MAX(sort_order),0) AS n FROM md_builder_shared_properties)
   INSERT INTO md_builder_shared_properties
@@ -18,8 +22,17 @@ export async function applySmartDisabledFormula(client:Query){
  await client.query(`
   INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,default_value_override)
   SELECT c.component_api,'disabledFormula',true,NULL FROM md_builder_ribbon_components c
-  WHERE c.component_api=ANY($1::text[])
-  ON CONFLICT(component_api,property_key) DO NOTHING`,[[...DISABLE_WHEN_COMPONENTS]]);
+  ON CONFLICT(component_api,property_key) DO NOTHING`);
+ await client.query("UPDATE md_builder_shared_properties SET label='Disabled',tab='Design2',section_group='Others' WHERE property_key='disabledFormula'");
+ await client.query(`INSERT INTO md_builder_shared_properties(property_key,label,tab,section_group,control_kind,sort_order,scope,field_select)
+  SELECT 'itemDisabledWhen','Item disabled when',tab,'Others','expression',sort_order+1,'component',true
+  FROM md_builder_shared_properties WHERE property_key='disabledFormula' ON CONFLICT DO NOTHING`);
+ await client.query(`INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+  SELECT component_api,'itemDisabledWhen',true FROM md_builder_ribbon_components WHERE component_api=ANY($1::text[])
+  ON CONFLICT DO NOTHING`,[['smart_card_grid','smart_selector','smart_tabs','smart_table','smart_line_items']]);
+ await client.query(`INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+  SELECT r.component_api,d.area,d.slot_key,d.property_key FROM md_builder_design2_slots d JOIN md_builder_ribbon_component_rules r
+  ON r.property_key=d.property_key AND r.enabled WHERE d.slot_key IN ('extra_disabledFormula','extra_itemDisabledWhen') ON CONFLICT DO NOTHING`);
 }
 
 /** Numpad "Date" input type (DD/MM/YYYY, slashes added while typing) — additive choice. */

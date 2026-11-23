@@ -49,7 +49,8 @@ export function sessionValue(path:string,state:Readonly<Row>):unknown{
  if(path.startsWith('user.field.')){
   const fields=(user?.Fields??{}) as Row,name=path.slice(11).toLowerCase();
   const key=Object.keys(fields).find(item=>item.toLowerCase()===name);
-  const value=key===undefined?undefined:fields[key];
+  if(key===undefined)throw Error('Unknown tenant value @ThisTenant.User.'+path.slice(11));
+  const value=fields[key];
   return value===undefined||value===null?'':value;
  }
  if(path.startsWith('user.')&&sessionUser[path.slice(5)])return user?.[sessionUser[path.slice(5)]]??'';

@@ -1,3 +1,4 @@
+import {disabledWhen} from "../shared/showWhen.js";
 import icons from "../smart_icon/iconCatalog.json";
 import {smartCustomButtonAppearance} from "../smart/shared/SmartCustomButtonAppearance.js";
 import {smartPartSide} from "../smart/shared/SmartPartPlacement.js";
@@ -195,7 +196,8 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
      const active=selected===id;
      // Selected Row Border is retired: a selected row keeps its normal border.
      const borderColor=p.rowBorderColor;
-     return <tr key={id} data-design-area={p.builderPreview?"Row":undefined} tabIndex={0} aria-selected={active}
+     const disabled=disabledWhen(p,row,"itemDisabledWhen");
+     return <tr inert={disabled?true:undefined} aria-disabled={disabled||undefined} key={id} data-design-area={p.builderPreview?"Row":undefined} tabIndex={0} aria-selected={active}
        style={rowStyle(row)} onClick={()=>pick(row)}
        onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){
         event.preventDefault();pick(row);

@@ -1,3 +1,4 @@
+import {disabledWhen} from "../../shared/showWhen.js";
 import {convertedFormula,formulaConverter} from "../../shared/formulaCodeLookup.js";
 import {buildCollectionSource} from "../../shared/collectionSource.js";
 import {withRowTotals} from "../../shared/rowTotals.js";
@@ -506,7 +507,7 @@ function SmartSelector({p,fire}){
   const row=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{Name:raw,__collectionValue:raw};
   const caption=p.textSource?scopedExpression(p,"textSource",p.textSource,row):"";
   const label=text(caption||(row.__collectionLabel??row.label??row.Name??row.name??row.title??row.id??""));
-  return {index,label,value:row.__collectionValue??row.value??row.Id??row.id??index,record:row};
+  return {index,label,disabled:disabledWhen(p,row,'itemDisabledWhen'),value:row.__collectionValue??row.value??row.Id??row.id??index,record:row};
  });
  const fingerprint=JSON.stringify(options.map(item=>[item.label,item.value]));
  // Nothing is chosen until the user picks (or the page gives a value, e.g.
@@ -538,12 +539,12 @@ function SmartSelector({p,fire}){
    value={selected<0?"":String(selected)} data-empty={selected<0?"true":undefined}
    onChange={event=>{
     const index=Number(event.target.value),item=options[index];
-    if(!item)return;
+    if(!item||item.disabled)return;
     setActive(index);
     fire("change",{index,value:item.value,label:item.label,record:item.record});
    }}>
    {selected<0&&<option value="" disabled>{options.length?placeholder:"No options"}</option>}
-   {options.map(item=><option value={String(item.index)} key={item.index}>{item.label}</option>)}
+   {options.map(item=><option disabled={item.disabled} value={String(item.index)} key={item.index}>{item.label}</option>)}
   </select>
  </div>;
 }
@@ -590,12 +591,12 @@ function SmartMultiSelector({p,fire,options,fingerprint}){
    <input className="smart-multi-selector-search" type="search" placeholder="Search…" aria-label={"Search "+caption}
     value={query} onChange={event=>setQuery(event.target.value)} autoFocus/>
    <div className="smart-multi-selector-tools">
-    <button type="button" onClick={()=>publish(new Set(options.map(item=>String(item.value))))}>Select all</button>
+    <button type="button" onClick={()=>publish(new Set(options.filter(item=>!item.disabled).map(item=>String(item.value))))}>Select all</button>
     <button type="button" onClick={()=>publish(new Set())}>Clear</button>
    </div>
    <div className="smart-multi-selector-list">
     {visible.map(item=>{const value=String(item.value);return <label key={item.index} className="smart-multi-selector-item">
-     <input type="checkbox" checked={picked.has(value)} onChange={()=>toggle(value)}/>{item.label}</label>;})}
+     <input type="checkbox" disabled={item.disabled} checked={picked.has(value)} onChange={()=>toggle(value)}/>{item.label}</label>;})}
     {!visible.length&&<p className="smart-multi-selector-empty">No matches</p>}
    </div>
   </div>}
@@ -689,7 +690,7 @@ function SmartTabs({p,record,fire}){
  const recordTabs=collectionTabs??(dynamic?(isBuilderEmpty(p)?Array.from({length:Math.min(count,5)},(_,i)=>({
    label:"Tab "+(i+1),id:"editor-tab-"+i
   })):recordsOf(p).slice(0,count).map(row=>({
-   label:scopedExpression(p,"textSource",p.textSource,row),id:row?.Id??row?.id
+   record:row,label:scopedExpression(p,"textSource",p.textSource,row),id:row?.Id??row?.id
   }))):Array.from({length:count},(_,i)=>Array.isArray(p.tabs)&&p.tabs[i]!==undefined
    ?p.tabs[i]:i===0&&typeof p.label==="string"&&p.label&&!p.label.startsWith("@")
      ?p.label:"Tab "+(i+1)));
@@ -836,7 +837,7 @@ function SmartTabs({p,record,fire}){
     flexDirection:vertical?"column":"row",flexWrap:vertical?"nowrap":"wrap",
     alignItems:vertical?"stretch":undefined,alignContent:vertical?"flex-start":"stretch",
     overflowY:vertical?"auto":undefined,overflowX:vertical?"hidden":undefined}}>
-   {tabs.map((tab,index)=><button data-md-bind={p.builderPreview?(dynamic||hasCollection?"textSource":"tabCaptionFormula"):undefined} data-md-bind-titles={p.builderPreview?"Tab caption":undefined} data-md-bind-index={p.builderPreview&&!(dynamic||hasCollection)?index:undefined} data-md-bind-item={p.builderPreview&&typeof tab?.id==="string"?tab.id:undefined} key={tab?.id??index} ref={index===selectedTabIndex?selectedTabRef:null} type="button" role="tab"
+   {tabs.map((tab,index)=><button data-md-bind={p.builderPreview?(dynamic||hasCollection?"textSource":"tabCaptionFormula"):undefined} data-md-bind-titles={p.builderPreview?"Tab caption":undefined} data-md-bind-index={p.builderPreview&&!(dynamic||hasCollection)?index:undefined} data-md-bind-item={p.builderPreview&&typeof tab?.id==="string"?tab.id:undefined} key={tab?.id??index} ref={index===selectedTabIndex?selectedTabRef:null} type="button" role="tab" disabled={disabledWhen(p,tab?.record??tab,"itemDisabledWhen")}
     aria-selected={selectedTabIndex===index} style={{height:number(p.tabHeight,44),
      maxHeight:vertical?undefined:"100%",minHeight:vertical?number(p.tabHeight,44):0,
      flex:vertical?"0 0 auto":"1 1 auto",
@@ -1343,6 +1344,7 @@ export default function SmartRuntime(p){
       onSelect={!legacyWrapper&&(selectable||!hasButton&&hasCustomButton&&actionable)?selectRecord:null}
       onButtonClick={actionable?selectRecord:null}
       onCustomButton={key=>fire(key,{record:r,recordId})}/>;
+    if(disabledWhen(p,r,"itemDisabledWhen"))return <div key={recordKey??i} inert={true} aria-disabled="true" style={{opacity:0.5,pointerEvents:"none"}}>{card}</div>;
     return legacyWrapper
       ?<button key={r?.Id??r?.id??i} type="button" className="smart-grid-action"
         aria-label={"Select "+text(r?.Name??r?.name??r?.label??"product")}

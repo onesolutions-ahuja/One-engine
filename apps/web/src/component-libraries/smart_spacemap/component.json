@@ -1,0 +1,36 @@
+{
+  "apiName": "smart_spacemap",
+  "label": "Space Map",
+  "category": "Data",
+  "description": "Position and select records on a map.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_spacemap/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_spacemap/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 600,
+    "defaultHeight": 350,
+    "minWidth": 96,
+    "minHeight": 40
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "click",
+      "label": "click"
+    },
+    {
+      "apiName": "longPress",
+      "label": "longPress"
+    },
+    {
+      "apiName": "change",
+      "label": "change"
+    }
+  ]
+}

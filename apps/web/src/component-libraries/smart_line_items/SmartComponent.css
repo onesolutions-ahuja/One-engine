@@ -10,3 +10,5 @@
 .smart-line-items-second{padding-left:12px;font-size:.85em;opacity:.75;overflow-wrap:anywhere;white-space:pre-line}
 .smart-line-items-extra{padding-left:12px;font-size:.85em}
 .smart-line-items-empty{margin:0;padding:8px;color:#8e8e93;font-size:12px;border:1px dashed #d1d1d6}
+
+.smart-line-items [aria-disabled="true"]{opacity:.5;pointer-events:none}

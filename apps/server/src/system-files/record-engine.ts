@@ -1,3 +1,4 @@
+import {setupObject,setupRecords,changeSetupRecord} from './setup-records.js';
 import {randomUUID} from 'node:crypto';
 import {auditContext} from '../system-support/audit-context.js';
 import {scopedMetadata} from '../system-support/record-read-scope.js';
@@ -1000,6 +1001,7 @@ export class RecordEngine {
     return prepared;
   }
   async create(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>) {
+    if(setupObject(objectApi))return changeSetupRecord(this.db,this.rbac,tenantId,userId,objectApi,values);
     return this.createRecord(tenantId,userId,objectApi,values,false);
   }
   private async createRecord(tenantId:string,userId:string,objectApi:string,
@@ -1411,6 +1413,7 @@ export class RecordEngine {
   }
   async list(tenantId:string,userId:string,objectApi:string,limit=50,offset=0,
     options:RecordListOptions={}) {
+    if(setupObject(objectApi))return setupRecords(this.db,this.rbac,tenantId,userId,objectApi,limit,offset,options);
     // One list read on its own: setup and decisions are read once for it, not kept after.
     if(!recordReadScope())return this.soloScope(()=>this.listInScope(tenantId,userId,objectApi,limit,offset,options),true);
     return this.listInScope(tenantId,userId,objectApi,limit,offset,options);
@@ -1832,6 +1835,11 @@ export class RecordEngine {
 
   /** Single-record read uses the same tenant and field-level grants as list, without pagination. */
   async get(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient):Promise<Record<string,unknown>> {
+    if(setupObject(objectApi)){
+      const result=await setupRecords(client??this.db,this.rbac,tenantId,userId,objectApi,1,0,{},id);
+      if(!result.records[0])throw Error('Record not found');
+      return result.records[0];
+    }
     // In a page action a record read between two writes is read once (any write forgets all).
     const scope=recordReadScope();
     // One read on its own: setup and decisions are read once for it and not kept after.
@@ -1910,6 +1918,7 @@ export class RecordEngine {
   }
   async update(tenantId:string,userId:string,objectApi:string,id:string,values:Record<string,unknown>,
     ifUnmodifiedSince?:string,client?:PoolClient,runTriggers=false):Promise<void> {
+    if(setupObject(objectApi))throw Error("Read-only setup fields");
     if(!recordReadScope())return this.soloScope(()=>
       this.update(tenantId,userId,objectApi,id,values,ifUnmodifiedSince,client,runTriggers),false);
     forgetScopedRecords();
@@ -2258,6 +2267,7 @@ export class RecordEngine {
 
   /** Object-level delete permission and record access are checked for the root. */
   async remove(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient,ifUnmodifiedSince?:string):Promise<void> {
+    if(setupObject(objectApi)){await changeSetupRecord(this.db,this.rbac,tenantId,userId,objectApi,null,id);return;}
     if(!recordReadScope())return this.soloScope(()=>
       this.remove(tenantId,userId,objectApi,id,client,ifUnmodifiedSince),false);
     forgetScopedRecords();

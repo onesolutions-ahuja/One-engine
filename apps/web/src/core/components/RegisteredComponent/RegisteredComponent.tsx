@@ -1,3 +1,4 @@
+import {disabledWhen} from '../../../component-libraries/shared/showWhen.js';
 import {usePageFormulaScope,useFormulaDependencyVersion,PublishedFormulaProperties} from './PageFormulaScope';
 import {useSharedRendererStyle} from './sharedRendererStyle';
 import * as React from 'react';
@@ -54,9 +55,11 @@ function RegisteredComponentBody({ definition, props, appearanceProps, layoutTra
   const Component = useMemo(() => resolveTrustedModule(definition.compiledJs), [definition.compiledJs]);
   useSharedRendererStyle(definition.scopedCss);
 
+  const disabled=!props.builderPreview&&!props.designMode&&(props.disabled===true||disabledWhen(props,props.record??{}));
   const appearanceStyle = registeredComponentAppearance(appearanceProps);
   const appearanceClass = registeredComponentAppearanceClasses(appearanceProps);
   return <div className={`registered-component metadrive-component-${definition.apiName.toLowerCase()} ${appearanceClass}`}
+    ref={element=>{if(element)element.inert=disabled;}} aria-disabled={disabled||undefined}
     style={layoutTransparent?{...appearanceStyle,display:'contents'}:appearanceStyle}>
     {typeof document==='undefined'&&definition.scopedCss&&<style>{definition.scopedCss}</style>}
     <Component {...props} {...((definition as LibraryComponentMetadata & {sharedSmartRuntime?:boolean}).sharedSmartRuntime===true

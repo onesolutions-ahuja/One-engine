@@ -949,6 +949,12 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    onFormulaState:reportProperties,
    loadAsset:(id:string)=>requestPageMediaAsset<{contentType:string;contentBase64:string}>(runtime.request,id,getAccessToken()??''),
    viewRevision:source.version,
+   ...(definition.apiName==='smart_spacemap'?{writeMapRecord:async(method:'POST'|'PUT'|'DELETE',id:string|undefined,values?:Record<string,unknown>)=>{
+    if(!objectApiName||method!=='POST'&&!id)throw Error('Select an object and record');
+    await runtime.request('/records/'+encodeURIComponent(objectApiName)+(id?'/'+encodeURIComponent(id):''),
+     {method,...(values?{body:JSON.stringify(values)}:{})});
+    saved({objectApiNames:[objectApiName]});
+   }}:{}),
    loadCompanySettings:()=>runtime.request('/metadata/currencies'),
    uploadImage:(file:File)=>uploadTenantImageFile(file),
    fieldAccess:(objectApi:string)=>loadFieldAccess(runtime.request as never,objectApi),

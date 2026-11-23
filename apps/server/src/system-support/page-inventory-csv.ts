@@ -59,6 +59,7 @@ const inventoryPropertyAllowed=(key:string)=>!excludedInventoryProperties.has(ke
  * optional SQL Ribbon slots. Do not invent per-page keys from saved values. */
 const sharedPageSettings:ComponentSettingDefinition[]=[
  {...pagePropertyContract,section:'Advanced'},
+ {propertyKey:'disabledFormula',label:'Disabled',kind:'TEXT',maxLength:2000,section:'Others'},
  {propertyKey:'visibilityRules',label:'Visibility conditions',kind:'GROUP',
   fields:conditionSettings,section:'View'},
  {propertyKey:'actionFlows',label:'Configured Actions',kind:'GROUP',section:'Actions'},
@@ -73,6 +74,8 @@ const sharedPageSettings:ComponentSettingDefinition[]=[
 ];
 const pageSettingsFor=(type:string):ComponentSettingDefinition[]=>[
  ...sharedPageSettings,
+ ...(['smart_card_grid','smart_selector','smart_tabs','smart_table','smart_line_items'].includes(componentApi(type))?
+ [{propertyKey:'itemDisabledWhen',label:'Item disabled when',kind:'TEXT' as const,maxLength:2000,section:'Others'}]:[]),
  ...(type==='Record Field'?recordFieldSettings:type==='Field Section'?recordSectionSettings:[])
 ];
 const isPlain=(value:unknown):value is Record<string,unknown>=>value!==null

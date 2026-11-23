@@ -27,12 +27,17 @@ export type FormulaBindingContext={
 const SESSION_IDENTITY_KEY=Symbol.for('une.authenticatedFormulaIdentity');
 const scalars=(value:unknown):Record<string,unknown>=>{
   const out:Record<string,unknown>=Object.create(null);
-  if(value&&typeof value==='object'&&!Array.isArray(value))for(const [key,item] of Object.entries(value).slice(0,200))
+  if(value&&typeof value==='object'&&!Array.isArray(value))for(const [key,item] of Object.entries(value))
     if(/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key)&&(item===null||['string','number','boolean'].includes(typeof item)))out[key]=item;
   return out;
 };
 function sessionPermissions(value:unknown):FormulaBindingContext['customPermissions']{
-  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  if(Array.isArray(value)){
+    const names:Record<string,boolean>=Object.create(null);
+    for(const name of value)if(typeof name==='string')names[name.toLowerCase()]=true;
+    return {names,others:false};
+  }
+  if(!value||typeof value!=='object')return null;
   const source=value as {names?:unknown;others?:unknown};
   const names:Record<string,boolean>=Object.create(null);
   if(source.names&&typeof source.names==='object'&&!Array.isArray(source.names))

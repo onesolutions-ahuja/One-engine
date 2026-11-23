@@ -16,13 +16,36 @@ type Deps={db:Pick<SqlPersistence,'transaction'>;records:Pick<RecordEngine,'list
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** This device's Till, plus the active Tills to pick from when it is not set up yet. */
-export async function deviceTill(deps:Deps,actor:Actor,deviceKey:unknown):Promise<{till:Row|null;tills:Row[];mirrorKey:string}>{
+export async function deviceTill(deps:Deps,actor:Actor,deviceKey:unknown,attachedDevices?:unknown):Promise<{till:Row|null;tills:Row[];mirrorKey:string;suggestedTillId?:string}>{
  const till=await findDeviceTill(deps.records,actor,deviceKey);
  const mirrorKey=await findMirrorKey(deps.records,actor,deviceKey);
  if(till)return {till,tills:[],mirrorKey};
+ // An installed app lists the devices it sees attached (window.__uneAttachedDevices). A drawer
+ // or printer fixed to exactly one Till sets this device up as that Till, if this person may;
+ // otherwise that Till is offered first. Browsers send nothing and the page asks as before.
+ const suggested=await attachedTill(deps,actor,attachedDevices);
+ if(suggested){
+  try{return {till:await setDeviceTill(deps,actor,deviceKey,suggested),tills:[],mirrorKey};}catch{/* asks below */}
+ }
  const page=await deps.records.list(actor.tenant_id,actor.user_id,TILL_DEVICE_OBJECT,100,0,{sortField:'Name',sortDirection:'asc',
   filters:tillFilters()}) as {records:Row[]};
- return {till:null,mirrorKey,tills:page.records.map(row=>({Id:row.Id,Name:row.Name??'',Code:row.Code??'',Location:row.Location??''}))};
+ const tills=page.records.map(row=>({Id:row.Id,Name:row.Name??'',Code:row.Code??'',Location:row.Location??''}))
+  .sort((a,b)=>Number(b.Id===suggested)-Number(a.Id===suggested));
+ return {till:null,mirrorKey,tills,...(suggested?{suggestedTillId:suggested}:{})};
+}
+
+/** The one Till that the attached devices (USB/Bluetooth/serial IDs) are fixed to, or ''. */
+export async function attachedTill(deps:Pick<Deps,'records'>,actor:Actor,attachedDevices:unknown):Promise<string>{
+ const ids=Array.isArray(attachedDevices)?[...new Set(attachedDevices.filter((id):id is string=>
+  typeof id==='string'&&/^[\x21-\x7e]{3,128}$/.test(id)))].slice(0,20):[];
+ if(!ids.length)return '';
+ const tills=new Set<string>();
+ for(const field of ['Address','DeviceId']){
+  const found=await deps.records.list(actor.tenant_id,actor.user_id,TILL_DEVICE_OBJECT,50,0,{filters:[
+   {field,operator:'in',value:ids},{field:'Active',operator:'eq',value:'true'}]}) as {records:Row[]};
+  for(const row of found.records)if(typeof row.AttachedTill==='string'&&uuid.test(row.AttachedTill))tills.add(row.AttachedTill);
+ }
+ return tills.size===1?[...tills][0]:'';
 }
 
 /** Set this device up as one Till (a device is one Till; a Till is one device). */

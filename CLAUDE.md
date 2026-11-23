@@ -51,3 +51,6 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
 - Measure with `Date.now()` in two tabs of the same browser (MutationObserver on the changed text). Background tabs
   are throttled: front the tab being measured. Smart Till data is dummy: test sales are fine.
 - Never type passwords; if signed out, ask the owner to sign in.
+
+## Installed apps (Android / Windows)
+- Building or changing an installed app: follow `docs/APP-BUILD-CHECKLIST.md`. The app must set `window.__uneDeviceKey` and `window.__uneAttachedDevices` at start-up, or tills keep asking "Which till is this?".

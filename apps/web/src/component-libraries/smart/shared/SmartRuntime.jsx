@@ -476,6 +476,14 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
  * zero-based first option; options use the same authorised Object/Collection rows
  * as Tabs and Card Grid, or an explicit Page State array.
  */
+function selectorPicklist(ref,objects){
+ const match=/^([A-Za-z_]\w*)\.([A-Za-z_]\w*)$/.exec(typeof ref==="string"?ref.trim():"");
+ if(!match||!Array.isArray(objects))return null;
+ const field=objects.find(object=>object?.apiName===match[1])?.fields?.find(item=>item?.apiName===match[2]);
+ if(!Array.isArray(field?.picklistValues))return null;
+ return field.picklistValues.map(value=>typeof value==="string"?value:value?.value??value?.label)
+  .filter(value=>typeof value==="string"&&value).slice(0,200);
+}
 function SmartSelector({p,fire}){
  // Prefer Page Runtime's authorised collection. When a standalone editor or
  // Flow preview has no collection owner, resolve the same bounded typed
@@ -488,8 +496,11 @@ function SmartSelector({p,fire}){
    node=>{const converter=formulaConverter(p);
     return converter?converter.compileNode(node)(recordOf(p)):collectionLiteral(node);}):null;
  const formulaItems=Array.isArray(fallback?.value?.items)?fallback.value.items:null;
+ // "Picklist field" (Object.Field): the field's picklist values from Object Manager, so a
+ // reason list is edited in one place and every selector using it follows.
+ const picklistItems=selectorPicklist(p.selectorPicklistField,p.objects);
  const rows=sourced?recordsOf(p)
-  :formulaItems??(Array.isArray(p.options)&&p.options.length?p.options
+  :picklistItems??formulaItems??(Array.isArray(p.options)&&p.options.length?p.options
    :Array.isArray(p.items)&&p.items.length?p.items:recordsOf(p));
  const options=rows.slice(0,200).map((raw,index)=>{
   const row=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{Name:raw,__collectionValue:raw};

@@ -13,6 +13,11 @@ One file for the whole plan. Updated page by page. Source research: Codex notes 
 - Order of work: plan each page here, agree it, then make the CSV, then test.
 - Claude: planning and code (opens the PR, stops there). Owner: merge, CI, deploy.
 
+## Till from attached devices (22 Nov)
+- Browser: the till asks "Which till is this?" after login (kept for now, BYOD).
+- Installed apps (Android/Windows) must report attached devices: see `docs/APP-BUILD-CHECKLIST.md`. A Named Device with **Attached to Till** then picks the Till automatically.
+- Chrome: could list a USB/serial device after a one-time Allow (later).
+
 ## Priorities
 | # | Feature | Priority | Status |
 |---|---------|----------|--------|

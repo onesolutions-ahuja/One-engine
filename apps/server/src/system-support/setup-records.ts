@@ -1,8 +1,9 @@
-import type {SqlPersistence} from './sql-persistence.js';
-import type {RbacEngine} from './rbac-engine.js';
-import type {RecordListOptions} from './record-engine.js';
-import {resetRecordReadScope} from '../system-support/record-read-scope.js';
-import {clearRequestRbacMemo} from '../system-support/audit-context.js';
+import {compileRecordFilters} from '../object-engine/QueryBuilder.js';
+import type {SqlPersistence} from '../system-files/sql-persistence.js';
+import type {RbacEngine} from '../system-files/rbac-engine.js';
+import type {RecordListOptions} from '../system-files/record-engine.js';
+import {resetRecordReadScope} from './record-read-scope.js';
+import {clearRequestRbacMemo} from './audit-context.js';
 
 // Existing setup tables use composite primary keys. The record API needs a stable UUID.
 const recordId=(key:string)=>`overlay(overlay(md5(${key}) placing '8' from 13 for 1) placing '8' from 17 for 1)::uuid`;
@@ -37,12 +38,29 @@ export async function setupRecords(db:Pick<SqlPersistence,'query'>,rbac:RbacEngi
  if(options.relatedField)conditions.push(column(options.relatedField)+'='+param(options.relatedId));
  if(options.filterField)conditions.push(column(options.filterField)+'::text='+param(options.filterValue));
  if(options.search){const search=param('%'+options.search+'%');conditions.push('('+readable.map(f=>column(f)+'::text ILIKE '+search).join(' OR ')+')');}
- if(options.filters?.length||options.filterLogic||options.cursor||options.scope&&options.scope!=='all'||options.filterOperator&&options.filterOperator!=='Equals')
+ if(options.filters?.length){
+  const metadata=new Map(readable.map(f=>[f,{api_name:f,data_type:['User','PermissionSet','CustomPermission'].includes(f)?'reference':'text',
+   nativeValue:'r.'+column(f),nativeText:'r.'+column(f)+'::text'}]));
+  const built=compileRecordFilters(options.filters,options.filterLogic,metadata,args.length+1);
+  conditions.push(built.predicate.replace(/\br\.id\b/g,'r."Id"'));args.push(...built.parameters);
+ }
+ if(options.scope&&options.scope!=='all'||options.filterOperator&&options.filterOperator!=='Equals')
   throw Error('Unsupported setup record filter');
- const sql='SELECT '+readable.map(column).join(',')+',count(*) over() AS total FROM ('+sources[name]+') r'+(conditions.length?' WHERE '+conditions.join(' AND '):'')+
-  ' ORDER BY '+column(options.sortField??'Id')+(options.sortDirection==='desc'?' DESC':' ASC')+',"Id" LIMIT '+param(Math.min(100,Math.max(1,limit)))+' OFFSET '+param(Math.max(0,offset));
+ const field=options.sortField??'Id',direction=options.sortDirection??'asc',sort=column(field);
+ const comparison=direction==='desc'?'<':'>';
+ const base='SELECT '+readable.map(column).join(',')+',count(*) over() AS total FROM ('+sources[name]+') r'+(conditions.length?' WHERE '+conditions.join(' AND '):'');
+ let after='';
+ if(options.cursor){
+  const cursor=options.cursor;
+  if((cursor.field??'Id')!==field||cursor.direction!==direction)throw Error('Invalid setup record cursor');
+  const cursorId=param(cursor.id),value=param(cursor.value);
+  after=' WHERE ('+sort+'::text '+comparison+' '+value+' OR ('+sort+'::text IS NOT DISTINCT FROM '+value+' AND "Id">'+cursorId+'::uuid))';
+ }
+ const sql='SELECT * FROM ('+base+') page'+after+' ORDER BY '+sort+' '+direction+',"Id" ASC LIMIT '+param(Math.min(100,Math.max(1,limit)))+' OFFSET '+param(options.cursor?0:Math.max(0,offset));
  const {rows}=await db.query(sql,args);
- return {records:rows.map(({total,...row})=>row),total:Number(rows[0]?.total??0)};
+ const last=rows.at(-1);
+ const nextCursor=last?Buffer.from(JSON.stringify({field:options.sortField??null,direction,value:last[field]==null?null:String(last[field]),id:last.Id})).toString('base64url'):undefined;
+ return {nextCursor,records:rows.map(({total,...row})=>row),total:Number(rows[0]?.total??0)};
 }
 export async function changeSetupRecord(db:SqlPersistence,rbac:RbacEngine,tenant:string,user:string,name:ObjectName,values:Record<string,unknown>|null,id?:string){
  if(name!=='UserPermissionSet'&&name!=='PermissionSetCustomPermission')throw Error('Read-only setup object');

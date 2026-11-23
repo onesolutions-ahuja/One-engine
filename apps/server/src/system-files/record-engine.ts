@@ -1,4 +1,4 @@
-import {setupObject,setupRecords,changeSetupRecord} from './setup-records.js';
+import {setupObject,setupRecords,changeSetupRecord} from '../system-support/setup-records.js';
 import {randomUUID} from 'node:crypto';
 import {auditContext} from '../system-support/audit-context.js';
 import {scopedMetadata} from '../system-support/record-read-scope.js';
@@ -1001,11 +1001,14 @@ export class RecordEngine {
     return prepared;
   }
   async create(tenantId:string,userId:string,objectApi:string,values:Record<string,unknown>) {
-    if(setupObject(objectApi))return changeSetupRecord(this.db,this.rbac,tenantId,userId,objectApi,values);
     return this.createRecord(tenantId,userId,objectApi,values,false);
   }
   private async createRecord(tenantId:string,userId:string,objectApi:string,
     values:Record<string,unknown>,isClone:boolean,existingClient?:PoolClient):Promise<string> {
+    if(setupObject(objectApi)){
+      if(isClone)throw Error('Setup records cannot be cloned');
+      return changeSetupRecord(this.db,this.rbac,tenantId,userId,objectApi,values);
+    }
     if(!recordReadScope())return this.soloScope(()=>
       this.createRecord(tenantId,userId,objectApi,values,isClone,existingClient),false);
     forgetScopedRecords();

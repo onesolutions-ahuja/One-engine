@@ -1,6 +1,6 @@
 import type {PoolClient} from 'pg';
 
-type Field={name:string;type:string;length?:number;target?:string;choices?:string[];unique?:boolean};
+type Field={name:string;type:string;length?:number;target?:string;choices?:string[];unique?:boolean;formula?:string};
 export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Field[]}>= [
  {name:'PermissionSet',existing:true,fields:[{name:'Name',type:'text'},{name:'Label',type:'text'},{name:'Description',type:'text'}]},
  {name:'CustomPermission',existing:false,fields:[{name:'Name',type:'text'},{name:'Label',type:'text'}]},
@@ -61,7 +61,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  {name:'Customer',existing:true,fields:[
   {name:'CreditLimit',type:'number'},
   {name:'Balance',type:'number'},
-  {name:'AvailableCredit',type:'number'},
+  {name:'AvailableCredit',type:'formula',formula:'$Record.CreditLimit + $Record.Balance'},
   {name:'AccountOnHold',type:'boolean'},
  ]},
  {name:'CashLedger',existing:true,fields:[
@@ -130,11 +130,11 @@ export async function seedEposObjects(client:PoolClient,tenantId:string){
    [tenantId,object.name,object.name.replace(/([a-z])([A-Z])/g,'$1 $2'),['CustomPermission','PermissionSetCustomPermission','UserPermissionSet'].includes(object.name)]);
  }
  for(const object of EPOS_OBJECTS)for(const field of object.fields){
-  await client.query(`INSERT INTO md_field_definitions(tenant_id,object_api,api_name,label,data_type,related_object,max_length,is_unique,required)
-   SELECT $1,$2,$3,$4,$5,$6,$7,$8,false WHERE EXISTS
+  await client.query(`INSERT INTO md_field_definitions(tenant_id,object_api,api_name,label,data_type,related_object,max_length,is_unique,required,formula_expression,formula_return_type)
+   SELECT $1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10 WHERE EXISTS
    (SELECT 1 FROM md_object_definitions WHERE tenant_id=$1 AND api_name=$2 AND deleted_at IS NULL)
    ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
-   [tenantId,object.name,field.name,field.name.replace(/([a-z])([A-Z])/g,'$1 $2'),field.type,field.target??null,field.length??null,field.unique??false]);
+   [tenantId,object.name,field.name,field.name.replace(/([a-z])([A-Z])/g,'$1 $2'),field.type,field.target??null,field.length??null,field.unique??false,field.formula??null,field.formula?'number':null]);
   if(field.choices)await addChoices(client,tenantId,object.name,field.name,field.choices);
  }
  await addChoices(client,tenantId,'CashLedger','Method',['Customer credit','Gift card','On account']);

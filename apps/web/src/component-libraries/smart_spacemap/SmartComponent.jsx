@@ -61,7 +61,7 @@ export default function SmartComponent(p){
  const read=(row,key)=>runComponentFormula(p,p[key],row).value;
  if(hiddenByShowWhen(p))return null;
  const disabled=p.disabled||disabledWhen(p);
- return <section className="space-map" aria-disabled={disabled||undefined} inert={disabled?true:undefined}>
+ return <section className="space-map" style={{fontFamily:p.fontFamily}} aria-disabled={disabled||undefined} ref={node=>{if(node)node.inert=Boolean(disabled);}}>
   {edit&&<header><button type="button" onClick={()=>{const name=window.prompt("Item name");if(name)void write("POST",null,{[fieldName(p.labelField)||"Name"]:name});}}>Add item</button>
    <button type="button" disabled={!selected} onClick={()=>{if(window.confirm("Delete selected item?"))void write("DELETE",{Id:selected}).then(ok=>{if(ok)select(null);});}}>Delete item</button></header>}
   {error&&<div role="alert">{error}</div>}

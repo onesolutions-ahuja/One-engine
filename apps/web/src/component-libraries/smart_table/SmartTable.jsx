@@ -197,9 +197,9 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
      // Selected Row Border is retired: a selected row keeps its normal border.
      const borderColor=p.rowBorderColor;
      const disabled=disabledWhen(p,row,"itemDisabledWhen");
-     return <tr inert={disabled?true:undefined} aria-disabled={disabled||undefined} key={id} data-design-area={p.builderPreview?"Row":undefined} tabIndex={0} aria-selected={active}
-       style={rowStyle(row)} onClick={()=>pick(row)}
-       onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){
+     return <tr ref={node=>{if(node)node.inert=disabled;}} aria-disabled={disabled||undefined} key={id} data-design-area={p.builderPreview?"Row":undefined} tabIndex={0} aria-selected={active}
+       style={rowStyle(row)} onClick={()=>{if(!disabled)pick(row);}}
+       onKeyDown={event=>{if(disabled)return;if(event.key==="Enter"||event.key===" "){
         event.preventDefault();pick(row);
        }}}>
        {startActions.length>0&&buttonCell(startActions,row,id,"start")}

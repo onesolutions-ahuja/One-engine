@@ -1344,7 +1344,7 @@ export default function SmartRuntime(p){
       onSelect={!legacyWrapper&&(selectable||!hasButton&&hasCustomButton&&actionable)?selectRecord:null}
       onButtonClick={actionable?selectRecord:null}
       onCustomButton={key=>fire(key,{record:r,recordId})}/>;
-    if(disabledWhen(p,r,"itemDisabledWhen"))return <div key={recordKey??i} inert={true} aria-disabled="true" style={{opacity:0.5,pointerEvents:"none"}}>{card}</div>;
+    if(disabledWhen(p,r,"itemDisabledWhen"))return <div key={recordKey??i} ref={node=>{if(node)node.inert=true;}} aria-disabled="true" style={{opacity:0.5,pointerEvents:"none"}}>{card}</div>;
     return legacyWrapper
       ?<button key={r?.Id??r?.id??i} type="button" className="smart-grid-action"
         aria-label={"Select "+text(r?.Name??r?.name??r?.label??"product")}

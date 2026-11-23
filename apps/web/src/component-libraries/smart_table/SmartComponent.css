@@ -17,4 +17,4 @@
 .smart-table-empty{padding:18px}
 @media(max-width:640px){.smart-table-native th,.smart-table-native td{padding:5px 7px}}
 
-.smart-table [aria-disabled="true"]{opacity:.5;pointer-events:none}
+.smart-table-root [aria-disabled="true"]{opacity:.5;pointer-events:none}

@@ -55,3 +55,13 @@ test('open carts on other tills: <> and NOW() minus minutes compile to server fi
  const ago=(Date.now()-Date.parse(out.filters[2].value))/60000;
  assert.ok(ago>1&&ago<4,String(out.filters[2].value));
 });
+
+test('a written "" is a blank test: <> "" keeps filled rows, = "" keeps blank rows',()=>{
+ const notBlank=compileRecordFilterFormula('AND(@Product.Name <> "Ready", @Product.Name <> "")',fields,{});
+ assert.equal(notBlank.blocked,false,notBlank.error);
+ assert.deepEqual(notBlank.filters,[{field:'Name',operator:'ne',value:'Ready'},{field:'Name',operator:'isNotBlank',value:''}]);
+ const blank=compileRecordFilterFormula('@Product.Name = ""',fields,{});
+ assert.deepEqual(blank.filters,[{field:'Name',operator:'isBlank',value:''}]);
+ // An empty @ThisPage value still blocks until it is chosen.
+ assert.equal(compileRecordFilterFormula('@Product.Name = @ThisPage.Input.pick',fields,{}).blocked,true);
+});

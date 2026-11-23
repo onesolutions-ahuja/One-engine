@@ -188,7 +188,9 @@ export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=ne
    ['component.position.x',{value:component.position?.x,tab:'Layout'}],
    ['component.position.y',{value:component.position?.y,tab:'Layout'}],
    ['component.position.width',{value:component.position?.width,tab:'Layout'}],
-   ['component.position.height',{value:component.position?.height,tab:'Layout'}]
+   ['component.position.height',{value:component.position?.height,tab:'Layout'}],
+   // The container this component sits in (Smart Container, Smart MultiPage page...).
+   ['component.parent',{value:parentName(page.components,component,names),tab:'Layout'}]
   ]);
   const properties=component.properties??{};
   const published=new Map<string,{tab:string;defaultValue?:unknown;kind?:string}>();
@@ -220,10 +222,15 @@ export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=ne
 }
 type CsvRow={line:number;cells:string[]};
 type CsvFormat='typed'|'legacy';
-function parseCsv(text:string):{rows:CsvRow[];issues:InventoryIssue[];columns:number;format:CsvFormat;
+/** Header + rows of a page CSV (for the Excel workbook). */
+export function inventoryCsvTable(text:string):{header:string[];rows:string[][];issues:InventoryIssue[]}{
+ const parsed=parseCsv(text,9000000);
+ return {header:parsed.header,rows:parsed.rows.map(row=>row.cells),issues:parsed.issues};
+}
+function parseCsv(text:string,limit=1800000):{rows:CsvRow[];issues:InventoryIssue[];columns:number;format:CsvFormat;
  layoutIndex:number;header:string[]}{
  const issues:InventoryIssue[]=[];
- if(text.length>1800000)return {rows:[],columns:5,format:'typed',layoutIndex:-1,header:[],issues:[{row:1,component_name:'',component_property:'',remark:'CSV exceeds the 1.8 MB import limit'}]};
+ if(text.length>limit)return {rows:[],columns:5,format:'typed',layoutIndex:-1,header:[],issues:[{row:1,component_name:'',component_property:'',remark:'CSV exceeds the 1.8 MB import limit'}]};
  const rows:CsvRow[]=[],current:string[]=[];
  let cell='',quoted=false,afterQuote=false,line=1,start=1;
  const finishCell=()=>{current.push(cell);cell='';afterQuote=false;};
@@ -249,7 +256,7 @@ function parseCsv(text:string):{rows:CsvRow[];issues:InventoryIssue[];columns:nu
   }else if(ch==='"'){
    issues.push({row:start,component_name:'',component_property:'',remark:'Unexpected quote in CSV value'});
   }else cell+=ch;
-  if(rows.length>50000){
+  if(rows.length>(limit>1800000?200000:50000)){
    issues.push({row:line,component_name:'',component_property:'',remark:'CSV exceeds 50,000 rows'});
    break;
   }
@@ -491,6 +498,20 @@ export function applyInventoryCsv(page:InventoryPage,csv:string,definitions:Defi
    }else if(name==='region'){
     if(!['header','main','sidebar'].includes(value.trim())){report(entry,'Invalid component region');continue;}
     if(component.region!==value.trim()){component.region=value.trim();changes++;}
+   }else if(name==='parent'){
+    // Put this component inside a container by its name; "none" moves it to the page.
+    const wanted=value.trim();
+    if(/^none$/i.test(wanted)){
+     if(component.properties?.layoutParentId){delete component.properties.layoutParentId;changes++;}
+     continue;
+    }
+    const parent=byName.get(canonicalComponentName(wanted));
+    if(!parent){report(entry,'Parent component not found: '+wanted);continue;}
+    if(!isContainerBlock(parent)){report(entry,'Parent must be a container (e.g. Smart Container, Smart MultiPage)');continue;}
+    if(parent.id===component.id||insideOf(copy.components,parent.id,component.id)){
+     report(entry,'A component cannot be placed inside itself');continue;}
+    if(component.properties?.layoutParentId!==parent.id){
+     component.properties={...(component.properties??{}),layoutParentId:parent.id};changes++;}
    }else if(name.startsWith('position.')){
     const coord=name.slice('position.'.length);
     if(!['x','y','width','height'].includes(coord)){report(entry,'Unknown canvas position property');continue;}
@@ -562,4 +583,26 @@ export function applyInventoryCsv(page:InventoryPage,csv:string,definitions:Defi
  if(issues.length===0&&changes>0)copy.components=ensureComponentInstanceNames(copy.components);
  issues.sort((a,b)=>a.row-b.row);
  return {valid:issues.length===0,issues,changes,skipped,page:copy};
+}
+
+/** Containers a CSV row may put components into (same rule as the Page Builder). */
+function isContainerBlock(block:Block):boolean{
+ return ['Container','Row','Column','Card','Grid','Tabs','Accordion'].includes(block.type)
+  ||block.type==='Custom:ui_container'||block.type==='Custom:smart_multipage'
+  ||(block.type==='Custom:smart_container'&&block.properties?.layoutContainer!==false)
+  ||(block.type.startsWith('Custom:')&&block.properties?.layoutContainer===true);
+}
+const parentIdOf=(block:Block):string=>
+ typeof block.properties?.layoutParentId==='string'?block.properties.layoutParentId as string:String((block as {parentId?:unknown}).parentId??'');
+/** True when `id` sits somewhere inside `ancestorId`. */
+function insideOf(blocks:Block[],id:string,ancestorId:string):boolean{
+ const byId=new Map(blocks.map(b=>[b.id,b]));const seen=new Set<string>();
+ let current=byId.get(id)?parentIdOf(byId.get(id)!):'';
+ while(current&&!seen.has(current)){if(current===ancestorId)return true;seen.add(current);
+  const next=byId.get(current);current=next?parentIdOf(next):'';}
+ return false;
+}
+function parentName(blocks:Block[],block:Block,names:Map<string,string>):string{
+ const id=parentIdOf(block);
+ return id&&blocks.some(b=>b.id===id)?names.get(id)??'':'';
 }

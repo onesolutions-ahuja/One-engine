@@ -1,4 +1,5 @@
 import {multiPageChildren} from './multiPageChildren';
+import {nestedCanvasStyle} from '../TemplatePageRuntime/pageComponentLayout';
 import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {readLocal,writeLocal} from '../PageCompiler/localCopy';
 import {componentLayer,layerShows,usePageLayer} from './pageLayers';
@@ -1545,7 +1546,7 @@ function LightningAppRuntime({
       data-page-style={pageAppearanceStyleKeys(resolvePageComponentStyle(component.properties, component.type, layoutDevice))}
       style={{
         ...(nested
-          ? { position: 'relative', left: 'auto', top: 'auto', width: '100%', height: 'auto', minHeight: 40 }
+          ? nestedCanvasStyle(page.components, component)
           : {
               left: component.position?.x ?? 0,
               top: component.position?.y ?? 0,

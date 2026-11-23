@@ -1,4 +1,5 @@
 import {multiPageChildren} from '../../../../pages/PageRuntime/multiPageChildren';
+import {nestedCanvasStyle} from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { loadCanvasAsset } from './canvasAssetCache';
 import CanvasFloatingActions from '../../CanvasFloatingActions';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
@@ -196,7 +197,7 @@ export function createPageCanvasRenderer(
       style={{
         ...((!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas'
           ? nested
-            ? { position: 'relative', left: 'auto', top: 'auto', width: '100%', height: 'auto', minHeight: 40 }
+            ? nestedCanvasStyle(page.components, component)
             : {
                 left: component.position?.x ?? 0,
                 top: component.position?.y ?? 0,

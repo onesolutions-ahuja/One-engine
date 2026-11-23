@@ -56,8 +56,11 @@ export function translateCanvasSelection(
   components:readonly Component[],ids:readonly string[],dx:number,dy:number,page:PageSize
 ):Component[]{
   const selected=new Set(ids);
+  // Moves happen at one level: the page, or inside one container (positions count from it).
+  const first=components.find(item=>selected.has(item.id)&&item.position);
+  const level=first?parentOf(first):null;
   const targets=components.filter(item=>selected.has(item.id)&&item.position
-    &&!parentOf(item)&&item.properties.editorLocked!==true
+    &&parentOf(item)===level&&item.properties.editorLocked!==true
     );
   if(!targets.length||(!dx&&!dy))return [...components];
   const minX=Math.min(...targets.map(item=>item.position!.x));

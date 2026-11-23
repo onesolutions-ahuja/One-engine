@@ -4,7 +4,7 @@ import { canvasGroupKey, canvasGroupMembers, canvasGroupBounds } from '../../can
 import { constrainCanvasRect } from '../../canvasPointerInteractions';
 import { marqueeCanvasIds, translateCanvasSelection } from '../../canvasSelectionInteractions';
 import { useCanvasGroupGestures } from '../../useCanvasGroupGestures';
-import { rawLayoutParentId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
+import { containerCanvasSize, rawLayoutParentId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { findRegisteredComponent } from '../../../../components/Registry/componentRegistryLookup';
 import { canvasBoundPosition, canvasUnitsFromScreenDelta } from '../../../../pages/PageRuntime/pageCanvas';
 import { type PageComponentMetadata } from '../../../../metadata/Definitions/metadata';
@@ -46,8 +46,11 @@ export function useCanvasGestures(
     const memberIds=selectionIds.includes(component.id)?selectionIds:
       groupEditId===component.id?[component.id]:
       canvasGroupMembers(page.components,component).map(item=>item.id);
+    // Components inside a container move inside it (only with siblings of the same container).
+    const parentId=rawLayoutParentId(component);
     const moving=page.components.filter(item=>memberIds.includes(item.id)
-      &&item.position&&!rawLayoutParentId(item)&&!isCanvasLocked(item));
+      &&item.position&&rawLayoutParentId(item)===parentId&&!isCanvasLocked(item));
+    const limits=parentId?containerCanvasSize(page.components,parentId):{width:page.canvasWidth,height:page.canvasHeight};
     if(!moving.length||moving.some(item=>canvasGroupKey(item)&&groupEditId!==item.id
       &&canvasGroupMembers(page.components,item).some(member=>
         !memberIds.includes(member.id)||isCanvasLocked(member))))return;
@@ -64,7 +67,8 @@ export function useCanvasGestures(
     canvasMoveStart.current={
       id:component.id,pointerId:event.pointerId,pointerX:event.clientX,pointerY:event.clientY,
       original:{...bounds},element,x:bounds.x,y:bounds.y,
-      members:members.map(member=>({...member,element:member.element!}))
+      members:members.map(member=>({...member,element:member.element!})),
+      limits,nested:Boolean(parentId)
     };
     setSelectedRegion(null);setSelectedId(component.id);setSelectionIds(memberIds);
     setPageSettingsOpen(false);
@@ -77,14 +81,18 @@ export function useCanvasGestures(
     const x=start.original.x+canvasUnitsFromScreenDelta(event.clientX-start.pointerX,scale);
     const y=start.original.y+canvasUnitsFromScreenDelta(event.clientY-start.pointerY,scale);
     const movingIds=new Set(start.members.map(member=>member.id));
-    const bounds={width:page.canvasWidth,height:page.canvasHeight};
+    const bounds=start.limits??{width:page.canvasWidth,height:page.canvasHeight};
+    const parentId=page.components.find(item=>item.id===start.id);
+    const sameParent=parentId?rawLayoutParentId(parentId):null;
     const next=canvasSnap?snapCanvasPosition({...start.original,x,y},bounds,
-      page.components.filter(item=>!movingIds.has(item.id)&&!rawLayoutParentId(item)&&item.position)
+      page.components.filter(item=>!movingIds.has(item.id)&&rawLayoutParentId(item)===sameParent&&item.position)
         .map(item=>item.position!),true):
       {position:canvasBoundPosition({...start.original,x,y},bounds,false),guides:{x:false,y:false}};
     start.x=next.position.x;start.y=next.position.y;
     const dx=start.x-start.original.x,dy=start.y-start.original.y;
     start.members.forEach(member=>{member.element.style.translate=`${dx}px ${dy}px`;});
+    // Guides are drawn in page units: not shown while moving inside a container.
+    if(start.nested)next.guides={x:false,y:false};
     if(canvasGuideXRef.current){
       canvasGuideXRef.current.style.display=next.guides.x?'block':'none';
       canvasGuideXRef.current.style.left=`${start.x}px`;
@@ -114,7 +122,7 @@ export function useCanvasGestures(
       suppressCanvasClickRef.current=true;
       window.requestAnimationFrame(()=>{suppressCanvasClickRef.current=false;});
       const next=translateCanvasSelection(page.components,start.members.map(item=>item.id),dx,dy,
-        {width:page.canvasWidth,height:page.canvasHeight});
+        start.limits??{width:page.canvasWidth,height:page.canvasHeight});
       applyPage({...page,components:next});
     }
   };

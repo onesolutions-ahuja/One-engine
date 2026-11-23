@@ -277,6 +277,7 @@ export function createSystemServer(db:SqlPersistence) {
   // XLSX is carried as base64 JSON; bound this route separately from ordinary API payloads.
   app.use('/api/metadata/loader',express.json({limit:'15mb'}));
   app.use('/api/data-loader',express.json({limit:'15mb'}));
+  app.use('/api/metadata/pages/inventory/xlsx',express.json({limit:'10mb'}));
   app.use(express.json({limit:'2mb'}));
   app.use(express.urlencoded({extended:false,limit:'1mb'}));
   app.use((_req,res,next)=>{res.set(browserSecurityHeaders({frame_policy:'DENY',csp_enabled:true}));next();});

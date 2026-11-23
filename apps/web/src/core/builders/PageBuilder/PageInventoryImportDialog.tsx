@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import './PageInventoryImportDialog.css';
+import {pageCsvFromFile} from './pageInventoryExcel';
 
 type Issue={row:number;pageapi?:string;component_type?:string;component_name:string;component_property:string;value?:string;remark:string};
 type Preview={valid:boolean;issues:Issue[];changes:number;skipped:number;
@@ -33,9 +34,10 @@ export default function PageInventoryImportDialog({request,onClose,onApplied}:Pr
  const loadFile=async(file:File|undefined)=>{
   setCsv('');setFileName(file?.name??'');setPreview(null);setError('');
   if(!file)return;
-  if(!file.name.toLowerCase().endsWith('.csv')){setError('Choose a CSV file.');return;}
-  if(file.size>1800000){setError('CSV files must be smaller than 1.8 MB.');return;}
-  try{setCsv(await file.text());}catch{setError('Unable to read the CSV file.');}
+  if(!/\.(xlsx|csv)$/i.test(file.name)){setError('Choose an Excel (.xlsx) file.');return;}
+  if(file.size>6000000){setError('Files must be smaller than 6 MB.');return;}
+  try{setCsv(await pageCsvFromFile(request,file));}
+  catch(failure){setError(failure instanceof Error?failure.message:'Unable to read the Excel file.');}
  };
  const validate=async()=>{
   if(!csv||busy)return;
@@ -45,7 +47,7 @@ export default function PageInventoryImportDialog({request,onClose,onApplied}:Pr
     '/metadata/pages/inventory/batch/validate',
     {method:'POST',body:JSON.stringify({variant:'Desktop',csv})});
    setPreview(result);
-  }catch(failure){setError(failure instanceof Error?failure.message:'Unable to validate the CSV file.');}
+  }catch(failure){setError(failure instanceof Error?failure.message:'Unable to validate the file.');}
   finally{setBusy(false);}
  };
  const apply=async()=>{
@@ -60,7 +62,7 @@ export default function PageInventoryImportDialog({request,onClose,onApplied}:Pr
    onApplied(result.updatedPages,result.changes);
   }catch(failure){
    setPreview(null);
-   setError(failure instanceof Error?failure.message:'Unable to apply CSV updates. Validate again.');
+   setError(failure instanceof Error?failure.message:'Unable to apply the updates. Validate again.');
   }finally{setBusy(false);}
  };
  return <div className="modal-backdrop" role="presentation" onMouseDown={event=>{
@@ -69,17 +71,17 @@ export default function PageInventoryImportDialog({request,onClose,onApplied}:Pr
   <section className="modal page-inventory-import-dialog" role="dialog" aria-modal="true"
    aria-labelledby="page-inventory-import-title">
    <div className="modal-header">
-    <h2 id="page-inventory-import-title">Upload component inventory CSV</h2>
+    <h2 id="page-inventory-import-title">Upload page Excel</h2>
     <button className="btn btn-small" type="button" onClick={onClose} disabled={busy}>Close</button>
    </div>
-   <p className="modal-copy">The CSV pageapi column selects each existing page automatically, including multiple pages in one upload.
+   <p className="modal-copy">The Pages sheet's pageapi column selects each existing page automatically, including multiple pages in one upload.
     Missing pages cause a validation error and are never created. Existing component names update their properties;
     missing component names create instances of installed component types. All pages validate before any change is saved.</p>
    <div className="page-inventory-import-fields">
     <div className="page-inventory-file">
      <p className="page-inventory-help"><strong>Layout column picks Desktop, Tablet, Mobile or Custom drafts · Multiple existing pages supported</strong></p>
-     <label className="form-label" htmlFor="page-inventory-csv">Choose CSV file</label>
-     <input id="page-inventory-csv" type="file" accept=".csv,text/csv" disabled={busy}
+     <label className="form-label" htmlFor="page-inventory-csv">Choose Excel file (.xlsx)</label>
+     <input id="page-inventory-csv" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv" disabled={busy}
       onChange={e=>void loadFile(e.target.files?.[0])}/>
      <p className="page-inventory-file-name">{fileName||'No file selected'}</p>
      <p className="page-inventory-help">Expected: pageapi, component_type, component_name, propertyid, value, layout (optional), ribbon_tab (optional).
@@ -98,7 +100,7 @@ export default function PageInventoryImportDialog({request,onClose,onApplied}:Pr
     </p>
     {preview.issues.length>0&&<>
      <div className="page-inventory-issue-heading">
-      <strong>CSV errors — no changes saved</strong>
+      <strong>Errors — no changes saved</strong>
       <button className="btn btn-small" type="button" onClick={()=>downloadErrors(preview.issues,'multipage')}>
        Download error report CSV
       </button>
@@ -117,7 +119,7 @@ export default function PageInventoryImportDialog({request,onClose,onApplied}:Pr
    <div className="modal-actions">
     <button className="btn" type="button" onClick={onClose} disabled={busy}>Cancel</button>
     <button className="btn" type="button" onClick={()=>void validate()}
-     disabled={busy||!csv}>{busy?'Checking…':'Validate CSV'}</button>
+     disabled={busy||!csv}>{busy?'Checking…':'Validate'}</button>
     <button className="btn btn-brand" type="button" onClick={()=>void apply()}
      disabled={busy||!preview?.valid||!preview.changes}>Apply validated upsert</button>
    </div>

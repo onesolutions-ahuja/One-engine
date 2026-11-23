@@ -36,6 +36,8 @@ jobs:
         env:
           EPOS_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test
         run: node --import tsx --test apps/server/test/eposPlatform.test.ts apps/web/test/spaceMap.test.mjs apps/web/test/tenantFormulaValues.test.ts
+      - name: Core metadata version guard and Smart MultiPage
+        run: node --import tsx --test apps/server/test/coreObjectsVersion.test.ts apps/web/test/smartMultiPage.test.mjs
       - name: Native storage RecordEngine PostgreSQL tests
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test

@@ -79,7 +79,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v17: Company (one record per tenant: company details, receipts; read as @ThisTenant.Company.*).
 // v18: NamedDevice.AttachedTill (a drawer/printer fixed to a Till; apps find the Till from it).
 // v21: Order/OrderLine created; Customer duplicate ledger balance fields retired (AccountBalance kept).
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v21';
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v22';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
@@ -91,8 +91,11 @@ const metadata=[
 /** One upgrade-safe reconciliation for all shared Core metadata. Existing
  * tenant choices are retained by the catalogs' conflict-safe inserts.
  */
+/** Checksum of the Core metadata above. Any change to it needs a new
+ * CORE_OBJECTS_BOOTSTRAP_VERSION, or the server refuses to start (test: coreObjectsVersion). */
+export const coreObjectsChecksum=()=>createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
 export async function reconcileCoreObjects(db:SqlPersistence):Promise<number>{
- const checksum=createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
+ const checksum=coreObjectsChecksum();
  const count=await db.transaction(async client=>{
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['metadrive:system:migrations']);
   const applied=await client.query<{checksum:string}>(

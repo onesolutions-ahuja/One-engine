@@ -1,5 +1,6 @@
 import {applySpaceMap} from './smart-spacemap.js';
 import {applySmartMultiPage} from './smart-multipage.js';
+import {applySmartNumpadRound} from './smart-numpad-round.js';
 import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
 import {RECORD_ACCESS_FAST_DDL} from './record-access-fast.js';
 import {createHash} from 'node:crypto';
@@ -859,6 +860,7 @@ INSERT INTO md_system_permission_catalogue(permission_key,label,description,reso
  ON CONFLICT DO NOTHING;`);
   await applySpaceMap(client);
   await applySmartMultiPage(client);
+  await applySmartNumpadRound(client);
   await applySmartDisabledFormula(client);
   await applySmartNumpadDateMode(client);
   await applySmartCartSummaryVisible(client);

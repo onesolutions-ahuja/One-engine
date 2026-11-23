@@ -10,3 +10,4 @@
 .smart-numpad-prefix,.smart-numpad-suffix{position:absolute;top:50%;transform:translateY(-50%);pointer-events:none;font-size:.85em;color:#64748b;}
 .smart-numpad-prefix{left:14px}.smart-numpad-suffix{right:14px}
 @media(max-width:360px){.smart-numpad{padding:6px!important;}}
+.smart-numpad.is-selected .smart-numpad-input{border-color:#2563eb!important}

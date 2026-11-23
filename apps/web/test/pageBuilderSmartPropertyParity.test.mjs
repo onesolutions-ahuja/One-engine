@@ -96,5 +96,7 @@ test('Smart Image Header selection edits the rendered Label Alignment value',()=
  const runtime=read('../src/component-libraries/smart/shared/SmartRuntime.jsx');
  assert.match(runtime,/textAlign:\(single\?p\.labelAlignment\|\|p\.headerAlignment:p\.headerAlignment\|\|p\.labelAlignment\)\|\|"left"/);
  assert.match(runtime,/const header=text\(headerResult\.value\)\|\|\(sample\?"Product Name":preview\?"Text here":""\)/);
- assert.match(runtime,/\(Boolean\(badge\)\|\|p\.builderPreview\)/);
+ // The editor shows the badge only when it has a value (no "Badge" placeholder).
+ assert.match(runtime,/\{Boolean\(badge\)&&<span/);
+ assert.doesNotMatch(runtime,/"Supporting text"|p\.builderPreview\?"Badge":""/);
 });

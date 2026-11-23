@@ -106,8 +106,11 @@ const finite=(value:number):number=>{
   if(!Number.isFinite(value))throw new Error('Formula result must be finite');
   return value;
 };
+/** A blank value (empty field, empty text) counts as 0 in arithmetic, as in Excel:
+ * Quantity * Cost with no Cost yet is 0, not an error. Text that is not a number still fails. */
 const formulaNumber=(value:unknown):number=>{
-  const result=typeof value==='number'?value:typeof value==='string'&&value.trim()?Number(value):NaN;
+  const result=typeof value==='number'?value:value===null||value===undefined?0
+   :typeof value==='string'?(value.trim()?Number(value):0):NaN;
   return finite(result);
 };
 const formulaText=(value:unknown):string=>value===null||value===undefined?'':String(value);

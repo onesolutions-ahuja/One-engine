@@ -9,6 +9,7 @@ import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js'
 import {isSharedWiringProperty} from '../system-files/page-layout-device-inheritance.js';
 import {assertMetadataPackageEditable} from '../system-support/metadata-package-service.js';
 import {registerPageDetailsController} from './PageDetailsController.js';
+import {inventoryWorkbook,inventoryCsvFromWorkbook} from '../system-support/page-inventory-xlsx.js';
 import {applyInventoryCsv,exportInventoryCsv,inventoryDefinitions,inventoryRequestedTypes,inventoryCsvPageGroups,originalInventoryIssue,type InventoryPage,type InventoryCsvPageGroup,type InventoryIssue} from '../system-support/page-inventory-csv.js';
 import {validateExplicitComponentNames} from '../system-support/page-component-names.js';
 import {requirePagePropertyContract} from '../system-support/page-property-contract.js';
@@ -129,6 +130,23 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
     res.json({pages:await loadPageLayoutSummaries(db,actor.tenant_id,names)});
   }));
   // Read saved draft component metadata, never a browser-local or published runtime approximation.
+  /** Page CSV <-> one Excel workbook (Pages + Guide + Sample). Validate/apply stay CSV-based. */
+  app.post('/api/metadata/pages/inventory/xlsx/write',wrap(async(req,res)=>{
+    const actor=authenticated(req);
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');
+    const csv=typeof req.body?.csv==='string'?req.body.csv:'';
+    if(!csv||csv.length>9000000)throw new Error('Page data is empty or too large');
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({base64:inventoryWorkbook(csv).toString('base64')});
+  }));
+  app.post('/api/metadata/pages/inventory/xlsx/read',wrap(async(req,res)=>{
+    const actor=authenticated(req);
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');
+    const base64=typeof req.body?.base64==='string'?req.body.base64:'';
+    if(!base64||base64.length>8000000)throw new Error('Excel file is empty or larger than 6 MB');
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({csv:inventoryCsvFromWorkbook(Buffer.from(base64,'base64'))});
+  }));
   app.get('/api/metadata/pages/:apiName/inventory',wrap(async(req,res)=>{
     const actor=authenticated(req),name=req.params.apiName;
     if(!api.test(name))throw new Error('Invalid Page API name');

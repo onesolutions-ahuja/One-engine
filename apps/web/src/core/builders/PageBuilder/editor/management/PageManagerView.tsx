@@ -46,14 +46,14 @@ export default function PageManagerView({ props, editorState, management, layout
         <header className="page-manager-header"><div><h1>{recordPageContext ? 'Record Page Editor' : 'Page Builder'}</h1><p>{recordPageContext ? 'Object-owned record pages: view, edit, activate and publish device layouts.' : 'Manage Home and App Pages. Record Pages are managed inside Object Manager.'}</p></div>
           <div className="page-manager-header-actions">
             <button ref={createPageTriggerRef} className="btn btn-brand" type="button" onClick={openCreatePage}><Plus size={16}/> New Page</button>
-            <button className="btn" type="button" disabled={saving} onClick={()=>setInventoryUploadOpen(true)}><Upload size={16}/> Upload CSV</button>
+            <button className="btn" type="button" disabled={saving} onClick={()=>setInventoryUploadOpen(true)}><Upload size={16}/> Upload Excel</button>
             {!recordPageContext && <button className="btn" type="button" disabled={Boolean(inventoryDownloading)}
-              title="One CSV with every property of every page (colours, labels, formulas…). Edit it, then send it back with Upload CSV."
+              title="One Excel file with every property of every page (colours, labels, formulas…), plus a Guide and a Sample sheet. Edit it, then send it back with Upload Excel."
               onClick={()=>void downloadAllPageFormulas()}><Download size={16}/> {inventoryDownloading==='*'?'Downloading…':'Download all pages'}</button>}
-            <select className="form-control" aria-label="Inventory CSV device layout" title="Layout used by page inventory downloads"
+            <select className="form-control" aria-label="Excel download device layout" title="Layout used by page inventory downloads"
               style={{width:'min(172px, 100%)',minWidth:0,maxWidth:'100%',boxSizing:'border-box'}} value={inventoryExportVariant} onChange={event=>setInventoryExportVariant(event.target.value as PageLayoutVariant|'Auto')}>
-              <option value="Auto">CSV: Page’s layout</option>
-              {(['Desktop','Tablet','Mobile','Custom'] as const).map(device=><option key={device} value={device}>CSV: {device}</option>)}
+              <option value="Auto">Excel: Page’s layout</option>
+              {(['Desktop','Tablet','Mobile','Custom'] as const).map(device=><option key={device} value={device}>Excel: {device}</option>)}
             </select>
           </div></header>
         {/* Filters sit on the Page type row (or alone for Record Page Editor), so the list starts higher. */}
@@ -131,7 +131,7 @@ export default function PageManagerView({ props, editorState, management, layout
                 aria-label={'Edit page properties for '+item.label} title="Edit page properties"
                 onClick={()=>setPageDetailsApi(item.apiName)}><Pencil size={16}/></button>
               <button className="page-manager-icon-action" type="button" disabled={Boolean(inventoryDownloading)}
-                aria-label={'Download component inventory for '+item.label} title="Download component inventory CSV"
+                aria-label={'Download component inventory for '+item.label} title="Download page Excel"
                 onClick={()=>void downloadPageInventory(item)}><Download size={16}/></button>
               <button className="page-manager-icon-action" type="button" disabled={Boolean(inventoryDownloading)}
                 aria-label={'Download compiled script for '+item.label} title="Download the compiled page file (.js) the server builds"

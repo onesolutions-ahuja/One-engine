@@ -222,10 +222,15 @@ export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=ne
 }
 type CsvRow={line:number;cells:string[]};
 type CsvFormat='typed'|'legacy';
-function parseCsv(text:string):{rows:CsvRow[];issues:InventoryIssue[];columns:number;format:CsvFormat;
+/** Header + rows of a page CSV (for the Excel workbook). */
+export function inventoryCsvTable(text:string):{header:string[];rows:string[][];issues:InventoryIssue[]}{
+ const parsed=parseCsv(text,9000000);
+ return {header:parsed.header,rows:parsed.rows.map(row=>row.cells),issues:parsed.issues};
+}
+function parseCsv(text:string,limit=1800000):{rows:CsvRow[];issues:InventoryIssue[];columns:number;format:CsvFormat;
  layoutIndex:number;header:string[]}{
  const issues:InventoryIssue[]=[];
- if(text.length>1800000)return {rows:[],columns:5,format:'typed',layoutIndex:-1,header:[],issues:[{row:1,component_name:'',component_property:'',remark:'CSV exceeds the 1.8 MB import limit'}]};
+ if(text.length>limit)return {rows:[],columns:5,format:'typed',layoutIndex:-1,header:[],issues:[{row:1,component_name:'',component_property:'',remark:'CSV exceeds the 1.8 MB import limit'}]};
  const rows:CsvRow[]=[],current:string[]=[];
  let cell='',quoted=false,afterQuote=false,line=1,start=1;
  const finishCell=()=>{current.push(cell);cell='';afterQuote=false;};
@@ -251,7 +256,7 @@ function parseCsv(text:string):{rows:CsvRow[];issues:InventoryIssue[];columns:nu
   }else if(ch==='"'){
    issues.push({row:start,component_name:'',component_property:'',remark:'Unexpected quote in CSV value'});
   }else cell+=ch;
-  if(rows.length>50000){
+  if(rows.length>(limit>1800000?200000:50000)){
    issues.push({row:line,component_name:'',component_property:'',remark:'CSV exceeds 50,000 rows'});
    break;
   }

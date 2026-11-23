@@ -1192,7 +1192,7 @@ export class RecordEngine {
   /** Can this batch be saved set-based without anything seeing it part-way? */
   private async bulkAllowed(client:PoolClient,tenantId:string,userId:string,objectApi:string,
     operation:'created'|'updated',lists:ReadonlyArray<Record<string,unknown>>){
-    if(objectApi==='CashLedger'||objectApi==='User')return false;
+    if(objectApi==='CashLedger'||objectApi==='User'||setupObject(objectApi))return false;
     if(lists.some(values=>Object.getPrototypeOf(values)!==Object.prototype&&Object.getPrototypeOf(values)!==null))return false;
     if(lists.some(values=>Object.hasOwn(values,'OwnerId')||Object.hasOwn(values,'RecordTypeId')))return false;
     if(await this.triggerMayRun(client,tenantId,objectApi,operation,'before-save')

@@ -1,3 +1,4 @@
+import {loadCompanyValues} from './tenant-formula-values.js';
 import {spawn} from 'node:child_process';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
@@ -37,7 +38,13 @@ type PrintPage={
 };
 /** Only allow references to the authorised record. No remote URLs or HTML input
  * are executed. The same published page/version is used for immediate and delayed jobs. */
-export function resolvePrintValue(value:unknown,record:Record<string,unknown>,objectApi:string):string{
+type CompanyValues=Readonly<Record<string,string|number|boolean>>;
+const companyValue=(company:CompanyValues,field:string)=>{
+ const key=field.toLowerCase();
+ if(!Object.hasOwn(company,key))throw Error('Unknown tenant value @ThisTenant.Company.'+field);
+ return company[key];
+};
+export function resolvePrintValue(value:unknown,record:Record<string,unknown>,objectApi:string,company:CompanyValues={}):string{
  if(typeof value!=='string')return recordValue(value);
  const source=value.trim();
  if(!source)return '';
@@ -49,8 +56,9 @@ export function resolvePrintValue(value:unknown,record:Record<string,unknown>,ob
  }
  if(!source.startsWith('=')&&!source.startsWith('IF(')&&!source.startsWith('TEXT(')){
   // Printed documents can contain literal captions with embedded record fields.
-  return value.replace(/(?:\{!|\{\{|@)([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)(?:\}|\}\})?/g,
+  return value.replace(/(?:\{!|\{\{|@)(ThisTenant\.Company|[A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)(?:\}\}|\})?/gi,
     (match,objectName:string,fieldName:string)=>{
+     if(objectName.toLowerCase()==='thistenant.company')return recordValue(companyValue(company,fieldName));
      if(objectName!==objectApi)return match;
      if(!Object.hasOwn(record,fieldName))throw Error('Print field is unavailable: '+fieldName);
      return recordValue(record[fieldName]);
@@ -58,6 +66,7 @@ export function resolvePrintValue(value:unknown,record:Record<string,unknown>,ob
  }
  const expression=source.startsWith('=')?source.slice(1):source;
  const result=evaluateFlowFormula(expression,reference=>{
+  if(/^ThisTenant\.Company\./i.test(reference))return companyValue(company,reference.slice(19));
   const parts=reference.split('.');
   const key=parts.at(-1)??'';
   if(parts.length>2||(parts.length===2&&parts[0]!==objectApi))
@@ -67,10 +76,10 @@ export function resolvePrintValue(value:unknown,record:Record<string,unknown>,ob
  },{},'flow_formula');
  return recordValue(result);
 }
-function textSource(component:PrintComponent,record:Record<string,unknown>,objectApi:string){
+function textSource(component:PrintComponent,record:Record<string,unknown>,objectApi:string,company:CompanyValues){
  const p=component.properties;
  const source=p.textSource??p.content??p.value??p.labelText??p.title??p.defaultValue??component.label;
- return resolvePrintValue(source,record,objectApi);
+ return resolvePrintValue(source,record,objectApi,company);
 }
 function layoutStyle(component:PrintComponent,page:PrintPage,index:number){
  const p=component.properties,visual=object(p.visualStyle),layout=object(p.layoutStyle);
@@ -95,7 +104,7 @@ type PdfElement={html:string;text:string;x:number;y:number;width:number;height:n
 const dataAsset=/^asset:([0-9a-f-]{36})$/i;
 export async function buildPrintDocument(page:PrintPage,record:Record<string,unknown>,
  loadImage?:(assetId:string)=>Promise<{contentType:string;contentBase64:string}>,
- loadRows?:(component:PrintComponent)=>Promise<Record<string,unknown>[]>){
+ loadRows?:(component:PrintComponent)=>Promise<Record<string,unknown>[]>,company:CompanyValues={}){
  if(!Number.isFinite(page.canvasWidth)||!Number.isFinite(page.canvasHeight)||
   page.canvasWidth<100||page.canvasWidth>10000||page.canvasHeight<100||page.canvasHeight>10000)
   throw Error('Invalid published Print Template size');
@@ -108,11 +117,11 @@ export async function buildPrintDocument(page:PrintPage,record:Record<string,unk
   const p=object(component.properties);
   // Actions are never executed while rendering documents.
   const style=layoutStyle(component,page,index);
-  const value=textSource(component,record,page.targetObject);
+  const value=textSource(component,record,page.targetObject,company);
   const kind=component.type.toLowerCase();
   const imageSource=p.imageSource??p.src;
   const image=typeof imageSource==='string'?
-   resolvePrintValue(imageSource,record,page.targetObject):'';
+   resolvePrintValue(imageSource,record,page.targetObject,company):'';
   let content=escapeHtml(value).replace(/\r?\n/g,'<br>');
   let embeddedImage:PdfElement['image'];
   let contentRows:Record<string,unknown>[]|null=null;
@@ -414,7 +423,7 @@ export class BackendPrintTemplatePdfService {
     if(rows.length>=result.total)return rows;
    }
    throw Error('Print Table exceeds 5000 records');
-  });
+  },await loadCompanyValues(this.db,tenantId));
   const binary=await chromiumPdf(doc.html)??vectorPdf(doc);
   if(binary.length>5*1024*1024)throw Error('Generated PDF exceeds file size limit');
   const saved=await media.upload(tenantId,userId,{

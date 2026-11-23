@@ -1,3 +1,4 @@
+import {resolvePrintValue} from '../src/system-support/backend-print-template-pdf-service.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {seedEposObjects,EPOS_OBJECTS} from '../src/app-seeders/core-epos-objects.js';
@@ -13,6 +14,13 @@ test('receipt settings preserve zero, false, optional blanks and enforce their l
  assert.equal(read('serviceChargePercent',12.25),12.25);
  for(const [key,value] of [['refundDays',3651],['giftCardValidMonths',0.1],['receiptQrUrl','http://example.com'],
   ['serviceChargePercent',1.234],['showVatBreakdown','false'],['vatNumber','a'.repeat(41)]])assert.throws(()=>read(String(key),value));
+});
+
+test('print templates resolve company fields in formulas and captions',()=>{
+ const company={vatnumber:'GB123',refunddays:21};
+ assert.equal(resolvePrintValue('VAT: @ThisTenant.Company.VatNumber',{},'Invoice',company),'VAT: GB123');
+ assert.equal(resolvePrintValue('=@ThisTenant.Company.RefundDays + 1',{},'Invoice',company),'22');
+ assert.throws(()=>resolvePrintValue('@ThisTenant.Company.Missing',{},'Invoice',company),/Unknown tenant value/);
 });
 
 test('setup writes require Manage Users before executing SQL',async()=>{

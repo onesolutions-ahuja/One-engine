@@ -85,7 +85,7 @@ export async function changeSetupRecord(db:SqlPersistence,rbac:RbacEngine,tenant
    // Broad grants can intersect a more specific deny or a muted group permission.
    for(const rule of [...checks]){
     if(!['*','Flow','App:*','Tab:*'].includes(rule.resource)&&rule.action!=='*')continue;
-    const exceptions=await client.query(`SELECT DISTINCT resource,action FROM (
+    const exceptions=await client.query<{resource:string;action:string}>(`SELECT DISTINCT resource,action FROM (
       SELECT resource,action FROM md_permission_rules WHERE tenant_id=$1 AND effect='deny'
       UNION SELECT resource,action FROM md_permission_group_mutes WHERE tenant_id=$1
      ) exceptions WHERE ($2='*' OR resource IN('*',$2) OR ($2='Flow' AND resource LIKE 'Flow:%')

@@ -57,7 +57,7 @@ export async function rollupParentsMany(client:PoolClient,tenantId:string,childO
   }
 // A related numeric factor is virtual and must be evaluated against the current lookup row.
 async function productFormulaSql(client:PoolClient,tenant:string,child:string,source:string){
- const fields=(await client.query('SELECT api_name,formula_expression,related_object FROM md_field_definitions WHERE tenant_id=$1 AND object_api=$2 AND deleted_at IS NULL',[tenant,child])).rows;
+ const fields=(await client.query<{api_name:string;formula_expression:string|null;related_object:string|null}>('SELECT api_name,formula_expression,related_object FROM md_field_definitions WHERE tenant_id=$1 AND object_api=$2 AND deleted_at IS NULL',[tenant,child])).rows;
  const expression=fields.find(f=>f.api_name===source)?.formula_expression??'';
  const factors=/^\s*\$Record\.(\w+)\s*\*\s*\$Record\.(\w+)\.(\w+)\s*$/.exec(expression);
  if(!factors)throw Error('Unsupported roll-up source formula');
@@ -71,8 +71,8 @@ export async function refreshRelatedFormulaRollups(client:PoolClient,tenant:stri
  const deps=await objectSetup<{parent:string;child:string;lookup:string;parent_field:string}>(client,'related-formula-rollups',tenant,object);
  for(const dep of deps.rows){
   const native=await objectNativeFields(client,tenant,dep.child);
-  const parents=await client.query('SELECT DISTINCT '+nativeValueSql(native,dep.parent_field,'n')+' AS id FROM '+nativeTableSql(native)+' n WHERE n.tenant_id=$1 AND NOT n.is_deleted AND '+nativeValueSql(native,dep.lookup,'n')+'=ANY($2::uuid[])',[tenant,ids]);
-  await refreshRollups(client,tenant,dep.child,new Map([[dep.parent,new Set<string>(parents.rows.map(p=>p.id).filter(Boolean))]]));
+  const parents=await client.query<{id:string|null}>('SELECT DISTINCT '+nativeValueSql(native,dep.parent_field,'n')+' AS id FROM '+nativeTableSql(native)+' n WHERE n.tenant_id=$1 AND NOT n.is_deleted AND '+nativeValueSql(native,dep.lookup,'n')+'=ANY($2::uuid[])',[tenant,ids]);
+  await refreshRollups(client,tenant,dep.child,new Map([[dep.parent,new Set<string>(parents.rows.flatMap(p=>p.id?[p.id]:[]))]]));
  }
 }
 export async function refreshRollups(client:PoolClient,tenantId:string,childObject:string,

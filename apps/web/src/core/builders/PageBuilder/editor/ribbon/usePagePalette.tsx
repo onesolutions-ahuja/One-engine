@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import {
 CalendarDays, Grid2X2, Type, Square, Image as ImageIcon, MousePointer2, BarChart3, QrCode, Film, FormInput,
 ToggleRight, List, Puzzle, Search, Star, Layers3, ShoppingCart, PanelsTopLeft, MessageCircle,
-BadgeCheck, Table2, Menu, Repeat, Keyboard, PanelBottom
+BadgeCheck, Table2, Menu, Repeat, Keyboard, PanelBottom, PanelTop
 } from 'lucide-react';
 import { isBuilderApi } from '../../builderPropertyInventory';
 import { layoutTypes } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
@@ -79,6 +79,7 @@ export function usePagePalette(
     switch(component.type){
       case 'Custom:smart_navigation':return <Menu size={15}/>;
       case 'Custom:smart_container':return <Layers3 size={15}/>;
+      case 'Custom:smart_multipage':return <PanelTop size={15}/>;
       case 'Custom:smart_icon':return <Star size={15}/>;
       case 'Custom:smart_toggle':return <ToggleRight size={15}/>;
       case 'Custom:smart_keyboard':return <Keyboard size={15}/>;

@@ -1,3 +1,4 @@
+import {multiPageChildren} from './multiPageChildren';
 import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {readLocal,writeLocal} from '../PageCompiler/localCopy';
 import {componentLayer,layerShows,usePageLayer} from './pageLayers';
@@ -1392,9 +1393,11 @@ function LightningAppRuntime({
     if (isLayoutType(component.type)) return <div key={component.id} className="page-nested-layout" style={{...resolvePageComponentStyle(component.properties, component.type, layoutDevice),...behaviorAppearance(component.properties,appVisibilityContext)}}>{childrenOf(page.components, component.id).map((child) => renderComponent(child))}</div>;
     if (component.type.startsWith('Custom:')) {
       const definition = findRegisteredComponent(libraryComponents, component.type.slice('Custom:'.length), 'page');
+      const nestedKids = isLayoutContainer(component)
+        ? childrenOf(page.components, component.id).filter(isAppComponentVisible) : [];
       const nestedChildren = isLayoutContainer(component)
-        ? childrenOf(page.components, component.id).filter(isAppComponentVisible).map((child) => page.layoutMode === 'free-canvas'
-            ? renderCanvasComponent(child, true) : renderComponent(child))
+        ? multiPageChildren(component, nestedKids, nestedKids.map((child) => page.layoutMode === 'free-canvas'
+            ? renderCanvasComponent(child, true) : renderComponent(child)), page.components)
         : undefined;
       if (!definition) return <div className="records-message" role="status" key={component.id}>
         Component is no longer registered: {component.label}

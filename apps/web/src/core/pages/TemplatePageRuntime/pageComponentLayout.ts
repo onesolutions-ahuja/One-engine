@@ -316,6 +316,8 @@ export function isLayoutContainer(component: PageComponentMetadata): boolean {
     // Smart Container is a shared layout primitive. Older saved instances have no
     // layoutContainer flag, so recognise them without rewriting tenant metadata.
     || (component.type==='Custom:smart_container' && component.properties?.layoutContainer !== false)
+    // Smart MultiPage: each direct child is one page.
+    || component.type==='Custom:smart_multipage'
     || (component.type.startsWith('Custom:') && component.properties?.layoutContainer === true);
 }
 export function rawLayoutParentId(component: PageComponentMetadata): string | null {
@@ -492,4 +494,24 @@ export function resolveLayoutStyle(
     ...(s.overflowY ? { overflowY: String(s.overflowY) } : {}),
     ...(s.hidden ? { display: 'none' } : {})
   };
+}
+
+/** Smart MultiPage page key: the child's "Page key" property, else its name. */
+export function multiPageKey(child: PageComponentMetadata): string {
+  const key = child.properties?.pageKey;
+  return typeof key === 'string' && key.trim() ? key.trim() : child.label;
+}
+/** True when `id` is `ancestorId` or sits anywhere inside it. */
+export function isSelfOrDescendant(components: PageComponentMetadata[], ancestorId: string, id: string | null | undefined): boolean {
+  if (!id) return false;
+  const byId = new Map(components.map((item) => [item.id, item]));
+  const seen = new Set<string>();
+  let current: string | null = id;
+  while (current && !seen.has(current)) {
+    if (current === ancestorId) return true;
+    seen.add(current);
+    const item = byId.get(current);
+    current = item ? rawLayoutParentId(item) : null;
+  }
+  return false;
 }

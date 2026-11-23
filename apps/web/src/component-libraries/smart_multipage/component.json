@@ -1,0 +1,28 @@
+{
+  "apiName": "smart_multipage",
+  "label": "Smart MultiPage",
+  "category": "Layout",
+  "description": "Tabbed card: each tab is its own design area; only the selected tab's page shows.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_multipage/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_multipage/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 420,
+    "defaultHeight": 320,
+    "minWidth": 96,
+    "minHeight": 60
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "change",
+      "label": "Change"
+    }
+  ]
+}

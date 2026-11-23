@@ -29,10 +29,13 @@ export async function loadCompanyValues(db:Query,tenantId:string):Promise<Record
  }
  values.id=tenantId;
  values.name=text(values.name)||text(values.legalname)||text(tenant.rows[0]?.name);
- values.tradingname=values.name;
+
  values.logo=text(profile.logoUrl);
- values.logourl=values.logo;
- for(const setting of receiptSettings)values[setting.key.toLowerCase()]=(company?.[setting.field]??setting.initial??'') as string|number|boolean;
+
+ for(const setting of receiptSettings){
+  delete values[setting.field.toLowerCase()];
+  values[setting.key.toLowerCase()]=(company?.[setting.field]??setting.initial??'') as string|number|boolean;
+ }
  values.receiptdisplayname=values.receiptdisplayname||values.name;
  values.currency=typeof money.corporateCurrency==='string'&&/^[A-Z]{3}$/.test(money.corporateCurrency)?money.corporateCurrency:'GBP';
  values.vatrate=typeof money.standardVatRate==='number'&&Number.isFinite(money.standardVatRate)?money.standardVatRate:'';
@@ -65,7 +68,7 @@ export async function companyRecord(db:Query,tenantId:string):Promise<Record<str
 
 /** Names in `$.permission("Name")` calls of generated page code. */
 export function permissionNames(source:string):string[]{
- return [...new Set([...source.matchAll(/\$\.permission\(\s*"([A-Za-z_][A-Za-z0-9_.]{0,79})"\s*\)/g)].map(match=>match[1]))];
+ return [...new Set([...source.matchAll(/\$\.permission\(\s*"([A-Za-z_][A-Za-z0-9_.]{0,79})"\s*\)/g)].map(match=>match[1]))].slice(0,50);
 }
 /** Custom field values of a user (md_users.custom_fields), only fields still defined on User. */
 export async function loadUserCustomFields(db:Query,tenantId:string,userId:string):Promise<Record<string,unknown>>{

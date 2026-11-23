@@ -18,7 +18,7 @@ import {resolveRelationshipFieldPath} from '../relationship-engine/RelationshipP
 import {assertDeletionAllowed,shouldCascadeReference} from '../relationship-engine/ReferentialIntegrityGuard.js';
 import {assertLookupTargetExists} from '../relationship-engine/LookupResolver.js';
 import {enforceMasterDetailReparenting} from '../relationship-engine/MasterDetailManager.js';
-import {rollupParents,rollupParentsMany,refreshRollups} from '../relationship-engine/RollupAggregationManager.js';
+import {rollupParents,rollupParentsMany,refreshRollups,refreshRelatedFormulaRollups} from '../relationship-engine/RollupAggregationManager.js';
 import {readRollupSummaryField} from '../field-engine/types/RollupSummaryField.js';
 import {validateLookupField} from '../field-engine/types/LookupField.js';
 import {compareLookupFilter,type LookupFilterMetadata} from './object-manager-lookup-filters.js';
@@ -317,7 +317,9 @@ export class RecordEngine {
         &&!reference.startsWith('$RecordType.')&&reference!=='$Record')
         throw new Error('Unsupported formula global reference: '+reference);
       if(field){
-        if(!api.test(field))throw new Error('Invalid formula field reference');
+        const path=field.split('.');
+        if(!path.every(segment=>api.test(segment)))throw new Error('Invalid formula field reference');
+        field=path[0];
         fields[field]=await this.rbac.allowed(tenantId,userId,objectApi+'.'+field,'read');
       }
     }
@@ -531,7 +533,7 @@ export class RecordEngine {
         if(name==='$Record')return formulaContext.currentRecord;
         if(name.startsWith('$Record.'))
           return referenceCache.has(name)?referenceCache.get(name):
-            formulaContext.currentRecord?.[name.slice(8)]??null;
+            calculated.has(name.slice(8))?calculated.get(name.slice(8)):formulaContext.currentRecord?.[name.slice(8)]??null;
         if(name.startsWith('$User.'))return contextValue(formulaContext.actor,name.slice(6));
         if(name.startsWith('$Profile.'))return contextValue(formulaContext.profile,name.slice(9));
         if(name.startsWith('$Organization.'))
@@ -1362,6 +1364,7 @@ export class RecordEngine {
       for(const parentId of parentIds)affected.add(parentId);
       affectedParents.set(parentObject,affected);
     }
+    await refreshRelatedFormulaRollups(client,tenantId,objectApi,ids);
     await refreshRollups(client,tenantId,objectApi,affectedParents);
     forgetScopedRecords();
   }
@@ -2026,6 +2029,7 @@ export class RecordEngine {
         for(const parentId of parentIds)affected.add(parentId);
         affectedParents.set(parentObject,affected);
       }
+      await refreshRelatedFormulaRollups(transactionClient,tenantId,objectApi,[id]);
       await refreshRollups(transactionClient,tenantId,objectApi,affectedParents);
     };
     if(client){

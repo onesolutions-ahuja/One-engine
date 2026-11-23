@@ -69,6 +69,11 @@ const SETUP_SQL={
            AND s.api_name=f.rollup_source_field AND s.deleted_at IS NULL) AS source_data_type
        FROM md_field_definitions f
        WHERE f.tenant_id=$1 AND f.object_api=$2 AND f.data_type='rollup' AND f.deleted_at IS NULL`,
+  'related-formula-rollups':`SELECT r.object_api AS parent,r.rollup_child_object AS child,r.rollup_relationship_field AS parent_field,l.api_name AS lookup
+    FROM md_field_definitions l JOIN md_field_definitions f ON f.tenant_id=l.tenant_id AND f.object_api=l.object_api
+    JOIN md_field_definitions r ON r.tenant_id=f.tenant_id AND r.rollup_child_object=f.object_api AND r.rollup_source_field=f.api_name
+    WHERE l.tenant_id=$1 AND l.related_object=$2 AND l.data_type='reference' AND f.data_type='formula' AND r.data_type='rollup'
+    AND strpos(f.formula_expression,'$Record.'||l.api_name||'.')>0 AND l.deleted_at IS NULL AND f.deleted_at IS NULL AND r.deleted_at IS NULL`,
   'rollup-parents':`SELECT object_api AS parent_object,rollup_relationship_field AS relationship_field
       FROM md_field_definitions WHERE tenant_id=$1 AND data_type='rollup'
         AND rollup_child_object=$2 AND deleted_at IS NULL`,

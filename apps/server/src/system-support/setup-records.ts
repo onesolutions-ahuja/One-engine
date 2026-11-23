@@ -1,3 +1,4 @@
+import {holdsReservedPermissionSet} from '../system-files/platform-tenant-service.js';
 import {compileRecordFilters} from '../object-engine/QueryBuilder.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
@@ -65,12 +66,41 @@ export async function setupRecords(db:Pick<SqlPersistence,'query'>,rbac:RbacEngi
 export async function changeSetupRecord(db:SqlPersistence,rbac:RbacEngine,tenant:string,user:string,name:ObjectName,values:Record<string,unknown>|null,id?:string){
  if(name!=='UserPermissionSet'&&name!=='PermissionSetCustomPermission')throw Error('Read-only setup object');
  return db.transaction(async client=>{
+  await client.query('SELECT id FROM md_tenants WHERE id=$1 FOR UPDATE',[tenant]);
   resetRecordReadScope();clearRequestRbacMemo();
   await rbac.require(tenant,user,'SystemPermission:ManageUsers','read');
+  const key=name==='UserPermissionSet'?'User':'CustomPermission';
+  if(values && (Object.keys(values).length!==2||typeof values.PermissionSet!=='string'||typeof values[key]!=='string'))throw Error('Invalid permission assignment');
+  const link=values??(await client.query('SELECT * FROM ('+sources[name]+') links WHERE "Id"=$2',[tenant,id])).rows[0];
+  if(!link)throw Error('Setup record not found');
+  const set=(await client.query('SELECT api_name,navigation_default_access FROM md_permission_sets WHERE tenant_id=$1 AND id=$2',[tenant,link.PermissionSet])).rows[0];
+  const policy=set?.api_name;
+  if(!policy)throw Error('Unknown permission set');
+  if((policy==='OneEngine'||policy==='PlatformDeveloper')&&!await holdsReservedPermissionSet(client,tenant,user,policy))throw Error('Reserved permission set');
+  if(name==='UserPermissionSet'){
+   if(link.User===user)throw Error('Cannot change own permission set assignment');
+   const rules=await client.query('SELECT resource,action FROM md_permission_rules WHERE tenant_id=$1 AND permission_set_id=$2 AND effect=$3',[tenant,link.PermissionSet,values?'allow':'deny']);
+   const checks=rules.rows.map(r=>({resource:String(r.resource),action:String(r.action)}));
+   if(values&&set.navigation_default_access==='Allow')checks.push({resource:'App:*',action:'read'},{resource:'Tab:*',action:'read'});
+   // Broad grants can intersect a more specific deny or a muted group permission.
+   for(const rule of [...checks]){
+    if(!['*','Flow','App:*','Tab:*'].includes(rule.resource)&&rule.action!=='*')continue;
+    const exceptions=await client.query(`SELECT DISTINCT resource,action FROM (
+      SELECT resource,action FROM md_permission_rules WHERE tenant_id=$1 AND effect='deny'
+      UNION SELECT resource,action FROM md_permission_group_mutes WHERE tenant_id=$1
+     ) exceptions WHERE ($2='*' OR resource IN('*',$2) OR ($2='Flow' AND resource LIKE 'Flow:%')
+      OR ($2 IN('App:*','Tab:*') AND split_part(resource,':',1)=split_part($2,':',1)))
+      AND ($3='*' OR action IN('*',$3))`,[tenant,rule.resource,rule.action]);
+    for(const exception of exceptions.rows)checks.push({resource:exception.resource==='*'?rule.resource:exception.resource,action:exception.action==='*'?rule.action:exception.action});
+   }
+   if((await rbac.allowedMany(tenant,user,checks)).some(allowed=>!allowed))throw Error('Permission denied');
+  }else{
+   const permission=(await client.query('SELECT "Name" FROM ('+sources.CustomPermission+') permissions WHERE "Id"=$2',[tenant,link.CustomPermission])).rows[0];
+   if(!permission)throw Error('Unknown custom permission');
+   await rbac.require(tenant,user,'CustomPermission:'+permission.Name,'read');
+  }
   let result;
   if(values){
-   const key=name==='UserPermissionSet'?'User':'CustomPermission';
-   if(Object.keys(values).length!==2||typeof values.PermissionSet!=='string'||typeof values[key]!=='string')throw Error('Invalid permission assignment');
    if(name==='UserPermissionSet')result=await client.query(`INSERT INTO md_permission_assignments(tenant_id,user_id,permission_set_id)
     VALUES($1,$2,$3) RETURNING ${assignmentId} AS id`,[tenant,values.User,values.PermissionSet]);
    else result=await client.query(`INSERT INTO md_permission_rules(tenant_id,permission_set_id,resource,action,effect)
@@ -81,6 +111,8 @@ export async function changeSetupRecord(db:SqlPersistence,rbac:RbacEngine,tenant
    AND action='read' AND effect='allow' AND ${grantId}=$2 RETURNING ${grantId} AS id`,[tenant,id]);
   if(!result.rows.length)throw Error('Setup record not found');
   resetRecordReadScope();clearRequestRbacMemo();
+  await client.query('INSERT INTO md_rbac_revisions(tenant_id,revision) VALUES($1,1) ON CONFLICT(tenant_id) DO UPDATE SET revision=md_rbac_revisions.revision+1',[tenant]);
+  await client.query("INSERT INTO md_security_events(tenant_id,actor_user_id,subject_user_id,action,details) VALUES($1,$2,$3,'rbac.policies.update',$4)",[tenant,user,link.User??null,JSON.stringify({object:name,operation:values?'assign':'revoke',permissionSetId:link.PermissionSet,customPermissionId:link.CustomPermission})]);
   return String(result.rows[0].id);
  });
 }

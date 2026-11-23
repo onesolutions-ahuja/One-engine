@@ -78,7 +78,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v16: smart_paired_screens (screens paired with a device, for any app's settings page).
 // v17: Company (one record per tenant: company details, receipts; read as @ThisTenant.Company.*).
 // v18: NamedDevice.AttachedTill (a drawer/printer fixed to a Till; apps find the Till from it).
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v19';
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v20';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,

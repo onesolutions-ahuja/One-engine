@@ -1,6 +1,14 @@
 import type {PoolClient} from 'pg';
 
-type Field={name:string;type:string;length?:number;target?:string;choices?:string[];unique?:boolean;formula?:string};
+type Summary={child:string;relationship:string;source:string;filters?:[string,string][]};
+const ledgerBalance=(relationship:string,method:string):Field[]=>[
+ ...['IN','OUT'].map((direction):Field=>({
+  name:direction==='IN'?'IncomingTotal':'OutgoingTotal',type:'rollup',
+  summary:{child:'CashLedger',relationship,source:'Amount',filters:[['Method',method],['Direction',direction]]}
+ })),
+ {name:'Balance',type:'formula',formula:'BLANKVALUE($Record.IncomingTotal, 0) - BLANKVALUE($Record.OutgoingTotal, 0)'}
+];
+type Field={name:string;type:string;length?:number;target?:string;choices?:string[];unique?:boolean;formula?:string;summary?:Summary};
 export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Field[]}>= [
  {name:'PermissionSet',existing:true,fields:[{name:'Name',type:'text'},{name:'Label',type:'text'},{name:'Description',type:'text'}]},
  {name:'CustomPermission',existing:false,fields:[{name:'Name',type:'text'},{name:'Label',type:'text'}]},
@@ -14,8 +22,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'CustomerCreditMax',type:'number'},
  ]},
  {name:'Product',existing:true,fields:[
-  {name:'Unit',type:'picklist',choices:['each','g','kg','ml','l']},
-  {name:'ComponentCost',type:'number'},
+  {name:'ComponentCost',type:'rollup',summary:{child:'ProductBOM',relationship:'Product',source:'LineCost'}},
   {name:'PopupNote',type:'text',length:255},
   {name:'VariablePrice',type:'boolean'},
   {name:'EatOutPrice',type:'number'},
@@ -27,6 +34,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'Product',type:'reference',target:'Product'},
   {name:'ComponentProduct',type:'reference',target:'Product'},
   {name:'Quantity',type:'number'},
+  {name:'LineCost',type:'formula',formula:'$Record.Quantity * $Record.ComponentProduct.Cost'},
   {name:'Unit',type:'picklist',choices:['each','g','kg','ml','l']},
   {name:'Removable',type:'boolean'},
   {name:'SortOrder',type:'number'},
@@ -36,7 +44,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'Name',type:'text'},
   {name:'Code',type:'text',length:40,unique:true},
   {name:'InitialValue',type:'number'},
-  {name:'Balance',type:'number'},
+  ...ledgerBalance('GiftCard','Gift card'),
   {name:'ExpiryDate',type:'date'},
   {name:'Status',type:'picklist',choices:['Active','Used','Expired','Cancelled']},
   {name:'Customer',type:'reference',target:'Customer'},
@@ -60,8 +68,8 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  ]},
  {name:'Customer',existing:true,fields:[
   {name:'CreditLimit',type:'number'},
-  {name:'Balance',type:'number'},
-  {name:'AvailableCredit',type:'formula',formula:'$Record.CreditLimit + $Record.Balance'},
+  ...ledgerBalance('Customer','Customer credit'),
+  {name:'AvailableCredit',type:'formula',formula:'BLANKVALUE($Record.CreditLimit, 0) + $Record.Balance'},
   {name:'AccountOnHold',type:'boolean'},
  ]},
  {name:'CashLedger',existing:true,fields:[
@@ -130,11 +138,16 @@ export async function seedEposObjects(client:PoolClient,tenantId:string){
    [tenantId,object.name,object.name.replace(/([a-z])([A-Z])/g,'$1 $2'),['CustomPermission','PermissionSetCustomPermission','UserPermissionSet'].includes(object.name)]);
  }
  for(const object of EPOS_OBJECTS)for(const field of object.fields){
-  await client.query(`INSERT INTO md_field_definitions(tenant_id,object_api,api_name,label,data_type,related_object,max_length,is_unique,required,formula_expression,formula_return_type)
-   SELECT $1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10 WHERE EXISTS
+  const inserted=await client.query(`INSERT INTO md_field_definitions(tenant_id,object_api,api_name,label,data_type,related_object,max_length,is_unique,required,formula_expression,formula_return_type,rollup_child_object,rollup_relationship_field,rollup_operation,rollup_source_field)
+   SELECT $1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10,$11,$12,$13,$14 WHERE EXISTS
    (SELECT 1 FROM md_object_definitions WHERE tenant_id=$1 AND api_name=$2 AND deleted_at IS NULL)
-   ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
-   [tenantId,object.name,field.name,field.name.replace(/([a-z])([A-Z])/g,'$1 $2'),field.type,field.target??null,field.length??null,field.unique??false,field.formula??null,field.formula?'number':null]);
+   ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING RETURNING id`,
+   [tenantId,object.name,field.name,field.name.replace(/([a-z])([A-Z])/g,'$1 $2'),field.type,field.target??null,field.length??null,field.unique??false,field.formula??null,field.formula?'number':null,field.summary?.child??null,field.summary?.relationship??null,field.summary?'SUM':null,field.summary?.source??null]);
+  if(inserted.rowCount&&field.summary?.filters){
+   for(const [order,[key,value]] of field.summary.filters.entries())await client.query(`INSERT INTO md_field_rollup_filters
+    (tenant_id,object_api,child_object,rollup_field_api,filter_field_api,operator,value_text,sort_order)
+    VALUES($1,$2,$3,$4,$5,'Equals',$6,$7) ON CONFLICT DO NOTHING`,[tenantId,object.name,field.summary.child,field.name,key,value,order]);
+  }
   if(field.choices)await addChoices(client,tenantId,object.name,field.name,field.choices);
  }
  await addChoices(client,tenantId,'CashLedger','Method',['Customer credit','Gift card','On account']);

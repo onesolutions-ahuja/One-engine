@@ -44,7 +44,7 @@ export const TENANT_FORMULA_REFERENCES=Object.freeze(["@ThisTenant.Company.Name"
 export function tenantCompanyValue(field){
  const brand=getTenantBrand(),key=String(field??"").toLowerCase();
  if(key==="name")return brand.name;
- if(key==="logo"||key==="logourl")return brand.logo;
+ if(key==="logo")return brand.logo;
  if(!(key in (brand.company??{})))throw Error('Unknown tenant value @ThisTenant.Company.'+field);
  const value=brand.company?.[key];
  return value===undefined||value===null?"":value;

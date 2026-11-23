@@ -59,7 +59,7 @@ export default function SmartComponent(p){
   if(Object.keys(values).length&&await write("PUT",row,values))fire("change",{...row,...values});
  };
  const read=(row,key)=>runComponentFormula(p,p[key],row).value;
- if(hiddenByShowWhen(p))return null;
+ if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const disabled=p.disabled||disabledWhen(p);
  return <section className="space-map" style={{fontFamily:p.fontFamily}} aria-disabled={disabled||undefined} ref={node=>{if(node)node.inert=Boolean(disabled);}}>
   {edit&&<header><button type="button" onClick={()=>{const name=window.prompt("Item name");if(name)void write("POST",null,{[fieldName(p.labelField)||"Name"]:name});}}>Add item</button>

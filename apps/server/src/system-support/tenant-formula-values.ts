@@ -32,9 +32,12 @@ export async function loadCompanyValues(db:Query,tenantId:string):Promise<Record
 
  values.logo=text(profile.logoUrl);
 
+ // Each receipt setting answers to both names: the Company field (@ThisTenant.Company.ReceiptAutoPrint)
+ // and its settings key (@ThisTenant.Company.AutoPrintReceipt), with the default when blank.
  for(const setting of receiptSettings){
-  delete values[setting.field.toLowerCase()];
-  values[setting.key.toLowerCase()]=(company?.[setting.field]??setting.initial??'') as string|number|boolean;
+  const value=(company?.[setting.field]??setting.initial??'') as string|number|boolean;
+  values[setting.field.toLowerCase()]=value;
+  values[setting.key.toLowerCase()]=value;
  }
  values.receiptdisplayname=values.receiptdisplayname||values.name;
  values.currency=typeof money.corporateCurrency==='string'&&/^[A-Z]{3}$/.test(money.corporateCurrency)?money.corporateCurrency:'GBP';

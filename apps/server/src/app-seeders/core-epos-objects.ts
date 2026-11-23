@@ -52,10 +52,11 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  ]},
  {name:'ServicePoint',existing:false,fields:[
   {name:'Name',type:'text'},
-  {name:'Type',type:'picklist',choices:['Table','Room','Chair','Bay','Seat','Desk']},
+  {name:'Type',type:'picklist',choices:['Table','Room','Chair','Bay','Seat','Desk','Takeaway']},
   {name:'Area',type:'text',length:80},
   {name:'Seats',type:'number'},
   {name:'Status',type:'picklist',choices:['Free','Seated','Ordered','Bill','Cleaning']},
+  {name:'CurrentCart',type:'reference',target:'Cart'},
   {name:'PosX',type:'number'},
   {name:'PosY',type:'number'},
   {name:'Width',type:'number'},
@@ -82,7 +83,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'DiscountReason',type:'picklist',choices:['Staff','Loyalty','Damaged','Manager','Other']},
   {name:'Note',type:'text',length:255},
   {name:'Course',type:'number'},
-  {name:'KitchenStatus',type:'picklist',choices:['Not sent','Sent','Done']},
+  {name:'KitchenStatus',type:'picklist',choices:['Not sent','Sent','Done','Served','Void']},
  ]},
  {name:'Cart',existing:true,fields:[
   {name:'OrderType',type:'picklist',choices:['Eat in','Take away','Delivery','Collection']},
@@ -115,7 +116,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'CartLine',type:'reference',target:'CartLine'},
   {name:'Course',type:'number'},
   {name:'Note',type:'text',length:255},
-  {name:'KitchenStatus',type:'picklist',choices:['New','Done']},
+  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void']},
   {name:'Options',type:'text',length:500},
  ]},
 ];

@@ -43,7 +43,7 @@ export const BUILDER_SMART_APIS=[
  'smart_selector','smart_tabs','smart_text','smart_textbox','smart_label',
  'smart_card_grid','smart_image','smart_calendar','smart_navigation','smart_container',
  'smart_cart','smart_icon','smart_table','smart_keyboard','smart_dock','smart_chart',
- 'smart_qr','smart_video','smart_line_items','smart_id_card','smart_paired_screens'
+ 'smart_qr','smart_video','smart_line_items','smart_id_card','smart_paired_screens','smart_multipage'
 ] as const;
 type Mapping=[string,string,string,string];
 const map=(api:string,area:string,slot:string,key:string):Mapping=>[api,area,slot,key];
@@ -53,7 +53,7 @@ const standard=['smart_numpad','smart_button','smart_toggle','smart_lookup','sma
  'smart_selector','smart_tabs','smart_text','smart_textbox','smart_label',
  'smart_calendar','smart_navigation','smart_container','smart_cart',
  'smart_icon','smart_table','smart_keyboard','smart_dock','smart_chart',
- 'smart_qr','smart_video','smart_line_items','smart_paired_screens'];
+ 'smart_qr','smart_video','smart_line_items','smart_paired_screens','smart_multipage'];
 const body=standard.flatMap(api=>[
  map(api,'Body','fill','backgroundColor'),
  map(api,'Body','border','borderColor'),map(api,'Body','radius','radius'),

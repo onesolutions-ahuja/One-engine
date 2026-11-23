@@ -5,7 +5,7 @@ type Actions=Record<string,unknown>;
 const clickComponents=new Set(['smart_button','smart_toggle','smart_calendar','smart_cart','smart_card_grid','smart_id_card','smart_spacemap','smart_numpad',
  'smart_keyboard','smart_dock']);
 const selectComponents=new Set(['smart_lookup']);
-const changeComponents=new Set(['smart_calendar','smart_lookup','smart_search','smart_selector','smart_tabs','smart_toggle','smart_text','smart_card_grid','smart_id_card','smart_spacemap','smart_numpad',
+const changeComponents=new Set(['smart_multipage','smart_calendar','smart_lookup','smart_search','smart_selector','smart_tabs','smart_toggle','smart_text','smart_card_grid','smart_id_card','smart_spacemap','smart_numpad',
  'smart_keyboard']);
 /** Smart Dock: one independent event per item, shown under Other events. */
 export const dockItemEvents=['dockItem1','dockItem2','dockItem3','dockItem4','dockItem5','dockItem6',

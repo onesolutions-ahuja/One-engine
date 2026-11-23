@@ -1,3 +1,4 @@
+import {multiPageChildren} from '../../../../pages/PageRuntime/multiPageChildren';
 import { loadCanvasAsset } from './canvasAssetCache';
 import CanvasFloatingActions from '../../CanvasFloatingActions';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
@@ -83,9 +84,12 @@ export function createPageCanvasRenderer(
       : undefined;
     const inPage = page.components.some((item) => item.id === component.id);
     const nested = inPage && !childrenOf(page.components, null).some((item) => item.id === component.id);
+    const nestedKids = isLayoutContainer(component) && (!libraryPreview || interactivePreview)
+      ? childrenOf(page.components, component.id) : [];
     const nestedChildren = isLayoutContainer(component) && (!libraryPreview || interactivePreview)
-      ? childrenOf(page.components, component.id).map((child) =>
-          renderPageComponent(child, page.components.findIndex((item) => item.id === child.id), libraryPreview, interactivePreview))
+      ? multiPageChildren(component, nestedKids, nestedKids.map((child) =>
+          renderPageComponent(child, page.components.findIndex((item) => item.id === child.id), libraryPreview, interactivePreview)),
+          page.components, selectedId)
       : undefined;
     const visualStyle = resolvePageComponentStyle(component.properties, component.type, device);
     // Unconfigured registered components remain discoverable without authoring

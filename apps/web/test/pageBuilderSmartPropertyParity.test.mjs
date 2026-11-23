@@ -6,14 +6,14 @@ import {applySmartBuilderPropertyParity,BUILDER_SMART_APIS}
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 
-test('property parity upgrade registers all 26 smart components and stays idempotent',async()=>{
+test('property parity upgrade registers all 27 smart components and stays idempotent',async()=>{
  const calls=[];
  await applySmartBuilderPropertyParity({query:async(sql,params)=>{calls.push({sql,params});}});
  const statements=calls.map(call=>call.sql);
  const registered=statements.find(sql=>sql.includes('INSERT INTO md_builder_ribbon_components(component_api)'));
  assert.ok(registered);
- assert.equal(BUILDER_SMART_APIS.length,26);
- assert.equal(new Set(BUILDER_SMART_APIS).size,26);
+ assert.equal(BUILDER_SMART_APIS.length,27);
+ assert.equal(new Set(BUILDER_SMART_APIS).size,27);
  for(const api of BUILDER_SMART_APIS)
   assert.ok(registered.includes("'"+api+"'"),'missing '+api);
  assert.ok(statements.every(sql=>/ON CONFLICT|UPDATE md_builder_ribbon_component_rules|DELETE FROM md_builder_design2_slot_rules/.test(sql)),

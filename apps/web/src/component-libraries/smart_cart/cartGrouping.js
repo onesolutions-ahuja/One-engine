@@ -30,7 +30,8 @@ function canonical(value){
 const qtyOf=(row,quantityField)=>{
   const raw=(quantityField&&row?.[quantityField])??row?.Quantity??row?.quantity??row?.Qty??row?.qty??1;
   const count=Number(raw);
-  return Number.isFinite(count)&&count>0?count:0;
+  // Negative = a returned item (refund/exchange); it stays visible.
+  return Number.isFinite(count)?count:0;
 };
 const amountFields=new Set(['linetotal','lineamount']);
 const numericAmount=value=>(typeof value==='number'||typeof value==='string'&&value.trim()!=='')
@@ -51,9 +52,10 @@ export function groupCartRows(records,{quantityField='Quantity'}={}){
   for(const source of Array.isArray(records)?records:[]){
     if(!source||typeof source!=='object'||Array.isArray(source))continue;
     const count=qtyOf(source,quantityField);
-    // A zero/negative line was removed from the basket, not a visible item.
-    if(count<=0)continue;
-    const key=identityOf(source,quantityField,count);
+    // A zero line was removed from the basket, not a visible item.
+    if(count===0)continue;
+    // Returned (negative) and sold lines of one product never merge.
+    const key=(count<0?'-':'+')+identityOf(source,quantityField,count);
     if(!index.has(key)){
       const row={...source,Quantity:count,__cartSourceRows:[source]};
       if(quantityField&&Object.hasOwn(source,quantityField))row[quantityField]=count;

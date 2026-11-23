@@ -634,7 +634,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   if(validation)throw Error(validation);
   // Tabs, Navigation, Toggle, Search Box, Lookup, grids… publish their value
   // first, so an action and any reader of @ThisPage.Name.Selected.* see the new pick.
-  if(['change','select','click'].includes(action.event))runtime.publishState(component.id,action.value);
+  if(['change','select','click','longPress'].includes(action.event))runtime.publishState(component.id,action.value);
   window.dispatchEvent(new CustomEvent('metadrive:in-screen-action',{
    detail:{pageSessionKey:runtime.pageSessionKey,componentId:component.id,event:action.event,value:action.value}}));
   // Page interactions (show/hide/set another component) are applied by the page layout.
@@ -657,7 +657,7 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   const raw=actionFlows[action.event];
   const binding=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw as Record<string,unknown>:null;
   if(!binding){
-   if(hasInteraction||selectsCollection)return {updated:true};
+   if(hasInteraction||selectsCollection||definition.apiName==='smart_spacemap')return {updated:true};
    throw Error('No metadata event action is configured for "'+action.event+'".');
   }
   const payload=eventPayload(action.value);

@@ -1023,7 +1023,10 @@ export function createSystemServer(db:SqlPersistence) {
     const record=await companyRecord(db,actor.tenant_id);
     const profile:Record<string,unknown>={logoUrl:typeof setting?.logoUrl==='string'?setting.logoUrl:''};
     for(const [key,field] of PROFILE_TO_COMPANY_FIELD)profile[key]=record?.[field]??'';
-    for(const setting of receiptSettings)profile[setting.key]=record?.[setting.field]??setting.initial??'';
+    for(const setting of receiptSettings){
+      const value=record?.[setting.field]??setting.initial??'';
+      profile[setting.key]=setting.kind==='choice'&&value!==''?Number(value).toFixed(2):value;
+    }
     return {profile,companyRecordId:record?.Id??null};
   };
   app.get('/api/tenant/company-profile',route(async(req,res)=>{

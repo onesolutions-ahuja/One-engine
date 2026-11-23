@@ -125,8 +125,13 @@ const scopedDisplayExpression=(p,key,source,record)=>{
   return {value:scopedExpression(p,key,source,record)};
  const result=expressionResult(source,record,p.pageState,p.objectApiName,
   p.formulaCollectionSources,p.namedCollections,undefined,p.sessionId,p.readComponent,p.objects,p.__codeLookup,p.builderPreview===true);
+ // In the editor a record-bound formula has no real record to read (e.g. the open sale):
+ // show blank there, not FORMULAERROR. Real formula mistakes are caught when the page is saved.
+ if(result.error&&p.builderPreview===true&&p.objectApiName&&!realRecord(record))return {value:""};
  return result.error?{value:"FORMULAERROR",error:result.error}:{value:result.value};
 };
+const realRecord=record=>Boolean(record&&typeof record==="object"&&record.__builderSample!==true
+ &&Object.keys(record).length>0);
 const recordOf=p=>p.objectApiName&&Array.isArray(p.records)
  ?(p.records[0]??{}):p.record&&typeof p.record==="object"&&!Array.isArray(p.record)?p.record:
  Array.isArray(p.records)&&p.records.length?p.records[0]:Array.isArray(p.items)&&p.items.length?p.items[0]:{};
@@ -377,7 +382,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   {grid&&!idCard&&(description||value||buttonText||customButtons.length>0||p.builderPreview)&&<div className="smart-card-details"
    // After the title (order 1): name first, then price / description / buttons.
    style={{order:2,...(cardPadding===null?{}:{padding:cardPadding+"px"})}}>
-   {(description||p.builderPreview)&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
+   {description&&<span data-md-bind={p.builderPreview?"cardDescription":undefined} data-md-bind-titles={p.builderPreview?"Card description":undefined} className="smart-card-description" data-design-area={p.builderPreview?"Header Supporting":undefined} 
      style={{...smartPartOffsetStyle(p,"supporting"),color:description==='FORMULAERROR'?formulaDisplayErrorColor:
       focusedText||p.supportingTextColor||undefined,
       backgroundColor:p.supportingBackgroundColor||undefined,
@@ -390,8 +395,8 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
       borderRadius:p.supportingRadius!==undefined?number(p.supportingRadius,0,0,600):undefined,
       boxShadow:p.supportingShadow==="large"?"0 8px 20px #0003":p.supportingShadow==="medium"?"0 3px 9px #0003":p.supportingShadow==="small"?"0 1px 4px #0002":undefined,
       whiteSpace:p.supportingWrapText===false?"nowrap":p.supportingWrapText===true?"pre-line":undefined,
-      textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description||(p.builderPreview?"Supporting text":"")}</span>}
-   {(value||buttonText||customButtons.length>0||p.builderPreview)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
+      textAlign:["left","center","right"].includes(p.supportingAlignment)?p.supportingAlignment:undefined}}>{description}</span>}
+   {(value||buttonText||customButtons.length>0)&&<div data-design-area={p.builderPreview?"Footer":undefined} className="smart-card-footer"
     style={{...smartPartOffsetStyle(p,"footer"),backgroundColor:p.footerBackgroundColor||undefined,
      border:p.footerBorderColor?"1px solid "+p.footerBorderColor:undefined,
      borderRadius:p.footerRadius!==undefined?number(p.footerRadius,0,0,600):undefined,
@@ -413,7 +418,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
        fontWeight:focusedWeight??(typeof p.footerBold==="boolean"?(p.footerBold?700:400):undefined),
        fontSize:p.footerTextSize!==undefined&&p.footerTextSize!==null&&p.footerTextSize!==""
         ?number(p.footerTextSize,19,8,96):undefined}}>{value}</strong>}
-    {(buttonText||p.builderPreview)&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
+    {buttonText&&<button data-md-bind={p.builderPreview?"cardButtonText":undefined} data-md-bind-titles={p.builderPreview?"Card button text":undefined} type="button" data-design-area={p.builderPreview?"Button 3":undefined} className="smart-card-button"
       disabled={!onButtonClick||p.builderPreview} aria-label={buttonText||"Button"}
       style={{
        ...smartPartOrderStyle(p.cardButtonPlacement,"right"),
@@ -441,7 +446,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
         p.cardButtonAlignment==="right"?"flex-end":
         p.cardButtonAlignment==="center"?"center":undefined
       }}
-      onClick={event=>{event.stopPropagation();onButtonClick?.();}}>{buttonText||(p.builderPreview?"Button":"")}</button>}
+      onClick={event=>{event.stopPropagation();onButtonClick?.();}}>{buttonText}</button>}
     {customButtons.map(key=>{
      const label=gridText(p,key+"Label",record)||(key==="customButton1"?"+":"−");
      return <button key={key} data-md-bind={p.builderPreview?(key+"Label"):undefined} data-design-area={p.builderPreview?(key==="customButton1"?"Button":"Button 2"):undefined} type="button" className="smart-card-button smart-card-custom-action"
@@ -451,7 +456,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
     })}
    </div>}
   </div>}
-  {(Boolean(badge)||p.builderPreview)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
+  {Boolean(badge)&&<span title={badgeResult.error||undefined} data-design-area={p.builderPreview?"Badge":undefined} data-md-bind={p.builderPreview?"badgeText":undefined} data-md-bind-titles={p.builderPreview?"Badge text":undefined} className={"smart-badge "+(p.badgeAlignment||"image-top-right")}
    style={{...smartPartOffsetStyle(p,"badge"),fontWeight:p.badgeBold===false?400:700,fontSize:number(p.badgeTextSize,12),
    color:badgeResult.error?formulaDisplayErrorColor:readableText(p.badgeBodyColor||SMART_BLUE,p.badgeTextColor)||"#fff",
    background:badgeResult.error?"#fff":p.badgeBodyColor||SMART_BLUE,
@@ -469,7 +474,7 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
    ...(p.badgeWidth!==undefined&&p.badgeWidth!==null&&p.badgeWidth!==""||
        p.badgeHeight!==undefined&&p.badgeHeight!==null&&p.badgeHeight!==""
        ?{display:"inline-flex",alignItems:"center",justifyContent:p.badgeTextAlignment==="left"?"flex-start":p.badgeTextAlignment==="right"?"flex-end":"center"}:{})
-   }}>{badge||(p.builderPreview?"Badge":"")}</span>}
+   }}>{badge}</span>}
  </article>;
 }
 /**

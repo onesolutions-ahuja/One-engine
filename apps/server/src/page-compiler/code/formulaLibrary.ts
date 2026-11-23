@@ -26,8 +26,10 @@ export type FormulaClock={now():Date;timeZone():string};
 const text=(value:unknown):string=>value===null||value===undefined?'':String(value);
 const formulaText=(value:unknown):string=>typeof value==='boolean'?(value?'TRUE':'FALSE'):text(value);
 const points=(value:unknown):string[]=>Array.from(text(value));
+/** Number argument; blank counts as 0 (as in Excel). */
 const num=(value:unknown):number=>{
- const result=typeof value==='number'?value:typeof value==='string'&&value.trim()?Number(value):NaN;
+ const result=typeof value==='number'?value:value===null||value===undefined?0
+  :typeof value==='string'?(value.trim()?Number(value):0):NaN;
  if(!Number.isFinite(result))throw Error('Expected a finite number');
  return result;
 };

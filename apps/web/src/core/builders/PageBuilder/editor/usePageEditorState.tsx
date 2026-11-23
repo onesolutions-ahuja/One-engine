@@ -251,6 +251,8 @@ export function usePageEditorState(
     original:{x:number;y:number;width:number;height:number};
     element:HTMLElement;x:number;y:number;
     members:Array<{id:string;original:{x:number;y:number;width:number;height:number};element:HTMLElement}>;
+    /** Inside a container: the container's size (positions count from its top-left). */
+    limits?:{width:number;height:number};nested?:boolean;
   }|null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<'Design' | 'Data & Actions' | 'Visibility' | 'Position'>('Design');

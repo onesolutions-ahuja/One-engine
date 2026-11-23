@@ -515,3 +515,26 @@ export function isSelfOrDescendant(components: PageComponentMetadata[], ancestor
   }
   return false;
 }
+
+/** Free-canvas child of a container: placed at its own x/y/width/height, counted from the
+ * container's top-left (containers inside containers count from their own parent).
+ * A Smart MultiPage page fills the page area. No saved position = old stacked layout. */
+export function nestedCanvasStyle(components: PageComponentMetadata[], child: PageComponentMetadata): Record<string, string | number> {
+  const parentId = rawLayoutParentId(child);
+  const parent = parentId ? components.find((item) => item.id === parentId) : undefined;
+  if (parent?.type === 'Custom:smart_multipage') return { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' };
+  const pos = child.position;
+  if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) return {
+    position: 'absolute', left: pos.x, top: pos.y, width: pos.width ?? 320, height: pos.height ?? 180
+  };
+  return { position: 'relative', left: 'auto', top: 'auto', width: '100%', height: 'auto', minHeight: 40 };
+}
+
+/** Area children of a container are placed in (a Smart MultiPage page uses the MultiPage's size). */
+export function containerCanvasSize(components: PageComponentMetadata[], containerId: string): { width: number; height: number } {
+  const container = components.find((item) => item.id === containerId);
+  const parentId = container ? rawLayoutParentId(container) : null;
+  const parent = parentId ? components.find((item) => item.id === parentId) : undefined;
+  const sized = parent?.type === 'Custom:smart_multipage' ? parent : container;
+  return { width: Math.max(1, sized?.position?.width ?? 320), height: Math.max(1, sized?.position?.height ?? 180) };
+}

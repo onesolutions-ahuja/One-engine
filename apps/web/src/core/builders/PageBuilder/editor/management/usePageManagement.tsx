@@ -1,3 +1,4 @@
+import {downloadPageExcel} from '../../pageInventoryExcel';
 import { availableComponentSettings, resolveComponentSettings, validateComponentSettings } from '../../../../components/Properties/componentSettingDefinitions';
 import { pagePropertyIssues } from '../../../../components/Properties/pagePropertyContract';
 import { generateMetadataApiName, metadataNameConflictExcept, suggestMetadataApiName } from '../../../../metadata/Definitions/metadataApiNames';
@@ -351,11 +352,7 @@ export function usePageManagement(
     try{
       const {csv}=await request<{csv:string}>(
         '/metadata/pages/'+encodeURIComponent(item.apiName)+'/inventory?variant='+variant);
-      const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-      const link=document.createElement('a');
-      link.href=url;link.download=item.apiName+'_'+variant+'_component_inventory.csv';
-      document.body.append(link);link.click();link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      await downloadPageExcel(request,csv,item.apiName+'_'+variant+'_page');
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download page inventory');}
     finally{setInventoryDownloading('');}
   };
@@ -383,11 +380,7 @@ export function usePageManagement(
         }catch{failed.push(item.label||item.apiName);}
       }
       const csv=parts.filter(Boolean).join('\r\n')+'\r\n';
-      const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-      const link=document.createElement('a');
-      link.href=url;link.download='all_pages_inventory.csv';
-      document.body.append(link);link.click();link.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      await downloadPageExcel(request,csv,'all_pages');
       if(failed.length)onNotify('Not included (could not be read): '+failed.slice(0,10).join(', '));
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the pages');}
     finally{setInventoryDownloading('');}

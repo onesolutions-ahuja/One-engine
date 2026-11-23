@@ -2868,3 +2868,9 @@ CREATE TABLE IF NOT EXISTS md_till_devices (
  FOREIGN KEY(tenant_id,user_id) REFERENCES md_users(tenant_id,id)
 );
 CREATE INDEX IF NOT EXISTS md_till_devices_user ON md_till_devices(tenant_id,user_id) WHERE revoked_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS md_custom_permission_definitions(
+ tenant_id uuid NOT NULL REFERENCES md_tenants(id),name text NOT NULL,PRIMARY KEY(tenant_id,name));
+INSERT INTO md_system_permission_catalogue(permission_key,label,description,resource,action)
+ VALUES('users:manage','Manage Users','Manage user permission assignments','SystemPermission:ManageUsers','read')
+ ON CONFLICT DO NOTHING;

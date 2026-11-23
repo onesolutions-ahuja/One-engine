@@ -34,9 +34,9 @@ export type UserField=keyof typeof USER_FIELDS;
  * Currency and VatRate. Any field added to Company in Object Manager is read by its own name too. */
 export const COMPANY_FIELDS=['Id','Name','Logo','LegalName','Description',
  'Phone','Email','Website','AddressLine1','AddressLine2','City','Postcode','Country','Timezone','Locale',
- 'Currency','VatRate','VatNumber','ReceiptDisplayName','ReceiptMessage','RefundDays','ReceiptShowVat',
- 'ReceiptAskChoice','ReceiptAutoPrint','ReceiptShowBarcode','ReceiptQrLink','ReceiptQrCaption','ReceiptTipLine',
- 'CardSurchargeOn','CardSurchargePercent','CashRoundingOn','CashRoundingStep'] as const;
+ 'Currency','VatRate','VatNumber','ReceiptDisplayName','ReceiptMessage','RefundDays','ReceiptQrCaption','CardSurchargePercent','CashRoundingStep','ShowVatBreakdown','AskReceiptChoice','AutoPrintReceipt',
+ 'ShowReceiptBarcode','ReceiptQrUrl','ShowCustomerBalance','GroupSameItems','ShowItemOptions','TipLineEnabled','TipLinePercents',
+ 'ReceiptEmailConnection','CardSurchargeEnabled','CashRoundingEnabled','GiftCardValidMonths','ServiceChargePercent','ServiceChargeFromCovers'] as const;
 export type CompanyField=string;
 /** Company Settings key for @ThisTenant.Company.<Field> (VatNumber -> vatnumber; matched without case). */
 export const companyKey=(field:string)=>field.toLowerCase();

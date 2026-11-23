@@ -1,3 +1,4 @@
+import {receiptSettings,receiptValue} from '../expression-engine/ReceiptSettings.js';
 import {loadCompanyValues,companyRecord} from './tenant-formula-values.js';
 import {PROFILE_TO_COMPANY_FIELD} from '../app-seeders/core-company.js';
 import {registerRevolutCheckoutRoutes} from './revolut-checkout-service.js';
@@ -1022,6 +1023,10 @@ export function createSystemServer(db:SqlPersistence) {
     const record=await companyRecord(db,actor.tenant_id);
     const profile:Record<string,unknown>={logoUrl:typeof setting?.logoUrl==='string'?setting.logoUrl:''};
     for(const [key,field] of PROFILE_TO_COMPANY_FIELD)profile[key]=record?.[field]??'';
+    for(const setting of receiptSettings){
+      const value=record?.[setting.field]??setting.initial??'';
+      profile[setting.key]=setting.kind==='choice'&&value!==''?Number(value).toFixed(2):value;
+    }
     return {profile,companyRecordId:record?.Id??null};
   };
   app.get('/api/tenant/company-profile',route(async(req,res)=>{
@@ -1037,7 +1042,8 @@ export function createSystemServer(db:SqlPersistence) {
       if(key==='logoUrl')continue;
       const field=PROFILE_TO_COMPANY_FIELD.get(key);
       if(!field)throw new Error('Invalid company profile');
-      values[field]=value===''?null:value;
+      const setting=receiptSettings.find(s=>s.field===field);
+      values[field]=setting?receiptValue(setting,value):value===''?null:value;
     }
     if(Object.hasOwn(body,'logoUrl'))
       await platformTenants.saveSetting(actor.tenant_id,actor.user_id,'company-profile',{logoUrl:body.logoUrl});

@@ -20,3 +20,12 @@ export function hiddenByShowWhen(p,row={}){
  return shown===false||shown===0||shown===null||shown===undefined||String(shown).trim()===""
   ||String(shown).toUpperCase()==="FALSE"||String(shown)==="0"||shown==="FORMULAERROR";
 }
+
+export function disabledWhen(p,row={},key='disabledFormula'){
+ const formula=p[key];
+ if(p.builderPreview||p.designMode||formula==null||formula==='')return false;
+ try{
+  const value=typeof formula==='string'?(componentFormula(p,formula)?.(row)??formula):formula;
+  return value===true||value===1||String(value).toUpperCase()==='TRUE'||value==='FORMULAERROR';
+ }catch{return true;}
+}

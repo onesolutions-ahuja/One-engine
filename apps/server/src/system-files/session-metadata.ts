@@ -4,15 +4,14 @@ import {systemPermissionBindings} from '../system-support/permission-resource-ma
 import {loadConnectionSnapshot} from '../system-support/tenant-connections.js';
 import {loadUserCustomFields} from '../system-support/tenant-formula-values.js';
 
-/** Custom permissions named in this tenant's permission rules (CustomPermission:<Name>), each
- * TRUE/FALSE for this user. `others`: the answer for a name no rule mentions (full access = TRUE). */
+/** Granted custom permission names for page formulas. */
 async function customPermissionSnapshot(db:SqlPersistence,rbac:RbacEngine,tenantId:string,userId:string){
   const {rows}=await db.query<{name:string}>(`SELECT DISTINCT substr(resource,18) AS name FROM md_permission_rules
-    WHERE tenant_id=$1 AND resource LIKE 'CustomPermission:%' ORDER BY 1 LIMIT 500`,[tenantId]);
+    WHERE tenant_id=$1 AND resource LIKE 'CustomPermission:%' UNION SELECT name FROM md_custom_permission_definitions WHERE tenant_id=$1 ORDER BY 1`,[tenantId]);
   const names=rows.map(row=>row.name).filter(name=>/^[A-Za-z_][A-Za-z0-9_.]{0,79}$/.test(name));
-  const allowed=await rbac.allowedMany(tenantId,userId,[...names,'__NoRuleNamesThis__']
+  const allowed=await rbac.allowedMany(tenantId,userId,names
     .map(name=>({resource:'CustomPermission:'+name,action:'read'})));
-  return {names:Object.fromEntries(names.map((name,i)=>[name,allowed[i]===true])),others:allowed[names.length]===true};
+  return names.filter((_,i)=>allowed[i]===true);
 }
 
 /** Session capabilities are derived exclusively from the shared OneEngine RBAC evaluator. */

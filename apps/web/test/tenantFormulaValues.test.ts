@@ -26,15 +26,16 @@ test('page code reads them through the session, tenant and permission calls',()=
 });
 
 test('browser formulas show company values, user limits and permissions',()=>{
- setTenantBrand({name:'Corner Shop',logo:'',company:{vatnumber:'GB123',currency:'GBP',receiptautoprint:true,cashroundingstep:0.05}});
+ setTenantBrand({name:'Corner Shop',logo:'',company:{vatnumber:'GB123',currency:'GBP',autoprintreceipt:true,cashroundingstep:0.05}});
  setAuthenticatedFormulaBindingContext({id:'u1',displayName:'Sam',email:'s@x.io',timeZone:'Europe/London',locale:'en-GB',
   tenantId:'t1',tenantName:'Corner Shop',customFields:{RefundLimit:50},
-  customPermissions:{names:{'Till.Refund':true,'Till.CashOut':false},others:false}});
+  customPermissions:['Till.Refund']});
  assert.equal(runFormulaText('=@ThisTenant.Company.VatNumber',{}).value,'GB123');
  assert.equal(runFormulaText('=@ThisTenant.Company.Currency',{}).value,'GBP');
- assert.equal(runFormulaText('=IF(@ThisTenant.Company.ReceiptAutoPrint, "print", "no")',{}).value,'print');
+ assert.equal(runFormulaText('=IF(@ThisTenant.Company.AutoPrintReceipt, "print", "no")',{}).value,'print');
  assert.equal(runFormulaText('=@ThisTenant.Company.CashRoundingStep * 2',{}).value,0.1);
- assert.equal(runFormulaText('=@ThisTenant.Company.NotSet',{}).value,'');
+ assert.match(String(runFormulaText('=@ThisTenant.Company.NotSet',{}).error),/Unknown tenant value/i);
+ assert.match(String(runFormulaText('=@ThisTenant.User.NotSet',{}).error),/Unknown tenant value/i);
  assert.equal(runFormulaText('=@ThisTenant.User.RefundLimit + 1',{}).value,51);
  assert.equal(runFormulaText('=@ThisTenant.Permission.Till.Refund',{}).value,true);
  assert.equal(runFormulaText('=@ThisTenant.Permission.Till.CashOut',{}).value,false);

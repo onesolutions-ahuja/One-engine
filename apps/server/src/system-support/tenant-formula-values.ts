@@ -1,3 +1,4 @@
+import {receiptSettings} from '../expression-engine/ReceiptSettings.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import {loadNativeFields,nativeTableSql,nativeValueSql} from '../system-files/native-object-query.js';
 type Query=Pick<SqlPersistence,'query'>;
@@ -21,13 +22,21 @@ export async function loadCompanyValues(db:Query,tenantId:string):Promise<Record
  const money=plain(settings.rows.find(row=>row.setting_key==='currencies')?.properties);
  const values:Record<string,string|number|boolean>=Object.create(null);
  for(const [key,value] of Object.entries(company??{})){
-  if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key)||value===null||value===undefined)continue;
+  if(!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(key))continue;
+  if(value==null){values[key.toLowerCase()]='';continue;}
   if(typeof value==='string')values[key.toLowerCase()]=value.trim();
   else if(typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))values[key.toLowerCase()]=value;
  }
  values.id=tenantId;
  values.name=text(values.name)||text(values.legalname)||text(tenant.rows[0]?.name);
+
  values.logo=text(profile.logoUrl);
+
+ for(const setting of receiptSettings){
+  delete values[setting.field.toLowerCase()];
+  values[setting.key.toLowerCase()]=(company?.[setting.field]??setting.initial??'') as string|number|boolean;
+ }
+ values.receiptdisplayname=values.receiptdisplayname||values.name;
  values.currency=typeof money.corporateCurrency==='string'&&/^[A-Z]{3}$/.test(money.corporateCurrency)?money.corporateCurrency:'GBP';
  values.vatrate=typeof money.standardVatRate==='number'&&Number.isFinite(money.standardVatRate)?money.standardVatRate:'';
  return values;
@@ -64,9 +73,15 @@ export function permissionNames(source:string):string[]{
 /** Custom field values of a user (md_users.custom_fields), only fields still defined on User. */
 export async function loadUserCustomFields(db:Query,tenantId:string,userId:string):Promise<Record<string,unknown>>{
  const {rows}=await db.query<{api_name:string;value:unknown}>(`
-  SELECT f.api_name,u.custom_fields->f.api_name AS value
+  SELECT permitted.* FROM (SELECT f.api_name,u.custom_fields->f.api_name AS value
   FROM md_users u JOIN md_field_definitions f ON f.tenant_id=u.tenant_id AND f.object_api='User' AND f.deleted_at IS NULL
-  WHERE u.tenant_id=$1 AND u.id=$2 AND u.custom_fields ? f.api_name`,[tenantId,userId]);
+  WHERE u.tenant_id=$1 AND u.id=$2 AND f.api_name NOT IN ('Password','Username','Enabled','IsActive','Tenant','ReportsToId','LandingApp')
+  UNION ALL
+  SELECT field.key,field.value FROM md_users u CROSS JOIN LATERAL jsonb_each(jsonb_build_object(
+   'Username',u.email,'Enabled',u.enabled,'IsActive',u.enabled,'Tenant',u.tenant_id,'ReportsToId',u.reports_to_user_id,
+   'LandingApp',u.landing_app_api)) field WHERE u.tenant_id=$1 AND u.id=$2) permitted
+  CROSS JOIN LATERAL md_rbac_decision($1,$2,'User.'||permitted.api_name,'read') rights
+  WHERE rights.allow_granted AND NOT rights.deny_granted`,[tenantId,userId]);
  const out:Record<string,unknown>=Object.create(null);
  for(const row of rows)if(row.value===null||['string','number','boolean'].includes(typeof row.value))out[row.api_name]=row.value;
  return out;

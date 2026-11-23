@@ -4,6 +4,7 @@ import {ID_CARD_ROW_PROPERTIES} from '../../../component-libraries/smart_id_card
 
 /** Configuration and data, not scalar display formulas. Keep the original bindings. */
 const nonDisplayProperties=new Set([
+ 'xField','yField','widthField','heightField','rotationField','labelField','subLabelField','shapeField',
  'html','properties','record','records','items','pageState','sessionId','__formulaCode',
  'actionFlows','componentId','pageSessionKey','collectionFormula','selectorOptionsFormula','selectorPicklistField','filterFormula'
 ]);
@@ -14,18 +15,19 @@ const nonDisplayProperties=new Set([
  * ordinary scalar properties remain evaluated once in this parent renderer.
  */
 const rowDisplayProperties:Readonly<Record<string,ReadonlySet<string>>>={
- smart_card_grid:new Set(['textSource','imageSource','badgeText','cardDescription','cardValue',
+ smart_spacemap:new Set(['colourFormula','borderFormula','badgeFormula','pulseWhen']),
+ smart_card_grid:new Set(['itemDisabledWhen','textSource','imageSource','badgeText','cardDescription','cardValue',
   'cardButtonText','customButton1Label','customButton2Label']),
  smart_id_card:new Set(['textSource','imageSource','badgeText',...ID_CARD_ROW_PROPERTIES]),
  smart_cart:new Set(['textSource','imageSource','rowSupportingSource','column2Source',
   'column3Source','column4Source','column5Source','customButton1Label','customButton2Label']),
- smart_tabs:new Set(['textSource']),
- smart_selector:new Set(['textSource']),
+ smart_tabs:new Set(['itemDisabledWhen','textSource']),
+ smart_selector:new Set(['itemDisabledWhen','textSource']),
  smart_navigation:new Set(['textSource']),
  smart_calendar:new Set(['calendarStartSource','calendarEndSource','calendarTitleSource','calendarStatusSource']),
- smart_table:new Set(['column2Source','column3Source','column4Source','column5Source']),
+ smart_table:new Set(['itemDisabledWhen','column2Source','column3Source','column4Source','column5Source']),
  smart_chart:new Set(['textSource','column2Source']),
- smart_line_items:new Set(['textSource','column2Source','column3Source','column4Source','column5Source']),
+ smart_line_items:new Set(['itemDisabledWhen','textSource','column2Source','column3Source','column4Source','column5Source']),
  // A standalone image can pick the first record whose own image source is nonblank.
  smart_image:new Set(['textSource','imageSource','badgeText'])
 };

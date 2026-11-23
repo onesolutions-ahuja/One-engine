@@ -8,6 +8,7 @@ import {QUOTATION_OBJECTS,seedQuotationObjects} from './core-quotation-objects.j
 import {LOCATION_SRN_FIELDS,seedLocationSrnMetadata} from './core-location-srn.js';
 import {APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,seedAppointmentObjects} from './core-appointment-objects.js';
 import {CART_OBJECTS,seedCartObjects} from './cart-objects.js';
+import {EPOS_OBJECTS,EPOS_PERMISSION_SETS,seedEposObjects} from './core-epos-objects.js';
 import {CATALOGUE_OBJECTS,seedCatalogueObjects} from './core-catalogue-objects.js';
 import {CORE_CASH_LEDGER_FIELDS,seedCoreCashLedger} from './core-cash-ledger.js';
 import {NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,seedNamedDeviceObjects} from './core-named-devices.js';
@@ -53,6 +54,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  // After Product and CartLine: shared categories and product options for every selling app.
  await seedCatalogueObjects(client,tenantId);
  await seedCoreCashLedger(client,tenantId);
+ await seedEposObjects(client,tenantId);
  await seedNamedDeviceObjects(client,tenantId);
  await seedFreshProductImageField(client,tenantId);
  await seedFreshSmartComponents(client,tenantId);
@@ -76,11 +78,11 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v16: smart_paired_screens (screens paired with a device, for any app's settings page).
 // v17: Company (one record per tenant: company details, receipts; read as @ThisTenant.Company.*).
 // v18: NamedDevice.AttachedTill (a drawer/printer fixed to a Till; apps find the Till from it).
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v18';
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v20';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,
- LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,CATALOGUE_OBJECTS,
+ LOCATION_SRN_FIELDS,APPOINTMENT_OBJECTS,APPOINTMENT_STATUSES,CART_OBJECTS,CATALOGUE_OBJECTS,EPOS_OBJECTS,EPOS_PERMISSION_SETS,
  CORE_CASH_LEDGER_FIELDS,PRODUCT_IMAGE_FIELD,SMART_COMPONENTS,NAMED_DEVICE_OBJECTS,NAMED_DEVICE_PICKLISTS,
  TILL_NUMBERING_FIELDS,NO_DELETE_OBJECTS,STARTER_LOCATION,STARTER_TILL,SYSTEM_OBJECTS,STANDARD_OBJECTS,COMPANY_OBJECT
 ];

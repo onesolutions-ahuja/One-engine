@@ -12,6 +12,7 @@
     "smart_textbox/component.json",
     "smart_label/component.json",
     "smart_card_grid/component.json",
+    "smart_spacemap/component.json",
     "smart_image/component.json",
     "smart_calendar/component.json",
     "smart_navigation/component.json",

@@ -170,12 +170,12 @@ class ServerScope{
    'tenant.id':tenant?.id,'tenant.name':tenant?.name,'tenant.logo':tenant?.logo};
   if(path==='cartId'){const id=this.state('activeCartId');return typeof id==='string'&&uuid.test(id)?id:'';}
   // @ThisTenant.User.RefundLimit: the user's own value from SQL (a limit the server enforces).
-  if(path.startsWith('user.field.'))return namedValue(user?.fields,path.slice(11));
+  if(path.startsWith('user.field.'))return namedValue(user?.fields,path.slice(11),'User');
   if(!Object.prototype.hasOwnProperty.call(map,path))throw Error('Unsupported tenant value: '+path);
   return map[path]??'';
  }
  /** @ThisTenant.Company.<Field>: any Company Settings value (blank when not set). */
- tenant(name:string){return namedValue(this.identity?.tenant.company,name);}
+ tenant(name:string){return namedValue(this.identity?.tenant.company,name,'Company');}
  /** @ThisTenant.Permission.<Name>: read once before the action runs (RBAC CustomPermission:<Name>). */
  permission(name:string){return this.permissions.get(name.toLowerCase())===true;}
  permissions=new Map<string,boolean>();
@@ -509,10 +509,11 @@ async function loadSets(scope:ServerScope,code:ServerPageCode,only?:ReadonlySet<
 type Deps={db:Sql;records:Records;verifyPin?:(actor:Actor,pin:unknown,userId?:unknown)=>Promise<boolean>;
  rbac?:RbacEngine;namedCredentials?:NamedCredentialService};
 /** A value by name, ignoring case ('' when absent). */
-function namedValue(values:Record<string,unknown>|undefined,name:string):unknown{
- if(!values)return '';
+function namedValue(values:Record<string,unknown>|undefined,name:string,group:string):unknown{
+ if(!values)throw Error('Unknown tenant value @ThisTenant.'+group+'.'+name);
  const key=Object.keys(values).find(item=>item.toLowerCase()===name.toLowerCase());
- const value=key===undefined?undefined:values[key];
+ if(key===undefined)throw Error('Unknown tenant value @ThisTenant.'+group+'.'+name);
+ const value=values[key];
  return value===undefined||value===null?'':value;
 }
 async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{identity:boolean;connections:boolean;permissions?:string[]}){

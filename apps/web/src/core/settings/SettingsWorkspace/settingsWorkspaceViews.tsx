@@ -1,3 +1,4 @@
+import {receiptSettings} from '../../../../../server/src/expression-engine/ReceiptSettings';
 import {appRoutePath} from '../../workspace/Navigation/appRouting';
 import TenantGovernance from './TenantGovernance';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
@@ -477,7 +478,9 @@ const companyFields:ReadonlyArray<{key:keyof CompanyProfile;label:string}>= [
 {key:'country',label:'Country'},{key:'timezone',label:'Time zone'},{key:'locale',label:'Locale'}];
 
 function CompanySettings({ canManage, section = 'general' }: { canManage: boolean; section?: string }) {
-  const sectionTitle = section === 'branding' ? 'Company branding' : section === 'contacts' ? 'Contact details' : 'Company details';
+  const [receiptConnections,setReceiptConnections]=useState<string[]>([]);
+  useEffect(()=>{if(section==='receipts')void apiRequest<{user:{connections?:{systemConnected:string[];customConnected:string[]}}}>('/auth/me').then(s=>setReceiptConnections([...(s.user.connections?.systemConnected??[]),...(s.user.connections?.customConnected??[])])).catch(()=>setReceiptConnections([]));},[section]);
+  const sectionTitle = section==='receipts'?'Receipts':section === 'branding' ? 'Company branding' : section === 'contacts' ? 'Contact details' : 'Company details';
   const [company,setCompany]=useState<CompanyProfile>(blankCompanyProfile);
   const [companyBeforeEdit,setCompanyBeforeEdit]=useState<CompanyProfile|null>(null);
   const [companyEditing,setCompanyEditing]=useState(false);
@@ -524,7 +527,7 @@ function CompanySettings({ canManage, section = 'general' }: { canManage: boolea
   useEffect(()=>{void reloadCompany();},[]);
   const saveCompany=async()=>{if(!canManage||!companyReady||companySaving||logoReading||!saveCompanyAllowed)return;
     setCompanySaving(true);setCompanyError('');setCompanyNotice('');
-    try{const saved=await apiRequest<{profile:CompanyProfile}>('/tenant/company-profile',{method:'PUT',body:JSON.stringify(company)});
+    try{const saved=await apiRequest<{profile:CompanyProfile}>('/tenant/company-profile',{method:'PUT',body:JSON.stringify(Object.fromEntries(Object.entries(company).filter(([key,value])=>value!==(companyBeforeEdit as unknown as Record<string,unknown>)?.[key])))});
       setCompany(saved.profile);setCompanyEditing(false);setCompanyBeforeEdit(null);setCompanyNotice(section==='branding'?'Company logo saved.':'Company details saved.');
        // Update every @ThisTenant.Company image/text formula immediately after a confirmed save.
        void refreshTenantBrand();}
@@ -684,7 +687,19 @@ function CompanySettings({ canManage, section = 'general' }: { canManage: boolea
          <strong>{company.tradingName||company.legalName||'Your organisation'}</strong><span>Sign in</span></div>
        </div>}
        <div className="company-profile-grid">{companyEditing&&(section==='branding'||section==='general')&&<div className="company-profile-field" data-company-field="logoUrl"><label htmlFor="company-logo-upload">Company logo</label><input id="company-logo-upload" type="file" accept="image/png,image/jpeg,image/webp" disabled={companySaving||logoReading} onChange={event=>{void selectCompanyLogo(event.target.files?.[0]);event.target.value='';}}/><small>PNG, JPG or WebP · maximum 128 KB</small>{company.logoUrl&&<button className="btn" type="button" disabled={companySaving||logoReading} onClick={()=>{ if (!confirmDestructiveAction('Remove','company logo','Save company settings to apply the removal.')) return; setCompany(previous=>({...previous,logoUrl:''})); }}>Remove logo</button>}</div>}
-      {shownCompanyFields.map(field=><div className="company-profile-field" data-company-field={field.key} key={field.key}><label htmlFor={'company-'+field.key}>{field.label}</label>
+      {section==='receipts'&&receiptSettings.map(setting=>{
+        const value=(company as unknown as Record<string,string|number|boolean>)[setting.key]??setting.initial??'';
+        const change=(next:string|number|boolean)=>setCompany(previous=>({...previous,[setting.key]:next}));
+        const options=setting.kind==='connection'?receiptConnections:setting.options;
+        return <label className="company-profile-field" key={setting.key}>{setting.label}
+          {setting.kind==='boolean'?<input type="checkbox" disabled={!companyEditing||companySaving} checked={value===true} onChange={e=>change(e.target.checked)}/>:
+          options?<select disabled={!companyEditing||companySaving} value={setting.kind==='choice'&&value!==''?Number(value).toFixed(2):String(value)} onChange={e=>change(e.target.value)}>
+            <option value=""></option>{Array.from(new Set([...options,...(setting.kind==='connection'&&value?[String(value)]:[])])).map(option=><option key={option}>{option}</option>)}</select>:
+          <input type={setting.kind==='number'?'number':setting.kind==='url'?'url':'text'} disabled={!companyEditing||companySaving}
+            value={String(value)} min={0} max={setting.max} maxLength={setting.max} step={setting.decimals?0.01:1}
+            onChange={e=>change(setting.kind==='number'&&e.target.value!==''?Number(e.target.value):e.target.value)}/>}</label>;
+       })}
+      {section!=='receipts'&&shownCompanyFields.map(field=><div className="company-profile-field" data-company-field={field.key} key={field.key}><label htmlFor={'company-'+field.key}>{field.label}</label>
         {companyEditing?<input id={'company-'+field.key} className="form-control" value={company[field.key]}
           onChange={event=>setCompany(previous=>({...previous,[field.key]:event.target.value}))}/>
         :<p>{company[field.key]||'Not provided'}</p>}</div> )}</div></>:<p role="status">Company data could not be loaded. Editing is unavailable until a successful retry.</p>}

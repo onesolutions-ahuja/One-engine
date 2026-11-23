@@ -15,8 +15,8 @@ export const safeTenantLogo=value=>typeof value==="string"&&logoPattern.test(val
 /** Company Settings values (@ThisTenant.Company.<Field>): text, numbers and Yes/No only. */
 const companyValues=value=>{
  const out=Object.create(null);
- if(value&&typeof value==="object"&&!Array.isArray(value))for(const [key,item] of Object.entries(value).slice(0,200)){
-  if(!/^[a-z][a-z0-9]{0,63}$/.test(key))continue;
+ if(value&&typeof value==="object"&&!Array.isArray(value))for(const [key,item] of Object.entries(value)){
+  if(!/^[a-z][a-z0-9_]{0,79}$/.test(key))continue;
   if(typeof item==="string")out[key]=item.slice(0,2048);
   else if(typeof item==="boolean"||typeof item==="number"&&Number.isFinite(item))out[key]=item;
  }
@@ -45,6 +45,7 @@ export function tenantCompanyValue(field){
  const brand=getTenantBrand(),key=String(field??"").toLowerCase();
  if(key==="name")return brand.name;
  if(key==="logo")return brand.logo;
+ if(!(key in (brand.company??{})))throw Error('Unknown tenant value @ThisTenant.Company.'+field);
  const value=brand.company?.[key];
  return value===undefined||value===null?"":value;
 }

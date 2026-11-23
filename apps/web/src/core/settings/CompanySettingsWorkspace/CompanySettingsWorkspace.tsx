@@ -8,10 +8,10 @@ import MetadataPackageManager from '../../applications/MetadataPackages/Metadata
 import { apiRequest } from '../../authentication/Client/authClient';
 import PaymentDefaults from '../../integrations/NamedDevices/PaymentDefaults';
 import './CompanySettingsWorkspace.css';
-type Section = 'general'|'currency'|'branding'|'business'|'payments'|'contacts'|'mobile'|'integrations'|'security'|'developer';
+type Section = 'receipts'|'general'|'currency'|'branding'|'business'|'payments'|'contacts'|'mobile'|'integrations'|'security'|'developer';
 type DeveloperDestination = {label:string;workspace:string;description:string;allowed:boolean};
 const sections:ReadonlyArray<{id:Section;label:string}>=[
-{id:'general',label:'General'},{id:'currency',label:'Currency & Locale'},
+{id:'general',label:'General'},{id:'receipts',label:'Receipts'},{id:'currency',label:'Currency & Locale'},
 {id:'branding',label:'Branding'},{id:'business',label:'Business Settings'},{id:'payments',label:'Payments'},
 {id:'contacts',label:'Contacts'},{id:'mobile',label:'Mobile & Offline'},{id:'integrations',label:'Integrations'},
 {id:'security',label:'Security & Recovery'},{id:'developer',label:'Developer'}];
@@ -74,7 +74,7 @@ recovery:ReactNode;mfa:ReactNode;emailRecovery:ReactNode;locks:ReactNode;session
    {currentSection && <div className={"company-workspace-body company-workspace-section-"+currentSection}>
      {/* CompanySettings currently contains both company details and currency sections.
          Render it once, avoiding duplicate state and network requests. */}
-     {(currentSection==='general'||currentSection==='currency'||currentSection==='contacts'||currentSection==='branding')&&(typeof company === 'object' && company !== null && 'props' in company ? cloneElement(company as ReactElement, {section:currentSection}) : company)}
+     {(currentSection==='receipts'||currentSection==='general'||currentSection==='currency'||currentSection==='contacts'||currentSection==='branding')&&(typeof company === 'object' && company !== null && 'props' in company ? cloneElement(company as ReactElement, {section:currentSection}) : company)}
      {currentSection==='integrations'&&<section className="company-workspace-stack">{domains}{developer}</section>}
      {currentSection==='security'&&<section className="company-workspace-stack">
       <nav role="tablist" className="md-admin-tabstrip" aria-label="Security settings areas">

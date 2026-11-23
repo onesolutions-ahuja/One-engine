@@ -1,5 +1,5 @@
 import {runComponentFormula} from "../shared/formulaCodeLookup.js";
-import {hiddenByShowWhen} from "../shared/showWhen.js";
+import {disabledWhen,hiddenByShowWhen} from "../shared/showWhen.js";
 import {LINE_ITEMS_PREVIEW,lineItemRows,lineItemSettings} from "./lineItems.mjs";
 
 /** Smart Line Items: the item lines of a receipt, invoice or order slip.
@@ -22,6 +22,7 @@ export default function SmartComponent(p){
  const designing=p.builderPreview===true||p.editing===true||p.designMode===true;
  const real=lineItemRows(records,read);
  const items=real.length||!designing?real:LINE_ITEMS_PREVIEW.map((item,index)=>({...item,id:"preview-"+index}));
+ const sourceRows=new Map(records.map((row,index)=>[String(row?.Id??row?.id??index),row]));
  const settings=lineItemSettings(p);
  const textColour=colour(p.rowLabelColor,"#1d1d1f");
  const textSize=size(p.rowTextSize,13);
@@ -38,7 +39,7 @@ export default function SmartComponent(p){
   {heading&&<div className="smart-line-items-heading" data-design-area={designing?"Header":undefined}
    style={{color:colour(p.headerTextColor,textColour),fontSize:size(p.headerTextSize,textSize),
     fontWeight:p.headerBold===false?400:700}}>{heading}</div>}
-  {items.map((item,index)=><div key={item.id} className="smart-line-items-row"
+  {items.map((item,index)=><div aria-disabled={disabledWhen(p,sourceRows.get(item.id),"itemDisabledWhen")||undefined} key={item.id} className="smart-line-items-row"
     data-design-area={designing&&index===0?"Row":undefined}
     style={{borderBottom:index<items.length-1?separator:undefined,fontWeight:settings.bold?700:undefined}}>
    <div className="smart-line-items-line">

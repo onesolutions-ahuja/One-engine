@@ -55,6 +55,26 @@ export async function rollupParentsMany(client:PoolClient,tenantId:string,childO
     }
     return parents;
   }
+// A related numeric factor is virtual and must be evaluated against the current lookup row.
+async function productFormulaSql(client:PoolClient,tenant:string,child:string,source:string){
+ const fields=(await client.query<{api_name:string;formula_expression:string|null;related_object:string|null}>('SELECT api_name,formula_expression,related_object FROM md_field_definitions WHERE tenant_id=$1 AND object_api=$2 AND deleted_at IS NULL',[tenant,child])).rows;
+ const expression=fields.find(f=>f.api_name===source)?.formula_expression??'';
+ const factors=/^\s*\$Record\.(\w+)\s*\*\s*\$Record\.(\w+)\.(\w+)\s*$/.exec(expression);
+ if(!factors)throw Error('Unsupported roll-up source formula');
+ const target=fields.find(f=>f.api_name===factors[2])?.related_object;
+ if(!target)throw Error('Unknown roll-up formula lookup');
+ const native=await objectNativeFields(client,tenant,child);
+ const related=await objectNativeFields(client,tenant,target);
+ return nativeValueSql(native,factors[1],'n')+' * (SELECT '+nativeValueSql(related,factors[3],'ingredient')+' FROM '+nativeTableSql(related)+' ingredient WHERE ingredient.tenant_id=n.tenant_id AND ingredient.id='+nativeValueSql(native,factors[2],'n')+' AND NOT ingredient.is_deleted)';
+}
+export async function refreshRelatedFormulaRollups(client:PoolClient,tenant:string,object:string,ids:string[]){
+ const deps=await objectSetup<{parent:string;child:string;lookup:string;parent_field:string}>(client,'related-formula-rollups',tenant,object);
+ for(const dep of deps.rows){
+  const native=await objectNativeFields(client,tenant,dep.child);
+  const parents=await client.query<{id:string|null}>('SELECT DISTINCT '+nativeValueSql(native,dep.parent_field,'n')+' AS id FROM '+nativeTableSql(native)+' n WHERE n.tenant_id=$1 AND NOT n.is_deleted AND '+nativeValueSql(native,dep.lookup,'n')+'=ANY($2::uuid[])',[tenant,ids]);
+  await refreshRollups(client,tenant,dep.child,new Map([[dep.parent,new Set<string>(parents.rows.flatMap(p=>p.id?[p.id]:[]))]]));
+ }
+}
 export async function refreshRollups(client:PoolClient,tenantId:string,childObject:string,
     parentIds:Map<string,Set<string>>,visited=new Set<string>(),depth=0) {
     if(!parentIds.size)return;
@@ -68,6 +88,9 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
     const rollups=rows.filter(rollup=>typeof rollup.parent_object==='string'
       &&typeof rollup.field_api==='string'&&typeof rollup.relationship_field==='string'
       &&typeof rollup.operation==='string');
+    // Serialize competing child postings before taking the aggregate's read snapshot.
+    const parents=[...new Set([...parentIds.values()].flatMap(ids=>[...ids]))].sort();
+    await client.query('SELECT id FROM md_records WHERE tenant_id=$1 AND id=ANY($2::uuid[]) ORDER BY id FOR UPDATE',[tenantId,parents]);
     for(const rollup of rollups){
       for(const parentId of parentIds.get(rollup.parent_object)??[]){
         const operation=rollup.operation.toUpperCase();
@@ -110,7 +133,7 @@ export async function refreshRollups(client:PoolClient,tenantId:string,childObje
           ?` AND (${filterPredicates.join(rollup.filter_logic==='Any'?' OR ':' AND ')})`:'';
         const sourceType=rollup.source_data_type;
         const relation=nativeValueSql(native,rollup.relationship_field,'n');
-        const source=operation==='COUNT'?null:nativeValueSql(native,rollup.source_field!,'n');
+        const source=operation==='COUNT'?null:sourceType==='formula'?await productFormulaSql(client,tenantId,childObject,rollup.source_field!):nativeValueSql(native,rollup.source_field!,'n');
         const aggregate=operation==='COUNT'?'count(*)::text':
           operation==='SUM'?`COALESCE(sum(${source}),0)::text`:
             `${operation.toLowerCase()}(${source})::text`;

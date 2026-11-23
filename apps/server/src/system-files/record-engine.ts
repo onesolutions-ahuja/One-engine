@@ -1,3 +1,4 @@
+import {setupObject,setupRecords,changeSetupRecord} from '../system-support/setup-records.js';
 import {randomUUID} from 'node:crypto';
 import {auditContext} from '../system-support/audit-context.js';
 import {scopedMetadata} from '../system-support/record-read-scope.js';
@@ -17,7 +18,7 @@ import {resolveRelationshipFieldPath} from '../relationship-engine/RelationshipP
 import {assertDeletionAllowed,shouldCascadeReference} from '../relationship-engine/ReferentialIntegrityGuard.js';
 import {assertLookupTargetExists} from '../relationship-engine/LookupResolver.js';
 import {enforceMasterDetailReparenting} from '../relationship-engine/MasterDetailManager.js';
-import {rollupParents,rollupParentsMany,refreshRollups} from '../relationship-engine/RollupAggregationManager.js';
+import {rollupParents,rollupParentsMany,refreshRollups,refreshRelatedFormulaRollups} from '../relationship-engine/RollupAggregationManager.js';
 import {readRollupSummaryField} from '../field-engine/types/RollupSummaryField.js';
 import {validateLookupField} from '../field-engine/types/LookupField.js';
 import {compareLookupFilter,type LookupFilterMetadata} from './object-manager-lookup-filters.js';
@@ -316,7 +317,9 @@ export class RecordEngine {
         &&!reference.startsWith('$RecordType.')&&reference!=='$Record')
         throw new Error('Unsupported formula global reference: '+reference);
       if(field){
-        if(!api.test(field))throw new Error('Invalid formula field reference');
+        const path=field.split('.');
+        if(!path.every(segment=>api.test(segment)))throw new Error('Invalid formula field reference');
+        field=path[0];
         fields[field]=await this.rbac.allowed(tenantId,userId,objectApi+'.'+field,'read');
       }
     }
@@ -530,7 +533,7 @@ export class RecordEngine {
         if(name==='$Record')return formulaContext.currentRecord;
         if(name.startsWith('$Record.'))
           return referenceCache.has(name)?referenceCache.get(name):
-            formulaContext.currentRecord?.[name.slice(8)]??null;
+            calculated.has(name.slice(8))?calculated.get(name.slice(8)):formulaContext.currentRecord?.[name.slice(8)]??null;
         if(name.startsWith('$User.'))return contextValue(formulaContext.actor,name.slice(6));
         if(name.startsWith('$Profile.'))return contextValue(formulaContext.profile,name.slice(9));
         if(name.startsWith('$Organization.'))
@@ -1004,6 +1007,10 @@ export class RecordEngine {
   }
   private async createRecord(tenantId:string,userId:string,objectApi:string,
     values:Record<string,unknown>,isClone:boolean,existingClient?:PoolClient):Promise<string> {
+    if(setupObject(objectApi)){
+      if(isClone)throw Error('Setup records cannot be cloned');
+      return changeSetupRecord(this.db,this.rbac,tenantId,userId,objectApi,values);
+    }
     if(!recordReadScope())return this.soloScope(()=>
       this.createRecord(tenantId,userId,objectApi,values,isClone,existingClient),false);
     forgetScopedRecords();
@@ -1187,7 +1194,7 @@ export class RecordEngine {
   /** Can this batch be saved set-based without anything seeing it part-way? */
   private async bulkAllowed(client:PoolClient,tenantId:string,userId:string,objectApi:string,
     operation:'created'|'updated',lists:ReadonlyArray<Record<string,unknown>>){
-    if(objectApi==='CashLedger'||objectApi==='User')return false;
+    if(objectApi==='CashLedger'||objectApi==='User'||setupObject(objectApi))return false;
     if(lists.some(values=>Object.getPrototypeOf(values)!==Object.prototype&&Object.getPrototypeOf(values)!==null))return false;
     if(lists.some(values=>Object.hasOwn(values,'OwnerId')||Object.hasOwn(values,'RecordTypeId')))return false;
     if(await this.triggerMayRun(client,tenantId,objectApi,operation,'before-save')
@@ -1357,6 +1364,7 @@ export class RecordEngine {
       for(const parentId of parentIds)affected.add(parentId);
       affectedParents.set(parentObject,affected);
     }
+    await refreshRelatedFormulaRollups(client,tenantId,objectApi,ids);
     await refreshRollups(client,tenantId,objectApi,affectedParents);
     forgetScopedRecords();
   }
@@ -1411,6 +1419,7 @@ export class RecordEngine {
   }
   async list(tenantId:string,userId:string,objectApi:string,limit=50,offset=0,
     options:RecordListOptions={}) {
+    if(setupObject(objectApi))return setupRecords(this.db,this.rbac,tenantId,userId,objectApi,limit,offset,options);
     // One list read on its own: setup and decisions are read once for it, not kept after.
     if(!recordReadScope())return this.soloScope(()=>this.listInScope(tenantId,userId,objectApi,limit,offset,options),true);
     return this.listInScope(tenantId,userId,objectApi,limit,offset,options);
@@ -1832,6 +1841,11 @@ export class RecordEngine {
 
   /** Single-record read uses the same tenant and field-level grants as list, without pagination. */
   async get(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient):Promise<Record<string,unknown>> {
+    if(setupObject(objectApi)){
+      const result=await setupRecords(client??this.db,this.rbac,tenantId,userId,objectApi,1,0,{},id);
+      if(!result.records[0])throw Error('Record not found');
+      return result.records[0];
+    }
     // In a page action a record read between two writes is read once (any write forgets all).
     const scope=recordReadScope();
     // One read on its own: setup and decisions are read once for it and not kept after.
@@ -1910,6 +1924,7 @@ export class RecordEngine {
   }
   async update(tenantId:string,userId:string,objectApi:string,id:string,values:Record<string,unknown>,
     ifUnmodifiedSince?:string,client?:PoolClient,runTriggers=false):Promise<void> {
+    if(setupObject(objectApi))throw Error("Read-only setup fields");
     if(!recordReadScope())return this.soloScope(()=>
       this.update(tenantId,userId,objectApi,id,values,ifUnmodifiedSince,client,runTriggers),false);
     forgetScopedRecords();
@@ -2014,6 +2029,7 @@ export class RecordEngine {
         for(const parentId of parentIds)affected.add(parentId);
         affectedParents.set(parentObject,affected);
       }
+      await refreshRelatedFormulaRollups(transactionClient,tenantId,objectApi,[id]);
       await refreshRollups(transactionClient,tenantId,objectApi,affectedParents);
     };
     if(client){
@@ -2258,6 +2274,7 @@ export class RecordEngine {
 
   /** Object-level delete permission and record access are checked for the root. */
   async remove(tenantId:string,userId:string,objectApi:string,id:string,client?:PoolClient,ifUnmodifiedSince?:string):Promise<void> {
+    if(setupObject(objectApi)){await changeSetupRecord(this.db,this.rbac,tenantId,userId,objectApi,null,id);return;}
     if(!recordReadScope())return this.soloScope(()=>
       this.remove(tenantId,userId,objectApi,id,client,ifUnmodifiedSince),false);
     forgetScopedRecords();

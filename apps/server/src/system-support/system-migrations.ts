@@ -1,3 +1,4 @@
+import {applySpaceMap} from './smart-spacemap.js';
 import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
 import {RECORD_ACCESS_FAST_DDL} from './record-access-fast.js';
 import {createHash} from 'node:crypto';
@@ -850,6 +851,12 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await applySmartTableRowButtons(client);
   await applySmartSelectorMulti(client);
   await applySmartVisibleFormula(client);
+  await client.query(`CREATE TABLE IF NOT EXISTS md_custom_permission_definitions(
+ tenant_id uuid NOT NULL REFERENCES md_tenants(id),name text NOT NULL,PRIMARY KEY(tenant_id,name));
+INSERT INTO md_system_permission_catalogue(permission_key,label,description,resource,action)
+ VALUES('users:manage','Manage Users','Manage user permission assignments','SystemPermission:ManageUsers','read')
+ ON CONFLICT DO NOTHING;`);
+  await applySpaceMap(client);
   await applySmartDisabledFormula(client);
   await applySmartNumpadDateMode(client);
   await applySmartCartSummaryVisible(client);

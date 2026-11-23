@@ -1,3 +1,4 @@
+import {receiptSettings} from '../expression-engine/ReceiptSettings.js';
 import type {PoolClient} from 'pg';
 import {writeNativeValues} from '../system-files/native-values.js';
 import type {RecordStoredValue} from '../system-files/record-value-write.js';
@@ -39,7 +40,7 @@ export const COMPANY_OBJECT={object:'Company',label:'Company',fields:[
  {api:'CashRoundingStep',label:'Round cash to (e.g. 0.05)',type:'number',profile:'cashRoundingStep'}
 ]} as const;
 /** Company Settings profile key -> Company field (the Setup form keeps its keys). */
-export const PROFILE_TO_COMPANY_FIELD:ReadonlyMap<string,string>=new Map(COMPANY_OBJECT.fields.map(f=>[f.profile,f.api]));
+export const PROFILE_TO_COMPANY_FIELD:ReadonlyMap<string,string>=new Map<string,string>([...COMPANY_OBJECT.fields.map(f=>[f.profile,f.api] as const),...receiptSettings.map(f=>[f.key,f.field] as const)]);
 export const companyReceipt=(tenantId:string)=>'company-record-v1:'+tenantId;
 
 const stored=(type:string,value:unknown):RecordStoredValue|null=>{
@@ -53,7 +54,8 @@ const stored=(type:string,value:unknown):RecordStoredValue|null=>{
 export async function seedCompanyObject(client:PoolClient,tenantId:string):Promise<void>{
  await client.query(`INSERT INTO md_object_definitions(tenant_id,api_name,label,is_system)
   VALUES($1,$2,$3,true) ON CONFLICT(tenant_id,api_name) DO NOTHING`,[tenantId,COMPANY_OBJECT.object,COMPANY_OBJECT.label]);
- for(const field of COMPANY_OBJECT.fields)await client.query(`INSERT INTO md_field_definitions
+ const added=receiptSettings.filter(s=>!COMPANY_OBJECT.fields.some(f=>f.api===s.field)).map(s=>({api:s.field,label:s.label,type:s.kind==='number'||s.kind==='boolean'?s.kind:'text'}));
+ for(const field of [...COMPANY_OBJECT.fields,...added])await client.query(`INSERT INTO md_field_definitions
   (tenant_id,object_api,api_name,label,data_type,related_object,is_unique,required)
   VALUES($1,$2,$3,$4,$5,NULL,false,false) ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING`,
   [tenantId,COMPANY_OBJECT.object,field.api,field.label,field.type]);

@@ -68,8 +68,6 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  ]},
  {name:'Customer',existing:true,fields:[
   {name:'CreditLimit',type:'number'},
-  ...ledgerBalance('Customer','Customer credit'),
-  {name:'AvailableCredit',type:'formula',formula:'BLANKVALUE($Record.CreditLimit, 0) + $Record.Balance'},
   {name:'AccountOnHold',type:'boolean'},
  ]},
  {name:'CashLedger',existing:true,fields:[
@@ -95,7 +93,12 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  {name:'ProductCategory',existing:true,fields:[
   {name:'OrderPrinter',type:'text',length:128},
  ]},
- {name:'Order',existing:true,fields:[
+ {name:'Order',existing:false,fields:[
+  {name:'Name',type:'text',length:80},
+  {name:'Cart',type:'reference',target:'Cart'},
+  {name:'Customer',type:'reference',target:'Customer'},
+  {name:'Total',type:'number'},
+  {name:'Notes',type:'text',length:255},
   {name:'Source',type:'picklist',choices:['Till','Uber Eats','Deliveroo','Just Eat','Kiosk','Online']},
   {name:'OrderType',type:'picklist',choices:['Eat in','Take away','Delivery','Collection']},
   {name:'ServicePoint',type:'reference',target:'ServicePoint'},
@@ -104,7 +107,12 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'KitchenStatus',type:'picklist',choices:['New','Accepted','Preparing','Ready','Collected','Rejected']},
   {name:'PrepMinutes',type:'number'},
  ]},
- {name:'OrderLine',existing:true,fields:[
+ {name:'OrderLine',existing:false,fields:[
+  {name:'Name',type:'text',length:255},
+  {name:'Order',type:'reference',target:'Order'},
+  {name:'Product',type:'reference',target:'Product'},
+  {name:'Quantity',type:'number'},
+  {name:'CartLine',type:'reference',target:'CartLine'},
   {name:'Course',type:'number'},
   {name:'Note',type:'text',length:255},
   {name:'KitchenStatus',type:'picklist',choices:['New','Done']},
@@ -151,6 +159,19 @@ export async function seedEposObjects(client:PoolClient,tenantId:string){
   if(field.choices)await addChoices(client,tenantId,object.name,field.name,field.choices);
  }
  await addChoices(client,tenantId,'CashLedger','Method',['Customer credit','Gift card','On account']);
+ await removeDuplicateCustomerBalance(client,tenantId);
+}
+// Customer already keeps what is owed in AccountBalance. The ledger balance fields an earlier seed added
+// duplicated it, so retire them, but only while they are still exactly the seeded definitions.
+async function removeDuplicateCustomerBalance(client:PoolClient,tenantId:string){
+ await client.query(`UPDATE md_field_definitions SET deleted_at=now()
+  WHERE tenant_id=$1 AND object_api='Customer' AND deleted_at IS NULL AND (
+   (api_name IN ('IncomingTotal','OutgoingTotal') AND data_type='rollup' AND rollup_child_object='CashLedger'
+    AND rollup_relationship_field='Customer' AND rollup_source_field='Amount')
+   OR (api_name='Balance' AND data_type='formula'
+    AND formula_expression='BLANKVALUE($Record.IncomingTotal, 0) - BLANKVALUE($Record.OutgoingTotal, 0)')
+   OR (api_name='AvailableCredit' AND data_type='formula'
+    AND formula_expression='BLANKVALUE($Record.CreditLimit, 0) + $Record.Balance'))`,[tenantId]);
 }
 async function addChoices(client:PoolClient,tenantId:string,object:string,field:string,choices:string[]){
  await client.query(`INSERT INTO md_field_picklist_values(tenant_id,object_api,field_api,value,sort_order)

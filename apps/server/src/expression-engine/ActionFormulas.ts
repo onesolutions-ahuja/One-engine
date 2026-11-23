@@ -1,7 +1,7 @@
 import {Parser,type Expression} from './FormulaParser.js';
 import {screenArguments,screenLayerArg} from './screenLayer.js';
 export {screenLayerArg};
-import {tokenize} from './FormulaTokenizer.js';
+import {tokenize,PAGE_FORMULA_LIMITS} from './FormulaTokenizer.js';
 import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,assignedComponent,assignedProperty} from './PageReferences.js';
 import {validateFormulaFunctions} from './FormulaFunctionRegistry.js';
 import {actionFormulaFunctions} from './FormulaCategories.js';
@@ -61,7 +61,7 @@ export const isActionPlan=(source:string):boolean=>{
  if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
-  const root=new Parser(tokenize(source)).parse();
+  const root=new Parser(tokenize(source,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();
   const hasAction=(node:Expression):boolean=>node.kind==='call'?
    actionFunctionNames.includes(node.name)||node.args.some(hasAction):
    node.kind==='binary'?hasAction(node.left)||hasAction(node.right):
@@ -299,7 +299,7 @@ export function compileActionPlan(source:string):ActionStep[] {
   steps.push({name:node.name,object,id,fields,alias,guards});
  }
  const steps:ActionStep[]=[];
- add(steps,new Parser(tokenize(source)).parse(),[],false);
+ add(steps,new Parser(tokenize(source,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse(),[],false);
  return steps;
 }
 
@@ -347,7 +347,7 @@ export function splitServerDataActionPlan(formula:string):ActionPlanDataSplit|nu
 
 export const isScreenAction=(source:string)=>/^\s*=?\s*SCREEN\s*\(/i.test(source);
 export function parseScreenAction(source:string){
- const node=new Parser(tokenize(source)).parse();
+ const node=new Parser(tokenize(source,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();
  if(node.kind!=='call'||node.name!=='SCREEN'||node.args.length<1)
   throw Error('SCREEN requires a page API name, then optional mode, record and layer (any order)');
  const page=nameOf(node.args[0],'page API name');

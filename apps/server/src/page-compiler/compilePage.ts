@@ -1,6 +1,6 @@
 import {pageReferencesIn,savedValueKey} from '../expression-engine/PageReferences.js';
 import {Parser,type Expression} from '../expression-engine/FormulaParser.js';
-import {tokenize} from '../expression-engine/FormulaTokenizer.js';
+import {tokenize,PAGE_FORMULA_LIMITS} from '../expression-engine/FormulaTokenizer.js';
 import {compileActionPlan,isActionPlan,splitServerDataActionPlan,type ActionStep} from '../expression-engine/ActionFormulas.js';
 import {SQL_RECORD_AGGREGATES,serializeFormulaSqlExpression} from '../expression-engine/FormulaCategories.js';
 import {implicitPageStateKeys,pageComponentReadObjectNames,activePageRecordFilters,
@@ -114,7 +114,7 @@ const identifier=/^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const unique=(values:Iterable<string>)=>[...new Set(values)].sort();
 
 export function parseFormulaOnce(source:string):{ast:Expression|null;error?:string}{
- try{return {ast:new Parser(tokenize(source.trim().replace(/^=\s*/,''))).parse()};}
+ try{return {ast:new Parser(tokenize(source.trim().replace(/^=\s*/,''),PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse()};}
  catch(error){return {ast:null,error:error instanceof Error?error.message:String(error)};}
 }
 export function formulaReferences(ast:Expression|null):{references:string[];functions:string[]}{

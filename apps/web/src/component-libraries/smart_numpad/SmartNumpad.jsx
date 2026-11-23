@@ -1,5 +1,8 @@
 import {smartShapeAppearance} from "../smart/shared/SmartShapeAppearance.js";
 import {applyNumpadKey,normalizeNumpadValue,numpadSettings} from "./numpadValue.mjs";
+import {numpadKeyAction,onNumpadSelection,selectedNumpad,typingElsewhere} from "./numpadKeyboard.mjs";
+let numpadIds=0;
+const BackspaceIcon=()=><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><path d="m12 9 6 6"/><path d="m18 9-6 6"/></svg>;
 const size=(value,defaultValue,min=0,max=2000)=>{
  const n=Number(value);
  return Number.isFinite(n)?Math.max(min,Math.min(max,n)):defaultValue;
@@ -48,6 +51,34 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels,given}){
   const event=key==="C"?"clear":key==="backspace"?"backspace":null;
   update(applyNumpadKey(valueRef.current,key,settings),event);
  };
+ // Physical keyboard: only while this numpad is the selected one (last tapped).
+ const [numpadId]=React.useState(()=>"numpad-"+(++numpadIds));
+ const rootRef=React.useRef(null);
+ const [isSelected,setSelected]=React.useState(false);
+ React.useEffect(()=>onNumpadSelection(id=>setSelected(id===numpadId)),[numpadId]);
+ const pressRef=React.useRef(null);
+ pressRef.current=key=>{
+  if(key==="enter"){if(p.actionFlows?.click)fire("click",valueRef.current);return;}
+  press(key);
+ };
+ React.useEffect(()=>{
+  if(p.builderPreview||p.previewOnly)return;
+  const onKey=event=>{
+   if(selectedNumpad()!==numpadId||event.ctrlKey||event.metaKey||event.altKey)return;
+   const root=rootRef.current;
+   // Disabled (property or Disabled formula, which makes the frame inert) ignores keys.
+   if(!root||!root.isConnected||root.closest("[inert]")||p.disabled===true||p.readonly===true)return;
+   // Its own box types natively; another text box keeps its keys.
+   if(event.target===inputRef.current&&event.key!=="Enter")return;
+   if(typingElsewhere(event.target,inputRef.current))return;
+   const action=numpadKeyAction(event.key,settings.mode);
+   if(!action)return;
+   event.preventDefault();
+   pressRef.current(action);
+  };
+  window.addEventListener("keydown",onKey);
+  return ()=>window.removeEventListener("keydown",onKey);
+ },[numpadId,p.builderPreview,p.previewOnly,p.disabled,p.readonly,settings.mode]);
  const isPin=settings.mode==="pin"||p.numpadMask===true;
  const headerAlign=["left","center","right"].includes(p.headerAlignment)?p.headerAlignment:"right";
  const headerStyle={
@@ -68,6 +99,11 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels,given}){
   justifySelf:"center",minWidth:0,justifyContent:p.numpadKeyAlignment==="left"?"flex-start":p.numpadKeyAlignment==="right"?"flex-end":"center",
   ...smartShapeAppearance(p.numpadKeyShape||"shape:rectangle",size(p.numpadKeyRadius,9,0,128))
  };
+ // Round keys (lock-pad look): with no key width set, an oval key is a circle.
+ const round=p.numpadKeyShape==="shape:oval"&&!p.numpadKeyWidth;
+ if(round){baseKey.width=baseKey.height+"px";baseKey.aspectRatio="1";}
+ // On round keys, ⌫ / C / . are plain text keys (no fill), like the lock pad.
+ const textKey=round?{...baseKey,background:"transparent",borderColor:"transparent",boxShadow:"none"}:baseKey;
  const focusStyle={
   background:p.numpadFocusedFill||"#dbeafe",
   borderColor:p.numpadFocusedBorderColor||"#2563eb",
@@ -117,7 +153,8 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels,given}){
    ...smartShapeAppearance(p[prefix+"Shape"]||"shape:rectangle",size(p[prefix+"Radius"],9,0,128))
   };
  };
- return <div className="smart-numpad" style={bodyStyle} aria-label="Numeric keypad">
+ return <div ref={rootRef} className={"smart-numpad"+(isSelected?" is-selected":"")} style={bodyStyle}
+  aria-label="Numeric keypad" data-numpad-id={numpadId}>
   <div data-design-area={p.builderPreview?"Header":undefined} className="smart-numpad-input-wrap" style={{position:"relative"}}>
    {p.numpadPrefix&&!isPin&&<span className="smart-numpad-prefix" aria-hidden="true">{p.numpadPrefix}</span>}
    <input ref={inputRef} type={isPin?"password":"text"}
@@ -135,7 +172,8 @@ export default function SmartNumpad({p,fire,sourceValue,buttonLabels,given}){
    {p.numpadSuffix&&!isPin&&<span className="smart-numpad-suffix" aria-hidden="true">{p.numpadSuffix}</span>}
   </div>
   <div className="smart-numpad-grid" style={{gap:gap}}>
-   {(settings.mode==="decimal"?decimalLabels:labels).map(key=>sharedButton(key,key==="backspace"?"⌫":key,baseKey,()=>{
+   {(settings.mode==="decimal"?decimalLabels:labels).map(key=>sharedButton(key,key==="backspace"?(round?<BackspaceIcon/>:"⌫"):key,
+    /^[0-9]$/.test(key)?baseKey:textKey,()=>{
     if(heldClear.current){heldClear.current=false;return;}
     press(key);
    }))}

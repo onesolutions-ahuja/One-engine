@@ -8,7 +8,6 @@ export type Expression=
   |{kind:'call';name:string;args:Expression[]};
 
 const MAX_EXPRESSION_DEPTH=64;
-const MAX_EXPRESSION_NODES=512;
 
 const precedence=(operator:string):number=>{
   switch(operator.toUpperCase()){
@@ -26,10 +25,10 @@ const precedence=(operator:string):number=>{
 export class Parser {
   private position=0;
   private nodeCount=0;
-  constructor(private readonly tokens:Token[]){}
+  constructor(private readonly tokens:Token[],private readonly maxNodes=512){}
   parse():Expression {
-    if(this.tokens.length>MAX_EXPRESSION_NODES)
-      throw new Error('Formula exceeds the 512-token complexity limit');
+    if(this.tokens.length>this.maxNodes)
+      throw new Error(`Formula exceeds the ${this.maxNodes}-token complexity limit`);
     // Excel-style leading '=' is an expression marker, not a binary operator.
     // Shared by Flow, field, validation and component formula contexts.
     if(this.tokens[0]?.kind==='operator'&&this.tokens[0].value==='=')this.position=1;
@@ -38,8 +37,8 @@ export class Parser {
     return value;
   }
   private addNode<T extends Expression>(node:T):T {
-    if(++this.nodeCount>MAX_EXPRESSION_NODES)
-      throw new Error('Formula exceeds the 512-node complexity limit');
+    if(++this.nodeCount>this.maxNodes)
+      throw new Error(`Formula exceeds the ${this.maxNodes}-node complexity limit`);
     return node;
   }
   private expression(minimum:number,depth:number):Expression {

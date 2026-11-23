@@ -16,7 +16,7 @@
  * authored text ever becomes code.
  */
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
-import {tokenize} from '../../expression-engine/FormulaTokenizer.js';
+import {tokenize,PAGE_FORMULA_LIMITS} from '../../expression-engine/FormulaTokenizer.js';
 import {screenArguments} from '../../expression-engine/screenLayer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
 import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
@@ -57,7 +57,7 @@ type Scope={
 export function parseFormula(source:string):Expression{
  const body=source.trim();
  if(!body)return {kind:'literal',value:''};
- try{return new Parser(tokenize(body)).parse();}
+ try{return new Parser(tokenize(body,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();}
  catch(error){return fail(error instanceof Error?error.message:'Invalid formula');}
 }
 function literalName(node:Expression|undefined,label:string,pattern=name):string{

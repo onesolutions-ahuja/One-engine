@@ -1,5 +1,5 @@
 import {Parser,type Expression} from '../expression-engine/FormulaParser.js';
-import {tokenize} from '../expression-engine/FormulaTokenizer.js';
+import {tokenize,PAGE_FORMULA_LIMITS} from '../expression-engine/FormulaTokenizer.js';
 import {isActionPlan} from '../expression-engine/ActionFormulas.js';
 
 /**
@@ -48,7 +48,7 @@ export function pageComponentReadObjectNames(
   // a reader of CartLine/Cart, so every add-to-cart reloaded the whole catalogue.
   if(isActionPlan(expression))continue;
   let node:Expression;
-  try{node=new Parser(tokenize(expression.replace(/^=\s*/,''))).parse();}
+  try{node=new Parser(tokenize(expression.replace(/^=\s*/,''),PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();}
   catch{return null;}
   const visit=(ast:Expression):void=>{
    if(ast.kind==='reference'){

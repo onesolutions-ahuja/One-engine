@@ -448,3 +448,13 @@ test('browser: fast taps keep counting from the newest prediction while earlier 
  await fourth;
  assert.equal(total({}),6);
 });
+
+test('a popup for a row the tap creates opens after the save, with the saved Id',async()=>{
+ const {earlyScreens}=await import('../src/core/pages/PageCompiler/pageCodeRuntime.ts');
+ const effects=[{name:'CLOSESCREEN',args:[]},{name:'SCREEN',args:['smart_till_receipt','popup','tmp-inv-1']},
+  {name:'SCREEN',args:['smart_till_customer_display','4']}];
+ const changes=[{objectApiName:'Invoice',operation:'create' as const,record:{Id:'tmp-inv-1'}},
+  {objectApiName:'Cart',operation:'update' as const,record:{Id:'cart-1'}}];
+ assert.deepEqual(earlyScreens(effects,changes),[{name:'SCREEN',args:['smart_till_customer_display','4']}]);
+ assert.equal(earlyScreens(effects,[]).length,2);
+});

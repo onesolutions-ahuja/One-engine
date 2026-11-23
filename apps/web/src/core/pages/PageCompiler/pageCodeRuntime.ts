@@ -616,7 +616,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    }
    // A popup (SCREEN) the prediction opens is opened at once, not after the save;
    // other UI steps (PRINT, ...) still wait for the saved rows.
-   const early=predicted?tap.effects.filter(effect=>effect.name==='SCREEN'):[];
+   // Not a popup for a row this tap creates: its Id is only provisional until the save,
+   // so that popup opens after the save, with the saved Id (else it shows an empty record).
+   const early=predicted?earlyScreens(tap.effects,tap.changes):[];
    // The prediction goes with the save: the server shows it at once on this login's other
    // screens (a customer display), then replaces it with the saved rows.
    noteOwnBatch(batch);
@@ -680,4 +682,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
  return api;
 }
 export type PageCodeRuntime=ReturnType<typeof createPageCodeRuntime>;
+/** Popups a prediction may open at once: SCREEN steps that name no row this tap creates. */
+export function earlyScreens(effects:readonly Effect[],changes:readonly RecordChange[]):Effect[]{
+ const made=changes.filter(change=>change.operation==='create').map(change=>String(change.record.Id??'')).filter(Boolean);
+ return effects.filter(effect=>effect.name==='SCREEN'&&!made.some(id=>JSON.stringify(effect.args).includes(id)));
+}
 

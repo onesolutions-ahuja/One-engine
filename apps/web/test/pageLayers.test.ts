@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {componentLayer,layerShows,pageLayerNumbers,layerCaption,layerNumber} from '../src/core/pages/PageRuntime/pageLayers.ts';
+import {componentLayer,layerShows,pageLayerNumbers,layerCaption,layerNumber,addressShowsPage} from '../src/core/pages/PageRuntime/pageLayers.ts';
 import {parseScreenAction,compileActionPlan} from '../../server/src/expression-engine/ActionFormulas.ts';
 import {compileActionFormula} from '../../server/src/page-compiler/code/generateCode.ts';
 import {exportInventoryCsv,applyInventoryCsv} from '../../server/src/system-support/page-inventory-csv.ts';
@@ -94,4 +94,11 @@ test('SCREEN(page, layer, seconds): show the layer that long, then layer 0',()=>
  assert.equal(parseScreenAction('SCREEN(Disp, 5)').seconds,undefined);
  assert.throws(()=>parseScreenAction('SCREEN(Disp, 5, 99)'),/1-60/);
  assert.throws(()=>parseScreenAction('SCREEN(Disp, popup, 5, 4)'),/seconds/);
+});
+
+test('?layer= is for the page in the address, not a popup opened over it',()=>{
+ assert.equal(addressShowsPage('smart_till_tables','/une/apps/SMARTTILL/pages/smart_till_tables'),true);
+ assert.equal(addressShowsPage('smart_till_payment','/une/apps/SMARTTILL/pages/smart_till_tables'),false);
+ assert.equal(addressShowsPage('Smart_Till_Tables','/une/apps/SMARTTILL/pages/smart_till_tables/'),true);
+ assert.equal(addressShowsPage('','/x'),true);
 });

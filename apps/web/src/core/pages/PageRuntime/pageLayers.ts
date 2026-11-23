@@ -53,8 +53,17 @@ export function requestedLayer(page=''):number{
   const key=PENDING+page.toLowerCase();
   const pending=layerNumber(window.sessionStorage.getItem(key));
   if(pending!==null){window.sessionStorage.removeItem(key);return pending;}
+  // ?layer= belongs to the page in the address only, never to a popup opened over it
+  // (the payment screen would otherwise open on the till's layer and show nothing).
+  if(!addressShowsPage(page))return 0;
   return layerNumber(new URLSearchParams(window.location.search).get('layer'))??0;
  }catch{return 0;}
+}
+/** True when the address bar is this page (/…/pages/<page>), or no page is named. */
+export function addressShowsPage(page:string,path=window.location.pathname):boolean{
+ if(!page)return true;
+ const last=decodeURIComponent(path.replace(/\/+$/,'').split('/').pop()??'');
+ return last.toLowerCase()===page.toLowerCase();
 }
 /** Show layer `layer` of `page` if that page is open in this window. True when it was. */
 export function showPageLayer(page:string,layer:number):boolean{

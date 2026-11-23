@@ -6,6 +6,7 @@ import type {FlowRuntime} from '../system-files/flow-runtime.js';
 import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageRuntime} from '../system-files/page-runtime.js';
 import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js';
+import {isSharedWiringProperty} from '../system-files/page-layout-device-inheritance.js';
 import {assertMetadataPackageEditable} from '../system-support/metadata-package-service.js';
 import {registerPageDetailsController} from './PageDetailsController.js';
 import {applyInventoryCsv,exportInventoryCsv,inventoryDefinitions,inventoryRequestedTypes,inventoryCsvPageGroups,originalInventoryIssue,type InventoryPage,type InventoryCsvPageGroup,type InventoryIssue} from '../system-support/page-inventory-csv.js';
@@ -15,6 +16,36 @@ import {validatePageComponentContracts} from '../system-support/component-contra
 import {loadPageLayoutSummaries} from '../system-support/page-layout-summary.js';
 export function registerPageApiController(app:Express,db:SqlPersistence,rbac:RbacEngine){
   const pages=new PageRuntime(db);
+  /** A device layout (Tablet/Mobile/Custom) stores only its look; actions, data bindings and
+   * formulas live on Desktop and every device inherits them. A CSV row that changes wiring on a
+   * device layout is therefore written to Desktop too, otherwise the change would be dropped
+   * silently on save. Only components that exist on Desktop are shared; device-only ones keep
+   * their own wiring. Returns the saved Desktop page, or null when nothing needed sharing. */
+  const shareWiringWithDesktop=async(tenant:string,pageapi:string,
+    variant:ReturnType<typeof pageLayoutVariant>,edited:InventoryPage,actor:string)=>{
+    if(variant==='Desktop')return null;
+    const desktop=await pages.editor(tenant,pageapi,'Desktop') as unknown as InventoryPage;
+    if(!(desktop.draftRevision??0)||!Array.isArray(desktop.components))return null;
+    const sharedRows=await db.query<{property_key:string}>(`SELECT property_key
+      FROM md_builder_shared_properties WHERE tab IN ('Data','Actions') AND scope='component'`);
+    const shared=new Set(sharedRows.rows.map(row=>row.property_key));
+    const byId=new Map(edited.components.map(component=>[component.id,component]));
+    let changed=0;
+    const components=desktop.components.map(component=>{
+      const device=byId.get(component.id);
+      if(!device)return component;
+      const props={...(component.properties??{})} as Record<string,unknown>;
+      for(const [key,value] of Object.entries(device.properties??{})){
+        if(!isSharedWiringProperty(key,shared))continue;
+        if(JSON.stringify(props[key])===JSON.stringify(value))continue;
+        props[key]=value;changed++;
+      }
+      return {...component,properties:props};
+    });
+    if(!changed)return null;
+    return await pages.saveLayoutDraft(tenant,pageapi,'Desktop',
+      {...desktop,components},actor) as unknown as InventoryPage;
+  };
   const preflightInventory=async(tenant:string,variant:ReturnType<typeof pageLayoutVariant>,
     result:ReturnType<typeof applyInventoryCsv>)=>{
     if(!result.valid||!result.changes)return result;
@@ -200,6 +231,9 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
         const saved=await pages.saveLayoutDraft(actor.tenant_id,group.pageapi,group.variant,
           result.page,actor.user_id) as unknown as InventoryPage;
         updatedPages.push(saved);
+        const desktop=await shareWiringWithDesktop(actor.tenant_id,group.pageapi,group.variant,
+          result.page,actor.user_id);
+        if(desktop)updatedPages.push(desktop);
       }
     });
     res.json({valid:true,issues:[] as InventoryIssue[],changes:batch.changes,
@@ -241,8 +275,13 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
     if(!result.changes){res.json({valid:true,issues:[],changes:0,skipped:result.skipped,page});return;}
     // saveLayoutDraft is transactional, audits the user and checks draftRevision under a lock.
     // A rejected property or concurrent edit leaves the existing saved page unchanged.
-    const saved=await pages.saveLayoutDraft(actor.tenant_id,name,variant,result.page,actor.user_id);
-    res.json({valid:true,issues:[],changes:result.changes,skipped:result.skipped,page:saved});
+    const saved=await db.transaction(async()=>{
+      const page=await pages.saveLayoutDraft(actor.tenant_id,name,variant,result.page,actor.user_id);
+      const desktop=await shareWiringWithDesktop(actor.tenant_id,name,variant,result.page,actor.user_id);
+      return {page,desktop};
+    });
+    res.json({valid:true,issues:[],changes:result.changes,skipped:result.skipped,page:saved.page,
+      ...(saved.desktop?{desktopPage:saved.desktop}:{})});
   }));
   registerPageDetailsController(app,db,rbac);
 

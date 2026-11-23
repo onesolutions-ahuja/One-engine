@@ -190,6 +190,10 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    throw Error('This field cannot be filtered reliably by the server');
   if(field.apiName.startsWith('@'))throw Error('Related formula fields are not directly server-filterable');
   const value=asState(valueNode,state,sessionId);
+  // A written "" is a blank test, as in Excel: @Order.Status <> "" keeps rows that have a status.
+  // (An @ThisPage value that is still empty keeps blocking the list until it is chosen.)
+  if(valueNode.kind==='literal'&&value===''&&(op==='='||op==='=='||op==='<>'||op==='!='))
+   return {filters:[{field:field.apiName,operator:op==='<>'||op==='!='?'isNotBlank':'isBlank',value:''}],logic:'1'};
   if(value===undefined||value===null||value==='')throw Error(EMPTY_FILTER_VALUE);
   if(!['string','boolean','number'].includes(typeof value)||typeof value==='number'&&!Number.isFinite(value))
    throw Error('Formula comparison requires a scalar');

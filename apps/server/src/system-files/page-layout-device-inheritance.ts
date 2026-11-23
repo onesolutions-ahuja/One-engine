@@ -19,6 +19,10 @@ const sharedWiring=new Set(['actionFlows','actions','interactions','dataBindings
  'dataBinding','binding','bindings','objectApiName','fieldApiName','contextApiName',
  'flowApiName','eventHandlers','eventBindings',
  'query','recordQuery','dataSource','formula','formulaExpression']);
+/** True for engine wiring (actions, data bindings, formulas): a device layout inherits these from
+ * Desktop and never stores its own copy. `shared` holds the SQL Ribbon Data/Actions keys. */
+export const isSharedWiringProperty=(key:string,shared:ReadonlySet<string>=new Set())=>
+ sharedWiring.has(key)||shared.has(key);
 const visualOnly=(properties:Record<string,unknown>,shared:ReadonlySet<string>)=>
  Object.fromEntries(Object.entries(properties).filter(([key])=>
   !sharedWiring.has(key)&&!shared.has(key)));

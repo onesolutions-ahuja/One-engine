@@ -3,7 +3,7 @@ import type {Express,Request,Response,NextFunction,RequestHandler} from 'express
 import {mcpOrigin} from './mcp-resource.js';
 import {callMcpTool,mcpTools,mcpToolScopes,mcpToolAllowed,type McpServices,type McpActor} from './mcp-tools.js';
 import {auditContext} from './audit-context.js';
-const versions=['2025-06-18','2025-03-26','2024-11-05'];
+const versions=['2025-11-25','2025-06-18','2025-03-26','2024-11-05'];
 type Req=Request&{actor?:McpActor};
 export function registerMcpRoutes(app:Express,s:McpServices,authorize:RequestHandler){
  const origin=mcpOrigin();

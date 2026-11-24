@@ -6,7 +6,8 @@ type Query={query:(sql:string,params?:unknown[])=>Promise<unknown>};
 type Rule=[component:string,property:string,valueKey:string|null];
 type Slot=[component:string,area:string,slot:string,property:string];
 export const SUPPORTED_RIBBON_RULES:Rule[]=[
- ['smart_button','shapeFill','backgroundColor'],
+ ['smart_button','shapeFill','iconFillColor'],
+ ['smart_icon','shapeFill','iconFillColor'],
  ['smart_calendar','label',null],
  ['smart_card_grid','defaultValueColor',null],
  ['smart_card_grid','headerBold',null],
@@ -137,6 +138,7 @@ export const SUPPORTED_RIBBON_RULES:Rule[]=[
 /** Design area cells that had no property mapped for the component. */
 export const SUPPORTED_RIBBON_SLOTS:Slot[]=[
  ['smart_button','Body','shapeFill','shapeFill'],
+ ['smart_icon','Body','shapeFill','shapeFill'],
  ['smart_card_grid','Body','bold','headerBold'],
  ['smart_cart','Body','bold','headerBold'],
  ['smart_cart','Body','focused','selectedRowColor'],
@@ -229,4 +231,7 @@ export async function applySupportedRibbonProperties(client:Query){
   JOIN md_builder_design2_slots d ON d.area=s.area AND d.slot_key=s.slot
   ON CONFLICT(component_api,area,slot_key) DO NOTHING`,
   [JSON.stringify(SUPPORTED_RIBBON_SLOTS.map(([api,area,slot,prop])=>({api,area,slot,prop})))]);
+ // Shape fill colours the icon on components that draw one; Body fill stays the body.
+ await client.query(`UPDATE md_builder_ribbon_component_rules SET value_key='iconFillColor'
+  WHERE property_key='shapeFill' AND component_api IN ('smart_button','smart_icon')`);
 }

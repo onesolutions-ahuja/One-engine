@@ -29,6 +29,7 @@ import {applySmartDisabledFormula,applySmartNumpadDateMode,applySmartCartSummary
 import {applySmartIdCard} from './smart-id-card.js';
 import {applySmartPairedScreens} from './smart-paired-screens.js';
 import {applySmartBuilderPropertyParity} from './smart-builder-property-parity.js';
+import {applySupportedRibbonProperties} from './smart-ribbon-supported-properties.js';
 
 /** Recover original migration files from the immutable SQL baseline.
  * The old runner accepted any subset of known versions and ran missing files
@@ -947,6 +948,8 @@ INSERT INTO md_system_permission_catalogue(permission_key,label,description,reso
   await client.query(NATIVE_OBJECT_DDL);
   await client.query(RECORD_ACCESS_FAST_DDL);
   // Cover setup tables introduced by later migrations in the same transaction.
+  // Last ribbon writer: switch on properties the component code already supports.
+  await applySupportedRibbonProperties(client);
   if(appliedNewMigration)await client.query('SELECT md_install_setup_audit()');
    });
    await applyNativeObjectStorage(db);

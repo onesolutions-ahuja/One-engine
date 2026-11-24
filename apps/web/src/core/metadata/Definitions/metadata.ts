@@ -1073,6 +1073,8 @@ export type LightningAppMetadata = {
   utilityItems: Array<'Notes' | 'History'>;
   /** The App Page users land on; blank means the first App Page in navigation. */
   homePageApiName?: string;
+  /** Lock screen for this app's pages only: PIN lock after idle minutes (0 = only LOCKSCREEN() / Lock button). */
+  lockScreen?: { enabled: boolean; idleMinutes: number };
 };
 
 export const objectMetadata: ObjectMetadata[] = [

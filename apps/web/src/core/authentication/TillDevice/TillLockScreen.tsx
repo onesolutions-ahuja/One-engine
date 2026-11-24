@@ -54,8 +54,8 @@ export function TillLockScreen({onUnlocked,onUseEmail}:{
  });
  return <main className="till-lock" aria-label="Till locked">
   <section className="till-lock-people">
-   <div className="till-lock-eyebrow">TILL LOCKED</div>
-   <h1>Who's on till?</h1>
+   <div className="till-lock-eyebrow">SCREEN LOCKED</div>
+   <h1>Who's signing in?</h1>
    <ul className="till-lock-list">
     {people.map(person=><li key={person.userId} className={chosen?.userId===person.userId?'is-chosen':''}>
      <button type="button" className="till-lock-person" aria-pressed={chosen?.userId===person.userId}

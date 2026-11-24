@@ -5,7 +5,7 @@ import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import {holdScreenPage,onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
 // The corner code on a paired screen (loaded only there).
 const ScreenCornerCode=React.lazy(()=>import('../../authentication/PairedScreen/ScreenCornerCode'));
-import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT } from '../../authentication/TillDevice/tillDevice';
+import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT, appLockHere, tillLockApplies, setTillLocked } from '../../authentication/TillDevice/tillDevice';
 import { apiBase, getAccessToken, setAccessToken, setSessionUserId, forgetLanding, apiRequest, prefetchLandingBootstrap, prefetchPageEditorDraft, bootPageEndpoint, rememberBootPage, ApiRequestError, isAuthErrorMessage, withAuthRefreshLock, loadAppCommunicationHistory, loadConnectorMarketplaceApps, executeConnectorAppLifecycleFlow, loadFlowScreenRecords } from '../../authentication/Client/authClient';
 
 
@@ -268,10 +268,13 @@ function App() {
 
   // On a paired screen Back does not leave the page a customer is looking at.
   useEffect(()=>authState==='authenticated'&&onPairedScreenPage()?holdScreenPage():undefined,[authState]);
-  const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillPeople().length>0&&!onPairedScreenPage();
+  // Only on pages of an app with the lock screen on (App Manager), or right after a lock in this tab:
+  // Page Builder, Setup and other apps never show the PIN screen.
+  const tillHere=tillLockApplies()&&!onPairedScreenPage();
+  const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillHere&&tillPeople().length>0;
   /** Lock pressed while nobody is saved for PIN sign-in here: say why the email page shows. */
   const [lockedWithoutPin,setLockedWithoutPin]=useState(false);
-  // Lock (LOCKSCREEN(), the till's Lock button) or 5 idle minutes: the person's session ends,
+  // Lock (LOCKSCREEN(), the Lock button) or the app's idle minutes: the person's session ends,
   // their open work is put aside, and the till shows the saved people's PIN screen.
   useEffect(()=>{
     if(authState!=='authenticated')return;
@@ -279,6 +282,7 @@ function App() {
     const lock=()=>{
       const userId=activeTillUser();
       setLockedWithoutPin(tillPeople().length===0);
+      setTillLocked(true);
       stashTillWork(userId);
       setActiveTillUser(null);
       void apiRequest('/auth/logout',{method:'POST'}).catch(()=>{}).finally(()=>setAccessToken(undefined));
@@ -288,7 +292,9 @@ function App() {
     const restart=()=>{
       window.clearTimeout(idle);
       // A paired screen (customer display) is idle by nature: it never locks itself.
-      if(activeTillUser()&&!onPairedScreenPage())idle=window.setTimeout(lock,5*60*1000);
+      // Idle lock only on pages of an app with the lock screen on; 0 minutes = never on idle.
+      const here=appLockHere();
+      if(here&&here.idleMinutes>0&&!onPairedScreenPage())idle=window.setTimeout(lock,here.idleMinutes*60*1000);
     };
     const events=['pointerdown','keydown','wheel','touchstart'] as const;
     events.forEach(name=>window.addEventListener(name,restart,{passive:true}));
@@ -302,7 +308,7 @@ function App() {
   },[authState]);
   useEffect(()=>{
     // On a shared till the sign-in opens where the till is, so the person returns to the same page.
-    if(showTillLock||tillMode==='email'&&tillPeople().length>0)return;
+    if(showTillLock||tillHere&&tillMode==='email'&&tillPeople().length>0)return;
     // A paired screen whose sign-in ended signs in again with its screen key at /display.
     if(authState==='anonymous'&&onPairedScreenPage()){window.location.replace('/display');return;}
     if(authState==='anonymous'&&!standaloneEntry&&window.location.pathname!=='/login'&&window.location.pathname!=='/oauth/authorize'){
@@ -311,9 +317,10 @@ function App() {
       }
       window.location.replace('/login');
     }
-  },[authState,standaloneEntry,showTillLock,tillMode]);
+  },[authState,standaloneEntry,showTillLock,tillHere,tillMode]);
   const loginSuccess = (timing: EntryTiming) => {
     sessionGeneration.current += 1;
+    setTillLocked(false);
     try {
       if(sessionStorage.getItem('md_auth_return_to')==='/mail-admin'){
         sessionStorage.removeItem('md_auth_return_to');
@@ -327,9 +334,9 @@ function App() {
   if (authState === 'restoring') return <div className="auth-loading" role="status">Restoring session…</div>;
   if (showTillLock) return <TillLockScreen onUseEmail={()=>setTillMode('email')}
     onUnlocked={session=>loginSuccess({kind:'login',startedAt:performance.now(),authenticatedAt:performance.now(),landingAppApi:session.landingAppApi})}/>;
-  if (authState === 'anonymous' && !standaloneEntry && window.location.pathname!=='/login' && !(tillMode==='email'&&tillPeople().length>0)) return <div role="status">Opening login…</div>;
+  if (authState === 'anonymous' && !standaloneEntry && window.location.pathname!=='/login' && !(tillHere&&tillMode==='email'&&tillPeople().length>0)) return <div role="status">Opening login…</div>;
   if (authState === 'anonymous') return <Login branding={standaloneEntry??undefined} onStart={cancelRestore} onSuccess={loginSuccess}
-    tillDefault={tillPeople().length>0||lockedWithoutPin} lockedWithoutPin={lockedWithoutPin} onBackToTill={tillPeople().length?()=>setTillMode('lock'):undefined} />;
+    tillDefault={tillHere&&(tillPeople().length>0||lockedWithoutPin)} lockedWithoutPin={tillHere&&lockedWithoutPin} onBackToTill={tillHere&&tillPeople().length?()=>setTillMode('lock'):undefined} />;
   if (authState === 'error') return <Login branding={standaloneEntry??undefined} error={authError} onStart={cancelRestore} onSuccess={loginSuccess} onRetry={() => { setAuthError(''); setAuthState('anonymous'); void restoreSession(); }} />;
   if(window.location.pathname==='/oauth/authorize')return <React.Suspense fallback={<div role="status">Loading consent…</div>}><LazyOAuthConsent/></React.Suspense>;
   const onLogout=()=>{

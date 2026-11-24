@@ -189,6 +189,10 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   // App prerequisites (connectors / tenant callouts) detected at publish time.
   await client.query(`ALTER TABLE md_app_package_manifests
     ADD COLUMN IF NOT EXISTS prerequisites jsonb NOT NULL DEFAULT '[]'::jsonb`);
+  // App lock screen (any app): lock after idle minutes on that app's pages only.
+  await client.query(`ALTER TABLE md_tenant_app_metadata
+    ADD COLUMN IF NOT EXISTS lock_enabled boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS lock_idle_minutes integer NOT NULL DEFAULT 5 CHECK(lock_idle_minutes BETWEEN 0 AND 240)`);
   // Values of custom fields on the User object (RefundLimit, DiscountLimit …): defined in
   // Object Manager, kept with the user row (the User object is a view of md_users).
   await client.query(`ALTER TABLE md_users

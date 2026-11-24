@@ -18,6 +18,8 @@ export async function resolveTenantAppMetadata(db:SqlPersistence,tenantId:string
    navigationPageApiNames:entries.filter(item=>item.type==='App Page').map(item=>item.apiName),
    navigationOrder:entries,brandColor:row.brand_color??'#1d4ed8',
    homePageApiName:homes.rows.find(item=>item.app_id===row.id)?.api_name??'',
+   // Lock screen: the app locks itself after idle minutes (0 = only LOCKSCREEN() / Lock button).
+   lockScreen:{enabled:row.lock_enabled===true,idleMinutes:row.lock_idle_minutes??5},
    utilityItems:utilities.filter(item=>item.app_id===row.id).map(item=>item.utility_name),
    ...(row.revision===null?{}:{revision:row.revision})};
  });

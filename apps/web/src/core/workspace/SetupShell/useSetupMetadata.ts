@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Tenant-scoped bootstrap: core metadata first, optional admin metadata afterwards.
 import { useEffect, useRef } from 'react';
+import { rememberAppLocks } from '../../authentication/TillDevice/tillDevice';
 import { cachedLanding, rememberLanding, takeLandingPrefetch } from '../../authentication/Client/authClient';
 import { resolveSqlComponentLibrary, prefetchSqlComponentIndex } from '../../components/Registry/bundledRegistryClient';
 import { setAuthenticatedFormulaBindingContext } from '../../components/RegisteredComponent/fieldExpressionRuntime';
@@ -234,7 +235,7 @@ export function useSetupMetadata(ctx: any) {
           setObjects(displayObjects);
           if(displayObjects.length)setObject(current=>reconcileSelectedObject(current,displayObjects));
           setPages(displayPages);
-          setApps(displayApps);
+          setApps(displayApps);rememberAppLocks(displayApps);
           setCurrentAppId(current=>reconcileCurrentAppId(current,displayApps));
           setSetupPermissions(firstSession.user.permissions);
           setCurrentProfileId(firstSession.user.profileId);
@@ -316,7 +317,7 @@ export function useSetupMetadata(ctx: any) {
             ? liveRoute.resourceApiName : undefined;
           setPage(current => reconcileSelectedPage(current, pagePayload.pages, requestedPage));
         }
-        setApps(appPayload.apps);
+        setApps(appPayload.apps);rememberAppLocks(appPayload.apps);
         setCurrentAppId(current => reconcileCurrentAppId(current, appPayload.apps));
         // Named Credentials are owned by the dedicated authorised Setup loader.
         // Never overwrite its live result with this bootstrap's empty placeholder.

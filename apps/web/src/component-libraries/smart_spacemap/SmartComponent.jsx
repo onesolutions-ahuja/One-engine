@@ -77,7 +77,7 @@ export default function SmartComponent(p){
        fontSize:p.textSize,boxShadow:p.shadow==="none"?"none":undefined}}
       onPointerDown={e=>start(e,row)} onPointerMove={move} onPointerUp={e=>void end(e,row)} onPointerCancel={e=>void end(e,row)}
       onClick={e=>{if(e.detail===0&&!edit){select(row.Id);fire("click",row);}}}>
-      {shape==="Icon"&&icon&&<img alt="" src={"/smart-icons/"+icon.id+".svg"}/>}
+      {shape==="Icon"&&icon&&<img alt="" src={"/smart-icons/"+(icon.file||icon.id+".svg")}/>}
       <strong>{row[fieldName(p.labelField)||"Name"]}</strong><small>{row[fieldName(p.subLabelField)]}</small>{badge!==""&&<span>{badge}</span>}
       {edit&&<><i data-handle="resize" title="Resize">↘</i><i data-handle="rotate" title="Rotate">↻</i></>}
      </button>;})}

@@ -175,6 +175,13 @@
     "category": "Commerce & analytics"
   },
   {
+    "id": "paypal",
+    "label": "PayPal",
+    "category": "Commerce & analytics",
+    "file": "paypal.png",
+    "colored": true
+  },
+  {
     "id": "package",
     "label": "Package",
     "category": "Commerce & analytics"

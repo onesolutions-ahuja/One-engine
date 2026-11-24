@@ -1,11 +1,11 @@
 import icons from "./iconCatalog.json";
 import {SmartShapeGlyph,smartShapes} from "./SmartShapes";
 import {hiddenByShowWhen} from "../shared/showWhen.js";
+import {smartIconPaint} from "./iconPaint.js";
 const fallbackIcon=icons.find(icon=>icon.id==="house");
 export default function SmartComponent(p){
  if(hiddenByShowWhen(p))return <span data-smart-hidden="true" hidden/>;
  const selected=icons.find(icon=>icon.id===p.iconId)??smartShapes.find(shape=>shape.id===p.iconId)??fallbackIcon;
- const url="/smart-icons/"+selected.id+".svg";
  // Style = iOS (new inserts): soft blue glyph and press effect. Older icons stay Classic.
  // iOS is the only Smart style (the Classic/iOS switch was removed).
  const ios=true;
@@ -18,9 +18,8 @@ export default function SmartComponent(p){
   borderRadius:radius,boxShadow:shadow,overflow:"hidden"};
  const glyphStyle={display:"block",width:"70%",height:"70%",minWidth:0,minHeight:0,
   backgroundColor:typeof p.iconFillColor==="string"&&p.iconFillColor?p.iconFillColor:ios?"#007aff":"#000000",
-  WebkitMaskImage:"url("+url+")",maskImage:"url("+url+")",
-  WebkitMaskSize:"contain",maskSize:"contain",WebkitMaskRepeat:"no-repeat",maskRepeat:"no-repeat",
-  WebkitMaskPosition:"center",maskPosition:"center"};
+  // Brand icons (PayPal) keep their own colours until a glyph colour is picked.
+  ...smartIconPaint(selected.id,ios?"#007aff":"#000000",typeof p.iconFillColor==="string"&&p.iconFillColor?p.iconFillColor:"")};
  return <div className={"smart-runtime smart_icon smart-icon-surface"+(ios?" smart-ios":"")} style={style}
    data-builder-preview={p.builderPreview?"true":undefined}
    data-smart-icon={selected.id} role="img" aria-label={selected.label+" icon"}>

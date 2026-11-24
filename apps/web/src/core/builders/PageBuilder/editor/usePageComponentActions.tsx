@@ -112,7 +112,11 @@ export function usePageComponentActions(
          y:Math.max(0,Math.min(origin.y,page.canvasHeight-defaultHeight)),
          width:defaultWidth,height:defaultHeight}
       : undefined;
-    components.splice(Math.max(0, Math.min(position, components.length)), 0, {
+    // On a free canvas the list order is the stacking order: a new component
+    // always lands on top of its siblings so it can be seen, selected and moved.
+    const insertAt = page.layoutMode === 'free-canvas' ? components.length
+      : Math.max(0, Math.min(position, components.length));
+    components.splice(insertAt, 0, {
       id, type, label: custom ? libraryComponentLabel(custom) : type,
       properties: custom
         ? { navigatorName:allocated,libraryComponentId: custom.apiName,

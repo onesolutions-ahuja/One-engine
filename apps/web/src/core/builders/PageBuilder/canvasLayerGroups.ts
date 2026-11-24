@@ -48,38 +48,84 @@ export function canvasSiblingLayerIndex(
     .findIndex(item => item.id === id) + 1;
 }
 
-/** A command is unavailable when the whole selected group already occupies
- * the relevant edge. Locked objects cannot be rearranged. */
+/** Bounds of a block (one component, or a whole visual group). */
+function blockBounds(members: readonly PageComponentMetadata[]): Position | null {
+  if (members.length === 1) return members[0].position ?? null;
+  return canvasGroupBounds(members);
+}
+const covers = (outer: Position | null, inner: Position | null) =>
+  !!outer && !!inner && outer.x <= inner.x && outer.y <= inner.y &&
+  outer.x + outer.width >= inner.x + inner.width && outer.y + outer.height >= inner.y + inner.height;
+
+/** Sibling blocks in stacking order (bottom first). A visual group is one block. */
+function siblingBlocks(siblings: readonly PageComponentMetadata[]) {
+  const blocks: PageComponentMetadata[][] = [];
+  const seen = new Set<string>();
+  for (const sibling of siblings) {
+    if (seen.has(sibling.id)) continue;
+    const members = canvasGroupMembers(siblings, sibling);
+    for (const member of members) seen.add(member.id);
+    blocks.push(members);
+  }
+  return blocks;
+}
+
+/** Lowest slot a block may be sent to: it always stays above any sibling that
+ * fully covers it (a background panel, a full-page image...), so Send to back
+ * can never hide a component behind the canvas area it sits on. */
+function backFloor(blocks: PageComponentMetadata[][], from: number): number {
+  const own = blockBounds(blocks[from]);
+  let floor = 0;
+  blocks.forEach((block, index) => {
+    if (index !== from && covers(blockBounds(block), own)) floor = Math.max(floor, index < from ? index + 1 : index);
+  });
+  return Math.min(floor, from);
+}
+
+function layerState(components: readonly PageComponentMetadata[], id: string) {
+  const selected = components.find(item => item.id === id);
+  if (!selected || selected.properties.editorLocked === true) return null;
+  const siblings = components.filter(item => parentId(item) === parentId(selected));
+  const moving = canvasGroupMembers(siblings, selected);
+  if (moving.some(item => item.properties.editorLocked === true)) return null;
+  const blocks = siblingBlocks(siblings);
+  const from = blocks.findIndex(block => block.some(item => item.id === selected.id));
+  if (from < 0) return null;
+  return {selected, blocks, from};
+}
+
+const reorder = (components: readonly PageComponentMetadata[], selected: PageComponentMetadata,
+  blocks: PageComponentMetadata[][]) => {
+  const ordered = blocks.flat();
+  let cursor = 0;
+  return components.map(item => parentId(item) === parentId(selected) ? ordered[cursor++] : item);
+};
+
+/** A command is unavailable when the selected block already sits at the
+ * relevant edge (for back: just above what covers it). Locked objects cannot move. */
 export function canMoveCanvasLayer(
   components: readonly PageComponentMetadata[], id: string,
   direction: 'front' | 'back' | 'forward' | 'backward'
 ): boolean {
-  const selected = components.find(item => item.id === id);
-  if (!selected || selected.properties.editorLocked === true) return false;
-  const siblings = components.filter(item => parentId(item) === parentId(selected));
-  const moving = canvasGroupMembers(siblings,selected);
-  if (moving.some(item => item.properties.editorLocked === true)) return false;
-  const ids = new Set(moving.map(item=>item.id));
-  const first = siblings.findIndex(item => ids.has(item.id));
-  const last = siblings.length-1-siblings.slice().reverse().findIndex(item => ids.has(item.id));
-  if (first < 0 || last < 0) return false;
-  return direction === 'back' || direction === 'backward' ? first > 0 : last < siblings.length-1;
+  const state = layerState(components, id);
+  if (!state) return false;
+  const {blocks, from} = state;
+  return direction === 'back' || direction === 'backward'
+    ? from > backFloor(blocks, from) : from < blocks.length - 1;
 }
 
-/** Reorder sibling slots only. Grouped members stay together, without changing other parents. */
+/** Reorder sibling slots only. Grouped members stay together, without changing other parents.
+ * New and front-placed components go on top; Send to back stops above any covering sibling. */
 export function moveCanvasLayer(
   components: readonly PageComponentMetadata[], id: string, edge: 'front' | 'back'
 ): PageComponentMetadata[] {
-  const selected = components.find(item => item.id === id);
-  if (!selected || selected.properties.editorLocked === true) return [...components];
-  const siblings = components.filter(item => parentId(item) === parentId(selected));
-  const moving = canvasGroupMembers(siblings, selected);
-  if (moving.some(item => item.properties.editorLocked === true)) return [...components];
-  const groupIds = new Set(moving.map(item => item.id));
-  const others = siblings.filter(item => !groupIds.has(item.id));
-  const ordered = edge === 'front' ? [...others, ...moving] : [...moving, ...others];
-  let cursor = 0;
-  return components.map(item => parentId(item) === parentId(selected) ? ordered[cursor++] : item);
+  const state = layerState(components, id);
+  if (!state) return [...components];
+  const {selected, blocks, from} = state;
+  const to = edge === 'front' ? blocks.length - 1 : backFloor(blocks, from);
+  const [block] = blocks.splice(from, 1);
+  blocks.splice(to, 0, block);
+  return reorder(components, selected, blocks);
 }
 
 export function canvasGroupBounds(members: readonly PageComponentMetadata[]): Position | null {
@@ -111,31 +157,18 @@ export function scaleCanvasGroup(
 }
 
 /** One-step arrangement across sibling layer blocks. A visual group moves as
- * one block and never crosses into another container's stacking context. */
+ * one block and never crosses into another container's stacking context.
+ * Stepping back never goes below a sibling that fully covers the block. */
 export function shiftCanvasLayer(
   components: readonly PageComponentMetadata[], id: string, offset: -1 | 1
 ): PageComponentMetadata[] {
-  const selected=components.find(item=>item.id===id);
-  if(!selected||selected.properties.editorLocked===true)return [...components];
-  const siblings=components.filter(item=>parentId(item)===parentId(selected));
-  const moving=canvasGroupMembers(siblings,selected);
-  if(moving.some(item=>item.properties.editorLocked===true))return [...components];
-  const movingIds=new Set(moving.map(item=>item.id));
-  const blocks:PageComponentMetadata[][]=[];
-  const seen=new Set<string>();
-  for(const sibling of siblings){
-    if(seen.has(sibling.id))continue;
-    const members=canvasGroupMembers(siblings,sibling);
-    for(const member of members)seen.add(member.id);
-    blocks.push(members);
-  }
-  const from=blocks.findIndex(block=>block.some(item=>movingIds.has(item.id)));
-  const to=from+offset;
-  if(from<0||to<0||to>=blocks.length)return [...components];
-  [blocks[from],blocks[to]]=[blocks[to],blocks[from]];
-  const ordered=blocks.flat();
-  let cursor=0;
-  return components.map(item=>parentId(item)===parentId(selected)?ordered[cursor++]:item);
+  const state = layerState(components, id);
+  if (!state) return [...components];
+  const {selected, blocks, from} = state;
+  const to = from + offset;
+  if (to < 0 || to >= blocks.length || (offset < 0 && from <= backFloor(blocks, from))) return [...components];
+  [blocks[from], blocks[to]] = [blocks[to], blocks[from]];
+  return reorder(components, selected, blocks);
 }
 
 /** Explicit no-code sizing action; never infer a background or rescale siblings. */

@@ -22,6 +22,7 @@ import SmartMultiSelect from './SmartMultiSelect';
 import SmartIconGallery from './SmartIconGallery';
 import Design2CanvasActions from './Design2CanvasActions';
 import BuilderNumberInput from './BuilderNumberInput';
+import {renderedPartNumber} from './ribbonRenderedValue';
 import {smartTabsHaveDataSource} from './smartTabsCountSource';
 import type {ArrangeRibbonProps} from './ArrangeRibbon';
 import './SmartRibbon.css';
@@ -528,15 +529,21 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        </span>
      </div>;
    }
-   const isTextSize=compactDesign&&/^(textSize|badgeTextSize|cardButtonTextSize|summary2?TextSize|rowSupportingTextSize|customButton[12]TextSize|placeholderSize|headerTextSize|supportingTextSize|rowTextSize|focusedTextSize)$/.test(property.id);
-   const isCorner=compactDesign&&/radius/i.test(property.id);
-   const isWidth=compactDesign&&/width/i.test(property.id);
-   const isHeight=compactDesign&&/height/i.test(property.id);
+   // One icon per property everywhere (every component, every part, every ribbon layout):
+   // any ...TextSize is text size, any ...Radius is corner, any ...Width/...Height is size.
+   const isTextSize=/^(textSize|placeholderSize)$|TextSize$/.test(property.id);
+   const isCorner=/radius$/i.test(property.id);
+   const isWidth=/width$/i.test(property.id);
+   const isHeight=/height$/i.test(property.id);
    const isCanvasAxis=tab==='Design2'&&property.designRow===0&&
      (property.id==='x'||property.id==='y');
    const hasNumericIcon=(kind==='number'||kind==='position')&&
      (isTextSize||isCorner||isWidth||isHeight||isCanvasAxis);
    const isTabIndex=property.id==='tabIndex';
+   // Saved number, or blank ("auto", "100%", unset): blank then shows the canvas's current size as a hint.
+   const numberShown:number|''=kind==='position'&&useCanvasPosition?(position?.[property.id as keyof Position] as number|undefined)??'':
+    typeof value==='string'?(Number.isNaN(Number.parseFloat(value))?'':Number.parseFloat(value)):
+    typeof value==='number'&&Number.isFinite(value)?value:'';
    let editor;
    if(/^dockItem(?:[1-9]|1[0-2])Icon$/.test(property.id))editor=<SmartIconGallery value={String(value||'house')}
      disabled={!enabled} allowIcons onChange={write}/>;
@@ -625,8 +632,8 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        className="smart-office-number" aria-label={title} disabled={!enabled}
        min={property.min??0} max={property.max} step={isTabIndex?1:undefined}
        integer={isTabIndex}
-       value={kind==='position'&&useCanvasPosition?position?.[property.id as keyof Position]??'':
-        typeof value==='string'?(Number.isNaN(Number.parseFloat(value))?'':Number.parseFloat(value)):value as number}
+       placeholder={numberShown===''&&enabled?String(renderedPartNumber(componentId,property.group,property.id)??''):undefined}
+       value={numberShown}
        onValueChange={n=>write(isTabIndex?Math.max(0,Math.trunc(n)):n)}/>
    </span>;
    else if(kind==='shadow'&&compactDesign&&property.designDisplay==='dropdown')editor=<SmartIconDropdown kind="shadow" value={String(value)} label={title} disabled={!enabled} onChange={write}/>;
@@ -673,11 +680,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
        editor=<button type="button" className="smart-visible-toggle" disabled={!enabled}
          role="switch" aria-label={title} title={title} aria-checked={value===true}
          onClick={()=>write(value!==true)}><Icon size={16} aria-hidden="true"/></button>;
-     }else if(['headerBold','badgeBold','supportingBold','rowBold','summaryTextWeight','summary2TextWeight',
-       'focusedTextBold','rowSupportingBold','footerBold','cardButtonBold',
-       'wrapText','rowWrapText','summaryWrapText','footerWrapText',
-       'cardButtonWrapText','rowSupportingWrapText'].includes(property.id)){
-       const Icon=property.id.toLowerCase().includes('wrap')?WrapText:Bold;
+     }else if(/^(bold|wrapText)$|(Bold|TextWeight|WrapText)$/.test(property.id)){
+       // Same icon button for every Bold / Wrap text property of every part (never a checkbox).
+       const Icon=/wrap/i.test(property.id)?WrapText:Bold;
        editor=<button className="smart-icon-toggle" type="button" disabled={!enabled}
          aria-label={title} title={title} aria-pressed={value===true} onClick={()=>write(value!==true)}><Icon size={17}/></button>;
      }else editor=<input type="checkbox" aria-label={title} disabled={!enabled}

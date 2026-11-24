@@ -216,7 +216,62 @@ export const SUPPORTED_RIBBON_SLOTS:Slot[]=[
  ['smart_toggle','Body','shapeFill','shapeFill']
 ];
 
+
+/** Part properties the card renderer (Card Grid, ID Card, Image) already draws for every part
+ * but that had no ribbon property: [new property, label, area, copied-from property]. */
+type PartProperty=[property:string,label:string,area:string,template:string];
+export const CARD_PART_PROPERTIES:PartProperty[]=[
+ ['footerRadius','Footer radius','Footer','summaryRadius'],
+ ['footerShadow','Footer shadow','Footer','summaryShadow'],
+ ['supportingShadow','Supporting shadow','Header Supporting','summaryShadow'],
+ ['supportingWrapText','Supporting wrap','Header Supporting','footerWrapText']
+];
+/** Each card part gets the same icons in the same cells: [area, cell, property]. */
+const CARD_PART_CELLS:[area:string,slot:string,property:string][]=[
+ ['Footer','radius','footerRadius'],['Footer','shadow','footerShadow'],['Footer','wrap','footerWrapText'],
+ ['Footer','fill','footerBackgroundColor'],['Footer','border','footerBorderColor'],
+ ['Footer','height','footerHeight'],['Footer','width','footerWidth'],['Footer','alignment','footerAlignment'],
+ ['Footer','text','footerTextColor'],['Footer','bold','footerBold'],['Footer','size','footerTextSize'],
+ ['Header Supporting','radius','supportingRadius'],['Header Supporting','shadow','supportingShadow'],
+ ['Header Supporting','wrap','supportingWrapText'],['Header Supporting','fill','supportingBackgroundColor'],
+ ['Header Supporting','border','supportingBorderColor'],['Header Supporting','height','supportingBoxHeight'],
+ ['Header Supporting','width','supportingBoxWidth'],['Header Supporting','alignment','supportingAlignment'],
+ ['Header Supporting','text','supportingTextColor'],['Header Supporting','bold','supportingBold'],
+ ['Header Supporting','size','supportingTextSize']
+];
+const CARD_COMPONENTS=['smart_card_grid','smart_id_card','smart_image'];
+export const CARD_PART_SLOTS:Slot[]=CARD_COMPONENTS.flatMap(api=>
+ CARD_PART_CELLS.map(([area,slot,property]):Slot=>[api,area,slot,property]));
+
 export async function applySupportedRibbonProperties(client:Query){
+ // New part properties copy an existing one of the same kind (control, limits, icon size).
+ await client.query(`INSERT INTO md_builder_shared_properties
+   (property_key,label,tab,section_group,control_kind,sort_order,default_value,min_value,max_value,
+    field_select,choices,scope,design_row,design_width,design_height,design_order,design_caption,
+    design_caption_width,design_display,enabled_when)
+  SELECT n.prop,n.label,'Design2',n.area,t.control_kind,
+   (SELECT COALESCE(MAX(sort_order),0) FROM md_builder_shared_properties)+n.pos,
+   NULL,t.min_value,t.max_value,t.field_select,t.choices,t.scope,t.design_row,t.design_width,
+   t.design_height,t.design_order,t.design_caption,t.design_caption_width,t.design_display,t.enabled_when
+  FROM jsonb_to_recordset($1::jsonb) AS n(prop text,label text,area text,template text,pos int)
+  JOIN md_builder_shared_properties t ON t.property_key=n.template
+  ON CONFLICT(property_key) DO NOTHING`,
+  [JSON.stringify(CARD_PART_PROPERTIES.map(([prop,label,area,template],i)=>({prop,label,area,template,pos:i+1})))]);
+ // Card parts: enable and place on their icons (the panel draws every icon cell for every area).
+ await client.query(`WITH usable AS (
+   SELECT s.api,s.area,s.slot,s.prop FROM jsonb_to_recordset($1::jsonb) AS s(api text,area text,slot text,prop text)
+   JOIN md_builder_ribbon_components c ON c.component_api=s.api
+   JOIN md_builder_shared_properties p ON p.property_key=s.prop
+  ), enabled AS (
+   INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled)
+   SELECT DISTINCT api,prop,true FROM usable
+   ON CONFLICT(component_api,property_key) DO UPDATE SET enabled=true
+   RETURNING 1
+  )
+  INSERT INTO md_builder_design2_slot_rules(component_api,area,slot_key,property_key)
+  SELECT api,area,slot,prop FROM usable
+  ON CONFLICT(component_api,area,slot_key) DO NOTHING`,
+  [JSON.stringify(CARD_PART_SLOTS.map(([api,area,slot,prop])=>({api,area,slot,prop})))]);
  await client.query(`INSERT INTO md_builder_ribbon_component_rules(component_api,property_key,enabled,value_key)
   SELECT r.api,r.prop,true,r.vk FROM jsonb_to_recordset($1::jsonb) AS r(api text,prop text,vk text)
   JOIN md_builder_ribbon_components c ON c.component_api=r.api

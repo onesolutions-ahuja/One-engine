@@ -85,6 +85,11 @@ export function createPageCanvasRenderer(
       : undefined;
     const inPage = page.components.some((item) => item.id === component.id);
     const nested = inPage && !childrenOf(page.components, null).some((item) => item.id === component.id);
+    // Free-canvas children of a container (not MultiPage pages, which fill it) move and resize
+    // inside the container exactly like top-level shapes.
+    const nestedParentType = nested ? page.components.find(item => item.id === rawLayoutParentId(component))?.type : undefined;
+    const canvasMovable = page.layoutMode === 'free-canvas'
+      && (!nested || (Boolean(component.position) && nestedParentType !== 'Custom:smart_multipage'));
     const nestedKids = isLayoutContainer(component) && (!libraryPreview || interactivePreview)
       ? childrenOf(page.components, component.id) : [];
     const nestedChildren = isLayoutContainer(component) && (!libraryPreview || interactivePreview)
@@ -252,17 +257,17 @@ export function createPageCanvasRenderer(
             suppressClick: () => { suppressCanvasClickRef.current = true; },
             onDrop: properties => updateComponent(component.id, { properties })
           }); } : undefined}
-      onPointerDown={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? event => {
+      onPointerDown={!previewMode && !libraryPreview && canvasMovable ? event => {
         // A scrollable component is still a movable shape. Only native scrollbar
         // rails and touch panning are excluded; never exclude all Cart/Grid content.
         const target=event.target as Element;
         if(event.pointerType==='touch' || canvasScrollbarHit(target,event.clientX,event.clientY,event.currentTarget))return;
         startCanvasMove(event, component);
       } : undefined}
-      onPointerMove={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? moveCanvasPointer : undefined}
-      onPointerUp={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? event => endCanvasMove(event) : undefined}
-      onPointerCancel={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? event => endCanvasMove(event, true) : undefined}
-      onLostPointerCapture={!previewMode && !libraryPreview && page.layoutMode === 'free-canvas' && !nested ? event => endCanvasMove(event, true) : undefined}
+      onPointerMove={!previewMode && !libraryPreview && canvasMovable ? moveCanvasPointer : undefined}
+      onPointerUp={!previewMode && !libraryPreview && canvasMovable ? event => endCanvasMove(event) : undefined}
+      onPointerCancel={!previewMode && !libraryPreview && canvasMovable ? event => endCanvasMove(event, true) : undefined}
+      onLostPointerCapture={!previewMode && !libraryPreview && canvasMovable ? event => endCanvasMove(event, true) : undefined}
       onKeyDown={!libraryPreview ? (event) => {
          if (event.currentTarget !== event.target || previewMode) return;
          if (event.key === 'Enter' || event.key === ' ') {
@@ -284,7 +289,7 @@ export function createPageCanvasRenderer(
       {!previewMode && !libraryPreview && selectedId === component.id && <CanvasFloatingActions componentId={component.id} viewportRef={pagePreviewAreaRef} enabled={page.layoutMode === 'free-canvas'}><div
         className="canvas-element-actions" role="toolbar" aria-label={`Actions for ${component.label}`}
         onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-        {page.layoutMode === 'free-canvas' && !nested && !isCanvasLocked(component) && <button type="button"
+        {canvasMovable && !isCanvasLocked(component) && <button type="button"
           className="canvas-move-grip" aria-label={`Drag to move ${component.label}`}
           title="Drag to move only this component" draggable={false}
           onPointerDown={event => startCanvasMove(event, component)}
@@ -509,7 +514,7 @@ export function createPageCanvasRenderer(
             onPointerUp={event => finishTemplateResize(event)}
             onPointerCancel={event => finishTemplateResize(event, true)}
             onClick={event => event.stopPropagation()} />)}
-      {!libraryPreview && page.layoutMode === 'free-canvas' && !nested && selectedId === component.id && !previewMode && !isCanvasLocked(component)
+      {!libraryPreview && canvasMovable && selectedId === component.id && !previewMode && !isCanvasLocked(component)
         && (['n','e','s','w'] as const).map(edge=><span key={edge}
           className={`free-canvas-move-edge move-edge-${edge}`}
           role="button" tabIndex={0} aria-label={`Move ${component.label} from ${edge} edge`}
@@ -520,7 +525,7 @@ export function createPageCanvasRenderer(
           onPointerCancel={event=>endCanvasMove(event,true)}
           onLostPointerCapture={event=>endCanvasMove(event,true)}
           onClick={event=>event.stopPropagation()}/>)}
-      {!libraryPreview && page.layoutMode === 'free-canvas' && !nested && selectedId === component.id && !previewMode && !isCanvasLocked(component) && !canvasGroupKey(component)
+      {!libraryPreview && canvasMovable && selectedId === component.id && !previewMode && !isCanvasLocked(component) && !canvasGroupKey(component)
         && <CanvasFloatingResizeHandles componentId={component.id} componentLabel={component.label} viewportRef={pagePreviewAreaRef}
           onStart={(event,edge)=>startCanvasResize(event,component,edge)}
           onMove={moveCanvasResize} onEnd={endCanvasResize}

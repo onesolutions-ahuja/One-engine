@@ -233,8 +233,11 @@ export function useCanvasGestures(
     const dy = canvasUnitsFromScreenDelta(pointerY - start.pointerY + scrollDelta, scale);
     const west = start.edge.includes('w'), east = start.edge.includes('e'), north = start.edge.includes('n'), south = start.edge.includes('s');
     let x = start.x, y = start.y, width = start.width, height = start.height;
-    if (east) width = Math.max(Math.min(minWidth,page.canvasWidth-start.x), Math.min(page.canvasWidth - start.x, start.width + dx));
-    if (south) height = Math.max(Math.min(minHeight,page.canvasHeight-start.y), Math.min(page.canvasHeight - start.y, start.height + dy));
+    // Inside a container the container is the limit, not the page.
+    const parentId = rawLayoutParentId(component);
+    const area = parentId ? containerCanvasSize(page.components, parentId) : { width: page.canvasWidth, height: page.canvasHeight };
+    if (east) width = Math.max(Math.min(minWidth,area.width-start.x), Math.min(area.width - start.x, start.width + dx));
+    if (south) height = Math.max(Math.min(minHeight,area.height-start.y), Math.min(area.height - start.y, start.height + dy));
     if (west) { x = Math.max(0, Math.min(start.x + start.width - minWidth, start.x + dx)); width = start.width + start.x - x; }
     if (north) { y = Math.max(0, Math.min(start.y + start.height - minHeight, start.y + dy)); height = start.height + start.y - y; }
     start.current = { x, y, width, height };

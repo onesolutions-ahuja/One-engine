@@ -1,4 +1,5 @@
 import icons from "../smart_icon/iconCatalog.json";
+import {smartIconPaint} from "../smart_icon/iconPaint.js";
 import {dockItems,dockSettings} from "./dockItems.mjs";
 
 const size=(value,fallback,min=0,max=2000)=>{
@@ -61,8 +62,7 @@ export default function SmartDock({p,fire,resolve}){
     onClick={()=>tap(item)}>
      <span className="smart-dock-icon-wrap" style={{width:iconSize,height:iconSize}}>
       {glyph?<span className="smart-dock-icon" aria-hidden="true" style={{
-        backgroundColor:color,
-        WebkitMaskImage:"url(/smart-icons/"+glyph+".svg)",maskImage:"url(/smart-icons/"+glyph+".svg)"}}/>
+        ...smartIconPaint(glyph,color)}}/>
        :<span className="smart-dock-icon-empty" aria-hidden="true">{(item.label||String(item.index)).slice(0,1)}</span>}
       {item.badge&&<span className="smart-dock-badge" aria-label={item.badge+" new"}>{item.badge}</span>}
      </span>

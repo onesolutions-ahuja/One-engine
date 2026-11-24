@@ -9,6 +9,7 @@ import SmartKeyboard from "../../smart_keyboard/SmartKeyboard.jsx";
 import SmartDock from "../../smart_dock/SmartDock.jsx";
 import SmartSearch from "../../smart_search/SmartSearch.jsx";
 import icons from "../../smart_icon/iconCatalog.json";
+import {smartIconPaint} from "../../smart_icon/iconPaint.js";
 import {smartShapeAppearance} from "./SmartShapeAppearance.js";
 import {smartCustomButtonAppearance} from "./SmartCustomButtonAppearance.js";
 import {smartPartOffsetStyle,smartPartOrderStyle} from "./SmartPartPlacement.js";
@@ -1102,9 +1103,7 @@ export default function SmartRuntime(p){
     background:p.backgroundColor||SMART_BLUE,color:readableText(p.backgroundColor||SMART_BLUE,p.labelColor)||"#fff",borderColor:p.borderColor,
     ...(isDisabled?{opacity:.4,filter:"grayscale(.7)",cursor:"not-allowed"}:{})}}>
    {buttonIcon&&<span className="smart-button-glyph" aria-hidden="true" style={{
-     backgroundColor:p.iconFillColor||p.labelColor||"#fff",
-     WebkitMaskImage:'url(/smart-icons/'+buttonIcon.id+'.svg)',
-     maskImage:'url(/smart-icons/'+buttonIcon.id+'.svg)',
+     ...smartIconPaint(buttonIcon.id,p.labelColor||"#fff",p.iconFillColor),
      ...(iconSide==="end"?{order:2,marginLeft:"auto"}:iconSide==="start"?{marginRight:"auto"}:{})
    }}/>}
    {label&&<span className="smart-button-label">{label}</span>}

@@ -1,5 +1,6 @@
 import {disabledWhen} from "../shared/showWhen.js";
 import icons from "../smart_icon/iconCatalog.json";
+import {smartIconPaint} from "../smart_icon/iconPaint.js";
 import {smartCustomButtonAppearance} from "../smart/shared/SmartCustomButtonAppearance.js";
 import {smartPartSide} from "../smart/shared/SmartPartPlacement.js";
 /** Smart Table is presentation-only: Object API, filters, formula projections,
@@ -141,7 +142,7 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
       fire?.(action.event,{record:row,recordId:row?.Id??row?.id??null});
      }}>
      {action.icon&&<span className="smart-table-row-icon" aria-hidden="true" style={{
-      WebkitMaskImage:"url(/smart-icons/"+action.icon+".svg)",maskImage:"url(/smart-icons/"+action.icon+".svg)"}}/>}
+      ...smartIconPaint(action.icon,"currentColor")}}/>}
      {!iconOnly&&<span>{action.label}</span>}
     </button>;
    })}

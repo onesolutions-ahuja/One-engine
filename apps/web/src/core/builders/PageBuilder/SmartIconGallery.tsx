@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Shapes,ChevronDown} from 'lucide-react';
 import icons from '../../../component-libraries/smart_icon/iconCatalog.json';
+import {smartIconPaint} from '../../../component-libraries/smart_icon/iconPaint.js';
 import {smartShapes,SmartShapeGlyph} from '../../../component-libraries/smart_icon/SmartShapes';
 import './SmartIconGallery.css';
 
@@ -30,8 +31,7 @@ export default function SmartIconGallery({value,onChange,disabled=false,allowIco
  const icon=(item:{id:string;label:string})=>item.id.startsWith('shape:')
   ?<SmartShapeGlyph id={item.id} size={21}/>
   :<span className="smart-icon-gallery-glyph" aria-hidden="true"
-     style={{WebkitMaskImage:'url(/smart-icons/'+item.id+'.svg)',
-      maskImage:'url(/smart-icons/'+item.id+'.svg)'}}/>;
+     style={smartIconPaint(item.id,'currentColor')}/>;
  return <div className="smart-icon-gallery" aria-label="Shapes and icons">
   <button ref={button} type="button" className="smart-shapes-trigger"
     aria-haspopup="dialog" aria-expanded={open} disabled={disabled}

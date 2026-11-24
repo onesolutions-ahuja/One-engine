@@ -170,6 +170,11 @@
     "category": "Commerce & analytics"
   },
   {
+    "id": "receipts-gbp",
+    "label": "Receipts (£)",
+    "category": "Commerce & analytics"
+  },
+  {
     "id": "package",
     "label": "Package",
     "category": "Commerce & analytics"

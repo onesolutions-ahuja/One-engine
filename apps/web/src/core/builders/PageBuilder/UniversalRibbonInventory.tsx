@@ -3,6 +3,8 @@ import {auditUniversalRibbonCoverage} from './universalRibbonCoverage.mjs';
 import {createPortal} from 'react-dom';
 import RibbonColorPalette from './RibbonColorPalette';
 import BuilderNumberInput from './BuilderNumberInput';
+import {Bold,WrapText,ArrowLeftRight,ArrowUpDown} from 'lucide-react';
+import {RibbonTextSizeIcon,RibbonCornerRadiusIcon} from './SmartRibbonIcons';
 import type {LibraryComponentMetadata,ObjectMetadata,FlowDefinitionMetadata} from '../../metadata/Definitions/metadata';
 import CustomComponentPropertyEditor from '../ComponentProperties/CustomComponentPropertyEditor';
 import {metadataFieldObject,metadataSelection,metadataReference} from '../../metadata/Definitions/metadataReferences';
@@ -130,15 +132,29 @@ function PropertyEditor({definition,enabled,reviewOnly=false,properties,onChange
  const tip=reviewOnly?label+' — review only; not saved for this component':enabled?label:'Not supported by selected component';
  const props={disabled:!enabled,title:tip,'aria-label':label};
  let editor;
- if(definition.kind==='BOOLEAN')editor=<input type="checkbox" {...props} checked={value===true} onChange={e=>update(e.target.checked)}/>;
+ // Same icons as the Smart ribbon: Bold / Wrap text are icon buttons, never checkboxes.
+ if(definition.kind==='BOOLEAN'&&/^(bold|wrapText)$|(Bold|TextWeight|WrapText)$/.test(key)){
+   const Icon=/wrap/i.test(key)?WrapText:Bold;
+   editor=<button type="button" className="smart-icon-toggle" {...props} aria-pressed={value===true}
+     onClick={()=>update(value!==true)}><Icon size={17}/></button>;
+ }
+ else if(definition.kind==='BOOLEAN')editor=<input type="checkbox" {...props} checked={value===true} onChange={e=>update(e.target.checked)}/>;
  else if(definition.kind==='SELECT')editor=<select {...props} value={String(value)} onChange={e=>update(e.target.value)}>
    <option value="">Default</option>{(definition.choices??[]).map(choice=><option key={choice.key} value={choice.key}>{choice.label}</option>)}
  </select>;
  else if(definition.kind==='NUMBER'||definition.kind==='CURRENCY'){
+   // A saved "12" or "40px" is still a number: show it instead of a blank box.
+   const shown=typeof value==='number'?value:
+     typeof value==='string'&&Number.isFinite(Number.parseFloat(value))?Number.parseFloat(value):'';
    const field=<BuilderNumberInput {...props} key={key}
      min={definition.min} max={definition.max}
-     value={typeof value==='number'?value:''} onValueChange={update}/>;
-   editor=unit?<span className="smart-unit-field" data-unit={unit}>{field}</span>:field;
+     value={shown} placeholder={shown===''&&typeof value==='string'&&value?value:undefined} onValueChange={update}/>;
+   const glyph=/^(textSize|placeholderSize)$|TextSize$/.test(key)?<RibbonTextSizeIcon/>:
+     /radius$/i.test(key)?<RibbonCornerRadiusIcon/>:
+     /width$/i.test(key)?<ArrowLeftRight size={17} aria-hidden="true"/>:
+     /height$/i.test(key)?<ArrowUpDown size={17} aria-hidden="true"/>:null;
+   const boxed=unit?<span className="smart-unit-field" data-unit={unit}>{field}</span>:field;
+   editor=glyph?<span className="smart-numeric"><span className="smart-property-glyph" title={label}>{glyph}</span>{boxed}</span>:boxed;
  }
  else if(definition.kind==='IMAGE')editor=<><button type="button" disabled={!enabled} title={tip} onClick={()=>setMediaOpen(true)}>Choose / Upload</button>
    {mediaOpen&&createPortal(<div className="smart-universal-media-overlay" role="presentation" onMouseDown={e=>{if(e.currentTarget===e.target)setMediaOpen(false);}}>

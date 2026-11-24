@@ -1,9 +1,9 @@
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 /** Tenant installation, licence and entitlement checks remain SQL-backed. */
 export async function loadTenantApps(db:SqlPersistence,tenantId:string){
- const {rows}=await db.query<{id:string;api_name:string;label:string;description:string|null;brand_color:string|null;revision:number|null}>(`
+ const {rows}=await db.query<{id:string;api_name:string;label:string;description:string|null;brand_color:string|null;revision:number|null;lock_enabled:boolean|null;lock_idle_minutes:number|null}>(`
  SELECT a.id,COALESCE(m.api_name,a.api_name) AS api_name,
- COALESCE(m.label,a.label) AS label,m.description,m.brand_color,m.revision
+ COALESCE(m.label,a.label) AS label,m.description,m.brand_color,m.revision,m.lock_enabled,m.lock_idle_minutes
  FROM md_apps a
  JOIN md_app_installations i ON i.app_id=a.id AND i.tenant_id=$1
  JOIN md_app_entitlements e ON e.app_id=a.id AND e.tenant_id=$1

@@ -1,3 +1,4 @@
+import { rememberAppLocks } from '../../authentication/TillDevice/tillDevice';
 // Published app pages open without the Setup shell: they need only their app's runtime
 // metadata (objects, apps, a summary of each page, the session), not the ~350 KB Setup
 // landing bootstrap. Pure helpers: no network, no window access at import.
@@ -31,6 +32,7 @@ export function readAppRuntimeMetadata(value: unknown, appId: string): AppRuntim
   if (!user || typeof user.profileId !== 'string' || !Array.isArray(user.permissions)) return undefined;
   // Summaries never carry components; code that reads page.components still gets an array.
   const pages = data.pages.map(page => Array.isArray(page.components) ? page : { ...page, components: [] });
+  rememberAppLocks(data.apps);
   return { appId, objects: data.objects, pages, apps: data.apps, user };
 }
 

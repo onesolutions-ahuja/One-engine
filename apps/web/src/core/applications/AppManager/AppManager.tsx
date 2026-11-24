@@ -319,6 +319,7 @@ export default function AppManager({
   const stepIndex=Math.max(0,steps.findIndex(step=>step.id===activeStep));
   // The Home Page choices are the app's own App Pages, in navigation order.
   const homeChoices=navigationOrder.filter(item=>item.type==='App Page').map(item=>item.apiName);
+  const lock=draft.lockScreen??{enabled:false,idleMinutes:5};
   const homePage=homeChoices.includes(draft.homePageApiName??'')?draft.homePageApiName??'':homeChoices[0]??'';
   const homeLabel=pages.find(page=>page.apiName===homePage)?.label??homePage;
   const stepError=(index:number)=>{
@@ -470,6 +471,17 @@ export default function AppManager({
             :'Add an App Page in Navigation to choose a Home Page.'}</p>
           {assignedPages.some(page=>page.pageType==='Home Page') && <p className="permission-help">
             A Home Page assigned in Page Builder ({assignedPages.filter(page=>page.pageType==='Home Page').map(page=>page.label).join(', ')}) still takes priority.</p>}
+          <fieldset className="app-manager-lock">
+            <legend>Lock screen</legend>
+            <label className="form-label"><input type="checkbox" checked={lock.enabled}
+              onChange={event=>update('lockScreen',{...lock,enabled:event.target.checked})}/> Lock this app's pages (PIN sign-in for saved users)</label>
+            <label className="form-label" htmlFor="app-lock-idle">Lock after idle (minutes, 0 = only on LOCKSCREEN() or the Lock button)
+              <input id="app-lock-idle" className="form-control" type="number" min={0} max={240} step={1}
+                disabled={!lock.enabled} value={lock.idleMinutes}
+                onChange={event=>update('lockScreen',{...lock,idleMinutes:Math.min(240,Math.max(0,Math.round(Number(event.target.value)||0)))})}/>
+            </label>
+            <p className="permission-help">Only this app's pages lock. Page Builder, Setup and other apps never lock.</p>
+          </fieldset>
         </div>}
 
         {activeStep==='app-review' && <div id="app-review" className="app-manager-form-section">

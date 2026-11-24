@@ -6,6 +6,16 @@ import type {SqlPersistence} from './sql-persistence.js';
 export function appHomeFormFactor(variant:string):'desktop'|'tablet'|'phone'|'custom' {
   return variant==='Phone'||variant==='Mobile'?'phone':variant==='Tablet'?'tablet':variant==='Custom'?'custom':'desktop';
 }
+/** App lock screen setting: off by default; idle minutes 0-240 (0 = never on idle, only LOCKSCREEN()). */
+export function readLockScreen(raw:unknown):{enabled:boolean|null;idleMinutes:number|null}{
+  // Not sent (older callers): keep the app's saved setting.
+  if(raw===undefined||raw===null)return {enabled:null,idleMinutes:null};
+  const v=raw as {enabled?:unknown;idleMinutes?:unknown};
+  if(typeof raw!=='object'||Array.isArray(raw)||typeof v.enabled!=='boolean'
+    ||typeof v.idleMinutes!=='number'||!Number.isInteger(v.idleMinutes)||v.idleMinutes<0||v.idleMinutes>240)
+    throw new Error('Invalid App lock screen: idle minutes must be a whole number from 0 to 240');
+  return {enabled:v.enabled,idleMinutes:v.idleMinutes};
+}
 export class AppRuntime {
   constructor(private readonly db:SqlPersistence) {}
   /** Metadata for installed and entitled apps only, including tenant-owned apps. */
@@ -26,6 +36,7 @@ export class AppRuntime {
       ||p.navigationOrder.length>200||p.utilityItems.length>2
       ||(p.homePageApiName!==undefined&&typeof p.homePageApiName!=='string'))
       throw new Error('Invalid App metadata');
+    const lock=readLockScreen(p.lockScreen);
     const {objects,pages,order,utilityItems}=validateAppNavigation(p);
     // Home Page: the chosen App Page, else the first App Page in navigation order.
     const firstPage=order.find(item=>item.type==='App Page')?.apiName??'';
@@ -85,12 +96,14 @@ export class AppRuntime {
         if(!found.rowCount)throw new Error('Unknown App Page: '+pageApi);
       }
       await client.query(`
-        INSERT INTO md_tenant_app_metadata(tenant_id,app_id,api_name,label,description,brand_color,revision)
-        VALUES($1,$2,$3,$4,$5,$6,1)
+        INSERT INTO md_tenant_app_metadata(tenant_id,app_id,api_name,label,description,brand_color,revision,lock_enabled,lock_idle_minutes)
+        VALUES($1,$2,$3,$4,$5,$6,1,COALESCE($7::boolean,false),COALESCE($8::integer,5))
         ON CONFLICT(tenant_id,app_id) DO UPDATE SET label=EXCLUDED.label,
           description=EXCLUDED.description,brand_color=EXCLUDED.brand_color,
+          lock_enabled=COALESCE($7::boolean,md_tenant_app_metadata.lock_enabled),
+          lock_idle_minutes=COALESCE($8::integer,md_tenant_app_metadata.lock_idle_minutes),
           revision=md_tenant_app_metadata.revision+1
-      `,[tenantId,appId,apiName,p.label,p.description,p.brandColor]);
+      `,[tenantId,appId,apiName,p.label,p.description,p.brandColor,lock.enabled,lock.idleMinutes]);
       await client.query('DELETE FROM md_tenant_app_navigation WHERE tenant_id=$1 AND app_id=$2',[tenantId,appId]);
       await client.query('DELETE FROM md_tenant_app_utilities WHERE tenant_id=$1 AND app_id=$2',[tenantId,appId]);
       for(const [position,item] of order.entries())await client.query(`

@@ -128,8 +128,8 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'CartLine',type:'reference',target:'CartLine'},
   {name:'Course',type:'number'},
   {name:'Note',type:'text',length:255},
-  // Short = only some could be made (MadeQty); Served = the ticket was completed (off the screen).
-  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void','Short','Served']},
+  // Short = only some could be made (MadeQty); Completed = its ticket was completed (off the kitchen screen).
+  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void','Short','Completed']},
   {name:'Options',type:'text',length:500},
   {name:'MadeQty',type:'number'},
  ]},
@@ -174,6 +174,7 @@ export async function seedEposObjects(client:PoolClient,tenantId:string){
   if(field.choices)await addChoices(client,tenantId,object.name,field.name,field.choices);
  }
  await addChoices(client,tenantId,'CashLedger','Method',['Customer credit','Gift card','On account']);
+ await trackKitchenStatusHistory(client,tenantId);
  await removeDuplicateCustomerBalance(client,tenantId);
 }
 // Customer already keeps what is owed in AccountBalance. The ledger balance fields an earlier seed added
@@ -194,4 +195,16 @@ async function addChoices(client:PoolClient,tenantId:string,object:string,field:
  WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3),0)+c.ord FROM unnest($4::text[]) WITH ORDINALITY c(value,ord)
  WHERE EXISTS(SELECT 1 FROM md_field_definitions WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND data_type='picklist' AND deleted_at IS NULL)
  ON CONFLICT(tenant_id,object_api,field_api,value) DO NOTHING`,[tenantId,object,field,choices]);
+}
+
+/** Every kitchen status change (who, when, from, to) is kept by field history tracking, for
+ * speed reports: ordered → accepted → preparing → ready → collected, per order and per item.
+ * Switched on ONCE per tenant (marker row): a tenant that turns it off later keeps it off. */
+export const KITCHEN_STATUS_HISTORY=[['Order','KitchenStatus'],['OrderLine','KitchenStatus'],['CartLine','KitchenStatus']] as const;
+async function trackKitchenStatusHistory(client:PoolClient,tenantId:string){
+ const marker=await client.query(`INSERT INTO md_system_migrations(version,checksum) VALUES($1,'once')
+  ON CONFLICT DO NOTHING RETURNING version`,['kitchen-status-history-v1:'+tenantId]);
+ if(!marker.rowCount)return;
+ for(const [object,field] of KITCHEN_STATUS_HISTORY)await client.query(`UPDATE md_field_definitions SET track_history=true
+  WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND deleted_at IS NULL`,[tenantId,object,field]);
 }

@@ -254,7 +254,7 @@ const validZone=(zone:unknown):string=>{
  try{new Intl.DateTimeFormat('en-GB',{timeZone:name});return name;}catch{return '';}
 };
 /** Dates and times show in the business's time zone (Company Settings), so a
- * sale reads the same on every till, screen and receipt whatever the device's
+ * record reads the same on every device, screen and print whatever the device's
  * own clock zone. Falls back to the user's zone, then the device's, then UTC. */
 export function businessTimeZone():string{
  return validZone(tenantValue('Timezone'))||validZone(identity()?.user?.TimeZone)

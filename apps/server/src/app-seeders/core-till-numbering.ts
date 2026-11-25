@@ -61,10 +61,6 @@ export const TILL_NUMBERING_FIELDS:ReadonlyArray<{object:string;label?:string;ap
  ]},
  {object:'CashLedger',fields:[
   {api:'TillId',label:'Till',type:'reference',related:'NamedDevice'}
- ]},
- // Kitchen tickets show this number (one running series per tenant).
- {object:'Order',appOwned:true,fields:[
-  {api:'OrderNumber',label:'Order Number',type:'autonumber',format:'{0}'}
  ]}
 ];
 /** Numbered documents: delete is refused, Status is set to Cancelled instead. */

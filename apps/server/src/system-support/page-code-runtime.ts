@@ -633,6 +633,9 @@ function shownRows(value:unknown):Record<string,string[]>|undefined{
 
 /** True when an action reads the signed-in user or the company (formula text or generated code). */
 export const needsIdentity=(source:string)=>/@ThisTenant\.(?:User|Company)\.|\$\.session\(\s*["'](?:user|tenant)\.|\$\.tenant\(/i.test(source);
+/** Held record sets whose criteria read the signed-in user or company (a guest's table:
+ * ServicePoint Id = @ThisTenant.User.GuestOf) are reloaded after every save: they need it too. */
+const setsNeedIdentity=(code:Pick<ServerPageCode,'recordSets'>)=>code.recordSets.some(set=>needsIdentity(set.key));
 
 /** Run one page action: ONE transaction; all steps or none. */
 /** Taps of one page session (one sale on one screen) take turns; without a session, those of
@@ -647,7 +650,7 @@ export async function executePageCodeAction(deps:Deps,actor:Actor,code:ServerPag
  if(!action)return {ok:false,error:'This action is not part of the published page',changes:[],state:{},effects:[],sets:{}};
  // The source is the generated action code: user/company values appear as $.session("user.…"),
  // $.session("tenant.id") or $.tenant(…), not as @ThisTenant mentions.
- const scope=await scopeFor(deps,actor,request,{identity:needsIdentity(source),
+ const scope=await scopeFor(deps,actor,request,{identity:needsIdentity(source)||setsNeedIdentity(code),
   connections:/\bCONNECTED\s*\(/i.test(source),permissions:permissionNames(source)});
  try{
   const result=await deps.db.transaction(()=>withRecordReadScope(async()=>{
@@ -706,6 +709,6 @@ export async function pageCodeAggregates(deps:Deps,actor:Actor,request:PageCodeR
 /** All record sets of a page, for page open (with the page's first state). */
 export async function loadPageRecordSets(deps:Deps,actor:Actor,code:ServerPageCode,request:PageCodeRequest){
  if(!code.recordSets.length)return {};
- const scope=await scopeFor(deps,actor,request,{identity:false,connections:false});
+ const scope=await scopeFor(deps,actor,request,{identity:setsNeedIdentity(code),connections:false});
  return deps.db.transaction(()=>withRecordReadScope(()=>loadSets(scope,code)));
 }

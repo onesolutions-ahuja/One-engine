@@ -277,6 +277,22 @@ test('PAIRGUEST pairs a tablet as a record\'s guest (browser step); PAIRDISPLAY 
  assert.doesNotThrow(()=>compileActionPlan('=ACTIONS(GUESTLINK(SelfOrder, @recordId, AS(g)), UPDATERECORD(ServicePoint, @recordId, Name, g.Url))'));
 });
 
+test('a save reloads held sets whose criteria read the signed-in user (a guest\'s table)', async ()=>{
+ const tableId='66666666-6666-4666-8666-666666666666';
+ const fake=fakeRecords({ServicePoint:[{Id:tableId,Name:'Table 3'}],CartLine:[]});
+ const db={transaction:async<T>(run:()=>Promise<T>)=>run(),query:async(sql:string)=>({rows:/custom_fields/.test(sql)
+  ?[{api_name:'GuestOf',value:tableId}]:/FROM md_users u/i.test(sql)
+  ?[{email:'g@x',display_name:'Guest',time_zone:'UTC',locale:'en',currency_iso_code:null,manager_id:null,manager_name:null}]:[]})};
+ const page={apiName:'order',components:[
+  {id:'start',objectApiName:'',formulas:[],actions:[{event:'click',kind:'Formula',formula:'=GETRECORD(ServicePoint, Id, @ThisTenant.User.GuestOf, AS(sp))'}]},
+  {id:'add',objectApiName:'',formulas:[],actions:[{event:'click',kind:'Formula',formula:'=CREATERECORD(CartLine, Name, "Cola")'}]}]};
+ const server=serverPageCode(buildPageCode(page as never));
+ assert.ok(server.recordSets.some(set=>/GuestOf/.test(set.key)),'the guest\'s table is a held set');
+ const result=await executePageCodeAction({db,records:fake.records} as never,{tenant_id:'t',user_id:'u'},server,'add:click',
+  {sessionId:'s',state:{},rowObject:'',event:{}},'');
+ assert.equal(result.ok,true,result.error);
+});
+
 test('server function: a failing step saves nothing', async ()=>{
  const fake=fakeRecords({Product:[{Id:productId,Name:'Cola',Price:1.5}],Cart:[],CartLine:[]});
  fake.records.update=async()=>{throw Error('Field is read only');};

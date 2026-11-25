@@ -1,13 +1,35 @@
 .smart-multipage{display:flex;flex-direction:column;width:100%;height:100%;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;background:#fff}
-.smart-multipage-tabs{display:flex;gap:2px;padding:4px;flex:0 0 auto;overflow-x:auto}
-.smart-multipage-tabs button{flex:1 1 0;min-width:0;cursor:pointer;border:0;background:transparent;padding:6px 10px;font:inherit;font-size:13px;color:#334155;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.smart-multipage.is-segmented .smart-multipage-tabs{margin:6px;background:#eef1f5;border-radius:10px}
-.smart-multipage.is-segmented .smart-multipage-tabs button.active{background:#fff;box-shadow:0 1px 3px #0002;font-weight:600;color:#0f172a}
-.smart-multipage.is-pills .smart-multipage-tabs button{flex:0 0 auto;border-radius:999px}
-.smart-multipage.is-pills .smart-multipage-tabs button.active{background:#0a84ff;color:#fff}
-.smart-multipage.is-tabs .smart-multipage-tabs{padding:0 6px;border-bottom:1px solid #dbe3ec;gap:0}
-.smart-multipage.is-tabs .smart-multipage-tabs button{flex:0 0 auto;border-radius:0;border-bottom:2px solid transparent}
+/* Tab bar row: alignment decides where the (content-width) tab control sits. */
+.smart-multipage-tabbar{display:flex;flex:0 0 auto;min-width:0;padding:8px 10px 6px;justify-content:center}
+.smart-multipage.align-left .smart-multipage-tabbar{justify-content:flex-start}
+.smart-multipage.align-right .smart-multipage-tabbar{justify-content:flex-end}
+.smart-multipage-tabs{display:inline-flex;gap:2px;padding:3px;max-width:100%;overflow-x:auto;scrollbar-width:none;box-sizing:border-box}
+.smart-multipage.align-stretch .smart-multipage-tabs{display:flex;width:100%}
+.smart-multipage-tabs button{flex:0 0 auto;min-width:72px;cursor:pointer;border:0;background:transparent;font:inherit;color:#3a3a3c;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;transition:background-color .15s,color .15s,box-shadow .15s}
+.smart-multipage.align-stretch .smart-multipage-tabs button{flex:1 1 0;min-width:0}
+/* Sizes */
+.smart-multipage.size-small .smart-multipage-tabs button{font-size:12px;padding:4px 12px}
+.smart-multipage.size-medium .smart-multipage-tabs button{font-size:13px;padding:6px 16px}
+.smart-multipage.size-large .smart-multipage-tabs button{font-size:15px;padding:9px 22px}
+/* Shapes (track / tab) */
+.smart-multipage.shape-rounded .smart-multipage-tabs{border-radius:9px}.smart-multipage.shape-rounded .smart-multipage-tabs button{border-radius:7px}
+.smart-multipage.shape-pill .smart-multipage-tabs{border-radius:999px}.smart-multipage.shape-pill .smart-multipage-tabs button{border-radius:999px}
+.smart-multipage.shape-square .smart-multipage-tabs{border-radius:4px}.smart-multipage.shape-square .smart-multipage-tabs button{border-radius:3px}
+/* Segmented: macOS-style grey track with a raised white tab. */
+.smart-multipage.is-segmented .smart-multipage-tabs{background:rgba(118,118,128,.12)}
+.smart-multipage.is-segmented .smart-multipage-tabs button:hover:not(.active){background:rgba(118,118,128,.1)}
+.smart-multipage.is-segmented .smart-multipage-tabs button.active{background:#fff;color:#1c1c1e;font-weight:600;
+ box-shadow:0 1px 3px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+/* Pills */
+.smart-multipage.is-pills .smart-multipage-tabs{gap:6px;padding:0}
+.smart-multipage.is-pills .smart-multipage-tabs button.active{background:#0a84ff;color:#fff;font-weight:600}
+/* Tabs (underline) */
+.smart-multipage.is-tabs .smart-multipage-tabbar{padding:0 6px;border-bottom:1px solid #dbe3ec}
+.smart-multipage.is-tabs .smart-multipage-tabs{padding:0;gap:4px;border-radius:0}
+.smart-multipage.is-tabs .smart-multipage-tabs button{border-radius:0;border-bottom:2px solid transparent}
 .smart-multipage.is-tabs .smart-multipage-tabs button.active{border-bottom-color:#0a84ff;color:#0a84ff;font-weight:600}
+.smart-multipage-tabs button:focus-visible{outline:2px solid #0a84ff;outline-offset:1px}
 .smart-multipage-page{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:auto}
 .smart-multipage-page>*{flex:1 1 auto;min-height:0}
 .smart-multipage-empty{display:grid;place-items:center;height:100%;color:#64748b;font-size:13px}

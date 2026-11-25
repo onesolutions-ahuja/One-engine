@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {pageKeyList,shownPages,activePage} from '../src/component-libraries/smart_multipage/multiPageModel.js';
+import {pageKeyList,shownPages,activePage,tabBarLook} from '../src/component-libraries/smart_multipage/multiPageModel.js';
 
 const pages=['Cash','Card','PayPal','GiftCard'].map(key=>({key,label:key}));
 test('visible tabs keep formula order and ignore blanks/duplicates',()=>{
@@ -9,6 +9,11 @@ test('visible tabs keep formula order and ignore blanks/duplicates',()=>{
  assert.equal(shownPages(pages,'').length,4);
  assert.equal(shownPages(pages,'Cash',true).length,4);
  assert.deepEqual(shownPages(pages,'Klarna'),[]);
+});
+test('tab bar look: blank is macOS segmented (centred, medium, rounded); values are case-insensitive',()=>{
+ assert.deepEqual(tabBarLook({}),{align:'center',size:'medium',shape:'rounded'});
+ assert.deepEqual(tabBarLook({multiPageTabAlign:'stretch',multiPageTabSize:'Large',multiPageTabShape:'PILL'}),{align:'stretch',size:'large',shape:'pill'});
+ assert.deepEqual(tabBarLook({multiPageTabAlign:'middle'}).align,'center','unknown values fall back');
 });
 test('open page: builder selection, then tapped tab, then Active tab, then first',()=>{
  const shown=shownPages(pages,'Cash,PayPal');

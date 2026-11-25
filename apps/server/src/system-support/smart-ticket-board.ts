@@ -19,6 +19,7 @@ export const TICKET_BOARD_PROPERTY_SPECS:Spec[]=[
  spec('ticketTitle','Ticket title','expression'),
  spec('ticketTime','Ticket time','expression'),
  spec('ticketSection','Line heading','expression'),
+ spec('ticketLineVisible','Show line when','expression'),
  spec('ticketAccent','Ticket colour','expression'),
  spec('ticketWarnMinutes','Amber after (min)','number',10,0,600),
  spec('ticketLateMinutes','Red after (min)','number',15,0,600),

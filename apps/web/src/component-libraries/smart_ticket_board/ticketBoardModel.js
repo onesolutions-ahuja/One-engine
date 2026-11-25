@@ -97,3 +97,10 @@ export function columnCountFor(width,min,gap){
  const w=Number(width)||0,c=Math.max(120,Number(min)||300),g=Math.max(0,Number(gap)||0);
  return Math.max(1,Math.floor((w+g)/(c+g)));
 }
+
+/** "Show line when" result: false, "false", 0, "no" hide the line; anything else shows it. */
+export function lineVisible(value){
+ if(value===false||value===0)return false;
+ const text=String(value??"").trim().toLowerCase();
+ return !["false","0","no"].includes(text);
+}

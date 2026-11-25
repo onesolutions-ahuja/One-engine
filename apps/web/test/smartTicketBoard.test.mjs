@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fieldName,groupTickets,timeOf,sortTickets,formatAge,ageLevel,lineState,packColumns,columnCountFor,estimateHeight}
+import {lineVisible,fieldName,groupTickets,timeOf,sortTickets,formatAge,ageLevel,lineState,packColumns,columnCountFor,estimateHeight}
  from '../src/component-libraries/smart_ticket_board/ticketBoardModel.js';
 
 test('group field: any spelling becomes the row field',()=>{
@@ -43,4 +43,8 @@ test('cards pack into the shortest column, oldest top-left',()=>{
  assert.equal(columnCountFor(1240,300,14),3);
  assert.equal(columnCountFor(200,300,14),1);
  assert.equal(estimateHeight({lines:Array.from({length:50},()=>({}))},560),560,'long tickets are capped (they scroll inside)');
+});
+test('show line when: only false-like values hide a line',()=>{
+ for(const v of [false,'FALSE',0,'0','no'])assert.equal(lineVisible(v),false);
+ for(const v of [true,'TRUE','',null,'Grill'])assert.equal(lineVisible(v),true);
 });

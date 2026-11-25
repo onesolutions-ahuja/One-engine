@@ -1,7 +1,7 @@
 import {runComponentFormula} from "../shared/formulaCodeLookup.js";
 import {disabledWhen,hiddenByShowWhen} from "../shared/showWhen.js";
 import {smartCustomButtonAppearance} from "../smart/shared/SmartCustomButtonAppearance.js";
-import {groupTickets,timeOf,sortTickets,formatAge,ageLevel,lineState,estimateHeight,packColumns,columnCountFor}
+import {groupTickets,timeOf,sortTickets,formatAge,ageLevel,lineState,lineVisible,estimateHeight,packColumns,columnCountFor}
  from "./ticketBoardModel.js";
 
 /**
@@ -13,6 +13,7 @@ import {groupTickets,timeOf,sortTickets,formatAge,ageLevel,lineState,estimateHei
  * Lines (shared properties): Text Source = line text, Column 2 = qty, Row supporting source = second
  * line (options / notes), Column 3 = line state (Done / Void / Short / Held), Column 4 = small tag.
  * Ticket: Ticket title, Card description (subtitle), Badge text, Ticket time (age timer).
+ * Show line when: only matching lines (e.g. one kitchen section); empty tickets are hidden.
  * Events: click = line tapped, longPress = line held, customButton1/2 = ticket buttons
  * (Button 1 is the main action, drawn on the right; Button 2 on its left)
  * (@event.recordId = the ticket key, e.g. the Order Id; @event.recordIds = its line Ids).
@@ -60,22 +61,26 @@ export default function SmartComponent(p){
  const buttons=["customButton1","customButton2"].filter(key=>p[key+"Visible"]!==false&&
   (builder||Boolean(p.actionFlows?.[key])||String(p[key+"Label"]??"").trim()!==""));
 
+ // Show line when (e.g. this section's lines only): blank shows every line; a ticket with
+ // no line left is not shown. Ticket values still read the ticket's first line.
+ const lineFilter=String(p.ticketLineVisible??"").trim();
+ const shows=row=>!lineFilter||lineVisible(runComponentFormula(p,lineFilter,row).value);
  const tickets=rows.length||!builder?sortTickets(groupTickets(rows,p.ticketGroupField).map(group=>{
   const first=group.rows[0];
-  const lines=group.rows.map(row=>({id:String(row.Id??""),row,text:read("textSource",row),qty:read("column2Source",row),
+  const lines=group.rows.filter(shows).map(row=>({id:String(row.Id??""),row,text:read("textSource",row),qty:read("column2Source",row),
    note:read("rowSupportingSource",row),state:lineState(read("column3Source",row)),tag:read("column4Source",row),
    section:read("ticketSection",row)}));
   return {key:group.key,first,rows:group.rows,lines,title:read("ticketTitle",first)||read("textSource",first),
    subtitle:read("cardDescription",first),badge:p.badgeVisible===false?"":read("badgeText",first),accent:read("ticketAccent",first),
    time:timeOf(runComponentFormula(p,p.ticketTime,first).value),
    labels:Object.fromEntries(buttons.map(key=>[key,read(key+"Label",first)]))};
- })):SAMPLE.map(sample=>({...sample,rows:[],first:{},time:now-sample.age,
+ }).filter(ticket=>ticket.lines.length>0)):SAMPLE.map(sample=>({...sample,rows:[],first:{},time:now-sample.age,
   lines:sample.lines.map(line=>({...line,state:lineState(line.state),row:{Id:line.id}})),
   labels:Object.fromEntries(buttons.map((key,i)=>[key,String(p[key+"Label"]??"")||(i?"Print":"Complete")]))}));
 
  const fire=(event,value)=>{if(live&&!disabled)void Promise.resolve(p.onAction?.({event,value})).catch(()=>{});};
  const lineValue=(ticket,line)=>({record:line.row,recordId:line.id,ticketId:ticket.key,ticket:ticket.first});
- const ticketValue=ticket=>({record:ticket.first,recordId:ticket.key,recordIds:ticket.rows.map(row=>row.Id)});
+ const ticketValue=ticket=>({record:ticket.first,recordId:ticket.key,recordIds:ticket.lines.map(line=>line.id)});
  // Tap = click; hold 550 ms (or right-click) = longPress. Scrolling a long ticket is not a tap.
  const down=(e,ticket,line)=>{
   if(e.button!==undefined&&e.button!==0)return;

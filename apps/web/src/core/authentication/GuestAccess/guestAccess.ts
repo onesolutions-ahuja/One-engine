@@ -35,5 +35,8 @@ export function onGuestPage(pathname=window.location.pathname):boolean{
  const path=read(PATH);
  return Boolean(path&&tokenPattern.test(read(TOKEN))&&pathname.replace(/\/$/,'')===path);
 }
+/** On the guest page, sign-in refresh and sign-out use the guest's own cookie, so a guest link
+ * opened in a browser never replaces the staff sign-in there (and the reverse). */
+export const guestSessionHeaders=():Record<string,string>=>onGuestPage()?{'X-Une-Guest':'1'}:{};
 /** Where a guest page whose sign-in ended goes: its own link again. */
 export const guestLinkPath=():string=>{const token=read(TOKEN);return tokenPattern.test(token)?'/guest/'+token:'';};

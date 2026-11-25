@@ -4,7 +4,30 @@ type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 type Client={id?:string;label:string;enabled:boolean;client_type:'public'|'confidential';require_mfa:boolean;redirects:string[];scopes:string[];users:string[]};
 type Scope={scope:string;label:string;description:string;risk:string;assignable:boolean};
 type ScopeGroup={key:string;label:string;scopes:Scope[]};
-type Data={clients:Client[];users:{id:string;email:string}[];scopes:string[];scopeGroups?:ScopeGroup[]};
+type Data={clients:Client[];users:{id:string;email:string}[];scopes:string[];scopeGroups?:ScopeGroup[];
+ mcpUrl?:string|null;secretEndings?:Record<string,string>};
+/** Redirect URLs AI assistants use when they connect to this MCP server (shown as setup help). */
+const AI_REDIRECTS=['https://claude.ai/api/mcp/auth_callback','https://claude.com/api/mcp/auth_callback'];
+const MASK='••••••••••••••••';
+function CopyButton({value,label}:{value:string;label:string}){
+ const [copied,setCopied]=useState(false);
+ return <button type="button" className="btn connected-apps-icon-btn" aria-label={label} title={label}
+  onClick={()=>{void navigator.clipboard?.writeText(value).then(()=>{setCopied(true);window.setTimeout(()=>setCopied(false),1500);}).catch(()=>{});}}>
+  {copied?'Copied':'Copy'}</button>;
+}
+/** A one-time secret: hidden by default, eye to show, copy without showing. */
+function SecretValue({value}:{value:string}){
+ const [shown,setShown]=useState(false);
+ return <span className="connected-apps-secret-value">
+  <code aria-label={shown?'Client secret':'Client secret (hidden)'}>{shown?value:MASK}</code>
+  <button type="button" className="btn connected-apps-icon-btn" aria-pressed={shown} aria-label={shown?'Hide secret':'Show secret'}
+   title={shown?'Hide secret':'Show secret'} onClick={()=>setShown(v=>!v)}>
+   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>{shown&&<path d="M4 4l16 16"/>}
+   </svg></button>
+  <CopyButton value={value} label="Copy secret"/>
+ </span>;
+}
 const fresh=():Client=>({label:'',enabled:false,client_type:'public',require_mfa:true,redirects:[],scopes:['records:read'],users:[]});
 export default function TenantConnectedApps({request}:{request:Request}){
  const [data,setData]=useState<Data|null>(null),[draft,setDraft]=useState<Client>(fresh),[message,setMessage]=useState(''),[secret,setSecret]=useState(''),[busy,setBusy]=useState(false),[scopeSearch,setScopeSearch]=useState('');
@@ -41,10 +64,17 @@ export default function TenantConnectedApps({request}:{request:Request}){
  const selectApp=(client:Client)=>{setDraft({...client});setDirectoryOpen(false);setSecret('');setMessage('');};
  return <section className="surface permission-section connected-apps-section">
   <h2>Connected Apps</h2>
-  <p className="connected-apps-help">OAuth authorization code with PKCE (S256), explicit user consent and rotating refresh tokens. Editing an app revokes existing consents. Secret values are shown once.</p>
+  <p className="connected-apps-help">OAuth authorization code with PKCE (S256), explicit user consent and rotating refresh tokens. Editing an app revokes existing consents. A secret is shown once, then only its last 4 characters.</p>
   {message&&<p role="status" className="connected-apps-status">{message}</p>}
-  {secret&&<p role="status" className="connected-apps-status connected-apps-secret">Save this client secret now: <code>{secret}</code> <button type="button" className="btn" onClick={()=>setSecret('')}>Dismiss</button></p>}
+  {secret&&<div role="status" className="connected-apps-status connected-apps-secret">
+   <span>Save this client secret now. It is shown only once; afterwards only its last 4 characters are shown.</span>
+   <SecretValue value={secret}/> <button type="button" className="btn" onClick={()=>setSecret('')}>Dismiss</button></div>}
   {data&&<>
+  {data.mcpUrl&&<div className="connected-apps-mcp" aria-label="MCP server">
+   <div className="connected-apps-mcp-row"><strong>MCP server URL</strong><code>{data.mcpUrl}</code><CopyButton value={data.mcpUrl} label="Copy MCP server URL"/></div>
+   <p className="connected-apps-help">Paste this URL into an AI assistant's custom connector, with this app's Client ID and secret.
+    Give the app the <code>mcp:access</code> scope and add the assistant's redirect URL, for example {AI_REDIRECTS.map((uri,i)=><span key={uri}>{i?' and ':''}<code>{uri}</code></span>)}.</p>
+  </div>}
   {data.clients.length>0&&<div className="connected-apps-directory" aria-label="Existing OAuth applications">
    <div className="md-admin-actions"><button type="button" className="btn btn-brand" onClick={()=>{setDraft(fresh());setDirectoryOpen(false);setSecret('');}}>New connected app</button>
     {!directoryOpen&&<button type="button" className="btn" onClick={discard}>Browse applications</button>}</div>
@@ -61,7 +91,9 @@ export default function TenantConnectedApps({request}:{request:Request}){
       {data.clients.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
     </select>
   </label>
-  {draft.id&&<p className="connected-apps-meta">Client ID: <code>{draft.id}</code></p>}
+  {draft.id&&<p className="connected-apps-meta">Client ID: <code>{draft.id}</code> <CopyButton value={draft.id} label="Copy client ID"/></p>}
+  {draft.id&&draft.client_type==='confidential'&&<p className="connected-apps-meta">Client secret: <code>{'••••••••'+(data.secretEndings?.[draft.id]??'')}</code>
+   {!data.secretEndings?.[draft.id]&&<small> (rotate once to see its last 4 characters here)</small>}</p>}
   {draft.id&&draft.client_type==='confidential'&&(
     <button type="button" className="btn" disabled={busy} onClick={()=>{if(!window.confirm('Rotate this client secret? Existing user consents will be revoked.'))return;setBusy(true);void request<{clientSecret:string}>('/security/connected-apps/rotate-secret',{method:'POST',body:JSON.stringify({id:draft.id})}).then(r=>{setSecret(r.clientSecret);setMessage('Secret rotated; existing consents revoked.');}).catch(e=>setMessage(String(e))).finally(()=>setBusy(false));}}>
       Rotate client secret and revoke consents

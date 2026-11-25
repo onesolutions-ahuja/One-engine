@@ -2558,7 +2558,8 @@ $md_record_guard$;
 CREATE TABLE IF NOT EXISTS md_oauth_clients(
  tenant_id uuid NOT NULL REFERENCES md_tenants(id),id uuid NOT NULL DEFAULT gen_random_uuid(),label text NOT NULL,
  enabled boolean NOT NULL DEFAULT false,client_type text NOT NULL CHECK(client_type IN ('public','confidential')),
- secret_hash text,require_mfa boolean NOT NULL DEFAULT true,PRIMARY KEY(tenant_id,id),UNIQUE(id)
+ secret_hash text,require_mfa boolean NOT NULL DEFAULT true,
+ secret_last4 text CHECK(secret_last4 IS NULL OR length(secret_last4)=4),PRIMARY KEY(tenant_id,id),UNIQUE(id)
 );
 CREATE TABLE IF NOT EXISTS md_oauth_redirects(
  tenant_id uuid NOT NULL,client_id uuid NOT NULL,uri text NOT NULL,origin text NOT NULL,

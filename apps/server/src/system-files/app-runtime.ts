@@ -319,7 +319,9 @@ export class AppRuntime {
         JOIN md_lightning_page_details d ON d.tenant_id=x.tenant_id AND d.page_id=x.page_id
         JOIN md_page_definitions hp ON hp.tenant_id=d.tenant_id AND hp.id=d.page_id
         WHERE x.tenant_id=$1 AND x.app_api=$2 AND d.status='Active'
-          AND d.page_type='Home Page' AND hp.enabled=true
+          -- A Home Page, or an App Page given to this profile (a Kitchen profile opens the Kitchen page).
+          AND (d.page_type='Home Page' OR (d.page_type='App Page' AND x.scope='App and Profile'))
+          AND hp.enabled=true
           AND (CASE $3 WHEN 'desktop' THEN 'Desktop'
             WHEN 'tablet' THEN 'Tablet' WHEN 'phone' THEN 'Phone'
             WHEN 'custom' THEN 'Custom' ELSE '' END)=ANY(d.devices)

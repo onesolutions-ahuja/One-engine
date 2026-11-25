@@ -3,7 +3,7 @@ import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import {holdScreenPage,onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
-import {guestLinkPath,onGuestPage} from '../../authentication/GuestAccess/guestAccess';
+import {guestLinkPath,guestSessionHeaders,onGuestPage} from '../../authentication/GuestAccess/guestAccess';
 // The corner code on a paired screen (loaded only there).
 const ScreenCornerCode=React.lazy(()=>import('../../authentication/PairedScreen/ScreenCornerCode'));
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT, appLockHere, tillLockApplies, setTillLocked } from '../../authentication/TillDevice/tillDevice';
@@ -175,6 +175,7 @@ function App() {
           fetch(`${apiBase}/auth/refresh${refreshQuery.toString() ? '?' + refreshQuery.toString() : ''}`, {
             method: 'POST',
             credentials: 'include',
+            headers: guestSessionHeaders(),
             signal: controller.signal
           }), controller.signal
         );

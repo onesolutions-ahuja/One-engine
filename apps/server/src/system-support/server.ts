@@ -180,9 +180,14 @@ const builderEnabledWhen=(rule:unknown):{property:string;in:string[]}|undefined=
     ?{property:condition.property,in:condition.in as string[]}:undefined;
 };
 const tokenCookie='md_refresh';
-const getCookie=(req:Request):string|undefined=>{
-  const encoded=(req.get('cookie')??'').split(';').map(x=>x.trim()).find(x=>x.startsWith(tokenCookie+'='));
-  return encoded?.slice(tokenCookie.length+1);
+/** A guest link's session (/guest/<code>) has its own cookie: opening a table's QR in a
+ * browser never replaces the staff sign-in there, and signing in never ends the guest's. */
+const guestCookie='md_guest_refresh';
+/** Guest pages send X-Une-Guest: 1 so refresh and sign-out use the guest cookie. */
+const sessionCookie=(req:Request)=>req.get('x-une-guest')==='1'?guestCookie:tokenCookie;
+const getCookie=(req:Request,name=tokenCookie):string|undefined=>{
+  const encoded=(req.get('cookie')??'').split(';').map(x=>x.trim()).find(x=>x.startsWith(name+'='));
+  return encoded?.slice(name.length+1);
 };
 function cookieOptions(req:Request) {
   const origin=req.get('origin');
@@ -394,7 +399,7 @@ export function createSystemServer(db:SqlPersistence) {
       res.setHeader('Access-Control-Allow-Origin',origin);
       if(authorized.rows.length)res.setHeader('Access-Control-Allow-Credentials','true');
       res.setHeader('Vary','Origin');
-      res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type, If-Match, If-Unmodified-Since, X-MetaDrive-Request-Source, X-MetaDrive-Offline-Sync');
+      res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type, If-Match, If-Unmodified-Since, X-MetaDrive-Request-Source, X-MetaDrive-Offline-Sync, X-Une-Guest');
       res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,PATCH,DELETE,OPTIONS');
     }
     if(req.method==='OPTIONS') {res.status(204).end();return;}
@@ -549,11 +554,12 @@ export function createSystemServer(db:SqlPersistence) {
     }
   }));
   app.post('/api/auth/refresh',route(async(req,res)=>{
-    const token=getCookie(req);
+    const cookie=sessionCookie(req);
+    const token=getCookie(req,cookie);
     if(!token) {res.status(401).json({error:'Refresh token required'});return;}
     try {
       const session=await auth.refresh(token,{ip:req.ip});
-      res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
+      res.setHeader('Set-Cookie',`${cookie}=${session.refreshToken}; ${cookieOptions(req)}`);
       if(req.query.landing==='1')res.setHeader('Cache-Control','no-store');
       const actor={tenant_id:session.tenant_id,user_id:session.user_id};
       const [landingAppApi,bootPage,landing,appRuntime]=await Promise.all([
@@ -629,9 +635,10 @@ export function createSystemServer(db:SqlPersistence) {
     if(recent.length>30){res.status(429).json({error:'Too many screens asked for a code. Wait a minute.'});return;}
     res.json(await screens.start(req.body?.screenKey));
   }));
-  const sendScreenSession=(req:Request,res:Response,body:{session:{accessToken:string;refreshToken:string;expiresIn:number}}&Record<string,unknown>)=>{
+  const sendScreenSession=(req:Request,res:Response,body:{session:{accessToken:string;refreshToken:string;expiresIn:number}}&Record<string,unknown>,
+    cookie=tokenCookie)=>{
     const {session,...rest}=body;
-    res.setHeader('Set-Cookie',`${tokenCookie}=${session.refreshToken}; ${cookieOptions(req)}`);
+    res.setHeader('Set-Cookie',`${cookie}=${session.refreshToken}; ${cookieOptions(req)}`);
     res.json({...rest,access_token:session.accessToken,expires_in:session.expiresIn});
   };
   app.post('/api/auth/screen/poll',route(async(req,res)=>{
@@ -660,7 +667,7 @@ export function createSystemServer(db:SqlPersistence) {
     if(guestOpens.size>5000)guestOpens.clear();
     recent.push(now);guestOpens.set(ip,recent);
     if(recent.length>30){res.status(429).json({error:'Too many tries. Wait a minute.'});return;}
-    try{sendScreenSession(req,res,await guests.open(req.body?.token,{ip:req.ip}));}
+    try{sendScreenSession(req,res,await guests.open(req.body?.token,{ip:req.ip}),guestCookie);}
     catch(error){
       if(error instanceof Error&&error.message===GUEST_LINK_GONE){res.status(410).json({error:GUEST_LINK_GONE});return;}
       if(error instanceof Error&&error.message===GUEST_ACCESS_OFF){res.status(423).json({error:GUEST_ACCESS_OFF});return;}
@@ -1002,8 +1009,9 @@ export function createSystemServer(db:SqlPersistence) {
     res.json(await sessionMetadata(db,req.actor!.tenant_id,req.actor!.user_id));
   }));
   app.post('/api/auth/logout',route(async(req,res)=>{
-    await auth.signOut(req.get('authorization')!.slice(7),getCookie(req));
-    res.setHeader('Set-Cookie',`${tokenCookie}=; HttpOnly; Path=/api/auth; Max-Age=0; SameSite=Lax`);
+    const cookie=sessionCookie(req);
+    await auth.signOut(req.get('authorization')!.slice(7),getCookie(req,cookie));
+    res.setHeader('Set-Cookie',`${cookie}=; HttpOnly; Path=/api/auth; Max-Age=0; SameSite=Lax`);
     res.status(204).end();
   }));
   app.post('/api/auth/change-password',route(async(req,res)=>{

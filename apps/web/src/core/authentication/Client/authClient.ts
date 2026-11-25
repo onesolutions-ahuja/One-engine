@@ -1,4 +1,5 @@
 import { currentFormFactor } from '../../workspace/Responsive/useFormFactor';
+import {guestSessionHeaders} from '../GuestAccess/guestAccess';
 import {createRecordBatcher} from './recordBatch';
 import {createRecordPageCoalescer} from './recordPageCoalescer';
 import {invalidatePageMediaAssets} from '../../pages/PageRuntime/pageMediaAssetCoalescer';
@@ -34,7 +35,7 @@ function refreshAccessToken() {
   if (!refreshInFlight) {
     const startedToken = accessToken;
     refreshInFlight = withAuthRefreshLock(() =>
-      fetch(`${apiBase}/auth/refresh`, { method: 'POST', credentials: 'include' })
+      fetch(`${apiBase}/auth/refresh`, { method: 'POST', credentials: 'include', headers: guestSessionHeaders() })
     )
       .then(async (response) => {
         if (!response.ok) {
@@ -147,6 +148,7 @@ async function performApiRequest<T>(path: string, init?: RequestInit): Promise<T
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
+      ...guestSessionHeaders(),
       'X-MetaDrive-Request-Source': 'web-app'
     }
   });

@@ -28,6 +28,17 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'EatOutPrice',type:'number'},
   {name:'EatOutTaxRate',type:'number'},
   {name:'SellByWeight',type:'boolean'},
+  // Overrides the category's kitchen section for this product.
+  {name:'KitchenSection',type:'reference',target:'KitchenSection'},
+ ]},
+ // Kitchen sections (Grill, Fryer, Drinks…): each Kitchen screen tab shows its own lines.
+ // A line's section is its Product's, else its Category's (read through lookups, never copied).
+ {name:'KitchenSection',existing:false,fields:[
+  {name:'Name',type:'text',length:80},
+  {name:'Printer',type:'reference',target:'NamedDevice'},
+  {name:'Colour',type:'text',length:20},
+  {name:'SortOrder',type:'number'},
+  {name:'Active',type:'boolean'},
  ]},
  {name:'ProductBOM',existing:false,fields:[
   {name:'Name',type:'text'},
@@ -93,6 +104,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  ]},
  {name:'ProductCategory',existing:true,fields:[
   {name:'OrderPrinter',type:'text',length:128},
+  {name:'KitchenSection',type:'reference',target:'KitchenSection'},
  ]},
  {name:'Order',existing:false,fields:[
   {name:'Name',type:'text',length:80},
@@ -116,8 +128,10 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'CartLine',type:'reference',target:'CartLine'},
   {name:'Course',type:'number'},
   {name:'Note',type:'text',length:255},
-  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void']},
+  // Short = only some could be made (MadeQty); Served = the ticket was completed (off the screen).
+  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void','Short','Served']},
   {name:'Options',type:'text',length:500},
+  {name:'MadeQty',type:'number'},
  ]},
 ];
 const cashier=['Till_Hold','Till_MiscProduct','Till_Tables','Till_ItemDiscount','Customer_Select','Customer_List'];

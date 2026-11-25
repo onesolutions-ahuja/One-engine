@@ -1,4 +1,4 @@
-import {validMcpResource} from './mcp-resource.js';
+import {mcpOrigin,validMcpResource} from './mcp-resource.js';
 import {createHash,randomBytes,timingSafeEqual} from 'node:crypto';
 import {z} from 'zod';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
@@ -21,7 +21,7 @@ export class ConnectedAppService{
  async describe(tenant:string,user:string){
   await this.rbac.require(tenant,user,'ConnectedApp','manage');
   const [c,r,s,u,users,catalogue]=await Promise.all([
-   this.db.query('SELECT id,label,enabled,client_type,require_mfa FROM md_oauth_clients WHERE tenant_id=$1 ORDER BY label',[tenant]),
+   this.db.query<{id:string;label:string;enabled:boolean;client_type:string;require_mfa:boolean;secret_last4:string|null}>('SELECT id,label,enabled,client_type,require_mfa,secret_last4 FROM md_oauth_clients WHERE tenant_id=$1 ORDER BY label',[tenant]),
    this.db.query('SELECT client_id,uri FROM md_oauth_redirects WHERE tenant_id=$1',[tenant]),
    this.db.query('SELECT client_id,scope FROM md_oauth_client_scopes WHERE tenant_id=$1',[tenant]),
    this.db.query('SELECT client_id,user_id FROM md_oauth_client_users WHERE tenant_id=$1',[tenant]),
@@ -29,7 +29,11 @@ export class ConnectedAppService{
    this.db.query<{scope:string;group_key:string;group_label:string;label:string;description:string;risk:string;assignable:boolean}>(
     'SELECT scope,group_key,group_label,label,description,risk,assignable FROM md_oauth_scope_catalogue ORDER BY group_order,sort_order')
   ]);
-  return {clients:c.rows.map(p=>({...p,redirects:r.rows.filter(v=>v.client_id===p.id).map(v=>v.uri),scopes:s.rows.filter(v=>v.client_id===p.id).map(v=>v.scope),users:u.rows.filter(v=>v.client_id===p.id).map(v=>v.user_id)})),users:users.rows,scopes:catalogue.rows.filter(s=>s.assignable).map(s=>s.scope),
+  const origin=mcpOrigin();
+  // Secrets are stored only as a hash. Admins see the last 4 characters to tell which secret is in use.
+  const secretEndings=Object.fromEntries(c.rows.filter(p=>p.secret_last4).map(p=>[p.id,p.secret_last4]));
+  return {mcpUrl:origin?origin+'/api/mcp':null,secretEndings,
+   clients:c.rows.map(({secret_last4:_ending,...p})=>({...p,redirects:r.rows.filter(v=>v.client_id===p.id).map(v=>v.uri),scopes:s.rows.filter(v=>v.client_id===p.id).map(v=>v.scope),users:u.rows.filter(v=>v.client_id===p.id).map(v=>v.user_id)})),users:users.rows,scopes:catalogue.rows.filter(s=>s.assignable).map(s=>s.scope),
    scopeGroups:[...new Set(catalogue.rows.map(s=>s.group_key))].map(key=>{
     const items=catalogue.rows.filter(row=>row.group_key===key);
     return {key,label:items[0].group_label,scopes:items.map(({scope,label,description,risk,assignable})=>({scope,label,description,risk,assignable}))};
@@ -49,7 +53,7 @@ export class ConnectedAppService{
     const old=await c.query<{client_type:string}>('SELECT client_type FROM md_oauth_clients WHERE tenant_id=$1 AND id=$2 FOR UPDATE',[tenant,id]);
     if(!old.rows[0])throw Error('Connected app not found');if(old.rows[0].client_type!==p.client_type)throw Error('Invalid client type change');
     await c.query('UPDATE md_oauth_clients SET label=$3,enabled=$4,require_mfa=$5 WHERE tenant_id=$1 AND id=$2',[tenant,id,p.label,p.enabled,p.require_mfa]);
-   }else id=(await c.query<{id:string}>('INSERT INTO md_oauth_clients(tenant_id,label,enabled,client_type,secret_hash,require_mfa) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',[tenant,p.label,p.enabled,p.client_type,secret?hash(secret):null,p.require_mfa])).rows[0].id;
+   }else id=(await c.query<{id:string}>('INSERT INTO md_oauth_clients(tenant_id,label,enabled,client_type,secret_hash,require_mfa,secret_last4) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',[tenant,p.label,p.enabled,p.client_type,secret?hash(secret):null,p.require_mfa,secret?secret.slice(-4):null])).rows[0].id;
    for(const table of ['md_oauth_redirects','md_oauth_client_scopes','md_oauth_client_users'])await c.query('DELETE FROM '+table+' WHERE tenant_id=$1 AND client_id=$2',[tenant,id]);
    for(const uri of new Set(p.redirects))await c.query('INSERT INTO md_oauth_redirects VALUES($1,$2,$3,$4)',[tenant,id,uri,new URL(uri).origin]);
    for(const value of new Set(p.scopes))await c.query('INSERT INTO md_oauth_client_scopes VALUES($1,$2,$3)',[tenant,id,value]);
@@ -70,7 +74,7 @@ export class ConnectedAppService{
   await this.rbac.require(tenant,user,'ConnectedApp','manage');
   if(!uuid.safeParse(id).success)throw Error('Invalid OAuth client');
   const secret=mint();await this.db.transaction(async c=>{
-   const found=await c.query("UPDATE md_oauth_clients SET secret_hash=$3 WHERE tenant_id=$1 AND id=$2 AND client_type='confidential' RETURNING id",[tenant,id,hash(secret)]);
+   const found=await c.query("UPDATE md_oauth_clients SET secret_hash=$3,secret_last4=$4 WHERE tenant_id=$1 AND id=$2 AND client_type='confidential' RETURNING id",[tenant,id,hash(secret),secret.slice(-4)]);
    if(!found.rows[0])throw Error('Invalid confidential OAuth client');
    await c.query('UPDATE md_oauth_consents SET revoked_at=now() WHERE tenant_id=$1 AND client_id=$2 AND revoked_at IS NULL',[tenant,id]);
   });return {clientSecret:secret};

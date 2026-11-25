@@ -197,6 +197,9 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   // Object Manager, kept with the user row (the User object is a view of md_users).
   await client.query(`ALTER TABLE md_users
     ADD COLUMN IF NOT EXISTS custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb`);
+  // Connected Apps: last 4 characters of a client secret (the secret itself is only ever hashed).
+  await client.query(`ALTER TABLE md_oauth_clients ADD COLUMN IF NOT EXISTS secret_last4 text
+    CHECK(secret_last4 IS NULL OR length(secret_last4)=4)`);
   // Upgrade-safe account recovery additions (idempotent; the SQL baseline is immutable).
   // platform_default: the platform tenant offers its SMS/WhatsApp callout to all tenants.
   // delivery_channel 'admin': audited set-password links issued by an admin or platform support.

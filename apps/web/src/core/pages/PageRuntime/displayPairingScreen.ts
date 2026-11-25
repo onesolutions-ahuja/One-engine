@@ -20,7 +20,11 @@ const when=(iso:string|null)=>{
  return minutes<2?'online':minutes<60?minutes+' min ago':new Date(iso).toLocaleString([],{dateStyle:'short',timeStyle:'short'});
 };
 
-export async function showScreenPairing(request:Request,appId:string,pageApiName:string):Promise<void>{
+/** PAIRDISPLAY(Page): screens for this device. PAIRGUEST(App, RecordId): a record's tablet (a table's):
+ * it signs in as that record's guest, never as the person pairing it, and shows App's guest page. */
+export async function showScreenPairing(request:Request,appId:string,pageApiName:string,
+ guest?:{recordId:string}):Promise<void>{
+ const forGuest=guest?{guestRecordId:guest.recordId}:{};
  if(typeof document==='undefined')return;
  ensureTillDialogStyles();
  const make=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',className='')=>{
@@ -30,11 +34,11 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
  const dialog=make('dialog','','une-till-picker une-pair-screens');
  dialog.setAttribute('aria-modal','true');
  dialog.setAttribute('aria-labelledby','une-pair-screen-title');
- const title=make('h2','Customer displays');title.id='une-pair-screen-title';
+ const title=make('h2',guest?'Tablets for this table':'Customer displays');title.id='une-pair-screen-title';
  const help=make('p','On the other screen open '+window.location.host+'/display, then type the code it shows.');
  const input=make('input','','une-pair-input');input.inputMode='numeric';input.maxLength=4;input.autocomplete='off';
  input.placeholder='0000';input.setAttribute('aria-label','4-digit code from the screen');
- const name=make('input','','une-pair-name');name.maxLength=60;name.placeholder='Name, e.g. Counter';
+ const name=make('input','','une-pair-name');name.maxLength=60;name.placeholder=guest?'Name, e.g. Table 3 tablet':'Name, e.g. Counter';
  name.setAttribute('aria-label','Screen name (optional)');
  const pair=button('Pair','une-primary');
  const addRow=make('div','','une-pair-add');addRow.append(input,name,pair);
@@ -54,9 +58,9 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
 
  const refresh=async()=>{
   try{
-   const answer=await post<{screens:Screen[]}>(request,'/screens/list',{});
+   const answer=await post<{screens:Screen[]}>(request,'/screens/list',forGuest);
    list.replaceChildren();
-   if(!answer.screens.length)list.append(make('li','No displays paired yet.','une-pair-empty'));
+   if(!answer.screens.length)list.append(make('li',guest?'No tablets paired yet.':'No displays paired yet.','une-pair-empty'));
    for(const screen of answer.screens){
     const item=make('li');
     const dot=make('span','',screen.online?'une-dot une-online':'une-dot');dot.setAttribute('aria-hidden','true');
@@ -91,7 +95,7 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
   if(!/^\d{4}$/.test(code)){say('Type the 4 digits shown on the screen',true);input.focus();return;}
   pair.disabled=true;
   try{
-   await post(request,'/screens/approve',{code,name:name.value.trim(),appId,pageApiName});
+   await post(request,'/screens/approve',{code,name:name.value.trim(),appId,pageApiName,...forGuest});
    input.value='';name.value='';say('Paired. The screen opens in a moment.');void refresh();
   }catch(error){say(reason(error,'That code did not work'),true);input.select();}
   finally{pair.disabled=false;}
@@ -102,7 +106,7 @@ export async function showScreenPairing(request:Request,appId:string,pageApiName
  const shut=()=>{dialog.close();dialog.remove();};
  close.addEventListener('click',shut);
  dialog.addEventListener('cancel',shut);
- dialog.append(title,help,addRow,auto,list,footer);
+ dialog.append(...(guest?[title,help,addRow,list,footer]:[title,help,addRow,auto,list,footer]));
  document.body.appendChild(dialog);
  dialog.showModal();
  input.focus();

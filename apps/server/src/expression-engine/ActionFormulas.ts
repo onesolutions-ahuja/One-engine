@@ -58,7 +58,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PAIRGUEST|GUESTLINK|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();
@@ -123,6 +123,13 @@ export function compileActionPlan(source:string):ActionStep[] {
   steps.push({name:node.name,object:nameOf(args[0],'PAIRDISPLAY page'),fields:new Map(),guards});
   return;
  }
+ if(node.name==='PAIRGUEST'){
+  // PAIRGUEST(App, RecordId): pair a tablet as that record's guest (App Manager > Guest access).
+  if(args.length!==2)throw Error('PAIRGUEST needs the app and the record');
+  validateFormulaFunctions(args[1],'ribbon_binding');
+  steps.push({name:node.name,object:nameOf(args[0],'PAIRGUEST app'),values:[args[1]],fields:new Map(),guards});
+  return;
+ }
  if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'){
    // CLOSESCREEN("second") closes the second-monitor screen; otherwise no arguments.
    const second=node.name==='CLOSESCREEN'&&args.length===1&&nameOf(args[0],'CLOSESCREEN target').toLowerCase()==='second';
@@ -146,6 +153,16 @@ export function compileActionPlan(source:string):ActionStep[] {
    if(args.length!==2)throw Error('WAIT requires minutes and seconds');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
    steps.push({name:'WAIT',object:'',values:args,fields:new Map(),guards});
+   return;
+  }
+  if(node.name==='GUESTLINK'){
+   // GUESTLINK(Page, RecordId, Profile, AS(x)): one server step makes the record's guest link (QR).
+   const last=args.at(-1);
+   if(!(last?.kind==='call'&&last.name==='AS'))throw Error('GUESTLINK requires AS(variable) for the link');
+   const alias=takeAlias(last,'AS requires one variable');args.pop();
+   if(args.length!==2)throw Error('GUESTLINK requires the app and the record Id');
+   args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
+   steps.push({name:'GUESTLINK',object:'',values:args,fields:new Map(),alias,guards});
    return;
   }
   if(node.name==='CASHMOVE'){

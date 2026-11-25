@@ -21,6 +21,8 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'DiscountLimitPercent',type:'number'},
   {name:'CashOutLimit',type:'number'},
   {name:'CustomerCreditMax',type:'number'},
+  // Guest users (GUESTLINK): the record the guest is at, e.g. a table (@ThisTenant.User.GuestOf).
+  {name:'GuestOf',type:'text',length:36},
  ]},
  {name:'Product',existing:true,fields:[
   {name:'ComponentCost',type:'rollup',summary:{child:'ProductBOM',relationship:'Product',source:'LineCost'}},

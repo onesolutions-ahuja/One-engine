@@ -13,6 +13,7 @@ import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import {applySmartIosKeyboardDock} from './smart-ios-keyboard-dock.js';
 import {TILL_DEVICE_DDL} from './till-device-service.js';
 import {SCREEN_PAIRING_DDL} from './screen-pairing-service.js';
+import {GUEST_ACCESS_DDL} from './guest-access-service.js';
 import {LIVE_CHANGES_DDL} from './live-changes.js';
 import {OBJECT_KIND_DDL} from '../system-files/object-schema-lifecycle.js';
 import {OBJECT_WRITE_LOCK_DDL} from '../system-files/object-save-setup.js';
@@ -151,6 +152,7 @@ export async function applySystemMigrations(db:SqlPersistence) {
   await client.query(TILL_DEVICE_DDL);
   // Paired screens (customer displays...) for any app (idempotent).
   await client.query(SCREEN_PAIRING_DDL);
+  await client.query(GUEST_ACCESS_DDL);
   // Live changes: saved records and paired-screen moves are announced at commit (idempotent).
   await client.query(LIVE_CHANGES_DDL);
   // Standard Object flag and the trigger that keeps System Objects from ever being deleted.
@@ -194,6 +196,12 @@ CREATE TABLE IF NOT EXISTS md_app_package_manifests (
   await client.query(`ALTER TABLE md_tenant_app_metadata
     ADD COLUMN IF NOT EXISTS lock_enabled boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS lock_idle_minutes integer NOT NULL DEFAULT 5 CHECK(lock_idle_minutes BETWEEN 0 AND 240)`);
+  // App guest access (any app): /guest/<code> links and guest tablets, set in App Manager.
+  await client.query(`ALTER TABLE md_tenant_app_metadata
+    ADD COLUMN IF NOT EXISTS guest_enabled boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS guest_page text,
+    ADD COLUMN IF NOT EXISTS guest_profile text,
+    ADD COLUMN IF NOT EXISTS guest_object text`);
   // Values of custom fields on the User object (RefundLimit, DiscountLimit …): defined in
   // Object Manager, kept with the user row (the User object is a view of md_users).
   await client.query(`ALTER TABLE md_users

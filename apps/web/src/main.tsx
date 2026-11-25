@@ -27,6 +27,7 @@ window.addEventListener('vite:preloadError', (event: Event) => {
 const MailWebmail = lazy(() => import('./core/mail/MailWebmail'));
 // /display: a paired screen (customer display...) with no sign-in until a till pairs it.
 const PairedScreenStart = lazy(() => import('./core/authentication/PairedScreen/PairedScreenStart'));
+const GuestStart = lazy(() => import('./core/authentication/GuestAccess/GuestStart'));
 
 const Workspace = lazy(async () => {
   // Start every stylesheet and the app chunk downloading at the same time. The imports are
@@ -145,6 +146,7 @@ const workspaceDevelopmentRoot = import.meta.env.DEV && Boolean(import.meta.env.
 const isMarketingHome = !workspaceDevelopmentRoot && (pathname === '/' || pathname === '/index.html' || (Boolean(basePath) && window.location.pathname === basePath));
 const isPrivacyRoute = pathname === '/privacy' || pathname === '/privacy/' || pathname === '/privacy-policy' || pathname === '/privacy-policy/';
 const isDisplayRoute = pathname === '/display' || pathname === '/display/';
+const isGuestRoute = /^\/guest\/[^/]+\/?$/.test(pathname);
 const isTermsRoute = pathname === '/terms' || pathname === '/terms/' || pathname === '/terms-of-service' || pathname === '/terms-of-service/';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -153,6 +155,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       ? <Suspense fallback={<WorkspaceLoadingFallback />}><MailWebmail /></Suspense>
       : isDisplayRoute
         ? <Suspense fallback={<WorkspaceLoadingFallback />}><PairedScreenStart /></Suspense>
+      : isGuestRoute
+        ? <Suspense fallback={<WorkspaceLoadingFallback />}><GuestStart /></Suspense>
       : isPrivacyRoute
         ? <PrivacyPolicyPage />
         : isTermsRoute

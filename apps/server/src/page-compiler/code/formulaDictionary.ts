@@ -110,6 +110,8 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  INFOSCREEN:action(1,2,'INFOSCREEN(message, [actions after OK]): message box with OK'),
  LOCKSCREEN:action(0,0,'LOCKSCREEN(): lock the till'),
  PAIRDISPLAY:action(1,1,'PAIRDISPLAY(page): pair a screen showing /display (type its 4-digit code); it then shows that page of this app'),
+ PAIRGUEST:action(2,2,'PAIRGUEST(app, recordId): pair a tablet showing /display (type its 4-digit code) as that record\'s guest, e.g. a table\'s tablet; it shows the app\'s guest page (App Manager > Guest access)'),
+ GUESTLINK:action(3,3,'GUESTLINK(app, recordId, AS(x)): server; the record\'s guest link (x.Url, print it as a QR code). It opens the app\'s guest page with no sign-in (App Manager > Guest access). The old link for the record stops'),
  PRINT:action(2,2,'PRINT(template, recordId)'),CREATEPDF:action(2,3,'CREATEPDF(template, recordId, [AS(x)])'),
  FLOW:action(1,1,'FLOW(name): run a Flow'),
  EMAIL:action(4,24,'EMAIL(credential, to, subject, body, ...)'),WHATSAPP:action(3,23,'WHATSAPP(credential, to, message, ...)'),

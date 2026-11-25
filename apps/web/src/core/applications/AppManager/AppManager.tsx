@@ -320,6 +320,7 @@ export default function AppManager({
   // The Home Page choices are the app's own App Pages, in navigation order.
   const homeChoices=navigationOrder.filter(item=>item.type==='App Page').map(item=>item.apiName);
   const lock=draft.lockScreen??{enabled:false,idleMinutes:5};
+  const guest=draft.guestAccess??{enabled:false,pageApiName:'',profile:'',objectApiName:''};
   const homePage=homeChoices.includes(draft.homePageApiName??'')?draft.homePageApiName??'':homeChoices[0]??'';
   const homeLabel=pages.find(page=>page.apiName===homePage)?.label??homePage;
   const stepError=(index:number)=>{
@@ -481,6 +482,31 @@ export default function AppManager({
                 onChange={event=>update('lockScreen',{...lock,idleMinutes:Math.min(240,Math.max(0,Math.round(Number(event.target.value)||0)))})}/>
             </label>
             <p className="permission-help">Only this app's pages lock. Page Builder, Setup and other apps never lock.</p>
+          </fieldset>
+          <fieldset className="app-manager-lock">
+            <legend>Guest access</legend>
+            <label className="form-label"><input type="checkbox" checked={guest.enabled}
+              onChange={event=>update('guestAccess',{...guest,enabled:event.target.checked})}/> Guests can open this app with no sign-in (QR links and table tablets)</label>
+            <label className="form-label" htmlFor="app-guest-page">Guest page
+              <select id="app-guest-page" className="form-control" value={guest.pageApiName} disabled={!guest.enabled}
+                onChange={event=>update('guestAccess',{...guest,pageApiName:event.target.value})}>
+                <option value="">Choose…</option>
+                {homeChoices.map(name=><option key={name} value={name}>{pages.find(page=>page.apiName===name)?.label??name}</option>)}
+              </select>
+            </label>
+            <label className="form-label" htmlFor="app-guest-object">A guest belongs to
+              <select id="app-guest-object" className="form-control" value={guest.objectApiName} disabled={!guest.enabled}
+                onChange={event=>update('guestAccess',{...guest,objectApiName:event.target.value})}>
+                <option value="">Choose…</option>
+                {objects.map(object=><option key={object.apiName} value={object.apiName}>{object.label}</option>)}
+              </select>
+            </label>
+            <label className="form-label" htmlFor="app-guest-profile">Guest profile (API name)
+              <input id="app-guest-profile" className="form-control" placeholder="e.g. SelfOrder" maxLength={80}
+                disabled={!guest.enabled} value={guest.profile}
+                onChange={event=>update('guestAccess',{...guest,profile:event.target.value.trim()})}/>
+            </label>
+            <p className="permission-help">Each record (e.g. each table) gets its own link with GUESTLINK({draft.apiName||'App'}, @recordId, AS(g)) and its tablets with PAIRGUEST({draft.apiName||'App'}, @recordId). Turning this off stops every link and tablet at once.</p>
           </fieldset>
         </div>}
 

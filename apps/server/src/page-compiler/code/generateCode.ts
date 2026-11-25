@@ -390,6 +390,13 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    scope.ui.add('PAIRDISPLAY');
    return ['await $.ui("PAIRDISPLAY", '+q(literalName(args[0],'PAIRDISPLAY page'))+');'];
   }
+  case 'PAIRGUEST':{
+   // PAIRGUEST(App, RecordId): pair a tablet showing /display as that record's guest (a table's
+   // tablet); it shows App's guest page (App Manager > Guest access).
+   if(args.length!==2)fail('PAIRGUEST needs the app and the record, e.g. PAIRGUEST(SelfOrder, @recordId)');
+   scope.ui.add('PAIRGUEST');
+   return ['await $.ui("PAIRGUEST", '+q(literalName(args[0],'PAIRGUEST app'))+', '+value(args[1])+');'];
+  }
   case 'CLOSESCREEN':case 'LOCKSCREEN':{
    scope.ui.add(node.name);
    // CLOSESCREEN("second"): close the page shown on the second monitor.
@@ -452,6 +459,14 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    scope.data=true;scope.ui.add(node.name);
    const list=node.name==='CREATEPDF'?[q(literalName(args[0],'print template')),...args.slice(1).map(value)]:[];
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
+  }
+  case 'GUESTLINK':{
+   // GUESTLINK(App, RecordId, AS(x)): server; the record's guest link (App Manager > Guest access).
+   const last=args.at(-1);
+   const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
+   if(!alias||args.length!==2)fail('GUESTLINK needs the app, the record and AS(x), e.g. GUESTLINK(SelfOrder, @recordId, AS(g))');
+   scope.data=true;
+   return ['v['+q(alias)+'] = await $.service("GUESTLINK", ['+q(literalName(args[0],'GUESTLINK app'))+', '+value(args[1])+']);'];
   }
   case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'CASHMOVE':{
    const last=args.at(-1);

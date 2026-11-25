@@ -20,6 +20,9 @@ export async function resolveTenantAppMetadata(db:SqlPersistence,tenantId:string
    homePageApiName:homes.rows.find(item=>item.app_id===row.id)?.api_name??'',
    // Lock screen: the app locks itself after idle minutes (0 = only LOCKSCREEN() / Lock button).
    lockScreen:{enabled:row.lock_enabled===true,idleMinutes:row.lock_idle_minutes??5},
+   // Guest access: /guest/<code> links (QR) and guest tablets of this app (GUESTLINK, PAIRGUEST).
+   guestAccess:{enabled:row.guest_enabled===true,pageApiName:row.guest_page??'',profile:row.guest_profile??'',
+    objectApiName:row.guest_object??''},
    utilityItems:utilities.filter(item=>item.app_id===row.id).map(item=>item.utility_name),
    ...(row.revision===null?{}:{revision:row.revision})};
  });

@@ -1075,6 +1075,9 @@ export type LightningAppMetadata = {
   homePageApiName?: string;
   /** Lock screen for this app's pages only: PIN lock after idle minutes (0 = only LOCKSCREEN() / Lock button). */
   lockScreen?: { enabled: boolean; idleMinutes: number };
+  /** Guest access: /guest/<code> links (QR) and guest tablets open this page with no sign-in,
+   * as a record's guest (GUESTLINK / PAIRGUEST). Off stops them all at once. */
+  guestAccess?: { enabled: boolean; pageApiName: string; profile: string; objectApiName: string };
 };
 
 export const objectMetadata: ObjectMetadata[] = [

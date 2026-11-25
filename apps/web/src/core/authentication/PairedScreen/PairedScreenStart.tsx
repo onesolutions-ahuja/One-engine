@@ -56,6 +56,11 @@ export default function PairedScreenStart(){
    try{open(await apiRequest<ScreenAnswer>('/auth/screen/resume',{method:'POST',body:JSON.stringify({key})}));}
    catch(error){
     if(error instanceof ApiRequestError&&error.status===410){forgetScreen();void begin();return;}
+    // A table's tablet while its app's guest access is off: it stays paired and looks again.
+    if(error instanceof ApiRequestError&&error.status===423){
+     setMessage(error.message||'Switched off at the moment.');
+     timer=window.setTimeout(()=>void resume(),30_000);return;
+    }
     setMessage('Cannot reach the server. Retrying…');
     timer=window.setTimeout(()=>void resume(),10_000);
    }

@@ -81,7 +81,7 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v21: Order/OrderLine created; Customer duplicate ledger balance fields retired (AccountBalance kept).
 // v24: smart_ticket_board. v25: KitchenSection (+ Product/ProductCategory.KitchenSection),
 // OrderLine.MadeQty and Short/Completed, Order.OrderNumber, kitchen status history tracking.
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v25';
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v26';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,

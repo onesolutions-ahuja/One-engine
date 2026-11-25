@@ -20,7 +20,7 @@ const GUIDE:Array<[string,string,string]>=[
  ['component.visible','TRUE or FALSE.',''],
  ['pageLayer','Layer 0-9 (only one layer shows at a time).','0 = default layer.'],
  ['actionFlows','Events as JSON, e.g. {"click":{"actionType":"Formula","formula":"=SCREEN(page, popup)"}}.','Easier: copy from a downloaded page.'],
- ['Smart MultiPage','multiPageVisible (Visible tabs), multiPageActive (Active tab), multiPageTabBar, multiPageTabStyle, multiPageEmptyText. Each child container is one page; its Page key (pageKey) or name is the tab.','See the Sample sheet.']
+ ['Smart MultiPage','multiPageVisible (Visible tabs), multiPageActive (Active tab), multiPageTabBar, multiPageTabStyle, multiPageTabAlign (Center/Left/Right/Stretch), multiPageTabSize, multiPageTabShape, multiPageEmptyText. Each child container is one page; its Page key (pageKey) or name is the tab.','See the Sample sheet.']
 ];
 const SAMPLE:string[][]=[
  ['my_page','smart_multipage','PayHelper','component.position.x','32','Custom','Layout'],

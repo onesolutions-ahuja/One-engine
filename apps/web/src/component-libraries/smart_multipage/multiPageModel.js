@@ -22,3 +22,13 @@ export function activePage(shown,{picked,active,selected}={}){
  const find=key=>key==null||key===""?undefined:shown.find(page=>same(page.key,key));
  return find(selected)??find(picked)??find(active)??shown[0]??null;
 }
+/** Tab bar look from its properties. Blank = macOS segmented defaults: centred, medium, rounded. */
+export function tabBarLook(p={}){
+ const pick=(value,choices,fallback)=>{
+  const hit=choices.find(choice=>same(choice,value));
+  return (hit??fallback).toLowerCase();
+ };
+ return {align:pick(p.multiPageTabAlign,["Center","Left","Right","Stretch"],"Center"),
+  size:pick(p.multiPageTabSize,["Small","Medium","Large"],"Medium"),
+  shape:pick(p.multiPageTabShape,["Rounded","Pill","Square"],"Rounded")};
+}

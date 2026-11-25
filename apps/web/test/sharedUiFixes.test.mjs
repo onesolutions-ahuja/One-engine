@@ -7,7 +7,8 @@ const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 test('Dates and times use the business time zone (Company Settings) before the device zone',()=>{
  const text=read('../src/core/pages/PageCompiler/formulaText.ts');
  assert.match(text,/export function businessTimeZone\(\):string\{/);
- assert.match(text,/validZone\(tenantValue\('Timezone'\)\)\|\|validZone\(identity\(\)\?\.user\?\.TimeZone\)/);
+ assert.match(text,/validZone\(companyZone\(\)\)\|\|validZone\(identity\(\)\?\.user\?\.TimeZone\)/);
+ assert.match(text,/try\{return tenantValue\('Timezone'\);\}catch\{return '';\}/,'a missing company setting never breaks a date');
  const runtime=read('../src/core/pages/PageCompiler/pageCodeRuntime.ts');
  assert.match(runtime,/timeZone\(\)\{return businessTimeZone\(\);\}/);
  assert.match(runtime,/timeZone:businessTimeZone\(\)\}\);/,'server taps get the same zone');

@@ -256,7 +256,11 @@ const validZone=(zone:unknown):string=>{
 /** Dates and times show in the business's time zone (Company Settings), so a
  * record reads the same on every device, screen and print whatever the device's
  * own clock zone. Falls back to the user's zone, then the device's, then UTC. */
+const companyZone=():unknown=>{
+ // Company settings not loaded yet, or no Time zone field: not an error for a date.
+ try{return tenantValue('Timezone');}catch{return '';}
+};
 export function businessTimeZone():string{
- return validZone(tenantValue('Timezone'))||validZone(identity()?.user?.TimeZone)
+ return validZone(companyZone())||validZone(identity()?.user?.TimeZone)
   ||validZone(typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:'')||'UTC';
 }

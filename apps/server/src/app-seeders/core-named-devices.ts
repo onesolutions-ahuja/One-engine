@@ -15,6 +15,8 @@ export const NAMED_DEVICE_OBJECTS=[
   {api:'Connector',label:'Connector (for Cloud API devices)',type:'text'},
   {api:'DeviceId',label:'Device / Reader ID',type:'text'},
   {api:'Address',label:'USB, Bluetooth or network address',type:'text'},
+  // Serial (COM) devices: the speed the printer is set to. Wrong speed prints nothing or rubbish.
+  {api:'BaudRate',label:'Baud Rate (serial)',type:'picklist'},
   {api:'Location',label:'Store / Location',type:'reference',related:'Location'},
   {api:'IsDefault',label:'Default for its type',type:'boolean'},
   {api:'Active',label:'Active',type:'boolean'},
@@ -52,6 +54,7 @@ export const POS_TERMINAL_TYPE='POS Terminal';
 export const NAMED_DEVICE_PICKLISTS={
  'NamedDevice.DeviceType':['POS Terminal','Kiosk','Customer Display','Card Reader','Receipt Printer','Label Printer','Cash Drawer','Barcode Scanner','Scale','Other'],
  'NamedDevice.Connection':['Cloud API','USB','Bluetooth','Network','Serial'],
+ 'NamedDevice.BaudRate':['9600','19200','38400','57600','115200'],
  'IncomingWebhook.ProcessingStatus':['New','Processed','Failed']
 } as const;
 

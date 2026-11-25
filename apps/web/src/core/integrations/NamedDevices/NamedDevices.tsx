@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {browserSupports,findLocalDevice,newCloudPrntKey} from './deviceAccess';
+import {SERIAL_BAUD_RATES,testPrint} from '../../../../../server/src/expression-engine/ActionDevices.js';
 import './NamedDevices.css';
 
 /** Setup → Named Devices. One list for card readers reached through a connector (Cloud API)
@@ -7,13 +8,13 @@ import './NamedDevices.css';
  * so Profiles and Permission Sets decide who can see or change devices. */
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 export type NamedDevice={Id?:string;Name:string;DeviceType:string;Connection:string;Connector:string;
- DeviceId:string;Address:string;IsDefault:boolean;Active:boolean;Notes:string};
+ DeviceId:string;Address:string;BaudRate:string;IsDefault:boolean;Active:boolean;Notes:string};
 type Callout={apiName:string;label:string;fields?:string[];outputs?:string[]};
 const TYPES=['Card Reader','Receipt Printer','Label Printer','Cash Drawer','Barcode Scanner','Customer Display','Scale','Other'];
 const CONNECTIONS=['Cloud API','USB','Bluetooth','Network','Serial'];
 const blank:NamedDevice={Name:'',DeviceType:'Card Reader',Connection:'Cloud API',Connector:'',DeviceId:'',
- Address:'',IsDefault:false,Active:true,Notes:''};
-const FIELDS=['Name','DeviceType','Connection','Connector','DeviceId','Address','IsDefault','Active','Notes'] as const;
+ Address:'',BaudRate:'9600',IsDefault:false,Active:true,Notes:''};
+const FIELDS=['Name','DeviceType','Connection','Connector','DeviceId','Address','BaudRate','IsDefault','Active','Notes'] as const;
 const message=(error:unknown)=>error instanceof Error?error.message:String(error);
 
 export async function loadDevices(request:Request):Promise<NamedDevice[]>{
@@ -102,6 +103,12 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
    await reload();
   }catch(e){setError(message(e));}finally{setBusy(false);}
  }
+ async function test(){
+  if(!draft)return;
+  setBusy(true);setError('');setStatus('');
+  try{await testPrint(draft);setStatus('Test sent. Nothing or rubbish printed? Try another baud rate.');}
+  catch(e){setError(message(e));}finally{setBusy(false);}
+ }
  async function remove(device:NamedDevice){
   if(!device.Id||!window.confirm('Remove '+device.Name+'?'))return;
   try{await request('/records/NamedDevice/'+encodeURIComponent(device.Id),{method:'DELETE'});await reload();}
@@ -127,6 +134,8 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
      ?<label>CloudPRNT server URL (paste into the printer's CloudPRNT settings)
       <input readOnly value={draft.DeviceId?location.origin+'/api/cloudprnt/'+draft.DeviceId:''} placeholder="Press Create printer link"/></label>
      :<label>Address<input value={draft.Address} onChange={e=>edit({Address:e.target.value})} placeholder="Use Find device"/></label>}
+   {draft.Connection==='Serial'&&<label>Baud rate<select value={draft.BaudRate||'9600'} onChange={e=>edit({BaudRate:e.target.value})}>
+    {SERIAL_BAUD_RATES.map(item=><option key={item}>{item}</option>)}</select></label>}
    <label className="md-named-devices-check"><input type="checkbox" checked={draft.IsDefault} onChange={e=>edit({IsDefault:e.target.checked})}/>Default {draft.DeviceType.toLowerCase()}</label>
    <label className="md-named-devices-check"><input type="checkbox" checked={draft.Active} onChange={e=>edit({Active:e.target.checked})}/>Active</label>
    <div className="md-named-devices-actions">
@@ -135,6 +144,8 @@ export default function NamedDevices({request,canManage=true}:{request:Request;c
      {draft.DeviceId?'New printer link':'Create printer link'}</button>}
     {(cloud||browserSupports(draft.Connection))&&<button type="button" className="btn" disabled={busy} onClick={()=>void find()}>
      {cloud?(pairing?'Check pairing':'Find / pair'):'Find device'}</button>}
+    {['USB','Serial','Bluetooth'].includes(draft.Connection)&&draft.Address&&
+     <button type="button" className="btn" disabled={busy} onClick={()=>void test()}>Test print</button>}
     <button type="button" className="btn btn-brand" disabled={busy} onClick={()=>void save()}>Save</button>
     <button type="button" className="btn" onClick={()=>{setDraft(null);setPairing(null);}}>Cancel</button>
    </div>

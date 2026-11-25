@@ -114,6 +114,8 @@ function pageValueCode(page:PageReference):string{
    return '$.pageValue('+q(page.name)+', '+q(page.key)+')';
  }
 }
+/** Lookup steps a row value may follow; matches the page's row lookup loader. */
+const MAX_LOOKUP_HOPS=3;
 function reference(path:string,scope:Scope):string{
  scope.references.add(path);
  if(/(?:^|\.)(?:__proto__|prototype|constructor)(?:\.|$)/.test(path))fail('Invalid reference');
@@ -138,10 +140,12 @@ function reference(path:string,scope:Scope):string{
  }
  if(parts.length===1)fail('Bare @'+path+' is not supported; use @Object.Field');
  if(parts[0]===scope.rowObject&&parts.length===2)return '$.f('+scope.row+', '+q(parts[1])+')';
- if(parts[0]===scope.rowObject&&parts.length===3)return '$.m('+scope.row+', '+q(path)+')';
+ // A lookup value of this row, up to MAX_LOOKUP_HOPS steps (@OrderLine.Product.Category.Name):
+ // the same depth the page reads for each row (smartFieldMentions MAX_HOPS).
+ if(parts[0]===scope.rowObject&&parts.length>=3&&parts.length<=MAX_LOOKUP_HOPS+2)return '$.m('+scope.row+', '+q(path)+')';
  // Another Object's field (@Product.ImageUrl in a cart line): the related value the
  // page already read for this row (permission-checked lookup), blank if none.
- if(parts.length===2||parts.length===3)return '$.m('+scope.row+', '+q(scope.rowObject?scope.rowObject+'.'+path:path)+')';
+ if(parts.length>=2&&parts.length<=(scope.rowObject?MAX_LOOKUP_HOPS+1:3))return '$.m('+scope.row+', '+q(scope.rowObject?scope.rowObject+'.'+path:path)+')';
  return fail('Invalid reference @'+path);
 }
 function aggregateCall(node:Extract<Expression,{kind:'call'}>,scope:Scope):string{

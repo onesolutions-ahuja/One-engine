@@ -31,3 +31,10 @@ test('Tab scroll arrows: a round chevron centred on the tabs, no grey box on pla
 test('Grid card images leave room for the name, price and buttons',()=>{
  assert.match(read('../src/component-libraries/smart/shared/SmartRuntime.jsx'),/grid\?\(hasImageHeight\?"0 1 "\+imageHeight\+"px":"1 1 0px"\)/);
 });
+
+test('Popups open like a macOS sheet: short fade and slight scale, no genie pinch',()=>{
+ const dialog=read('../src/core/pages/PageRuntime/FormulaScreenDialog.tsx');
+ assert.match(dialog,/const OPEN:Keyframe\[\]=\[\{transform:'scale\(\.96\)',opacity:0\},\{transform:'scale\(1\)',opacity:1\}\];/);
+ assert.match(dialog,/duration:closing\?120:160/);
+ assert.doesNotMatch(dialog,/translateY\(55vh\)/);
+});

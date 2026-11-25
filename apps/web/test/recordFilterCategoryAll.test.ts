@@ -65,3 +65,13 @@ test('a written "" is a blank test: <> "" keeps filled rows, = "" keeps blank ro
  // An empty @ThisPage value still blocks until it is chosen.
  assert.equal(compileRecordFilterFormula('@Product.Name = @ThisPage.Input.pick',fields,{}).blocked,true);
 });
+
+test('ISBLANK and NOT(ISBLANK) on a field compile to blank tests (Held sales list)',()=>{
+ const cart=[{apiName:'Status',label:'Status',dataType:'Text'},
+  {apiName:'ServicePoint',label:'Table',dataType:'Lookup(ServicePoint)',relationship:{targetObjectApiName:'ServicePoint'}}] as unknown as FieldMetadata[];
+ const held=compileRecordFilterFormula('AND(@Cart.Status = "Held", ISBLANK(@Cart.ServicePoint))',cart,{});
+ assert.equal(held.blocked,false,held.error);
+ assert.deepEqual(held.filters,[{field:'Status',operator:'eq',value:'Held'},{field:'ServicePoint',operator:'isBlank',value:''}]);
+ const seated=compileRecordFilterFormula('NOT(ISBLANK(@Cart.ServicePoint))',cart,{});
+ assert.deepEqual(seated.filters,[{field:'ServicePoint',operator:'isNotBlank',value:''}]);
+});

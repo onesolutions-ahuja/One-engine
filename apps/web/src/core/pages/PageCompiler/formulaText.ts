@@ -76,7 +76,7 @@ class StandaloneScope{
  get sessionId(){return this.ctx.sessionId??'';}
  private get pageState():Readonly<Row>{return this.ctx.pageState??{};}
  now(){return this.ctx.now??new Date();}
- timeZone(){return String(identity()?.user?.TimeZone||'UTC');}
+ timeZone(){return businessTimeZone();}
  state(name:string){const value=this.pageState[name];return value===undefined||value===null?'':value;}
  session(path:string){return sessionValue(path,this.pageState);}
  tenant(name:string){return tenantValue(name);}
@@ -247,3 +247,20 @@ export function bareFieldsOnRow(text:string):string{
 
 // Independently bundled components (Smart renderers) reach the same converter through the page global.
 (globalThis as Record<symbol,unknown>)[Symbol.for('une.formulaCompilers')]=formulaCompilers;
+
+const validZone=(zone:unknown):string=>{
+ const name=String(zone??'').trim();
+ if(!name)return '';
+ try{new Intl.DateTimeFormat('en-GB',{timeZone:name});return name;}catch{return '';}
+};
+/** Dates and times show in the business's time zone (Company Settings), so a
+ * record reads the same on every device, screen and print whatever the device's
+ * own clock zone. Falls back to the user's zone, then the device's, then UTC. */
+const companyZone=():unknown=>{
+ // Company settings not loaded yet, or no Time zone field: not an error for a date.
+ try{return tenantValue('Timezone');}catch{return '';}
+};
+export function businessTimeZone():string{
+ return validZone(companyZone())||validZone(identity()?.user?.TimeZone)
+  ||validZone(typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:'')||'UTC';
+}

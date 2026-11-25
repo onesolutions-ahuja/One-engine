@@ -39,7 +39,7 @@ jobs:
       - name: Core metadata version guard and Smart MultiPage
         run: node --import tsx --test apps/server/test/coreObjectsVersion.test.ts apps/web/test/smartMultiPage.test.mjs
       - name: MCP page component edits
-        run: node --import tsx --test apps/server/test/mcpPageComponents.test.ts
+        run: node --import tsx --test apps/server/test/mcpPageComponents.test.ts apps/server/test/autoNumberSearch.test.ts apps/web/test/sharedUiFixes.test.mjs
       - name: Native storage RecordEngine PostgreSQL tests
         env:
           METADRIVE_SQL_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/metadrive_native_copy_test

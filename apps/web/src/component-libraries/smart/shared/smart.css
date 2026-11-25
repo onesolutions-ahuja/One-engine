@@ -264,6 +264,11 @@
 .smart-runtime.smart_tabs>.smart-tabs-arrow.is-right{right:0!important;left:auto!important}
 .smart-tabs-arrow.is-left{left:0;justify-content:flex-start;padding-left:6px}
 .smart-tabs-arrow.is-right{right:0;justify-content:flex-end;padding-right:6px}
+/* The chevron sits in a small round button centred on the tabs (Apple style),
+   never a glyph that drops below the middle or a box taller than the tabs. */
+.smart-tabs-arrow-icon{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+ background:#fff;color:#3c3c43;box-shadow:0 1px 3px rgb(0 0 0 / .18),0 0 0 .5px rgb(0 0 0 / .06)}
+.smart-tabs-arrow:hover .smart-tabs-arrow-icon{background:#f2f2f7}
 
 /* Field rules: required mark, missing (red) and locked (no edit access). */
 .smart-field-rule .smart-required-mark{position:absolute;top:2px;right:7px;color:#FF3B30;font-size:15px;font-weight:700;line-height:1;pointer-events:none}

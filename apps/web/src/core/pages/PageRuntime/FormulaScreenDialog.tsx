@@ -9,7 +9,7 @@ dialog.formula-print-preview{position:fixed;left:0;top:0;margin:0;padding:0;bord
 .formula-print-preview *::-webkit-scrollbar{display:none}`;
 import type {PopupScreen} from './screenFormula';
 
-const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:12px;overflow:auto;scrollbar-gutter:stable;
+const modalStyles=`dialog.formula-screen-modal{padding:0;border:0;border-radius:var(--formula-screen-radius,12px);overflow:auto;
  max-width:94vw;max-height:94vh;box-shadow:0 24px 64px rgba(0,0,0,.35);background:#fff}
 dialog.formula-screen-modal::backdrop{background:rgba(15,23,42,.45)}
 dialog.formula-screen-modal.formula-screen-ready::backdrop{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -27,8 +27,8 @@ dialog.formula-screen-modal.formula-screen-page::backdrop{background:#fff;backdr
 .formula-screen-frame{position:absolute;inset:0;z-index:1200}
 .formula-screen-frame-backdrop{position:absolute;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;
  background:rgba(15,23,42,.45)}
-.formula-screen-frame-backdrop>.formula-screen-card{position:relative;max-width:94%;max-height:94%;overflow:auto;scrollbar-gutter:stable;
- border-radius:12px;background:#fff;box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.formula-screen-frame-backdrop>.formula-screen-card{position:relative;max-width:94%;max-height:94%;overflow:auto;
+ border-radius:var(--formula-screen-radius,12px);background:#fff;box-shadow:0 24px 64px rgba(0,0,0,.35)}
 .formula-screen-card>.formula-screen-close{position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;
  border:0;border-radius:50%;background:rgba(15,23,42,.08);font-size:20px;line-height:36px;cursor:pointer}`;
 
@@ -51,21 +51,19 @@ export function formulaScreenWidth(canvas?:{canvasWidth?:number;canvasHeight?:nu
  return `min(94vw, ${Math.round(width)}px, calc((94vh - 4px) * ${(width/height).toFixed(4)}))`;
 }
 
-/** macOS-style genie: the popup pinches into the bottom centre (and grows back out).
+/** macOS-style sheet: a short fade with a slight scale (an alert opening), not a
+ * genie: the old pinch into the bottom edge looked odd and took 200-300 ms.
  * Transform and opacity only, so the GPU composites it with no per-frame repaint. */
-const GENIE:Keyframe[]=[
- {transform:'translateY(0) scale(1,1)',opacity:1},
- {transform:'translateY(8%) scale(.82,.88)',opacity:1,offset:.4},
- {transform:'translateY(55vh) scale(.08,.12)',opacity:0}
-];
+const OPEN:Keyframe[]=[{transform:'scale(.96)',opacity:0},{transform:'scale(1)',opacity:1}];
+const CLOSE:Keyframe[]=[{transform:'scale(1)',opacity:1},{transform:'scale(.97)',opacity:0}];
 const reducedMotion=()=>typeof window!=='undefined'&&typeof window.matchMedia==='function'
  &&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 export function genie(el:HTMLElement|null|undefined,closing:boolean,done?:()=>void){
  if(!el||typeof el.animate!=='function'||reducedMotion()){el?.classList.add('formula-screen-ready');done?.();return;}
- el.style.transformOrigin='50% 100%';
+ el.style.transformOrigin='50% 50%';
  if(closing)el.classList.remove('formula-screen-ready');
- const animation=el.animate(closing?GENIE:[...GENIE].reverse().map(frame=>frame.offset===undefined?frame:{...frame,offset:1-Number(frame.offset)}),
-  {duration:closing?160:200,easing:closing?'cubic-bezier(.4,0,1,1)':'cubic-bezier(.2,.9,.3,1)',fill:closing?'forwards':'none'});
+ const animation=el.animate(closing?CLOSE:OPEN,
+  {duration:closing?120:160,easing:closing?'cubic-bezier(.4,0,1,1)':'cubic-bezier(.2,.8,.2,1)',fill:closing?'forwards':'none'});
  let finished=false;
  const finish=()=>{if(finished)return;finished=true;
   // The backdrop blur turns on only once the popup is open: blurring during the
@@ -73,9 +71,26 @@ export function genie(el:HTMLElement|null|undefined,closing:boolean,done?:()=>vo
   if(!closing)el.classList.add('formula-screen-ready');
   done?.();};
  animation.onfinish=finish;animation.oncancel=finish;
- window.setTimeout(finish,closing?260:300);
+ window.setTimeout(finish,closing?200:240);
 }
 
+
+/** A popup page usually draws its own rounded sheet (a full-size container with a
+ * corner radius). The popup takes that radius, so its white corners never show
+ * outside the sheet's curve. Only a child that fills the popup counts. */
+export function matchSheetRadius(box:HTMLElement|null|undefined){
+ if(!box||typeof getComputedStyle!=='function')return;
+ const outer=box.getBoundingClientRect();
+ if(!outer.width||!outer.height)return;
+ let radius=0;
+ for(const element of Array.from(box.querySelectorAll<HTMLElement>('*')).slice(0,400)){
+  const r=element.getBoundingClientRect();
+  if(Math.abs(r.width-outer.width)>3||Math.abs(r.height-outer.height)>3)continue;
+  const value=parseFloat(getComputedStyle(element).borderTopLeftRadius);
+  if(Number.isFinite(value)&&value>radius)radius=value;
+ }
+ if(radius>0)box.style.setProperty('--formula-screen-radius',Math.min(radius,48)+'px');
+}
 /**
  * Formula SCREEN(...,popup) host. Popups are true modals: the rest of the page is
  * blurred and inert until the popup closes (Close button, Escape or CLOSESCREEN()).
@@ -109,6 +124,12 @@ export function FormulaScreenDialog({screen,canvas,onClose,children,frameDevice}
  const close=React.useRef(animatedClose);
  close.current=animatedClose;
  React.useEffect(()=>{if(!fullPage&&!screen.print)genie(popupBox(),false);},[]);
+ React.useEffect(()=>{
+  if(fullPage||screen.print)return;
+  // The popup page renders a moment after the popup opens: check again once it has.
+  const timers=[0,150,600].map(delay=>window.setTimeout(()=>matchSheetRadius(popupBox()),delay));
+  return ()=>timers.forEach(timer=>window.clearTimeout(timer));
+ },[]);
  React.useEffect(()=>{
   const dialog=ref.current;
   if(!dialog||inFrame)return;

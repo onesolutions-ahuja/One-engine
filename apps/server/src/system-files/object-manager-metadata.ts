@@ -5,6 +5,9 @@ import type {SqlPersistence} from './sql-persistence.js';
 import type {RbacEngine} from './rbac-engine.js';
 import {requireActionComponent,validateActionBindings,
   type QuickActionComponentBinding} from '../system-support/quick-action-component.js';
+/** Field types a search can match. Auto numbers (invoice and order numbers) are
+ * text people type or scan to find a document. */
+export const SEARCHABLE_FIELD_TYPES:readonly string[]=['text','email','phone','url','picklist','autonumber'];
 
 export type ObjectSettings = {
   allowReports:boolean;
@@ -337,7 +340,7 @@ export class ObjectManagerMetadataService {
           const field=item as Record<string,unknown>;
           const allowedType=typeof field.fieldApiName==='string'?fieldTypes.get(field.fieldApiName):undefined;
           if(typeof field.fieldApiName!=='string'
-            ||!['text','email','phone','url','picklist'].includes(allowedType??'')
+            ||!SEARCHABLE_FIELD_TYPES.includes(allowedType??'')
             ||!['A','B','C','D'].includes(String(field.weight))
             ||seen.has(field.fieldApiName))throw new Error('Invalid searchable field');
           seen.add(field.fieldApiName);

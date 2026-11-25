@@ -7,5 +7,5 @@ import {CORE_OBJECTS_BOOTSTRAP_VERSION,coreObjectsChecksum} from '../src/app-see
 // and put the new version and checksum here, in the same PR.
 test('Core metadata change comes with a new bootstrap version',()=>{
  assert.deepEqual({version:CORE_OBJECTS_BOOTSTRAP_VERSION,checksum:coreObjectsChecksum()},
-  {version:'core-objects-unified-v26',checksum:'377ceec79f65fada17db52503f82810fe238bc46974a59566cbca360488d381e'});
+  {version:'core-objects-unified-v27',checksum:'5aa401589585c81ea23543a5a1881b4472b9c7e6795ed9c0eb98fa1cf2a47f72'});
 });

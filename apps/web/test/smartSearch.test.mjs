@@ -61,3 +61,11 @@ test('Action event values @recordId and @value resolve (SCREEN(page, popup, @rec
  // Page code passes the SCREEN record (third value) or falls back to the tapped row's Id.
  assert.match(read('../src/core/pages/PageCompiler/CompiledPageRuntime.tsx'),/third\|\|String\(payload\.recordId/);
 });
+
+test('Smart Search shows one focus ring round the box, none on the inner input',()=>{
+ const css=read('../src/component-libraries/smart_search/SmartComponent.css');
+ assert.match(css,/\.smart-search-box:focus-within\{outline:3px solid/);
+ assert.match(css,/\.smart-search-input\{[^}]*outline:0/);
+ const ios=read('../src/component-libraries/smart/shared/smart-ios.css');
+ assert.match(ios,/:not\(\.smart-search-input\):focus-visible\{/,'the shared iOS ring skips the inner search input');
+});

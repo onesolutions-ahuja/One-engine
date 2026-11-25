@@ -1,0 +1,11 @@
+export type Ticket={key:string;rows:Record<string,unknown>[];time?:number|null;[extra:string]:unknown};
+export function fieldName(value:unknown):string;
+export function groupTickets(rows:unknown,groupField:unknown):Ticket[];
+export function timeOf(value:unknown):number|null;
+export function sortTickets<T extends {time?:number|null}>(tickets:T[]):T[];
+export function formatAge(ms:unknown):string;
+export function ageLevel(ms:unknown,warn?:unknown,late?:unknown):'ok'|'warn'|'late';
+export function lineState(value:unknown):''|'done'|'void'|'short'|'held';
+export function estimateHeight(ticket:{lines?:Array<{note?:unknown;tag?:unknown;section?:unknown}>;buttons?:unknown;subtitle?:unknown},maxHeight?:unknown):number;
+export function packColumns<T>(tickets:T[],columnCount:unknown,height:(ticket:T)=>number):T[][];
+export function columnCountFor(width:unknown,min:unknown,gap?:unknown):number;

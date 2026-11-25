@@ -6,7 +6,7 @@ import {ID_CARD_ROW_PROPERTIES} from '../../../component-libraries/smart_id_card
 const nonDisplayProperties=new Set([
  'xField','yField','widthField','heightField','rotationField','labelField','subLabelField','shapeField',
  'html','properties','record','records','items','pageState','sessionId','__formulaCode',
- 'actionFlows','componentId','pageSessionKey','collectionFormula','selectorOptionsFormula','selectorPicklistField','filterFormula'
+ 'ticketGroupField','actionFlows','componentId','pageSessionKey','collectionFormula','selectorOptionsFormula','selectorPicklistField','filterFormula'
 ]);
 
 /** These properties are consumed once PER authorised row by their component renderer.
@@ -16,6 +16,9 @@ const nonDisplayProperties=new Set([
  */
 const rowDisplayProperties:Readonly<Record<string,ReadonlySet<string>>>={
  smart_spacemap:new Set(['colourFormula','borderFormula','badgeFormula','pulseWhen']),
+ // Ticket values are read on each ticket's first line; line values on every line.
+ smart_ticket_board:new Set(['textSource','column2Source','column3Source','column4Source','rowSupportingSource',
+  'ticketTitle','ticketTime','ticketSection','ticketAccent','cardDescription','badgeText','customButton1Label','customButton2Label']),
  smart_card_grid:new Set(['itemDisabledWhen','textSource','imageSource','badgeText','cardDescription','cardValue',
   'cardButtonText','customButton1Label','customButton2Label']),
  smart_id_card:new Set(['textSource','imageSource','badgeText',...ID_CARD_ROW_PROPERTIES]),

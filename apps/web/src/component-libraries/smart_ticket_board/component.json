@@ -1,0 +1,40 @@
+{
+  "apiName": "smart_ticket_board",
+  "label": "Ticket Board",
+  "category": "Data",
+  "description": "Records grouped into tickets (cards that grow with their lines), packed in columns, oldest first. For kitchen tickets, pick lists or job cards: tap a line, hold a line, and up to two buttons per ticket.",
+  "surfaces": [
+    "page",
+    "dashboard",
+    "flow"
+  ],
+  "version": 1,
+  "scope": "platform-core",
+  "jsxFile": "component-libraries/smart_ticket_board/SmartComponent.jsx",
+  "cssFile": "component-libraries/smart_ticket_board/SmartComponent.css",
+  "resize": {
+    "defaultWidth": 1240,
+    "defaultHeight": 760,
+    "minWidth": 200,
+    "minHeight": 120
+  },
+  "propertyDefinitions": [],
+  "eventDefinitions": [
+    {
+      "apiName": "click",
+      "label": "When a line is tapped"
+    },
+    {
+      "apiName": "longPress",
+      "label": "When a line is held"
+    },
+    {
+      "apiName": "customButton1",
+      "label": "Custom Button 1"
+    },
+    {
+      "apiName": "customButton2",
+      "label": "Custom Button 2"
+    }
+  ]
+}

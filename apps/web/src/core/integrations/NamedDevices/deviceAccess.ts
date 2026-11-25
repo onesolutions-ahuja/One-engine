@@ -2,9 +2,10 @@
  * device picker and the person chooses. Nothing is opened until a later action uses it.
  * The saved Address is what an app action uses to find the device again. */
 type Found={name:string;address:string};
+type SerialInfo={getInfo:()=>{usbVendorId?:number;usbProductId?:number}};
 type Nav=Navigator&{
  usb?:{requestDevice:(o:{filters:unknown[]})=>Promise<{productName?:string;vendorId:number;productId:number;serialNumber?:string}>};
- serial?:{requestPort:(o?:unknown)=>Promise<{getInfo:()=>{usbVendorId?:number;usbProductId?:number}}>};
+ serial?:{requestPort:(o?:unknown)=>Promise<SerialInfo>;getPorts:()=>Promise<SerialInfo[]>};
  bluetooth?:{requestDevice:(o:{acceptAllDevices:boolean;optionalServices?:string[]})=>Promise<{id:string;name?:string}>};
 };
 const hex=(value:number|undefined)=>(value??0).toString(16).padStart(4,'0');
@@ -23,8 +24,13 @@ export async function findLocalDevice(connection:string):Promise<Found>{
  }
  if(connection==='Serial'){
   if(!nav.serial)throw Error('This browser cannot reach serial devices. Use Chrome or Edge.');
-  const info=(await nav.serial.requestPort()).getInfo();
-  return {name:'Serial device',address:'serial:'+hex(info.usbVendorId)+':'+hex(info.usbProductId)};
+  const port=await nav.serial.requestPort();
+  const info=port.getInfo();
+  const id=hex(info.usbVendorId)+':'+hex(info.usbProductId);
+  // Built-in COM ports all read 0000:0000: keep which one of them this is.
+  const same=(await nav.serial.getPorts()).filter(item=>{const i=item.getInfo();return hex(i.usbVendorId)+':'+hex(i.usbProductId)===id;});
+  const index=Math.max(0,same.indexOf(port));
+  return {name:info.usbVendorId?'Serial device':'COM port',address:'serial:'+id+(index?':'+index:'')};
  }
  if(connection==='Bluetooth'){
   if(!nav.bluetooth)throw Error('This browser cannot reach Bluetooth devices. Use Chrome or Edge.');

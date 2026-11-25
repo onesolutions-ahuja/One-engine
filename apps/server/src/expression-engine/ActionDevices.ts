@@ -3,7 +3,20 @@
  * permission given once in Setup → Named Devices). Network printers use Star CloudPRNT: the job
  * is queued on our server and the printer collects it. Commands: Print, Open (cash drawer), Cut. */
 type Request=<T>(path:string,init?:{method:string;body?:string})=>Promise<T>;
-export type Device={Name?:string;DeviceType?:string;Connection?:string;DeviceId?:string;Address?:string;IsDefault?:boolean;Active?:boolean};
+export type Device={Name?:string;DeviceType?:string;Connection?:string;DeviceId?:string;Address?:string;IsDefault?:boolean;Active?:boolean;BaudRate?:string|number};
+/** Common serial (COM) printer speeds. 9600 when not set (the old default). */
+export const SERIAL_BAUD_RATES=['9600','19200','38400','57600','115200'] as const;
+export function baudRate(device:Pick<Device,'BaudRate'>):number{
+ const value=Number(device.BaudRate);
+ return Number.isInteger(value)&&value>=1200&&value<=921600?value:9600;
+}
+/** Pick the allowed serial port saved as serial:<vendor>:<product>[:<n>]. Built-in COM ports
+ * have no USB ids (0000:0000), so n tells several of them apart. */
+export function pickSerialPort<T extends {getInfo():{usbVendorId?:number;usbProductId?:number}}>(ports:readonly T[],address:string):T|undefined{
+ const [,vendor,product,index]=address.split(':');
+ const matches=ports.filter(item=>hex(item.getInfo().usbVendorId)===vendor&&hex(item.getInfo().usbProductId)===product);
+ return matches[Number(index)||0]??matches[0];
+}
 const ESC=0x1b,GS=0x1d;
 const COMMANDS=['PRINT','OPEN','CUT'];
 
@@ -99,13 +112,12 @@ async function sendUsb(address:string,bytes:Uint8Array){
  for(let i=0;i<bytes.length;i+=16384)
   await device.transferOut(endpoint.endpointNumber,bytes.subarray(i,i+16384));
 }
-async function sendSerial(address:string,bytes:Uint8Array){
+async function sendSerial(address:string,bytes:Uint8Array,baud=9600){
  const serial=nav()?.serial;
  if(!serial)throw Error('This browser cannot reach serial devices. Use Chrome or Edge.');
- const [,vendor,product]=address.split(':');
- const port=(await serial.getPorts()).find(item=>hex(item.getInfo().usbVendorId)===vendor&&hex(item.getInfo().usbProductId)===product);
+ const port=pickSerialPort(await serial.getPorts(),address);
  if(!port)throw Error('Device not allowed in this browser. Open Setup → Named Devices → Find device once on this till.');
- await port.open({baudRate:9600}).catch(()=>undefined);
+ await port.open({baudRate:baud}).catch(()=>undefined);
  const writer=port.writable.getWriter();
  try{await writer.write(bytes);}finally{writer.releaseLock();await port.close().catch(()=>undefined);}
 }
@@ -145,7 +157,7 @@ export async function runDeviceCommand(request:Request,type:unknown,command:unkn
  }else{
   const bytes=escPos(command,body);
   if(connection==='USB')await sendUsb(address,bytes);
-  else if(connection==='Serial')await sendSerial(address,bytes);
+  else if(connection==='Serial')await sendSerial(address,bytes,baudRate(device));
   else if(connection==='Bluetooth')await sendBluetooth(address,bytes);
   else throw Error(String(device.Name??type)+' is a '+connection+' device; DEVICE works with USB, Serial, Bluetooth or Network devices');
  }
@@ -167,7 +179,20 @@ export async function printImageOnDevice(request:Request,device:Device,image:{
  }
  const bytes=escPosRaster(image.bits,image.bytesPerRow,image.height);
  if(connection==='USB')await sendUsb(address,bytes);
- else if(connection==='Serial')await sendSerial(address,bytes);
+ else if(connection==='Serial')await sendSerial(address,bytes,baudRate(device));
  else if(connection==='Bluetooth')await sendBluetooth(address,bytes);
  else throw Error(String(device.Name??'Printer')+' is a '+connection+' device and cannot print templates');
+}
+
+/** Setup → Named Devices "Test print": a short receipt on this device, so the right
+ * baud rate (serial) can be found by trying each one. */
+export async function testPrint(device:Device):Promise<void>{
+ const connection=String(device.Connection??'');
+ const address=String(device.Address??'');
+ const text='Test print\n'+String(device.Name??'')+'\n'+connection+(connection==='Serial'?' '+baudRate(device)+' baud':'')+'\n£1.23';
+ const bytes=escPos('PRINT',text);
+ if(connection==='USB')await sendUsb(address,bytes);
+ else if(connection==='Serial')await sendSerial(address,bytes,baudRate(device));
+ else if(connection==='Bluetooth')await sendBluetooth(address,bytes);
+ else throw Error('Test print works with USB, Serial or Bluetooth devices');
 }

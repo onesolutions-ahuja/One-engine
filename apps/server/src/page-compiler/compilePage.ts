@@ -258,7 +258,9 @@ export function usesCollections(properties:Readonly<Record<string,unknown>>,form
  return Boolean(typeof properties.collectionFormula==='string'&&properties.collectionFormula.trim()
   ||formulas.some(f=>f.functions.includes('COLLECTION')||f.functions.includes('TABLE')||f.functions.includes('SUM'))
   ||typeof properties.filterKey==='string'&&properties.filterKey.trim()
-  ||typeof properties.categoryFieldApiName==='string'&&properties.categoryFieldApiName.trim());
+  ||typeof properties.categoryFieldApiName==='string'&&properties.categoryFieldApiName.trim()
+  // Grouping rows into tickets needs every row: a ticket must never be cut across pages.
+  ||typeof properties.ticketGroupField==='string'&&properties.ticketGroupField.trim());
 }
 function wordIn(text:string,word:string):boolean{
  const needle=word.toLowerCase();

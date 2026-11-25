@@ -1,4 +1,5 @@
 import {applySpaceMap} from './smart-spacemap.js';
+import {applySmartTicketBoard} from './smart-ticket-board.js';
 import {applySmartMultiPage} from './smart-multipage.js';
 import {applySmartNumpadRound} from './smart-numpad-round.js';
 import {NATIVE_OBJECT_DDL,applyNativeObjectStorage} from './native-object-storage.js';
@@ -867,6 +868,7 @@ INSERT INTO md_system_permission_catalogue(permission_key,label,description,reso
  VALUES('users:manage','Manage Users','Manage user permission assignments','SystemPermission:ManageUsers','read')
  ON CONFLICT DO NOTHING;`);
   await applySpaceMap(client);
+  await applySmartTicketBoard(client);
   await applySmartMultiPage(client);
   await applySmartNumpadRound(client);
   await applySmartDisabledFormula(client);

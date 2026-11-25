@@ -79,7 +79,8 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
 // v17: Company (one record per tenant: company details, receipts; read as @ThisTenant.Company.*).
 // v18: NamedDevice.AttachedTill (a drawer/printer fixed to a Till; apps find the Till from it).
 // v21: Order/OrderLine created; Customer duplicate ledger balance fields retired (AccountBalance kept).
-export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v23';
+// v24: smart_ticket_board.
+export const CORE_OBJECTS_BOOTSTRAP_VERSION='core-objects-unified-v24';
 const metadata=[
  FRESH_CORE_OBJECTS,FRESH_STANDARD_FIELDS,COMMUNICATION_OBJECTS,
  COMMUNICATION_PICKLISTS,COMMUNICATION_ACTIVITY_FIELDS,QUOTATION_OBJECTS,

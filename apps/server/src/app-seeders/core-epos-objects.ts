@@ -8,7 +8,8 @@ const ledgerBalance=(relationship:string,method:string):Field[]=>[
  })),
  {name:'Balance',type:'formula',formula:'BLANKVALUE($Record.IncomingTotal, 0) - BLANKVALUE($Record.OutgoingTotal, 0)'}
 ];
-type Field={name:string;type:string;length?:number;target?:string;choices?:string[];unique?:boolean;formula?:string;summary?:Summary};
+type Field={name:string;type:string;length?:number;target?:string;choices?:string[];unique?:boolean;formula?:string;summary?:Summary;
+ /** Auto Number format, e.g. '{0}'. */ format?:string};
 export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Field[]}>= [
  {name:'PermissionSet',existing:true,fields:[{name:'Name',type:'text'},{name:'Label',type:'text'},{name:'Description',type:'text'}]},
  {name:'CustomPermission',existing:false,fields:[{name:'Name',type:'text'},{name:'Label',type:'text'}]},
@@ -28,6 +29,17 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'EatOutPrice',type:'number'},
   {name:'EatOutTaxRate',type:'number'},
   {name:'SellByWeight',type:'boolean'},
+  // Overrides the category's kitchen section for this product.
+  {name:'KitchenSection',type:'reference',target:'KitchenSection'},
+ ]},
+ // Kitchen sections (Grill, Fryer, Drinks…): each Kitchen screen tab shows its own lines.
+ // A line's section is its Product's, else its Category's (read through lookups, never copied).
+ {name:'KitchenSection',existing:false,fields:[
+  {name:'Name',type:'text',length:80},
+  {name:'Printer',type:'reference',target:'NamedDevice'},
+  {name:'Colour',type:'text',length:20},
+  {name:'SortOrder',type:'number'},
+  {name:'Active',type:'boolean'},
  ]},
  {name:'ProductBOM',existing:false,fields:[
   {name:'Name',type:'text'},
@@ -93,6 +105,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
  ]},
  {name:'ProductCategory',existing:true,fields:[
   {name:'OrderPrinter',type:'text',length:128},
+  {name:'KitchenSection',type:'reference',target:'KitchenSection'},
  ]},
  {name:'Order',existing:false,fields:[
   {name:'Name',type:'text',length:80},
@@ -107,6 +120,8 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'ExternalOrderId',type:'text',length:128},
   {name:'KitchenStatus',type:'picklist',choices:['New','Accepted','Preparing','Ready','Collected','Rejected']},
   {name:'PrepMinutes',type:'number'},
+  // Kitchen tickets show this number (one running series per tenant).
+  {name:'OrderNumber',type:'autonumber',format:'{0}',unique:true},
  ]},
  {name:'OrderLine',existing:false,fields:[
   {name:'Name',type:'text',length:255},
@@ -116,8 +131,10 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'CartLine',type:'reference',target:'CartLine'},
   {name:'Course',type:'number'},
   {name:'Note',type:'text',length:255},
-  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void']},
+  // Short = only some could be made (MadeQty); Completed = its ticket was completed (off the kitchen screen).
+  {name:'KitchenStatus',type:'picklist',choices:['New','Done','Void','Short','Completed']},
   {name:'Options',type:'text',length:500},
+  {name:'MadeQty',type:'number'},
  ]},
 ];
 const cashier=['Till_Hold','Till_MiscProduct','Till_Tables','Till_ItemDiscount','Customer_Select','Customer_List'];
@@ -147,11 +164,11 @@ export async function seedEposObjects(client:PoolClient,tenantId:string){
    [tenantId,object.name,object.name.replace(/([a-z])([A-Z])/g,'$1 $2'),['CustomPermission','PermissionSetCustomPermission','UserPermissionSet'].includes(object.name)]);
  }
  for(const object of EPOS_OBJECTS)for(const field of object.fields){
-  const inserted=await client.query(`INSERT INTO md_field_definitions(tenant_id,object_api,api_name,label,data_type,related_object,max_length,is_unique,required,formula_expression,formula_return_type,rollup_child_object,rollup_relationship_field,rollup_operation,rollup_source_field)
-   SELECT $1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10,$11,$12,$13,$14 WHERE EXISTS
+  const inserted=await client.query(`INSERT INTO md_field_definitions(tenant_id,object_api,api_name,label,data_type,related_object,max_length,is_unique,required,formula_expression,formula_return_type,rollup_child_object,rollup_relationship_field,rollup_operation,rollup_source_field,auto_number_format)
+   SELECT $1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10,$11,$12,$13,$14,$15 WHERE EXISTS
    (SELECT 1 FROM md_object_definitions WHERE tenant_id=$1 AND api_name=$2 AND deleted_at IS NULL)
    ON CONFLICT(tenant_id,object_api,api_name) DO NOTHING RETURNING id`,
-   [tenantId,object.name,field.name,field.name.replace(/([a-z])([A-Z])/g,'$1 $2'),field.type,field.target??null,field.length??null,field.unique??false,field.formula??null,field.formula?'number':null,field.summary?.child??null,field.summary?.relationship??null,field.summary?'SUM':null,field.summary?.source??null]);
+   [tenantId,object.name,field.name,field.name.replace(/([a-z])([A-Z])/g,'$1 $2'),field.type,field.target??null,field.length??null,field.unique??false,field.formula??null,field.formula?'number':null,field.summary?.child??null,field.summary?.relationship??null,field.summary?'SUM':null,field.summary?.source??null,field.format??null]);
   if(inserted.rowCount&&field.summary?.filters){
    for(const [order,[key,value]] of field.summary.filters.entries())await client.query(`INSERT INTO md_field_rollup_filters
     (tenant_id,object_api,child_object,rollup_field_api,filter_field_api,operator,value_text,sort_order)
@@ -160,6 +177,7 @@ export async function seedEposObjects(client:PoolClient,tenantId:string){
   if(field.choices)await addChoices(client,tenantId,object.name,field.name,field.choices);
  }
  await addChoices(client,tenantId,'CashLedger','Method',['Customer credit','Gift card','On account']);
+ await trackKitchenStatusHistory(client,tenantId);
  await removeDuplicateCustomerBalance(client,tenantId);
 }
 // Customer already keeps what is owed in AccountBalance. The ledger balance fields an earlier seed added
@@ -180,4 +198,20 @@ async function addChoices(client:PoolClient,tenantId:string,object:string,field:
  WHERE tenant_id=$1 AND object_api=$2 AND field_api=$3),0)+c.ord FROM unnest($4::text[]) WITH ORDINALITY c(value,ord)
  WHERE EXISTS(SELECT 1 FROM md_field_definitions WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND data_type='picklist' AND deleted_at IS NULL)
  ON CONFLICT(tenant_id,object_api,field_api,value) DO NOTHING`,[tenantId,object,field,choices]);
+}
+
+/** Every kitchen status change (who, when, from, to) is kept by field history tracking, for
+ * speed reports: ordered → accepted → preparing → ready → collected, per order and per item.
+ * Switched on ONCE per tenant (marker row): a tenant that turns it off later keeps it off. */
+export const KITCHEN_STATUS_HISTORY=[['Order','KitchenStatus'],['OrderLine','KitchenStatus'],['CartLine','KitchenStatus']] as const;
+async function trackKitchenStatusHistory(client:PoolClient,tenantId:string){
+ // A database without the migrations ledger (first install, tests) has no tenant choice to keep yet.
+ const ledger=await client.query<{name:string|null}>(`SELECT to_regclass('md_system_migrations')::text AS name`);
+ if(ledger.rows[0]?.name){
+  const marker=await client.query(`INSERT INTO md_system_migrations(version,checksum) VALUES($1,'once')
+   ON CONFLICT DO NOTHING RETURNING version`,['kitchen-status-history-v1:'+tenantId]);
+  if(!marker.rowCount)return;
+ }
+ for(const [object,field] of KITCHEN_STATUS_HISTORY)await client.query(`UPDATE md_field_definitions SET track_history=true
+  WHERE tenant_id=$1 AND object_api=$2 AND api_name=$3 AND deleted_at IS NULL`,[tenantId,object,field]);
 }

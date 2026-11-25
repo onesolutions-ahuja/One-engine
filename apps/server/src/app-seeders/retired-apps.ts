@@ -27,6 +27,9 @@ export const CHATTER_COMPONENT_APIS = [
 ] as const;
 const CHATTER_PERMISSION_SETS = ['AcetillCashier','AceAssistUser','AceAssistCashier',
   'AceKioskUser','AceChatterUser','OneChatterUser','UNEAceChatterUser'] as const;
+/** Every other set the removed apps seeded (AcetillUser, AceAssistFinanceIssuer,
+ * AceAssistWhatsAppBookingService, ...) carries the app's name first. */
+export const RETIRED_PERMISSION_SET_PATTERN='^(Acetill|AceAssist|AceKiosk|AceChatter|OneChatter|UNEAceChatter)[A-Z_]';
 
 export async function deleteRetiredChatterMetadata(
   db:Pick<SqlPersistence,'transaction'>
@@ -105,18 +108,22 @@ export async function deleteRetiredChatterMetadata(
     // These permission sets belong to the removed apps. Do not remove Flow
     // definitions or any Flow/Object permissions from other permission sets.
     const permissionIds='SELECT tenant_id,id FROM md_permission_sets '+
-      'WHERE api_name=ANY($1::text[])';
+      'WHERE api_name=ANY($1::text[]) OR api_name ~ $2';
+    const retiredSets=[[...CHATTER_PERMISSION_SETS],RETIRED_PERMISSION_SET_PATTERN];
     for(const table of ['md_permission_assignments','md_role_permission_sets',
       'md_permission_group_sets','md_profile_permission_sets',
       'md_permission_set_license_requirements','md_permission_rules']) {
       await client.query('DELETE FROM '+table+' WHERE (tenant_id,permission_set_id) '+
-        'IN ('+permissionIds+')',[[...CHATTER_PERMISSION_SETS]]);
+        'IN ('+permissionIds+')',retiredSets);
     }
     // The optional profile editor pointer is a non-cascading FK to the set.
     await client.query('UPDATE md_profiles SET editor_set_id=NULL '+
-      'WHERE (tenant_id,editor_set_id) IN ('+permissionIds+')',[[...CHATTER_PERMISSION_SETS]]);
+      'WHERE (tenant_id,editor_set_id) IN ('+permissionIds+')',retiredSets);
     await client.query('DELETE FROM md_permission_sets '+
-      'WHERE api_name=ANY($1::text[])',[[...CHATTER_PERMISSION_SETS]]);
+      'WHERE api_name=ANY($1::text[]) OR api_name ~ $2',retiredSets);
+    // A rule whose resource or action was saved as array text ({"Invoice.X","read"}) can
+    // never match and stops every permissions save ("Invalid system permission").
+    await client.query("DELETE FROM md_permission_rules WHERE resource LIKE '{%' OR action LIKE '{%'");
     await client.query('DELETE FROM md_permission_rules '+
       "WHERE resource=ANY($1::text[])",[
         REMOVED_APP_APIS.map(name=>'App:'+name)]);

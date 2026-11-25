@@ -76,6 +76,12 @@ try {
  await db.query("INSERT INTO md_component_definitions(tenant_id,api_name,renderer_key,enabled) "+
   "VALUES($1,'onechatter_conversation','one-bundled:onechatter_conversation',true)",[tid]);
  await db.query("INSERT INTO md_permission_sets(tenant_id,api_name) VALUES($1,'AceChatterUser')",[tid]);
+ // Sets the removed apps seeded under other names, and an array-text rule no save can read.
+ for(const name of ['AcetillUser','AceAssistFinanceIssuer','AceAssistWhatsAppBookingService'])
+  await db.query('INSERT INTO md_permission_sets(tenant_id,api_name) VALUES($1,$2)',[tid,name]);
+ await db.query("INSERT INTO md_permission_rules(tenant_id,permission_set_id,resource,action,effect) "+
+  "SELECT $1,id,'{\"Invoice.InvoiceNumber\",\"read\"}','{\"Invoice.InvoiceNumber\",\"edit\"}','allow' "+
+  "FROM md_permission_sets WHERE tenant_id=$1 AND api_name='OneEngine'",[tid]);
  await db.query("UPDATE md_users SET landing_app_api='AceChatter' "+
   "WHERE tenant_id=$1 AND email='administrator@example.test'",[tid]);
  const {rows:[flow]}=await db.query(
@@ -98,6 +104,11 @@ try {
  assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_permission_sets "+
   "WHERE tenant_id=$1 AND api_name='OneEngine'",[tid])).rows[0].n,1,
   'Core permissions survive');
+ assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_permission_sets "+
+  "WHERE tenant_id=$1 AND api_name ~ '^(Acetill|AceAssist|AceKiosk|AceChatter)'",[tid])).rows[0].n,0,
+  'Every retired app permission set is removed');
+ assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_permission_rules "+
+  "WHERE tenant_id=$1 AND resource LIKE '{%'",[tid])).rows[0].n,0,'Array-text rules are removed');
  assert.equal((await db.query("SELECT COUNT(*)::integer AS n FROM md_users "+
   "WHERE tenant_id=$1 AND landing_app_api='AceChatter'",[tid])).rows[0].n,0);
  const replay=await deleteRetiredChatterMetadata(db);

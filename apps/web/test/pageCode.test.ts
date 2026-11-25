@@ -227,6 +227,25 @@ test('server function: every step in ONE transaction, the clicked row is read fr
  assert.ok(Object.keys(second.sets).length>=1,'fresh rows of the written Objects come back');
 });
 
+test('server function: a grouped list button sends the group Id (another Object) and still runs', async ()=>{
+ const orderId='33333333-3333-4333-8333-333333333333',lineId='44444444-4444-4444-8444-444444444444';
+ const fake=fakeRecords({Order:[{Id:orderId,KitchenStatus:'Preparing'}],OrderLine:[{Id:lineId,Order:orderId,KitchenStatus:'Done'}]});
+ const get=fake.records.get;
+ fake.records.get=async(t:string,u:string,object:string,id:string)=>{
+  if(!(fake.tables[object]??[]).some(row=>row.Id===id))throw Error('Record not found');
+  return get(t,u,object,id);
+ };
+ const db={transaction:async<T>(run:()=>Promise<T>)=>run(),query:async()=>({rows:[]})};
+ const page={apiName:'kitchen',components:[{id:'board',objectApiName:'OrderLine',formulas:[],actions:[{event:'customButton1',kind:'Formula',
+  formula:'=ACTIONS(FOREACH(OrderLine, Order, @event.recordId, AS(l), UPDATERECORD(OrderLine, l.Id, KitchenStatus, "Completed")), UPDATERECORD(Order, @event.recordId, KitchenStatus, "Ready"))'}]}]};
+ const server=serverPageCode(buildPageCode(page as never));
+ const request={sessionId:'s-1',state:{},rowObject:'OrderLine',event:{recordId:orderId}};
+ const result=await executePageCodeAction({db,records:fake.records} as never,{tenant_id:'t',user_id:'u'},server,'board:customButton1',request,'');
+ assert.equal(result.ok,true,result.error);
+ assert.equal(fake.tables.OrderLine[0].KitchenStatus,'Completed');
+ assert.equal(fake.tables.Order[0].KitchenStatus,'Ready');
+});
+
 test('server function: a failing step saves nothing', async ()=>{
  const fake=fakeRecords({Product:[{Id:productId,Name:'Cola',Price:1.5}],Cart:[],CartLine:[]});
  fake.records.update=async()=>{throw Error('Field is read only');};

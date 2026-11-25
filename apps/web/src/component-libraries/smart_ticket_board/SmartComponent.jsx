@@ -14,6 +14,10 @@ import {groupTickets,timeOf,sortTickets,formatAge,ageLevel,lineState,lineVisible
  * line (options / notes), Column 3 = line state (Done / Void / Short / Held), Column 4 = small tag.
  * Ticket: Ticket title, Card description (subtitle), Badge text, Ticket time (age timer).
  * Show line when: only matching lines (e.g. one kitchen section); empty tickets are hidden.
+ * Card height (fixed, equal cards in a grid) · Lines on card (+N more) · Hide done lines (cards list
+ * only what is left; "All done" when nothing is) · Tap lines (off: a tap anywhere selects the ticket)
+ * · Selected ticket (formula, e.g. =@ThisPage.sel.Value) is outlined.
+ * change = a ticket was tapped (@event.recordId = the ticket key).
  * Events: click = line tapped, longPress = line held, customButton1/2 = ticket buttons
  * (Button 1 is the main action, drawn on the right; Button 2 on its left)
  * (@event.recordId = the ticket key, e.g. the Order Id; @event.recordIds = its line Ids).
@@ -78,11 +82,22 @@ export default function SmartComponent(p){
   lines:sample.lines.map(line=>({...line,state:lineState(line.state),row:{Id:line.id}})),
   labels:Object.fromEntries(buttons.map((key,i)=>[key,String(p[key+"Label"]??"")||(i?"Print":"Complete")]))}));
 
+ const fixedHeight=num(p.ticketCardHeight,0,0,2000);
+ const linesOnCard=num(p.ticketLinesOnCard,0,0,50);
+ const hideDone=p.ticketHideDone===true||p.ticketHideDone==="true";
+ const lineTaps=!(p.ticketLineTaps===false||p.ticketLineTaps==="false");
+ const selectedKey=String(p.ticketSelected??"").trim()?read("ticketSelected",rows[0]??{}):"";
  const fire=(event,value)=>{if(live&&!disabled)void Promise.resolve(p.onAction?.({event,value})).catch(()=>{});};
  const lineValue=(ticket,line)=>({record:line.row,recordId:line.id,ticketId:ticket.key,ticket:ticket.first});
  const ticketValue=ticket=>({record:ticket.first,recordId:ticket.key,recordIds:ticket.lines.map(line=>line.id)});
  // Tap = click; hold 550 ms (or right-click) = longPress. Scrolling a long ticket is not a tap.
+ const selectTicket=(e,ticket)=>{
+  if(e.target.closest&&e.target.closest("button"))return;
+  if(lineTaps&&e.target.closest&&e.target.closest(".tb-line"))return;
+  fire("change",{record:ticket.first,recordId:ticket.key,recordIds:ticket.lines.map(line=>line.id)});
+ };
  const down=(e,ticket,line)=>{
+  if(!lineTaps)return;
   if(e.button!==undefined&&e.button!==0)return;
   clearTimeout(holdRef.current?.timer);
   const hold={id:line.id,x:e.clientX,y:e.clientY,held:false};
@@ -94,6 +109,7 @@ export default function SmartComponent(p){
   if(hold&&Math.abs(e.clientX-hold.x)+Math.abs(e.clientY-hold.y)>8){clearTimeout(hold.timer);holdRef.current=null;setPressed("");}
  };
  const up=(ticket,line)=>{
+  if(!lineTaps)return;
   const hold=holdRef.current;holdRef.current=null;setPressed("");
   if(!hold||hold.id!==line.id)return;
   clearTimeout(hold.timer);
@@ -126,9 +142,16 @@ export default function SmartComponent(p){
   const fresh=age!=null&&newMs>0&&age<newMs;
   const done=ticket.lines.filter(line=>line.state==="done").length;
   const open=ticket.lines.filter(line=>line.state!=="void").length;
+  const left=ticket.lines.filter(line=>line.state!=="done"&&line.state!=="void");
+  const listed=hideDone?left:ticket.lines;
+  const shown=linesOnCard>0?listed.slice(0,linesOnCard):listed;
+  const more=listed.length-shown.length;
+  const allDone=hideDone&&left.length===0;
+  const selected=selectedKey!==""&&selectedKey===ticket.key;
   let section="";
-  return <article key={ticket.key} className={"tb-card age-"+level+(fresh?" is-new":"")} style={cardStyle}
-   aria-label={ticket.title||"Ticket"}>
+  return <article key={ticket.key} className={"tb-card age-"+level+(fresh?" is-new":"")+(selected?" is-selected":"")
+   +(allDone?" is-all-done":"")+(fixedHeight?" is-fixed":"")} style={{...cardStyle,...(fixedHeight?{height:fixedHeight}:{})}}
+   aria-label={ticket.title||"Ticket"} aria-current={selected||undefined} onClick={e=>selectTicket(e,ticket)}>
    <div className="tb-bar" style={ticket.accent&&level==="none"?{background:ticket.accent}:undefined}/>
    <header className="tb-head" style={{padding:pad+"px "+pad+"px "+Math.max(6,pad-4)+"px"}}>
     <div className="tb-title"><strong style={titleStyle}>{ticket.title}</strong>
@@ -136,8 +159,9 @@ export default function SmartComponent(p){
     <div className="tb-meta">{ticket.badge&&<span className="tb-badge" style={badgeStyle}>{ticket.badge}</span>}
      {age!=null&&<span className="tb-age">{fresh?"New":formatAge(age)}</span>}</div>
    </header>
-   <ul className="tb-lines" style={{maxHeight:maxHeight-(buttons.length?118:64)}} role="list">
-    {ticket.lines.map(line=>{
+   <ul className="tb-lines" style={fixedHeight?undefined:{maxHeight:maxHeight-(buttons.length?118:64)}} role="list">
+    {allDone&&<li className="tb-all-done"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>All done</li>}
+    {shown.map(line=>{
      const heading=line.section&&line.section!==section?line.section:"";
      if(line.section)section=line.section;
      return <React.Fragment key={line.id||line.text}>
@@ -145,11 +169,11 @@ export default function SmartComponent(p){
       <li className={"tb-line"+(line.state?" is-"+line.state:"")+(pressed===line.id?" is-pressed":"")}
        style={{...lineStyle,paddingLeft:pad,paddingRight:pad,
         background:pressed===line.id&&p.selectedRowColor?p.selectedRowColor:undefined}}
-       role="button" tabIndex={live&&!disabled?0:-1} aria-label={(line.qty?line.qty+" × ":"")+line.text+(line.state?", "+line.state:"")}
+       role={lineTaps?"button":undefined} tabIndex={lineTaps&&live&&!disabled?0:-1} aria-label={(line.qty?line.qty+" × ":"")+line.text+(line.state?", "+line.state:"")}
        onPointerDown={e=>down(e,ticket,line)} onPointerMove={moveLine} onPointerUp={()=>up(ticket,line)}
        onPointerCancel={()=>{clearTimeout(holdRef.current?.timer);holdRef.current=null;setPressed("");}}
-       onContextMenu={e=>{e.preventDefault();clearTimeout(holdRef.current?.timer);holdRef.current=null;setPressed("");fire("longPress",lineValue(ticket,line));}}
-       onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fire("click",lineValue(ticket,line));}}}>
+       onContextMenu={e=>{if(!lineTaps)return;e.preventDefault();clearTimeout(holdRef.current?.timer);holdRef.current=null;setPressed("");fire("longPress",lineValue(ticket,line));}}
+       onKeyDown={e=>{if(lineTaps&&(e.key==="Enter"||e.key===" ")){e.preventDefault();fire("click",lineValue(ticket,line));}}}>
        {line.qty!==""&&<span className="tb-qty">{line.qty}</span>}
        <span className="tb-text"><span className="tb-name">{line.text}</span>
         {line.note&&<small className="tb-note" style={noteStyle}>{line.note}</small>}
@@ -159,9 +183,10 @@ export default function SmartComponent(p){
       </li>
      </React.Fragment>;
     })}
+    {more>0&&<li className="tb-more">+{more} more</li>}
    </ul>
    {(buttons.length>0||open>0)&&<footer className="tb-foot" style={{padding:(pad-2)+"px "+pad+"px "+pad+"px"}}>
-    <span className="tb-progress">{done} of {open} done</span>
+    <span className="tb-progress">{hideDone?(allDone?"Ready to complete":left.length+" to make · "+done+" done"):done+" of "+open+" done"}</span>
     {[...buttons].reverse().map(key=>{
      const label=ticket.labels[key];
      if(!label&&!builder)return null;
@@ -171,9 +196,12 @@ export default function SmartComponent(p){
    </footer>}
   </article>;
  };
- return <section ref={boardRef} className="smart-ticket-board" aria-disabled={disabled||undefined}
-  style={{fontFamily:p.fontFamily||undefined,gap}} data-builder-preview={builder?"true":undefined}>
+ return <section ref={boardRef} className={"smart-ticket-board"+(fixedHeight?" is-grid":"")} aria-disabled={disabled||undefined}
+  style={{fontFamily:p.fontFamily||undefined,gap,
+   ...(fixedHeight?{gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,"+columnWidth+"px),1fr))",gridAutoRows:fixedHeight}:{})}}
+  data-builder-preview={builder?"true":undefined}>
   {tickets.length===0?<p className="tb-empty">{String(p.emptyText??"")||"No open tickets"}</p>
+   :fixedHeight?tickets.map(card)
    :columns.map((column,index)=><div key={index} className="tb-column" style={{gap}}>{column.map(card)}</div>)}
  </section>;
 }

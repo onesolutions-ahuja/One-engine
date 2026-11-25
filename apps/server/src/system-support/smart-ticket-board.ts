@@ -25,7 +25,13 @@ export const TICKET_BOARD_PROPERTY_SPECS:Spec[]=[
  spec('ticketLateMinutes','Red after (min)','number',15,0,600),
  spec('ticketNewSeconds','New for (sec)','number',60,0,3600),
  spec('ticketColumnWidth','Column width','number',280,160,900),
- spec('ticketMaxHeight','Max ticket height','number',560,160,4000)
+ spec('ticketMaxHeight','Max ticket height','number',560,160,4000),
+ // Appended (never inserted): each setting's Ticket Board slot keeps its order number.
+ spec('ticketCardHeight','Card height (0 = grows)','number',0,0,2000),
+ spec('ticketLinesOnCard','Lines on card (0 = all)','number',0,0,50),
+ spec('ticketHideDone','Hide done lines','boolean',false),
+ spec('ticketLineTaps','Tap lines','boolean',true),
+ spec('ticketSelected','Selected ticket','expression')
 ];
 
 /** Existing shared keys the component uses (data, ticket and line text, looks, buttons). */
@@ -62,7 +68,7 @@ export async function applySmartTicketBoard(client:Query){
    COALESCE((SELECT MIN(area_order) FROM md_builder_design2_slots WHERE area=$2),
             (SELECT COALESCE(MAX(area_order),0)+1 FROM md_builder_design2_slots)),
    'extra_'||spec.property_key,3,spec.ordinal::integer,
-   CASE WHEN property.control_kind='number' THEN 58 ELSE 150 END,
+   CASE WHEN property.control_kind='number' THEN 58 WHEN property.control_kind='boolean' THEN 40 ELSE 150 END,
    26,spec.property_key,spec.property_key
   FROM specs spec JOIN md_builder_shared_properties property ON property.property_key=spec.property_key
   ON CONFLICT(area,slot_key) DO NOTHING`,[keys,AREA]);

@@ -7,7 +7,7 @@ import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
 import {TillDeviceService,TILL_DEVICE_EXPIRED} from './till-device-service.js';
 import {ScreenPairingService,SCREEN_GONE,UserActionError} from './screen-pairing-service.js';
-import {GuestAccessService,GUEST_LINK_GONE} from './guest-access-service.js';
+import {GuestAccessService,GUEST_LINK_GONE,GUEST_ACCESS_OFF} from './guest-access-service.js';
 import {withAuditContext,auditContext,setAuditActor} from './audit-context.js';
 import {ConnectedAppService} from './connected-app-service.js';
 import {SecurityMonitorService} from './security-monitor-service.js';
@@ -313,6 +313,7 @@ export function createSystemServer(db:SqlPersistence) {
   const tillDevices=new TillDeviceService(db,auth);
   const screens=new ScreenPairingService(db,auth);
   const guests=new GuestAccessService(db,auth,rbac,records);
+  screens.guestPage=(tenantId,appId)=>guests.guestPage(tenantId,appId);
   const federation=new FederationService(db,rbac,namedCredentials,integrationActivityWriter);
   const passkeys=new WebAuthnService(db,auth);
   const backups=new MfaBackupService(db,auth,mfa,rbac);
@@ -644,6 +645,8 @@ export function createSystemServer(db:SqlPersistence) {
     try{sendScreenSession(req,res,await screens.resume(req.body?.key,{ip:req.ip}));}
     catch(error){
       if(error instanceof Error&&error.message===SCREEN_GONE){res.status(410).json({error:SCREEN_GONE});return;}
+      // A table's tablet while its app's guest access is off: it waits and tries again.
+      if(error instanceof Error&&error.message===GUEST_ACCESS_OFF){res.status(423).json({error:GUEST_ACCESS_OFF});return;}
       throw error;
     }
   }));
@@ -660,6 +663,7 @@ export function createSystemServer(db:SqlPersistence) {
     try{sendScreenSession(req,res,await guests.open(req.body?.token,{ip:req.ip}));}
     catch(error){
       if(error instanceof Error&&error.message===GUEST_LINK_GONE){res.status(410).json({error:GUEST_LINK_GONE});return;}
+      if(error instanceof Error&&error.message===GUEST_ACCESS_OFF){res.status(423).json({error:GUEST_ACCESS_OFF});return;}
       throw error;
     }
   }));

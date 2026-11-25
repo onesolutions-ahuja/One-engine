@@ -40,7 +40,7 @@ export type ScreenTarget={appId:string;pageApiName:string;deviceName:string;mirr
 export type PairedScreen={id:string;name:string;appId:string;pageApiName:string;pairedAt:string;lastSeenAt:string|null;online:boolean};
 type Actor={tenant_id:string;user_id:string};
 type Row={id:string;tenant_id:string|null;user_id:string|null;mfa_verified:boolean;device_record_id:string|null;
- device_name:string|null;mirror_key:string|null;app_id:string|null;page_api_name:string|null;approved_at:Date|null;key_hash:string|null};
+ device_name:string|null;mirror_key:string|null;app_id:string|null;page_api_name:string|null;approved_at:Date|null;key_hash:string|null;guest?:boolean};
 /** The device the person pairs from, as the app knows it (its Named Device). */
 export type PairingDevice={id:string;name:string;deviceKey:string};
 
@@ -96,6 +96,16 @@ export class ScreenPairingService{
   [hash(key),SCREEN_KEY_DAYS]);
   const row=rows[0];
   if(!row)throw Error(SCREEN_GONE);
+  // A table's tablet shows its app's guest page, and nothing while that app's guest access is off.
+  if(row.guest){
+   if(!this.guestPage||!row.tenant_id||!row.app_id)throw Error(SCREEN_GONE);
+   const page=await this.guestPage(row.tenant_id,row.app_id);
+   try{return {session:await this.signIn(row,context),...target({...row,page_api_name:page})};}
+   catch(error){
+    if(error instanceof Error&&/Invalid credentials|MFA required/.test(error.message)){await this.revokeRow(row.id);throw Error(SCREEN_GONE);}
+    throw error;
+   }
+  }
   try{return {session:await this.signIn(row,context),...target(row)};}
   catch(error){
    // The person was disabled, locked out or lost their licence: the screen stops too.
@@ -125,26 +135,28 @@ export class ScreenPairingService{
   return {id:row.id,name:label||'Display',appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
  }
 
- /** A table's tablet (any record's): the code pairs the screen as that record's guest, not as the
-  * person typing it. It has no till to follow; it is listed and unpaired by its record. */
- async approveGuest(actor:Actor,code:unknown,guest:{userId:string;recordId:string;name:string},appId:unknown,pageApiName:unknown,name?:unknown):Promise<PairedScreen>{
+ /** PAIRGUEST: a table's tablet (any record's) pairs as that record's guest, not as the person
+  * typing the code. It has no till to follow; it is listed and unpaired by its record. */
+ async approveGuest(actor:Actor,code:unknown,guest:{userId:string;recordId:string;name:string;pageApiName:string},appId:unknown,name?:unknown):Promise<PairedScreen>{
   const label=screenName(name)||guest.name.slice(0,60);
   if(typeof code!=='string'||!/^\d{4}$/.test(code.trim()))fail('Type the 4-digit code shown on the screen');
   if(typeof appId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(appId))fail('Choose the app this screen belongs to');
-  if(typeof pageApiName!=='string'||!apiName.test(pageApiName))fail('Choose the page this screen shows');
+  if(!apiName.test(guest.pageApiName))fail('Choose the guest page in App Manager');
   if(!uuid.test(guest.userId)||!uuid.test(guest.recordId))fail('Choose the record this screen is for');
   if(!this.allowTry(actor.tenant_id+'\u0000'+actor.user_id))fail('Too many tries. Wait a minute and try again');
   const {rows}=await this.db.query<{id:string;approved_at:Date}>(`UPDATE md_screen_pairings
     SET tenant_id=$2,user_id=$3,mfa_verified=false,device_record_id=$4,device_name=$5,mirror_key=NULL,app_id=$6,page_api_name=$7,
-        approved_at=now(),code=NULL,screen_name=$8
+        approved_at=now(),code=NULL,screen_name=$8,guest=true
     WHERE id=(SELECT id FROM md_screen_pairings WHERE code=$1 AND approved_at IS NULL AND revoked_at IS NULL
       AND code_expires_at>now() ORDER BY created_at DESC LIMIT 1)
     RETURNING id,approved_at`,
-  [code.trim(),actor.tenant_id,guest.userId,guest.recordId,guest.name.slice(0,120),appId,pageApiName,label]);
+  [code.trim(),actor.tenant_id,guest.userId,guest.recordId,guest.name.slice(0,120),appId,guest.pageApiName,label]);
   const row=rows[0];
   if(!row)fail('That code is wrong or has expired. Check the code on the screen');
-  return {id:row.id,name:label,appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
+  return {id:row.id,name:label,appId,pageApiName:guest.pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
  }
+ /** Guest tablets: the app's guest page while its guest access is on (set by the guest service). */
+ guestPage:((tenantId:string,appId:string)=>Promise<string>)|null=null;
 
  /** Whether the till's own sign-in passed MFA: the screen gets no more than that. */
  async sessionMfa(bearer:string):Promise<boolean>{

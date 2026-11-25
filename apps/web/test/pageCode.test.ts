@@ -247,7 +247,7 @@ test('server function: a grouped list button sends the group Id (another Object)
  assert.equal(fake.tables.Order[0].KitchenStatus,'Ready');
 });
 
-test('GUESTLINK makes the record\'s guest link on the server, for this app and site', async ()=>{
+test('GUESTLINK(App, RecordId) makes the record\'s guest link on the server, with this site\'s address', async ()=>{
  const tableId='55555555-5555-4555-8555-555555555555';
  const fake=fakeRecords({ServicePoint:[{Id:tableId,Name:'Table 3'}]});
  const asked:unknown[]=[];
@@ -255,24 +255,26 @@ test('GUESTLINK makes the record\'s guest link on the server, for this app and s
   return {id:'a'.repeat(32),path:'/guest/x',url:String(input.origin)+'/guest/x',userId:'u'};}};
  const db={transaction:async<T>(run:()=>Promise<T>)=>run(),query:async()=>({rows:[]})};
  const page={apiName:'settings',components:[{id:'tables',objectApiName:'ServicePoint',formulas:[],actions:[{event:'click',kind:'Formula',
-  formula:'=ACTIONS(GUESTLINK(SelfOrder, @recordId, SelfOrder, AS(g)), UPDATERECORD(ServicePoint, @recordId, Name, g.Url))'}]}]};
+  formula:'=ACTIONS(GUESTLINK(SelfOrder, @recordId, AS(g)), UPDATERECORD(ServicePoint, @recordId, Name, g.Url))'}]}]};
  const server=serverPageCode(buildPageCode(page as never));
  const request=parsePageCodeRequest({sessionId:'s-1',state:{},rowObject:'ServicePoint',event:{recordId:tableId}},
-  {origin:'https://shop.example',app:'SMARTORDER'});
+  {origin:'https://shop.example'});
  const result=await executePageCodeAction({db,records:fake.records,guests} as never,{tenant_id:'t',user_id:'u'},server,'tables:click',request,'');
  assert.equal(result.ok,true,result.error);
- assert.deepEqual(asked,[{appId:'SMARTORDER',pageApiName:'SelfOrder',recordId:tableId,profile:'SelfOrder',origin:'https://shop.example'}]);
+ assert.deepEqual(asked,[{appId:'SelfOrder',recordId:tableId,origin:'https://shop.example'}]);
  assert.equal(fake.tables.ServicePoint[0].Name,'https://shop.example/guest/x');
  assert.throws(()=>buildPageCode({apiName:'p',components:[{id:'b',objectApiName:'',formulas:[],actions:[{event:'click',kind:'Formula',
-  formula:'=GUESTLINK(SelfOrder, @recordId, SelfOrder)'}]}]} as never).issues.length&&(()=>{throw Error('needs AS');})());
+  formula:'=GUESTLINK(SelfOrder, @recordId)'}]}]} as never).issues.length&&(()=>{throw Error('needs AS');})());
 });
 
-test('PAIRDISPLAY with a record and profile pairs a tablet as that record\'s guest (browser step)', ()=>{
- const code=compileActionFormula('=PAIRDISPLAY(SelfOrder, @recordId, SelfOrder)','ServicePoint');
- assert.match(code.js,/\$\.ui\("PAIRDISPLAY", "SelfOrder", \$\.event\("recordId"\), "SelfOrder"\)/);
+test('PAIRGUEST pairs a tablet as a record\'s guest (browser step); PAIRDISPLAY is unchanged', ()=>{
+ const code=compileActionFormula('=PAIRGUEST(SelfOrder, @recordId)','ServicePoint');
+ assert.match(code.js,/\$\.ui\("PAIRGUEST", "SelfOrder", \$\.event\("recordId"\)\)/);
  assert.match(compileActionFormula('=PAIRDISPLAY(CustomerDisplay)').js,/\$\.ui\("PAIRDISPLAY", "CustomerDisplay"\)/);
- assert.throws(()=>compileActionFormula('=PAIRDISPLAY(SelfOrder, @recordId)'),/PAIRDISPLAY needs/);
- assert.doesNotThrow(()=>compileActionPlan('=PAIRDISPLAY(SelfOrder, @recordId, SelfOrder)'));
+ assert.throws(()=>compileActionFormula('=PAIRDISPLAY(SelfOrder, @recordId, SelfOrder)'),/PAIRDISPLAY/);
+ assert.throws(()=>compileActionFormula('=PAIRGUEST(SelfOrder)'),/PAIRGUEST/);
+ assert.doesNotThrow(()=>compileActionPlan('=PAIRGUEST(SelfOrder, @recordId)'));
+ assert.doesNotThrow(()=>compileActionPlan('=ACTIONS(GUESTLINK(SelfOrder, @recordId, AS(g)), UPDATERECORD(ServicePoint, @recordId, Name, g.Url))'));
 });
 
 test('server function: a failing step saves nothing', async ()=>{

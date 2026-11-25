@@ -58,7 +58,7 @@ export function normalizeFlowCalls(node:Expression):Expression {
 
 export const actionFunctionNames:readonly string[]=[...actionFormulaFunctions].filter(name=>name!=='AS');
 export const isActionPlan=(source:string):boolean=>{
- if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|GUESTLINK|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
+ if(/^\s*=?\s*(?:ACTIONS|CREATERECORD|UPDATERECORD|DELETERECORD|GETRECORD|STATE|LOCATION|FOREACH|CLOSESCREEN|INFOSCREEN|LOCKSCREEN|PAIRDISPLAY|PAIRGUEST|GUESTLINK|PRINT|CREATEPDF|WAIT|EMAIL|WHATSAPP|SMS)\s*\(/i.test(source))return true;
  if(!/^\s*=?\s*IF\s*\(/i.test(source))return false;
  try{
   const root=new Parser(tokenize(source,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();
@@ -119,9 +119,15 @@ export function compileActionPlan(source:string):ActionStep[] {
    return;
   }
   if(node.name==='PAIRDISPLAY'){
-  if(args.length!==1&&args.length!==3)throw Error('PAIRDISPLAY needs the page the screen shows (and, for a guest tablet, the record Id and guest profile)');
-  if(args.length===3)nameOf(args[2],'PAIRDISPLAY guest profile');
-  steps.push({name:node.name,object:nameOf(args[0],'PAIRDISPLAY page'),values:args.slice(1),fields:new Map(),guards});
+  if(args.length!==1)throw Error('PAIRDISPLAY needs the page the screen shows');
+  steps.push({name:node.name,object:nameOf(args[0],'PAIRDISPLAY page'),fields:new Map(),guards});
+  return;
+ }
+ if(node.name==='PAIRGUEST'){
+  // PAIRGUEST(App, RecordId): pair a tablet as that record's guest (App Manager > Guest access).
+  if(args.length!==2)throw Error('PAIRGUEST needs the app and the record');
+  validateFormulaFunctions(args[1],'ribbon_binding');
+  steps.push({name:node.name,object:nameOf(args[0],'PAIRGUEST app'),values:[args[1]],fields:new Map(),guards});
   return;
  }
  if(node.name==='CLOSESCREEN'||node.name==='LOCKSCREEN'){
@@ -154,7 +160,7 @@ export function compileActionPlan(source:string):ActionStep[] {
    const last=args.at(-1);
    if(!(last?.kind==='call'&&last.name==='AS'))throw Error('GUESTLINK requires AS(variable) for the link');
    const alias=takeAlias(last,'AS requires one variable');args.pop();
-   if(args.length!==3)throw Error('GUESTLINK requires the page, the record Id and the guest profile');
+   if(args.length!==2)throw Error('GUESTLINK requires the app and the record Id');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
    steps.push({name:'GUESTLINK',object:'',values:args,fields:new Map(),alias,guards});
    return;

@@ -15,6 +15,11 @@ export default function GuestStart(){
     const answer=await apiRequest<GuestAnswer>('/auth/guest/open',{method:'POST',body:JSON.stringify({token})});
     window.location.replace(rememberGuest(token,answer));
    }catch(error){
+    // Guest access switched off for the app: say so and look again in a while.
+    if(error instanceof ApiRequestError&&error.status===423){
+     setMessage(error.message||'Ordering here is switched off at the moment.');
+     timer=window.setTimeout(()=>void open(),30_000);return;
+    }
     if(error instanceof ApiRequestError&&(error.status===410||error.status===429)){
      if(error.status===410)forgetGuest();
      setMessage(error.message||'This link is no longer valid. Ask a member of staff for help.');

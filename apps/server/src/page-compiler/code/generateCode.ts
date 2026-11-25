@@ -386,12 +386,16 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   }
   case 'PAIRDISPLAY':{
    // PAIRDISPLAY(Page): pair a /display screen with this device; it shows Page of this app.
-   // PAIRDISPLAY(Page, RecordId, Profile): pair a tablet as that record's guest (a table's tablet).
-   if(args.length!==1&&args.length!==3)fail('PAIRDISPLAY needs the page the screen shows, e.g. PAIRDISPLAY(CustomerDisplay), or page, record Id and guest profile');
+   if(args.length!==1)fail('PAIRDISPLAY needs the page the screen shows, e.g. PAIRDISPLAY(CustomerDisplay)');
    scope.ui.add('PAIRDISPLAY');
-   if(args.length===3)return ['await $.ui("PAIRDISPLAY", '+q(literalName(args[0],'PAIRDISPLAY page'))+', '+value(args[1])
-    +', '+q(literalName(args[2],'PAIRDISPLAY guest profile'))+');'];
    return ['await $.ui("PAIRDISPLAY", '+q(literalName(args[0],'PAIRDISPLAY page'))+');'];
+  }
+  case 'PAIRGUEST':{
+   // PAIRGUEST(App, RecordId): pair a tablet showing /display as that record's guest (a table's
+   // tablet); it shows App's guest page (App Manager > Guest access).
+   if(args.length!==2)fail('PAIRGUEST needs the app and the record, e.g. PAIRGUEST(SelfOrder, @recordId)');
+   scope.ui.add('PAIRGUEST');
+   return ['await $.ui("PAIRGUEST", '+q(literalName(args[0],'PAIRGUEST app'))+', '+value(args[1])+');'];
   }
   case 'CLOSESCREEN':case 'LOCKSCREEN':{
    scope.ui.add(node.name);
@@ -457,13 +461,12 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
   }
   case 'GUESTLINK':{
-   // GUESTLINK(Page, RecordId, Profile, AS(x)): server; makes a user, so it needs Security manage.
+   // GUESTLINK(App, RecordId, AS(x)): server; the record's guest link (App Manager > Guest access).
    const last=args.at(-1);
    const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
-   if(!alias||args.length!==3)fail('GUESTLINK needs page, recordId, profile and AS(x), e.g. GUESTLINK(SelfOrder, @recordId, SelfOrder, AS(g))');
+   if(!alias||args.length!==2)fail('GUESTLINK needs the app, the record and AS(x), e.g. GUESTLINK(SelfOrder, @recordId, AS(g))');
    scope.data=true;
-   return ['v['+q(alias)+'] = await $.service("GUESTLINK", ['+q(literalName(args[0],'GUESTLINK page'))+', '+value(args[1])
-    +', '+q(literalName(args[2],'GUESTLINK profile'))+']);'];
+   return ['v['+q(alias)+'] = await $.service("GUESTLINK", ['+q(literalName(args[0],'GUESTLINK app'))+', '+value(args[1])+']);'];
   }
   case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'CASHMOVE':{
    const last=args.at(-1);

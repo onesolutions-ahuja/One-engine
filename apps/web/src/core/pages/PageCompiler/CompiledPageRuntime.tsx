@@ -804,7 +804,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);
      else if(effect.name==='LOCKSCREEN')await lockTillScreen();
      // PAIRDISPLAY(Page): pair a /display screen to show Page of this app.
-     else if(effect.name==='PAIRDISPLAY')await showScreenPairing(runtime.request,currentAppId,first,second?{recordId:second,profile:third}:undefined);
+     else if(effect.name==='PAIRDISPLAY')await showScreenPairing(runtime.request,currentAppId,first);
+     // PAIRGUEST(App, RecordId): pair a tablet as that record's guest (shows App's guest page).
+     else if(effect.name==='PAIRGUEST')await showScreenPairing(runtime.request,first,'',{recordId:second});
      // Printing code loads only when something is printed.
      else if(effect.name==='PRINT')await (await import('../PageRuntime/printTemplate')).printTemplate(first,runtime.request as never,
       ()=>previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId));

@@ -153,7 +153,7 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    // The tap's prediction goes to the same login's other screens (a customer display) now,
    // before the save: they show it as fast as the till itself.
    const request=parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent'),
-    origin:requestOrigin(req),app:appParam?String(req.params.appId):''});
+    origin:requestOrigin(req)});
    const live=deps.live?readLiveRelay(body.live):null;
    // Which device and sale tapped: a display following that device moves to the sale at once.
    const from={...(request.deviceKey?{device:request.deviceKey}:{}),...(request.sessionId?{session:request.sessionId}:{})};
@@ -237,12 +237,11 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   const body=(req.body??{}) as Record<string,unknown>;
-  // A table's tablet: paired as that record's guest (PAIRDISPLAY(page, recordId, profile)).
+  // PAIRGUEST(App, RecordId): a table's tablet, paired as that record's guest (App Manager > Guest access).
   if(body.guestRecordId!==undefined){
    if(!deps.guests)throw Error('Guest tablets are unavailable');
-   const guest=await deps.guests.pairingGuest(actor,{appId:body.appId,pageApiName:body.pageApiName,
-    recordId:body.guestRecordId,profile:body.guestProfile});
-   res.json(await screens().approveGuest(actor,body.code,guest,body.appId,body.pageApiName,body.name));
+   const guest=await deps.guests.pairingGuest(actor,{appId:body.appId,recordId:body.guestRecordId});
+   res.json(await screens().approveGuest(actor,body.code,guest,body.appId,body.name));
    return;
   }
   const device=await pairingDevice(deps.records,actor,body.deviceKey);

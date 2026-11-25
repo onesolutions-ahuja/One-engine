@@ -58,8 +58,8 @@ export type PageCodeRequest={
  shown?:Record<string,string[]>;
  /** Seen by the server itself, never sent by the browser: for audit. */
  deviceIp?:string;deviceAgent?:string;
- /** Seen by the server: this site's address and the app the page runs in (GUESTLINK). */
- serverOrigin?:string;serverApp?:string;
+ /** Seen by the server: this site's address (GUESTLINK links). */
+ serverOrigin?:string;
 };
 /** The action needs a device step from the browser; nothing was saved. */
 export class DeviceStepNeeded extends Error{
@@ -437,12 +437,11 @@ class ServerScope{
    return {queued:true};
   }
   if(name==='GUESTLINK'){
-   // GUESTLINK(Page, RecordId, Profile): a new QR link for that record (the old one stops).
+   // GUESTLINK(App, RecordId): a new QR link for that record (the old one stops).
    const {guests}=this.services;
    if(!guests)throw Error('GUESTLINK is unavailable');
-   const [page,recordId,profile]=args;
-   const made=await guests.link(this.actor,{appId:this.request.serverApp,pageApiName:page,recordId,profile,
-    origin:this.request.serverOrigin});
+   const [app,recordId]=args;
+   const made=await guests.link(this.actor,{appId:app,recordId,origin:this.request.serverOrigin});
    return {Url:made.url,Path:made.path,Id:made.id};
   }
   if(name==='CASHMOVE'){
@@ -601,7 +600,7 @@ export async function findDeviceTill(records:Pick<Records,'list'|'get'>,actor:Ac
  return {Id:till.Id,Name:till.Name??'',Code:till.Code??'',Location:till.Location??'',LocationCode:locationCode};
 }
 
-export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unknown;origin?:unknown;app?:unknown}={}):PageCodeRequest{
+export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unknown;origin?:unknown}={}):PageCodeRequest{
  const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
  const event=(raw.event&&typeof raw.event==='object'&&!Array.isArray(raw.event)?raw.event:{}) as Record<string,unknown>;
  const sessionId=typeof raw.sessionId==='string'&&raw.sessionId.length<=80?raw.sessionId:'';
@@ -617,8 +616,7 @@ export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unkno
   ...(shownRows(raw.shown)?{shown:shownRows(raw.shown)!}:{}),
   ...(typeof seen.ip==='string'&&seen.ip?{deviceIp:seen.ip.slice(0,64)}:{}),
   ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{}),
-  ...(typeof seen.origin==='string'&&/^https?:\/\/[A-Za-z0-9.:-]{1,200}$/.test(seen.origin)?{serverOrigin:seen.origin}:{}),
-  ...(typeof seen.app==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(seen.app)?{serverApp:seen.app}:{})};
+  ...(typeof seen.origin==='string'&&/^https?:\/\/[A-Za-z0-9.:-]{1,200}$/.test(seen.origin)?{serverOrigin:seen.origin}:{})};
 }
 
 /** Shown row Ids per Object: at most 5 Objects and 500 Ids each, Ids only. */

@@ -20,11 +20,11 @@ const when=(iso:string|null)=>{
  return minutes<2?'online':minutes<60?minutes+' min ago':new Date(iso).toLocaleString([],{dateStyle:'short',timeStyle:'short'});
 };
 
-/** PAIRDISPLAY(Page): screens for this device. PAIRDISPLAY(Page, RecordId, Profile): a record's tablet
- * (a table's): it signs in as that record's guest, never as the person pairing it. */
+/** PAIRDISPLAY(Page): screens for this device. PAIRGUEST(App, RecordId): a record's tablet (a table's):
+ * it signs in as that record's guest, never as the person pairing it, and shows App's guest page. */
 export async function showScreenPairing(request:Request,appId:string,pageApiName:string,
- guest?:{recordId:string;profile:string}):Promise<void>{
- const forGuest=guest?{guestRecordId:guest.recordId,guestProfile:guest.profile}:{};
+ guest?:{recordId:string}):Promise<void>{
+ const forGuest=guest?{guestRecordId:guest.recordId}:{};
  if(typeof document==='undefined')return;
  ensureTillDialogStyles();
  const make=<K extends keyof HTMLElementTagNameMap>(tag:K,text='',className='')=>{

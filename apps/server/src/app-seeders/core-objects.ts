@@ -60,6 +60,8 @@ export async function seedCoreObjects(client:PoolClient,tenantId:string):Promise
  await seedFreshSmartComponents(client,tenantId);
  // After Location, Cart, Invoice and CashLedger: adds to them, then the starter Location/Till.
  await seedTillNumbering(client,tenantId);
+ // Documents nobody has set search fields for are found by their number (INV-2026-000045).
+ await seedAutoNumberSearch(client,tenantId);
  // The tenant's own company details (one record): Company Settings and @ThisTenant.Company.*.
  await seedCompanyObject(client,tenantId);
  await markCoreObjectKinds(client,tenantId);
@@ -117,4 +119,20 @@ export async function reconcileCoreObjects(db:SqlPersistence):Promise<number>{
  });
  await reconcileCoreObjectDefaults(db);
  return count;
+}
+
+/** An Object with no searchable fields cannot be searched at all. Give such
+ * Objects their Auto Number fields (document numbers) as searchable fields.
+ * Additive and once per tenant: an Object whose search fields a tenant has set,
+ * or later clears on purpose, is left alone. */
+export async function seedAutoNumberSearch(client:PoolClient,tenantId:string){
+ const marker='autonumber-search-defaults-v1:'+tenantId;
+ const done=await client.query('SELECT 1 FROM md_system_migrations WHERE version=$1',[marker]);
+ if(done.rowCount)return;
+ await client.query(`INSERT INTO md_search_layout_fields(tenant_id,object_api,field_api,weight)
+  SELECT f.tenant_id,f.object_api,f.api_name,'A' FROM md_field_definitions f
+  WHERE f.tenant_id=$1 AND lower(f.data_type)='autonumber'
+   AND NOT EXISTS(SELECT 1 FROM md_search_layout_fields s WHERE s.tenant_id=f.tenant_id AND s.object_api=f.object_api)
+  ON CONFLICT DO NOTHING`,[tenantId]);
+ await client.query('INSERT INTO md_system_migrations(version,checksum) VALUES($1,$2) ON CONFLICT DO NOTHING',[marker,'1']);
 }

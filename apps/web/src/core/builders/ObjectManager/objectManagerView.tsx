@@ -1243,7 +1243,7 @@ function ObjectManager({
     const options = ['searchResults', 'lookupDialog', 'lookupPhoneDialog'] as const;
     const searchable=searchLayouts.searchableFields??[];
     const eligibleFields=draft.fields.filter(field=>
-      ['text','email','phone','url','picklist'].includes(field.dataType.toLocaleLowerCase()));
+      ['text','email','phone','url','picklist','autonumber'].includes(field.dataType.toLocaleLowerCase()));
     const updateSearchable=(fieldApiName:string,weight?:'A'|'B'|'C'|'D')=>{
       const next=weight
         ?searchable.map(field=>field.fieldApiName===fieldApiName?{...field,weight}:field)

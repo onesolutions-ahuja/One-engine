@@ -56,8 +56,10 @@
 }
 .smart-runtime.smart-ios:not([data-builder-preview]) .smart-grid-action:active>.smart-card{transform:scale(.98)}
 
-/* One soft accent focus ring for keyboard users. */
-.smart-runtime.smart-ios :is(button,input,textarea,[contenteditable="true"]):focus-visible{
+/* One soft accent focus ring for keyboard users. A Smart Search box draws the
+   ring round the whole field (:focus-within), so its inner input draws none:
+   two rings, the inner one clipped by the rounded box, showed as "((". */
+.smart-runtime.smart-ios :is(button,input,textarea,[contenteditable="true"]):not(.smart-search-input):focus-visible{
  outline:3px solid color-mix(in srgb,var(--smart-ios-accent) 45%,transparent);
  outline-offset:2px;
 }

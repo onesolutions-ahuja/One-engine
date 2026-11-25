@@ -25,6 +25,10 @@
       "label": "When a line is tapped"
     },
     {
+      "apiName": "change",
+      "label": "When a ticket is tapped"
+    },
+    {
       "apiName": "longPress",
       "label": "When a line is held"
     },

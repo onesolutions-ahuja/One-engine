@@ -115,7 +115,7 @@ export const EPOS_OBJECTS:ReadonlyArray<{name:string;existing:boolean;fields:Fie
   {name:'Customer',type:'reference',target:'Customer'},
   {name:'Total',type:'number'},
   {name:'Notes',type:'text',length:255},
-  {name:'Source',type:'picklist',choices:['Till','Uber Eats','Deliveroo','Just Eat','Kiosk','Online']},
+  {name:'Source',type:'picklist',choices:['Till','Uber Eats','Deliveroo','Just Eat','Kiosk','Online','Self order']},
   {name:'OrderType',type:'picklist',choices:['Eat in','Take away','Delivery','Collection']},
   {name:'ServicePoint',type:'reference',target:'ServicePoint'},
   {name:'Covers',type:'number'},

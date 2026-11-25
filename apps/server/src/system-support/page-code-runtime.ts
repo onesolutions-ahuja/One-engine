@@ -151,7 +151,11 @@ class ServerScope{
  async loadEventRecord(){
   const id=this.request.event.recordId;
   if(typeof id==='string'&&uuid.test(id)&&key.test(this.request.rowObject)){
-   const row=await this.records.get(this.actor.tenant_id,this.actor.user_id,this.request.rowObject,id) as Row;
+   // A grouped list (ticket board grouped by Order) sends the group's Id, a record of
+   // another Object: then there is no clicked row, and @event.recordId is still that Id.
+   let row:Row;
+   try{row=await this.records.get(this.actor.tenant_id,this.actor.user_id,this.request.rowObject,id) as Row;}
+   catch(error){if(error instanceof Error&&error.message==='Record not found')return;throw error;}
    this.row=row;this.eventRecord=row;
   }
  }

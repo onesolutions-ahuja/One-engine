@@ -125,6 +125,27 @@ export class ScreenPairingService{
   return {id:row.id,name:label||'Display',appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
  }
 
+ /** A table's tablet (any record's): the code pairs the screen as that record's guest, not as the
+  * person typing it. It has no till to follow; it is listed and unpaired by its record. */
+ async approveGuest(actor:Actor,code:unknown,guest:{userId:string;recordId:string;name:string},appId:unknown,pageApiName:unknown,name?:unknown):Promise<PairedScreen>{
+  const label=screenName(name)||guest.name.slice(0,60);
+  if(typeof code!=='string'||!/^\d{4}$/.test(code.trim()))fail('Type the 4-digit code shown on the screen');
+  if(typeof appId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(appId))fail('Choose the app this screen belongs to');
+  if(typeof pageApiName!=='string'||!apiName.test(pageApiName))fail('Choose the page this screen shows');
+  if(!uuid.test(guest.userId)||!uuid.test(guest.recordId))fail('Choose the record this screen is for');
+  if(!this.allowTry(actor.tenant_id+'\u0000'+actor.user_id))fail('Too many tries. Wait a minute and try again');
+  const {rows}=await this.db.query<{id:string;approved_at:Date}>(`UPDATE md_screen_pairings
+    SET tenant_id=$2,user_id=$3,mfa_verified=false,device_record_id=$4,device_name=$5,mirror_key=NULL,app_id=$6,page_api_name=$7,
+        approved_at=now(),code=NULL,screen_name=$8
+    WHERE id=(SELECT id FROM md_screen_pairings WHERE code=$1 AND approved_at IS NULL AND revoked_at IS NULL
+      AND code_expires_at>now() ORDER BY created_at DESC LIMIT 1)
+    RETURNING id,approved_at`,
+  [code.trim(),actor.tenant_id,guest.userId,guest.recordId,guest.name.slice(0,120),appId,pageApiName,label]);
+  const row=rows[0];
+  if(!row)fail('That code is wrong or has expired. Check the code on the screen');
+  return {id:row.id,name:label,appId,pageApiName,pairedAt:new Date(row.approved_at).toISOString(),lastSeenAt:null,online:false};
+ }
+
  /** Whether the till's own sign-in passed MFA: the screen gets no more than that. */
  async sessionMfa(bearer:string):Promise<boolean>{
   if(!/^[A-Za-z0-9_-]{20,}$/.test(bearer))return false;

@@ -16,6 +16,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'STATE',parameters:['Key','Value']},
  {name:'LOCATION',parameters:['AS(variable)']},
  {name:'CASHMOVE',parameters:['Direction','Amount','Reason','TillSession','AS(variable)']},
+ {name:'GUESTLINK',parameters:['Page','RecordId','Profile','AS(variable)']},
  {name:'FOREACH',parameters:['Object','Field1','Value1','AS(item)','Action']},
  {name:'LOOP',parameters:['Times','AS(item)','Action']},
  {name:'REPEAT',parameters:['Action','UntilCondition','EverySeconds','MaxTimes']},
@@ -24,7 +25,7 @@ export const ACTION_FORMULA_DECLARATIONS=[
  {name:'CLOSESCREEN',parameters:[]},
  {name:'INFOSCREEN',parameters:['Message','ActionsAfterOk']},
  {name:'LOCKSCREEN',parameters:[]},
- {name:'PAIRDISPLAY',parameters:['Page']},
+ {name:'PAIRDISPLAY',parameters:['Page','RecordId','Profile']},
  {name:'AS',parameters:['variable']}
 ] as const;
 export const ACTION_FORMULA_FUNCTIONS:ReadonlySet<string>=

@@ -1,4 +1,4 @@
-import type {Express,Response} from 'express';
+import type {Express,Request,Response} from 'express';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
 import type {RbacEngine} from '../system-files/rbac-engine.js';
@@ -11,6 +11,7 @@ import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js'
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
 import {readLiveRelay,relayChanges,type LiveRelay} from '../system-support/live-changes.js';
+import type {GuestAccessService} from '../system-support/guest-access-service.js';
 import type {ScreenPairingService} from '../system-support/screen-pairing-service.js';
 
 /**
@@ -24,8 +25,15 @@ import type {ScreenPairingService} from '../system-support/screen-pairing-servic
  * becomes code. Every request re-checks the user's permissions.
  */
 import {stampDeviceCarts,validDeviceKey,DEVICE_OFFLINE_AT} from '../system-support/device-presence-service.js';
+/** This site's address as the browser used it (links made by an action, e.g. GUESTLINK). */
+function requestOrigin(req:Request):string{
+ const origin=req.get('origin');
+ if(origin&&/^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/.test(origin))return origin;
+ const host=req.get('host');
+ return host&&/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(host)?(req.secure?'https://':'http://')+host:'';
+}
 export type PageScriptDeps={db:SqlPersistence;rbac:RbacEngine;records:RecordEngine;pages:PageRuntime;
- definitions:ObjectDefinitionService;scripts:PageScriptService;screens?:ScreenPairingService;
+ definitions:ObjectDefinitionService;scripts:PageScriptService;screens?:ScreenPairingService;guests?:GuestAccessService;
  verifyPin?:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>Promise<boolean>;
  /** Live stream hub: a tap's predicted change and its saved answer reach the same login's
   * other screens at once (set once the hub exists). */
@@ -144,7 +152,8 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    const source=build.pageCode.actions.find(item=>item.key===key)?.js??'';
    // The tap's prediction goes to the same login's other screens (a customer display) now,
    // before the save: they show it as fast as the till itself.
-   const request=parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent')});
+   const request=parsePageCodeRequest(body.request,{ip:req.ip,agent:req.get('user-agent'),
+    origin:requestOrigin(req),app:appParam?String(req.params.appId):''});
    const live=deps.live?readLiveRelay(body.live):null;
    // Which device and sale tapped: a display following that device moves to the sale at once.
    const from={...(request.deviceKey?{device:request.deviceKey}:{}),...(request.sessionId?{session:request.sessionId}:{})};
@@ -228,6 +237,14 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   const body=(req.body??{}) as Record<string,unknown>;
+  // A table's tablet: paired as that record's guest (PAIRDISPLAY(page, recordId, profile)).
+  if(body.guestRecordId!==undefined){
+   if(!deps.guests)throw Error('Guest tablets are unavailable');
+   const guest=await deps.guests.pairingGuest(actor,{appId:body.appId,pageApiName:body.pageApiName,
+    recordId:body.guestRecordId,profile:body.guestProfile});
+   res.json(await screens().approveGuest(actor,body.code,guest,body.appId,body.pageApiName,body.name));
+   return;
+  }
   const device=await pairingDevice(deps.records,actor,body.deviceKey);
   const mfa=await screens().sessionMfa(String(req.get('authorization')??'').slice(7));
   res.json(await screens().approve(actor,mfa,body.code,device,body.appId,body.pageApiName,body.name));
@@ -235,7 +252,13 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  app.post('/api/screens/list',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
-  const device=await pairingDevice(deps.records,actor,(req.body??{}).deviceKey);
+  const body=(req.body??{}) as Record<string,unknown>;
+  // A table's tablets are listed by the table (Security manage, as pairing them).
+  if(typeof body.guestRecordId==='string'&&/^[0-9a-f-]{36}$/i.test(body.guestRecordId)){
+   await deps.rbac.require(actor.tenant_id,actor.user_id,'Security','manage');
+   res.json({screens:await screens().list(actor,body.guestRecordId),device:''});return;
+  }
+  const device=await pairingDevice(deps.records,actor,body.deviceKey);
   res.json({screens:await screens().list(actor,device.id),device:device.name});
  }));
  app.post('/api/screens/rename',wrap(async(req,res)=>{

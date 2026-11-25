@@ -1,4 +1,5 @@
 import {modernizeFormula} from '../../server/src/expression-engine/PageReferences.js';
+import {compileActionPlan} from '../../server/src/expression-engine/ActionFormulas.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -6,7 +7,7 @@ import {compileDisplayFormula,compileActionFormula} from '../../server/src/page-
 import {F,O} from '../../server/src/page-compiler/code/formulaLibrary';
 import {FORMULA_DICTIONARY} from '../../server/src/page-compiler/code/formulaDictionary';
 import {buildPageCode,pageCodeModule,serverPageCode} from '../../server/src/page-compiler/code/pageCode';
-import {executePageCodeAction} from '../../server/src/system-support/page-code-runtime';
+import {executePageCodeAction,parsePageCodeRequest} from '../../server/src/system-support/page-code-runtime';
 import {createPageCodeRuntime,type PageCode} from '../src/core/pages/PageCompiler/pageCodeRuntime';
 import {resolveCollectionMentionRows,resolveComponentMentionRows} from '../src/component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import type {ObjectMetadata} from '../src/core/metadata/Definitions/metadata';
@@ -244,6 +245,34 @@ test('server function: a grouped list button sends the group Id (another Object)
  assert.equal(result.ok,true,result.error);
  assert.equal(fake.tables.OrderLine[0].KitchenStatus,'Completed');
  assert.equal(fake.tables.Order[0].KitchenStatus,'Ready');
+});
+
+test('GUESTLINK makes the record\'s guest link on the server, for this app and site', async ()=>{
+ const tableId='55555555-5555-4555-8555-555555555555';
+ const fake=fakeRecords({ServicePoint:[{Id:tableId,Name:'Table 3'}]});
+ const asked:unknown[]=[];
+ const guests={link:async(_actor:unknown,input:Record<string,unknown>)=>{asked.push(input);
+  return {id:'a'.repeat(32),path:'/guest/x',url:String(input.origin)+'/guest/x',userId:'u'};}};
+ const db={transaction:async<T>(run:()=>Promise<T>)=>run(),query:async()=>({rows:[]})};
+ const page={apiName:'settings',components:[{id:'tables',objectApiName:'ServicePoint',formulas:[],actions:[{event:'click',kind:'Formula',
+  formula:'=ACTIONS(GUESTLINK(SelfOrder, @recordId, SelfOrder, AS(g)), UPDATERECORD(ServicePoint, @recordId, Name, g.Url))'}]}]};
+ const server=serverPageCode(buildPageCode(page as never));
+ const request=parsePageCodeRequest({sessionId:'s-1',state:{},rowObject:'ServicePoint',event:{recordId:tableId}},
+  {origin:'https://shop.example',app:'SMARTORDER'});
+ const result=await executePageCodeAction({db,records:fake.records,guests} as never,{tenant_id:'t',user_id:'u'},server,'tables:click',request,'');
+ assert.equal(result.ok,true,result.error);
+ assert.deepEqual(asked,[{appId:'SMARTORDER',pageApiName:'SelfOrder',recordId:tableId,profile:'SelfOrder',origin:'https://shop.example'}]);
+ assert.equal(fake.tables.ServicePoint[0].Name,'https://shop.example/guest/x');
+ assert.throws(()=>buildPageCode({apiName:'p',components:[{id:'b',objectApiName:'',formulas:[],actions:[{event:'click',kind:'Formula',
+  formula:'=GUESTLINK(SelfOrder, @recordId, SelfOrder)'}]}]} as never).issues.length&&(()=>{throw Error('needs AS');})());
+});
+
+test('PAIRDISPLAY with a record and profile pairs a tablet as that record\'s guest (browser step)', ()=>{
+ const code=compileActionFormula('=PAIRDISPLAY(SelfOrder, @recordId, SelfOrder)','ServicePoint');
+ assert.match(code.js,/\$\.ui\("PAIRDISPLAY", "SelfOrder", \$\.event\("recordId"\), "SelfOrder"\)/);
+ assert.match(compileActionFormula('=PAIRDISPLAY(CustomerDisplay)').js,/\$\.ui\("PAIRDISPLAY", "CustomerDisplay"\)/);
+ assert.throws(()=>compileActionFormula('=PAIRDISPLAY(SelfOrder, @recordId)'),/PAIRDISPLAY needs/);
+ assert.doesNotThrow(()=>compileActionPlan('=PAIRDISPLAY(SelfOrder, @recordId, SelfOrder)'));
 });
 
 test('server function: a failing step saves nothing', async ()=>{

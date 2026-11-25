@@ -386,8 +386,11 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   }
   case 'PAIRDISPLAY':{
    // PAIRDISPLAY(Page): pair a /display screen with this device; it shows Page of this app.
-   if(args.length!==1)fail('PAIRDISPLAY needs the page the screen shows, e.g. PAIRDISPLAY(CustomerDisplay)');
+   // PAIRDISPLAY(Page, RecordId, Profile): pair a tablet as that record's guest (a table's tablet).
+   if(args.length!==1&&args.length!==3)fail('PAIRDISPLAY needs the page the screen shows, e.g. PAIRDISPLAY(CustomerDisplay), or page, record Id and guest profile');
    scope.ui.add('PAIRDISPLAY');
+   if(args.length===3)return ['await $.ui("PAIRDISPLAY", '+q(literalName(args[0],'PAIRDISPLAY page'))+', '+value(args[1])
+    +', '+q(literalName(args[2],'PAIRDISPLAY guest profile'))+');'];
    return ['await $.ui("PAIRDISPLAY", '+q(literalName(args[0],'PAIRDISPLAY page'))+');'];
   }
   case 'CLOSESCREEN':case 'LOCKSCREEN':{
@@ -452,6 +455,15 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    scope.data=true;scope.ui.add(node.name);
    const list=node.name==='CREATEPDF'?[q(literalName(args[0],'print template')),...args.slice(1).map(value)]:[];
    return [(alias?'v['+q(alias)+'] = ':'')+'await $.service('+q(node.name)+', ['+list.join(', ')+']);'];
+  }
+  case 'GUESTLINK':{
+   // GUESTLINK(Page, RecordId, Profile, AS(x)): server; makes a user, so it needs Security manage.
+   const last=args.at(-1);
+   const alias=last?.kind==='call'&&last.name==='AS'?takeAlias(args.pop(),scope,'AS needs one name'):'';
+   if(!alias||args.length!==3)fail('GUESTLINK needs page, recordId, profile and AS(x), e.g. GUESTLINK(SelfOrder, @recordId, SelfOrder, AS(g))');
+   scope.data=true;
+   return ['v['+q(alias)+'] = await $.service("GUESTLINK", ['+q(literalName(args[0],'GUESTLINK page'))+', '+value(args[1])
+    +', '+q(literalName(args[2],'GUESTLINK profile'))+']);'];
   }
   case 'EMAIL':case 'WHATSAPP':case 'SMS':case 'CASHMOVE':{
    const last=args.at(-1);

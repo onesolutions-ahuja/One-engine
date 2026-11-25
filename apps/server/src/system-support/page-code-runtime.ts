@@ -7,6 +7,7 @@
  * tenant isolation, object/field permissions, sharing, validation and triggers
  * apply exactly as for any other save. If any step fails, nothing is saved.
  */
+import type {GuestAccessService} from './guest-access-service.js';
 import {SHOWN_ROWS} from '../page-compiler/code/generateCode.js';
 import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
@@ -57,6 +58,8 @@ export type PageCodeRequest={
  shown?:Record<string,string[]>;
  /** Seen by the server itself, never sent by the browser: for audit. */
  deviceIp?:string;deviceAgent?:string;
+ /** Seen by the server: this site's address and the app the page runs in (GUESTLINK). */
+ serverOrigin?:string;serverApp?:string;
 };
 /** The action needs a device step from the browser; nothing was saved. */
 export class DeviceStepNeeded extends Error{
@@ -141,7 +144,8 @@ class ServerScope{
  constructor(private readonly records:Records,private readonly actor:Actor,readonly request:PageCodeRequest,
   private readonly identity:TrustedFormulaSession|null,private readonly connections:ConnectionSnapshot|null,
   private readonly verify:((pin:unknown,userId?:unknown)=>Promise<boolean>)|null,
-  private readonly services:{db?:SqlPersistence;rbac?:RbacEngine;namedCredentials?:NamedCredentialService}={}){}
+  private readonly services:{db?:SqlPersistence;rbac?:RbacEngine;namedCredentials?:NamedCredentialService;
+   guests?:Pick<GuestAccessService,'link'>}={}){}
  /** Seconds REPEAT has waited in this action. */
  private slept=0;
  /** Messages are sent after the transaction commits (never for a rolled-back save). */
@@ -432,6 +436,15 @@ class ServerScope{
    this.messages.push({channel:name,credential,values:values.map(value=>value===null||value===undefined?'':String(value))});
    return {queued:true};
   }
+  if(name==='GUESTLINK'){
+   // GUESTLINK(Page, RecordId, Profile): a new QR link for that record (the old one stops).
+   const {guests}=this.services;
+   if(!guests)throw Error('GUESTLINK is unavailable');
+   const [page,recordId,profile]=args;
+   const made=await guests.link(this.actor,{appId:this.request.serverApp,pageApiName:page,recordId,profile,
+    origin:this.request.serverOrigin});
+   return {Url:made.url,Path:made.path,Id:made.id};
+  }
   if(name==='CASHMOVE'){
    const {db}=this.services;
    if(!db)throw Error('CASHMOVE is unavailable');
@@ -511,7 +524,7 @@ async function loadSets(scope:ServerScope,code:ServerPageCode,only?:ReadonlySet<
 }
 
 type Deps={db:Sql;records:Records;verifyPin?:(actor:Actor,pin:unknown,userId?:unknown)=>Promise<boolean>;
- rbac?:RbacEngine;namedCredentials?:NamedCredentialService};
+ rbac?:RbacEngine;namedCredentials?:NamedCredentialService;guests?:Pick<GuestAccessService,'link'>};
 /** A value by name, ignoring case ('' when absent). */
 function namedValue(values:Record<string,unknown>|undefined,name:string,group:string):unknown{
  if(!values)throw Error('Unknown tenant value @ThisTenant.'+group+'.'+name);
@@ -526,7 +539,7 @@ async function scopeFor(deps:Deps,actor:Actor,request:PageCodeRequest,needs:{ide
   needs.connections?loadConnectionSnapshot(deps.db,actor.tenant_id):Promise.resolve(null)]);
  const scope=new ServerScope(deps.records,actor,request,identity,connections as ConnectionSnapshot|null,
   deps.verifyPin?(pin,userId)=>deps.verifyPin!(actor,pin,userId):null,
-  {db:deps.db as SqlPersistence,rbac:deps.rbac,namedCredentials:deps.namedCredentials});
+  {db:deps.db as SqlPersistence,rbac:deps.rbac,namedCredentials:deps.namedCredentials,guests:deps.guests});
  if(needs.permissions?.length){
   if(!deps.rbac)throw Error('Permissions are unavailable for this action');
   const allowed=await deps.rbac.allowedMany(actor.tenant_id,actor.user_id,
@@ -588,7 +601,7 @@ export async function findDeviceTill(records:Pick<Records,'list'|'get'>,actor:Ac
  return {Id:till.Id,Name:till.Name??'',Code:till.Code??'',Location:till.Location??'',LocationCode:locationCode};
 }
 
-export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unknown}={}):PageCodeRequest{
+export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unknown;origin?:unknown;app?:unknown}={}):PageCodeRequest{
  const raw=(body&&typeof body==='object'&&!Array.isArray(body)?body:{}) as Record<string,unknown>;
  const event=(raw.event&&typeof raw.event==='object'&&!Array.isArray(raw.event)?raw.event:{}) as Record<string,unknown>;
  const sessionId=typeof raw.sessionId==='string'&&raw.sessionId.length<=80?raw.sessionId:'';
@@ -603,7 +616,9 @@ export function parsePageCodeRequest(body:unknown,seen:{ip?:unknown;agent?:unkno
   ...(typeof raw.mirrorKey==='string'&&deviceKeyPattern.test(raw.mirrorKey)?{mirrorKey:raw.mirrorKey}:{}),
   ...(shownRows(raw.shown)?{shown:shownRows(raw.shown)!}:{}),
   ...(typeof seen.ip==='string'&&seen.ip?{deviceIp:seen.ip.slice(0,64)}:{}),
-  ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{})};
+  ...(typeof seen.agent==='string'&&seen.agent?{deviceAgent:seen.agent.slice(0,255)}:{}),
+  ...(typeof seen.origin==='string'&&/^https?:\/\/[A-Za-z0-9.:-]{1,200}$/.test(seen.origin)?{serverOrigin:seen.origin}:{}),
+  ...(typeof seen.app==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(seen.app)?{serverApp:seen.app}:{})};
 }
 
 /** Shown row Ids per Object: at most 5 Objects and 500 Ids each, Ids only. */

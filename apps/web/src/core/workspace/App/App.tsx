@@ -3,6 +3,7 @@ import {installMobileAdminSheets} from '../SetupShell/mobileAdminSheets';
 import { createLoginView } from '../../authentication/Login/loginView';
 import { TillLockScreen } from '../../authentication/TillDevice/TillLockScreen';
 import {holdScreenPage,onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
+import {guestLinkPath,onGuestPage} from '../../authentication/GuestAccess/guestAccess';
 // The corner code on a paired screen (loaded only there).
 const ScreenCornerCode=React.lazy(()=>import('../../authentication/PairedScreen/ScreenCornerCode'));
 import { tillPeople, activeTillUser, setActiveTillUser, stashTillWork, TILL_LOCK_EVENT, appLockHere, tillLockApplies, setTillLocked } from '../../authentication/TillDevice/tillDevice';
@@ -267,10 +268,10 @@ function App() {
   },[needsLandingRedirect,landingApp]);
 
   // On a paired screen Back does not leave the page a customer is looking at.
-  useEffect(()=>authState==='authenticated'&&onPairedScreenPage()?holdScreenPage():undefined,[authState]);
+  useEffect(()=>authState==='authenticated'&&(onPairedScreenPage()||onGuestPage())?holdScreenPage():undefined,[authState]);
   // Only on pages of an app with the lock screen on (App Manager), or right after a lock in this tab:
   // Page Builder, Setup and other apps never show the PIN screen.
-  const tillHere=tillLockApplies()&&!onPairedScreenPage();
+  const tillHere=tillLockApplies()&&!onPairedScreenPage()&&!onGuestPage();
   const showTillLock=authState==='anonymous'&&tillMode==='lock'&&tillHere&&tillPeople().length>0;
   /** Lock pressed while nobody is saved for PIN sign-in here: say why the email page shows. */
   const [lockedWithoutPin,setLockedWithoutPin]=useState(false);
@@ -294,7 +295,7 @@ function App() {
       // A paired screen (customer display) is idle by nature: it never locks itself.
       // Idle lock only on pages of an app with the lock screen on; 0 minutes = never on idle.
       const here=appLockHere();
-      if(here&&here.idleMinutes>0&&!onPairedScreenPage())idle=window.setTimeout(lock,here.idleMinutes*60*1000);
+      if(here&&here.idleMinutes>0&&!onPairedScreenPage()&&!onGuestPage())idle=window.setTimeout(lock,here.idleMinutes*60*1000);
     };
     const events=['pointerdown','keydown','wheel','touchstart'] as const;
     events.forEach(name=>window.addEventListener(name,restart,{passive:true}));
@@ -311,6 +312,8 @@ function App() {
     if(showTillLock||tillHere&&tillMode==='email'&&tillPeople().length>0)return;
     // A paired screen whose sign-in ended signs in again with its screen key at /display.
     if(authState==='anonymous'&&onPairedScreenPage()){window.location.replace('/display');return;}
+    // A guest page (a table's QR link) whose session ended opens its own link again, never /login.
+    if(authState==='anonymous'&&onGuestPage()&&guestLinkPath()){window.location.replace(guestLinkPath());return;}
     if(authState==='anonymous'&&!standaloneEntry&&window.location.pathname!=='/login'&&window.location.pathname!=='/oauth/authorize'){
       if(window.location.pathname==='/mail-admin'||window.location.pathname==='/mail-admin/'){
         try{sessionStorage.setItem('md_auth_return_to','/mail-admin');}catch{/* The normal landing route remains available if storage is disabled. */}

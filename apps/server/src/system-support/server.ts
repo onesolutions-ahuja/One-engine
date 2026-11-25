@@ -7,6 +7,7 @@ import {registerMcpRoutes} from './mcp-routes.js';
 import {TillPinService} from './till-pin-service.js';
 import {TillDeviceService,TILL_DEVICE_EXPIRED} from './till-device-service.js';
 import {ScreenPairingService,SCREEN_GONE,UserActionError} from './screen-pairing-service.js';
+import {GuestAccessService,GUEST_LINK_GONE} from './guest-access-service.js';
 import {withAuditContext,auditContext,setAuditActor} from './audit-context.js';
 import {ConnectedAppService} from './connected-app-service.js';
 import {SecurityMonitorService} from './security-monitor-service.js';
@@ -311,6 +312,7 @@ export function createSystemServer(db:SqlPersistence) {
   const tillPins=new TillPinService(db);
   const tillDevices=new TillDeviceService(db,auth);
   const screens=new ScreenPairingService(db,auth);
+  const guests=new GuestAccessService(db,auth,rbac,records);
   const federation=new FederationService(db,rbac,namedCredentials,integrationActivityWriter);
   const passkeys=new WebAuthnService(db,auth);
   const backups=new MfaBackupService(db,auth,mfa,rbac);
@@ -645,6 +647,22 @@ export function createSystemServer(db:SqlPersistence) {
       throw error;
     }
   }));
+  // Guest links (/guest/<token>, a table's QR code): no sign-in; the link signs in as that
+  // record's guest user (its own profile) and opens the page the link was made for.
+  const guestOpens=new Map<string,number[]>();
+  app.post('/api/auth/guest/open',route(async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    const ip=normalizedLoginIp(req.ip)??'unknown',now=Date.now();
+    const recent=(guestOpens.get(ip)??[]).filter(at=>now-at<60_000);
+    if(guestOpens.size>5000)guestOpens.clear();
+    recent.push(now);guestOpens.set(ip,recent);
+    if(recent.length>30){res.status(429).json({error:'Too many tries. Wait a minute.'});return;}
+    try{sendScreenSession(req,res,await guests.open(req.body?.token,{ip:req.ip}));}
+    catch(error){
+      if(error instanceof Error&&error.message===GUEST_LINK_GONE){res.status(410).json({error:GUEST_LINK_GONE});return;}
+      throw error;
+    }
+  }));
   app.post('/api/auth/till-device/remove',route(async(req,res)=>{
     await tillDevices.revoke(req.body?.key);
     res.status(204).end();
@@ -693,7 +711,7 @@ export function createSystemServer(db:SqlPersistence) {
   // Star CloudPRNT network printers poll here for receipts queued by DEVICE(...).
   registerCloudPrntPublicRoutes(app,db);
   // Compiled page scripts: the script fetch carries a one-time ticket instead of a bearer token.
-  const pageScriptDeps={db,rbac,records,pages,definitions,namedCredentials,scripts:new PageScriptService(),screens,
+  const pageScriptDeps={db,rbac,records,pages,definitions,namedCredentials,scripts:new PageScriptService(),screens,guests,
     verifyPin:(actor:{tenant_id:string;user_id:string},pin:unknown,userId?:unknown)=>tillPins.verify(actor.tenant_id,
       typeof userId==='string'&&/^[0-9a-f-]{36}$/i.test(userId)?userId:actor.user_id,pin,actor.user_id)};
   registerPageScriptPublicRoute(app,pageScriptDeps);

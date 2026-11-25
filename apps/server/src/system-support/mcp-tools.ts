@@ -9,6 +9,7 @@ import type {PlatformTenantService} from '../system-files/platform-tenant-servic
 import {execFile} from 'node:child_process';
 import {createConnection} from 'node:net';
 import {promisify} from 'node:util';
+import {readPageComponents,updatePageComponents,type PageComponent} from './mcp-page-components.js';
 const execute=promisify(execFile);
 export async function brokerOperation(request:{action:string;service:string;release?:string}):Promise<{output:string}>{
  const socketPath=process.env.METADRIVE_MCP_BROKER_SOCKET;
@@ -54,6 +55,15 @@ const schemas={
  create_flow_draft:z.object({flow:identifier,definition:values}).strict(),
  save_page_draft:z.object({page:identifier,variant:layout.default('Desktop'),definition:values}).strict(),
  publish_page_draft:z.object({page:identifier,variant:layout.default('Desktop'),expectedRevision:z.number().int().min(1)}).strict(),
+ get_page_components:z.object({page:identifier,variant:layout.optional(),view:z.enum(['draft','published']).default('published'),
+  components:z.array(z.string().min(1).max(200)).max(100).optional(),search:z.string().min(1).max(200).optional(),
+  properties:z.array(z.string().min(1).max(120)).max(100).optional()}).strict(),
+ update_page_components:z.object({page:identifier,
+  changes:z.array(z.object({component:z.string().min(1).max(200),set:values.optional(),
+   unset:z.array(z.string().min(1).max(240)).max(100).optional(),
+   position:z.object({x:z.number().optional(),y:z.number().optional(),width:z.number().positive().optional(),height:z.number().positive().optional()}).strict().optional(),
+   visible:z.boolean().optional(),label:z.string().max(200).optional(),remove:z.boolean().optional()}).strict()).max(100).default([]),
+  add:z.array(values).max(50).optional(),publish:z.boolean().default(false)}).strict(),
  server_operation:z.object({action:z.enum(['status','logs','restart','activate_release','mail_diagnostic']),service:z.enum(['api','worker']).default('api'),release:z.string().regex(/^[a-f0-9]{40}$/).optional()}).strict()
 };
 const descriptions:Record<keyof typeof schemas,string>={
@@ -71,20 +81,22 @@ const descriptions:Record<keyof typeof schemas,string>={
  create_flow_draft:'Create a missing Flow as a draft through the existing SQL Flow Editor; reject existing names and never activate implicitly.',
  save_page_draft:'Save a versioned tenant Page Builder draft using its existing revision, validating component contracts and preserving the published page.',
  publish_page_draft:'Publish the named Page Builder draft only if its revision still matches. Requires Page manage permission.',
+ get_page_components:'Compact Page Builder read: without components or search it lists every component (id, navigator name, type, parent, position); with them it returns only the matching components and their properties. Defaults to the page\'s main device layout, published view.',
+ update_page_components:'Change named components on a Page Builder page without sending the whole layout: set or unset properties (dot paths such as actionFlows.click.formula), move, show or hide, rename, remove or add components. Edits Desktop (which holds formulas and data) and every device layout the page uses, re-basing inheriting layouts; each save is a versioned draft, publish=true publishes them with the revision check.',
  server_operation:'Platform administrators: inspect service status or logs, restart API/worker, or activate an already built immutable API release. Requires the installed operations helper. Does not build or fetch code.'
 };
 // JSON schemas are derived from the same Zod validators used for execution.
 import {zodToJsonSchema} from 'zod-to-json-schema';
-export const mcpTools=Object.entries(schemas).map(([name,schema])=>({name,description:descriptions[name as keyof typeof schemas],inputSchema:zodToJsonSchema(schema,{$refStrategy:'none'}),annotations:{readOnlyHint:['list_records','get_record','list_objects','describe_object','get_page_layout','get_flow_definition'].includes(name),destructiveHint:!['list_records','get_record','list_objects','describe_object','get_page_layout','get_flow_definition','create_record','create_page','save_page_draft','create_flow_draft'].includes(name),openWorldHint:name==='run_flow'}}));
+export const mcpTools=Object.entries(schemas).map(([name,schema])=>({name,description:descriptions[name as keyof typeof schemas],inputSchema:zodToJsonSchema(schema,{$refStrategy:'none'}),annotations:{readOnlyHint:['list_records','get_record','list_objects','describe_object','get_page_layout','get_page_components','get_flow_definition'].includes(name),destructiveHint:!['list_records','get_record','list_objects','describe_object','get_page_layout','get_page_components','get_flow_definition','create_record','create_page','save_page_draft','create_flow_draft'].includes(name),openWorldHint:name==='run_flow'}}));
 /** Scope choices are permission alternatives, not implicit RBAC grants.
  * All tools still run under the caller's tenant, user and OneEngine rules. */
 export function mcpToolScopes(name:string):readonly string[]{
  if(['list_records','get_record'].includes(name))return ['records:read'];
  if(['create_record','update_record','delete_record'].includes(name))return ['records:write'];
  if(['list_objects','describe_object'].includes(name))return ['metadata:read','objects:read','fields:read'];
- if(name==='get_page_layout')return ['metadata:read','pages:read'];
+ if(name==='get_page_layout'||name==='get_page_components')return ['metadata:read','pages:read'];
  if(name==='get_flow_definition')return ['metadata:read','flows:read'];
- if(name==='create_page'||name==='save_page_draft'||name==='publish_page_draft')return ['metadata:write','pages:manage'];
+ if(name==='create_page'||name==='save_page_draft'||name==='publish_page_draft'||name==='update_page_components')return ['metadata:write','pages:manage'];
  if(name==='create_flow_draft')return ['metadata:write','flows:manage'];
  if(name==='run_flow')return ['flows:execute'];
  if(name==='server_operation')return ['operations:manage','operations:read'];
@@ -153,6 +165,17 @@ export async function callMcpTool(s:McpServices,a:McpActor,name:string,input:unk
   if(typeof p.definition.draftRevision!=='number'||!Number.isInteger(p.definition.draftRevision)||p.definition.draftRevision<0)
    throw Error('A current draftRevision is required');
   return s.pages.saveLayoutDraft(t,p.page,p.variant,p.definition,u);
+ }
+ if(name==='get_page_components'){
+  const p=schemas.get_page_components.parse(input);
+  await s.rbac.require(t,u,'PageDefinition','read');
+  return readPageComponents(s.pages,t,p);
+ }
+ if(name==='update_page_components'){
+  const p=schemas.update_page_components.parse(input);
+  await s.rbac.require(t,u,'PageDefinition','manage');
+  if(!p.changes.length&&!p.add?.length)throw Error('Nothing to change');
+  return updatePageComponents(s.pages,t,u,{...p,add:p.add as PageComponent[]|undefined});
  }
  if(name==='publish_page_draft'){
   const p=schemas.publish_page_draft.parse(input);

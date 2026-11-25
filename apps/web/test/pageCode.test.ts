@@ -27,6 +27,16 @@ test('every dictionary entry has a code rule', ()=>{
  }
 });
 
+test('row formulas read lookups up to three steps deep, the same depth the page loads', ()=>{
+ const row={Name:'Cola',__mentionValues:{'@OrderLine.Product.KitchenSection':'','@OrderLine.Product.Category.KitchenSection':'sec-drinks'}};
+ const m=(r:Row,path:string)=>((r.__mentionValues as Row)['@'+path]??'');
+ const source='=BLANKVALUE(@OrderLine.Product.KitchenSection, @OrderLine.Product.Category.KitchenSection)';
+ assert.equal(fn(compileDisplayFormula(source,'OrderLine').js)(row,{...display(),m}),'sec-drinks');
+ assert.equal(fn(compileDisplayFormula('=@OrderLine.Product.Category.Parent.Name','OrderLine').js)({__mentionValues:{'@OrderLine.Product.Category.Parent.Name':'Bar'}},{...display(),m}),'Bar');
+ assert.throws(()=>compileDisplayFormula('=@OrderLine.A.B.C.D.Name','OrderLine'),/Invalid reference/);
+ assert.throws(()=>compileDisplayFormula('=@Order.Customer.Account.Name'),/Invalid reference/);
+});
+
 test('display formulas become plain functions that match the formula language', ()=>{
  const row={Price:2.5,Name:'Cola',AgeRestricted:true,TrackStock:true,StockLevel:0,MenuCategory:'drinks'};
  const formulas=[

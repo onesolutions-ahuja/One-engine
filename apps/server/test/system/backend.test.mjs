@@ -145,6 +145,24 @@ test('Custom-only In-Screen Pages open when the host asks for another layout',as
  assert.match(routes,/throw new Error\('In-Screen Page not found'\)/,'missing popups are 404, not SQL outages');
 });
 
+test('a Desktop Print Template prints from a phone, tablet or Custom-layout screen',async()=>{
+ const {PageRuntime}=await import('../../src/system-files/page-runtime.ts');
+ const asked=[];
+ const db={query:async(_sql,params)=>{asked.push(params[3]);
+  return {rows:params[3]==='Desktop'&&params[2]==='ticket'?[{api_name:'ticket'}]:[]};}};
+ const runtime=new PageRuntime(db);
+ runtime.load=async(_tenant,api,variant)=>({page:{apiName:api,variant}});
+ for(const device of ['Mobile','Phone','Tablet','Custom']){
+  asked.length=0;
+  const page=await runtime.resolveInScreenPage('t1','APP','ticket',device,'Print Template');
+  assert.equal(page?.page.apiName,'ticket',device);
+  assert.equal(asked.at(-1),'Desktop',device+' falls back to the Desktop layout');
+ }
+ asked.length=0;
+ assert.equal(await runtime.resolveInScreenPage('t1','APP','ticket','Phone'),null,'In-Screen Pages keep their own layouts');
+ assert.deepEqual(asked,['Phone','Custom']);
+});
+
 test('validation rules support ISNEW, ISCHANGED and PRIORVALUE',async()=>{
  const {evaluateFlowFormula}=await import('../../src/system-files/flow-formula-runtime.ts');
  // Seeded AceAssist rule that blocked every Invoice save with "Unsupported formula function: ISNEW".

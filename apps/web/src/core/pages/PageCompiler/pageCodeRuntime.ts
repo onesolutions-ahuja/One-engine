@@ -21,7 +21,7 @@ import {USER_FIELDS,type PageReference} from '../../../../../server/src/expressi
 import {optimisticIdPrefix} from '../PageRuntime/optimisticIds';
 import {startTap} from './pageTimings';
 import {noteOwnBatch} from './liveChanges';
-import {formulaFunction,looksLikeFormula,nodeFunction,sessionValue,tenantValue,permissionValue} from './formulaText';
+import {businessTimeZone,formulaFunction,looksLikeFormula,nodeFunction,sessionValue,tenantValue,permissionValue} from './formulaText';
 import type {Expression} from '../../../../../server/src/expression-engine/FormulaParser.js';
 import {deviceTillState,deviceTillValue,loadDeviceTill,mirrorDeviceKey,openerMirrorKey,subscribeDeviceTill,tillDeviceKey} from '../../authentication/TillDevice/deviceTill';
 
@@ -197,7 +197,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   constructor(readonly mode:'display'|'tap',private readonly ev:Row={},readonly row:Row={},private readonly batch=''){}
   get sessionId(){return host.sessionId();}
   now(){return new Date();}
-  timeZone(){return String(identity()?.user?.TimeZone||'UTC');}
+  timeZone(){return businessTimeZone();}
   state(name:string){
    if(Object.prototype.hasOwnProperty.call(this.stateChanges,name))return this.stateChanges[name]??'';
    const value=host.state()[name];
@@ -432,7 +432,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   ...(shownObjects.length?{shown:shownNow()}:{}),
   ...(usesDevice?{deviceKey:tillDeviceKey(),...(openerMirrorKey()?{mirrorKey:openerMirrorKey()}:{})}:{}),
   event:{recordId:ev.recordId,value:ev.value,index:ev.index,label:ev.label},
-  timeZone:typeof Intl!=='undefined'?Intl.DateTimeFormat().resolvedOptions().timeZone:undefined});
+  timeZone:businessTimeZone()});
 
  let tapGate:Promise<void>=Promise.resolve();
  const api={

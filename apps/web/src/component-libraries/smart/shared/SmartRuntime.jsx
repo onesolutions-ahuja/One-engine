@@ -340,7 +340,9 @@ function SmartCard({p,record,onButtonClick,onCustomButton,onSelect,selected=fals
   {imageVisible&&<div data-design-area={p.builderPreview?"Image":undefined} data-md-bind={p.builderPreview?"imageSource":undefined} data-md-bind-titles={p.builderPreview?"Card image":undefined} style={{...smartPartOffsetStyle(p,"image"),order:["right","bottom"].includes(imagePlacement)?2:0,
     flex:horizontal?(imageWidth!==null?"0 0 "+imageWidth+"px":idCard?"0 0 34%":"1 1 50%"):
       single?(hasImageHeight?"0 1 "+imageHeight+"px":"1 1 auto"):
-      grid?(hasImageHeight?"0 0 "+imageHeight+"px":"1 1 "+imageHeight+"px"):undefined,
+      // In a grid card the image takes what the name, price and buttons leave, never
+      // their room: a 220px image in a shorter card hid them (Catalogue products).
+      grid?(hasImageHeight?"0 1 "+imageHeight+"px":"1 1 0px"):undefined,
     // A user-defined side image cannot squeeze adjacent text to zero. A
     // captionless standalone Image can still use its full component width.
     maxWidth:horizontal&&imageWidth!==null
@@ -828,11 +830,14 @@ function SmartTabs({p,record,fire}){
   const el=tabsScroller.current;
   if(el)el.scrollBy({left:direction*Math.max(120,el.clientWidth*0.7),behavior:"smooth"});
  };
- const fade=p.backgroundColor&&p.backgroundColor!=="transparent"?p.backgroundColor:"#F2F2F7";
+ // Fade only into a background the tabs really have; otherwise no box at all:
+ // a grey fade on a white page read as a second, taller box beside the tabs.
+ const fade=p.backgroundColor&&p.backgroundColor!=="transparent"?p.backgroundColor:"";
  const arrow=side=><button type="button" className={"smart-tabs-arrow is-"+side} aria-label={side==="left"?"More tabs left":"More tabs right"}
   tabIndex={-1} onClick={()=>scrollTabs(side==="left"?-1:1)}
-  style={{background:"linear-gradient(to "+(side==="left"?"right":"left")+", "+fade+" 55%, transparent)"}}>
-  <span aria-hidden="true">{side==="left"?"‹":"›"}</span></button>;
+  style={{background:fade?"linear-gradient(to "+(side==="left"?"right":"left")+", "+fade+" 55%, transparent)":"transparent"}}>
+  <span className="smart-tabs-arrow-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+   strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d={side==="left"?"M15 5l-7 7 7 7":"M9 5l7 7-7 7"}/></svg></span></button>;
  return <>{!vertical&&!p.builderPreview&&tabEdges.left&&arrow("left")}
  {!vertical&&!p.builderPreview&&tabEdges.right&&arrow("right")}
  <div ref={tabsScroller} data-md-bind={p.builderPreview&&p.collectionFormula&&(dynamic||hasCollection)?"collectionFormula":undefined} className="smart-tabs-shell" style={{background:p.backgroundColor||undefined,

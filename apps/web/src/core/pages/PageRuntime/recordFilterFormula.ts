@@ -156,6 +156,19 @@ function compile(node:Expression,fields:ReadonlyArray<FieldMetadata>,state:Reado
    &&node.args.length<=20)
   return node.args.map(arg=>compile(arg,fields,state,sessionId))
    .reduce((a,b)=>both(node.name as 'AND'|'OR',a,b));
+ // ISBLANK(@Cart.ServicePoint) / NOT(ISBLANK(...)): the record's field is empty (or not).
+ // The error below always promised ISBLANK; it was never compiled (Held sales failed).
+ if(node.kind==='call'&&node.name==='ISBLANK'&&node.args.length===1){
+  const field=simpleField(node.args[0],fields);
+  if(field)return {filters:[{field:field.apiName,operator:'isBlank',value:''}],logic:'1'};
+  const truth=asState(node,state,sessionId);
+  if(typeof truth==='boolean')return {truth,filters:[],logic:''};
+ }
+ if(node.kind==='call'&&node.name==='NOT'&&node.args.length===1
+   &&node.args[0].kind==='call'&&node.args[0].name==='ISBLANK'&&node.args[0].args.length===1){
+  const field=simpleField(node.args[0].args[0],fields);
+  if(field)return {filters:[{field:field.apiName,operator:'isNotBlank',value:''}],logic:'1'};
+ }
  // INCLUDES(@ThisPage.Categories.Value, @Product.MenuCategory): the record's value is one of the
  // ticked values (a multi-select joins them with ";"). Each becomes `field = value`, joined with OR.
  if(node.kind==='call'&&node.name==='INCLUDES'&&node.args.length===2){

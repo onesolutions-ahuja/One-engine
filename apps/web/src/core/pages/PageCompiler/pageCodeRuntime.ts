@@ -38,9 +38,13 @@ export type Effect={name:string;args:unknown[]};
 type ServerResult={ok:boolean;stale?:boolean;error?:string;needs?:{name:string;args:unknown[];key:string};changes:RecordChange[];state:Record<string,unknown>;
  effects:Effect[];sets:Record<string,{rows:Row[];complete:boolean}>};
 
-/** A lookup the held rows cannot answer exactly: no prediction (the server answers). */
-export class NotHeld extends Error { readonly notHeld=true; }
-const notHeld=(why:string):never=>{throw new NotHeld(why);};
+/** A lookup the held rows cannot answer exactly: no prediction (the server answers).
+ * `object`/`criteria` say which read could not be answered (the miss the speed test shows). */
+export class NotHeld extends Error {
+ readonly notHeld=true;
+ constructor(message:string,readonly object='',readonly criteria?:unknown){super(message);}
+}
+const notHeld=(why:string,object='',criteria?:unknown):never=>{throw new NotHeld(why,object,criteria);};
 const identityKey=Symbol.for('une.authenticatedFormulaIdentity');
 const identity=()=>(globalThis as Record<symbol,unknown>)[identityKey] as undefined|{
  user?:Record<string,unknown>;organization?:Record<string,unknown>;connections?:unknown};
@@ -127,7 +131,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   }
   // Still loading: the formula shows blank and redraws when the total arrives,
   // instead of doing arithmetic on an empty value ("Formula result must be finite").
-  return notHeld('Total for '+object+' is loading');
+     return notHeld('Total for '+object+' is loading',object,criteria);
  };
  /** Empty answer: a count or sum of no rows is 0 (as in Excel); other totals stay blank. */
  const emptyTotal=(kind:string)=>/^(?:COUNT|SUM)/i.test(kind)?0:'';
@@ -314,7 +318,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     return [...merged.values()].filter(row=>rowMatches(row,criteria))
      .sort((a,b)=>String(a.CreatedAt??'').localeCompare(String(b.CreatedAt??'')));
    }
-   return notHeld('Rows of '+object+' are not on this page');
+   return notHeld('Rows of '+object+' are not on this page',object,criteria);
   }
   agg(kind:string,object:string,field:string,criteria:Criteria){
    try{return aggregateRows(kind,this.rows(object,criteria),field);}
@@ -341,7 +345,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     const row=sets.get(set.key)?.rows.find(item=>item.Id===id);
     if(row)return row;
    }
-   return notHeld('Row '+id+' of '+object+' is not on this page');
+   return notHeld('Row '+id+' of '+object+' is not on this page',object);
   }
   async create(object:string,pairs:Criteria){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
@@ -363,6 +367,19 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    * saves them together). */
   async createLater(object:string,pairs:Criteria){await this.create(object,pairs);}
   async updateLater(object:string,id:unknown,pairs:Criteria){await this.update(object,id,pairs);}
+  /** A batched FOREACH (set-based loop): the same saves the server makes, over the held rows. */
+  async createFrom(object:string,criteria:Criteria,fields:Array<[string,(row:Row)=>unknown]>){
+   if(this.mode!=='tap')throw Error('Formulas cannot save records');
+   for(const row of this.rows(object,criteria))await this.create(object,fields.map(([field,make])=>[field,make(row)]));
+  }
+  async updateWhere(object:string,criteria:Criteria,fields:Array<[string,(row:Row)=>unknown]>){
+   if(this.mode!=='tap')throw Error('Formulas cannot save records');
+   for(const row of this.rows(object,criteria))await this.update(object,row.Id,fields.map(([field,make])=>[field,make(row)]));
+  }
+  async removeWhere(object:string,criteria:Criteria){
+   if(this.mode!=='tap')throw Error('Formulas cannot save records');
+   for(const row of this.rows(object,criteria))await this.remove(object,row.Id);
+  }
   async remove(object:string,id:unknown){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    const key=savedId(String(id));
@@ -443,7 +460,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   asksTill:Object.values(code.sources).some(source=>/@ThisPage\.Till\./i.test(String(source)))
    ||Object.values(code.actions).some(action=>String(action.run).includes('$.till(')),
   /** Lookups the held rows could not answer (shown by the till speed test). */
-  misses:[] as string[],
+  /** Lookups the held rows could not answer: {componentName,event,reason,object,criteria}. */
+  misses:[] as Array<{componentName:string;event:string;reason:string;object?:string;criteria?:unknown}>,
   subscribe(listener:()=>void){listeners.add(listener);return ()=>{listeners.delete(listener);};},
   version:()=>version,
   /** A compiled display formula for this component property, or null. */
@@ -602,8 +620,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     predicted=true;
    }catch(error){
     if(!(error instanceof NotHeld))throw error;
-    api.misses.push(key+': '+error.message);
-    if(api.misses.length>20)api.misses.shift();
+    note(key,error.object?'unheld:'+error.object:'unheld',error.object||undefined,error.criteria);
    }
    if(!action.data){
     // Screen-only action (STATE, SCREEN, LOCKSCREEN): nothing to save.
@@ -657,6 +674,15 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(early.length)await io.effects([{name:'CLOSESCREEN',args:[]}]).catch(()=>undefined);
     throw Error(result.error||'The save failed; nothing was saved');
    }
+   // The server took the other branch (it read what this page does not hold): close what the
+   // prediction opened and record why, then let the server's own steps run below.
+   if(predicted&&early.length){
+    const dropped=early.filter(effect=>!result.effects.some(item=>JSON.stringify(item)===JSON.stringify(effect)));
+    if(dropped.length){
+     note(key,'server-differs');
+     await io.effects(dropped.map(()=>({name:'CLOSESCREEN',args:[]}))).catch(()=>undefined);
+    }
+   }
    if(predicted)noteSavedIds(tap.changes,result.changes);
    // An older answer arriving after a newer one never replaces the newer saved rows.
    if(seq>answeredSeq){
@@ -677,7 +703,15 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    }));
   }
  };
- // Debug handle for the speed test script (window.__unePageCode).
+ /** One missed lookup: which component and event, and the first read the held rows could not
+ * answer (unheld:<Object>, server-differs, ...). Kept for window.__unePageCode.misses. */
+function note(key:string,reason:string,object?:string,criteria?:unknown){
+ const at=key.lastIndexOf(':');
+ api.misses.push({componentName:at>0?key.slice(0,at):key,event:at>0?key.slice(at+1):'',reason,
+  ...(object?{object}:{}),...(criteria===undefined?{}:{criteria})});
+ if(api.misses.length>20)api.misses.shift();
+}
+// Debug handle for the speed test script (window.__unePageCode).
  try{(globalThis as Record<string,unknown>).__unePageCode=api;}catch{/* frozen global */}
  return api;
 }

@@ -534,3 +534,37 @@ test('a popup for a row the tap creates opens after the save, with the saved Id'
  assert.deepEqual(earlyScreens(effects,changes),[{name:'SCREEN',args:['smart_till_customer_display','4']}]);
  assert.equal(earlyScreens(effects,[]).length,2);
 });
+
+test('browser: a decision over held rows opens the right popup, an unheld Object is a named miss', async ()=>{
+ // IF(COUNTIFS(Obj, F, …) = 0, SCREEN(p, popup), ACTIONS(UPDATERECORD(…), SCREEN(q, popup)))
+ const code:PageCode={
+  formulas:{},sources:{},
+  actions:{'pay:Click':{data:false,reads:['Obj'],writes:[],ui:['SCREEN'],run:(async ($:{
+   agg:(kind:string,object:string,field:string,criteria:unknown)=>unknown;
+   update:(object:string,id:unknown,pairs:unknown)=>Promise<unknown>;
+   ui:(name:string,...args:unknown[])=>Promise<void>})=>{
+   const matched=Number($.agg('COUNTIFS','Obj','',[['F','x']]));
+   if(matched===0)await $.ui('SCREEN','p','popup');
+   else{await $.update('CartLine','line-1',[['F','x']]);await $.ui('SCREEN','q','popup');}
+  }) as never}},
+  recordSets:[{key:'Obj|F=x',object:'Obj',criteria:()=>[['F','x']]}]
+ };
+ const host=(answer:Record<string,unknown>)=>({endpoint:'/apps/X',build:{buildId:'b'},sessionId:()=>'s-1',state:()=>({}),
+  request:(async()=>answer) as never});
+ // Obj is held (and has no matching row): the prediction opens p, no miss.
+ const held=createPageCodeRuntime(code,host({ok:true,sets:{'Obj|F=x':{rows:[],complete:true}}}));
+ await held.loadSets();
+ const effects:string[]=[];
+ await held.run('pay:Click',{},'Obj',{show:()=>{},effects:async list=>{for(const effect of list)effects.push(effect.name+':'+String(effect.args[0]));}});
+ assert.deepEqual(effects,['SCREEN:p']);
+ assert.deepEqual(held.misses,[]);
+ // Obj is not held: the prediction cannot answer the COUNTIFS, and says which Object.
+ const missing=createPageCodeRuntime(code,host({ok:true,sets:{}}));
+ await missing.loadSets();
+ await assert.rejects(()=>missing.run('pay:Click',{},'Obj',{show:()=>{},effects:async()=>{}}));
+ assert.equal(missing.misses.length,1);
+ assert.equal(missing.misses[0].componentName,'pay');
+ assert.equal(missing.misses[0].event,'Click');
+ assert.equal(missing.misses[0].reason,'unheld:Obj');
+ assert.equal(missing.misses[0].object,'Obj');
+});

@@ -367,18 +367,18 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    * saves them together). */
   async createLater(object:string,pairs:Criteria){await this.create(object,pairs);}
   async updateLater(object:string,id:unknown,pairs:Criteria){await this.update(object,id,pairs);}
-  /** A batched FOREACH (set-based loop): the same saves the server makes, over the held rows. */
-  async createFrom(object:string,criteria:Criteria,fields:Array<[string,(row:Row)=>unknown]>){
+  /** A batched FOREACH (set-based loop): the same saves the server makes, over the loop's rows. */
+  async createFrom(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of this.rows(object,criteria))await this.create(object,fields.map(([field,make])=>[field,make(row)]));
+   for(const row of rows)await this.create(object,fields.map(([field,make])=>[field,make(row)]));
   }
-  async updateWhere(object:string,criteria:Criteria,fields:Array<[string,(row:Row)=>unknown]>){
+  async updateWhere(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of this.rows(object,criteria))await this.update(object,row.Id,fields.map(([field,make])=>[field,make(row)]));
+   for(const row of rows)await this.update(object,row.Id,fields.map(([field,make])=>[field,make(row)]));
   }
-  async removeWhere(object:string,criteria:Criteria){
+  async removeWhere(object:string,rows:readonly Row[]){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of this.rows(object,criteria))await this.remove(object,row.Id);
+   for(const row of rows)await this.remove(object,row.Id);
   }
   async remove(object:string,id:unknown){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');

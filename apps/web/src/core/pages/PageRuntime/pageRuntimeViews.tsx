@@ -131,7 +131,7 @@ import {CompiledPageProvider,MemoizedCompiledComponentNode,PageCodeFormulas} fro
 import type {CompiledPage} from '../PageCompiler/compilePage';
 import {issuedAppPageScript,type LoadedPageScript} from '../PageCompiler/serverPageScript';
 import {preloadAppPageScript,primeAppPageScript,useAppPageScript} from '../PageCompiler/useAppPageScript';
-import {appPackageComponentTypes,appPackagePage,loadAppPackage} from '../AppPackage/appPackage';
+import {appPackageComponentTypes,appPackagePage,loadAppPackage,subscribeAppPackage} from '../AppPackage/appPackage';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1209,9 +1209,12 @@ function LightningAppRuntime({
   // Never run components from the previous route while navigating. Cached
   // definitions render immediately; uncached routes show the loading state.
   // Published code: this page comes from the app package, so it is never fetched.
+  // The device picks the screen the page route would answer (layout, window width, popup).
   const packaged=useMemo(()=>!previewPage&&!printPreview&&runPublishedCode
-    ?appPackagePage(appId,pageApiName,requestedLayout):null,
-    [previewPage,printPreview,runPublishedCode,appId,pageApiName,requestedLayout,packageTick]);
+    ?appPackagePage(appId,pageApiName,{layout:requestedLayout,inScreen:Boolean(inScreenPage),viewportWidth}):null,
+    [previewPage,printPreview,runPublishedCode,appId,pageApiName,requestedLayout,inScreenPage,viewportWidth,packageTick]);
+  // Republished: the package was replaced, so this screen shows the new design at once.
+  useEffect(()=>runPublishedCode?subscribeAppPackage(()=>setPackageTick(tick=>tick+1)):undefined,[runPublishedCode]);
   const page=previewPage??packaged?.page??(routePending?cached:pageLoad.page);
   // A popup page runs under its own SCREEN instance key, so CLOSESCREEN() and
   // page-state events reach that popup instead of another copy of the page.
@@ -1294,16 +1297,16 @@ function LightningAppRuntime({
     // Published code: load the app's one file (once per hash) and its renderers ahead of time.
     if(!runPublishedCode||previewPage||printPreview)return;
     let live=true;
-    void loadAppPackage(apiRequest,appId,requestedLayout).then(loaded=>{
+    void loadAppPackage(apiRequest,appId).then(loaded=>{
       if(!live||!loaded)return;
-      preloadComponentRenderers(appPackageComponentTypes(appId,requestedLayout)
+      preloadComponentRenderers(appPackageComponentTypes(appId)
         .filter(type=>type.startsWith('Custom:'))
         .map(type=>findRegisteredComponent(libraryComponents,type.slice('Custom:'.length),'page'))
         .filter((item):item is LibraryComponentMetadata=>Boolean(item)));
       setPackageTick(tick=>tick+1);
     });
     return()=>{live=false;};
-  },[runPublishedCode,previewPage,printPreview,apiRequest,appId,requestedLayout,libraryComponents]);
+  },[runPublishedCode,previewPage,printPreview,apiRequest,appId,libraryComponents]);
   useEffect(() => {
     // Draft previews never fetch the published revision or pollute the tenant-scoped page cache.
     if(previewPage)return;

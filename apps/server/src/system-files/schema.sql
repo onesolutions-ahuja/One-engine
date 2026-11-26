@@ -2897,6 +2897,7 @@ CREATE TABLE IF NOT EXISTS md_app_packages(
  tenant_id uuid NOT NULL REFERENCES md_tenants(id),
  app_api text NOT NULL, layout_variant text NOT NULL, hash text NOT NULL,
  code text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+ pages_json text NOT NULL DEFAULT '{}',
  PRIMARY KEY(tenant_id,app_api,layout_variant,hash));
 CREATE INDEX IF NOT EXISTS md_app_packages_recent
  ON md_app_packages(tenant_id,app_api,layout_variant,created_at DESC);

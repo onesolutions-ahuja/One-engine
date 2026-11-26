@@ -94,7 +94,7 @@ import {
   PanelLeft,
   PanelRight
 } from 'lucide-react';
-import RegisteredComponent from '../../components/RegisteredComponent/RegisteredComponent';
+import RegisteredComponent,{preloadComponentRenderers} from '../../components/RegisteredComponent/RegisteredComponent';
 const RevolutEmbeddedCheckout=React.lazy(()=>import('./RevolutEmbeddedCheckout'));
 import { findRegisteredComponent } from '../../components/Registry/componentRegistryLookup';
 import PageRouteDirectory from '../PageRouteDirectory/PageRouteDirectory';
@@ -1036,26 +1036,39 @@ function appPageEndpoint(appId:string,pageApiName:string|undefined,inScreen:bool
       ? `/apps/${app}/pages/${encodeURIComponent(pageApiName)}?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`
       : `/apps/${app}/home-page?formFactor=${layout}&viewportWidth=${viewportWidth}&script=1`;
 }
-/** Pages this page can navigate to (not popups), fetched and
- * converted in the background once it has loaded, so moving to them shows the
- * next screen at once instead of a loading gap. */
+/** Pages this page can open (navigation and the popups its formulas open with SCREEN),
+ * fetched and converted in the background once it has loaded, with their components'
+ * renderers, so opening them shows the next screen at once instead of a loading gap. */
 const prefetchedPages=new WeakMap<PageDefinitionCache,Set<string>>();
+function preloadPageRenderers(page:LightningPageMetadata,libraryComponents:readonly LibraryComponentMetadata[]):void{
+  const types=[...new Set(page.components.map(item=>item.type).filter(type=>type.startsWith('Custom:')))];
+  preloadComponentRenderers(types.map(type=>findRegisteredComponent(libraryComponents,type.slice('Custom:'.length),'page'))
+    .filter((item):item is LibraryComponentMetadata=>Boolean(item)));
+}
 function prefetchLinkedPages(page:LightningPageMetadata,pages:readonly LightningPageMetadata[],appId:string,
-  layout:string,viewportWidth:number,cache:PageDefinitionCache,navigationPageApiNames:readonly string[]):void{
+  layout:string,viewportWidth:number,cache:PageDefinitionCache,navigationPageApiNames:readonly string[],
+  libraryComponents:readonly LibraryComponentMetadata[]):void{
   let text='';
   try{text=JSON.stringify(page.components);}catch{return;}
   const done=prefetchedPages.get(cache)??new Set<string>();
   prefetchedPages.set(cache,done);
   const word=(name:string)=>new RegExp('(^|[^A-Za-z0-9_])'+name+'([^A-Za-z0-9_]|$)').test(text);
-  const targets=pages.filter(item=>item.apiName!==page.apiName
-    // Popup (In-Screen) pages load only when first opened: they never compete with page open.
+  // Popups this page's own formulas open (e.g. Pay opens the payment popup) come first:
+  // they are opened most often and are expected to appear at once. Other popups of the
+  // app still load only when first opened, so they never compete with this page.
+  const popups=pages.filter(item=>item.apiName!==page.apiName&&item.pageType==='In-Screen Page'&&word(item.apiName));
+  const targets=[...popups,...pages.filter(item=>item.apiName!==page.apiName
     &&(item.pageType==='App Page'||item.pageType==='Home Page')
-    &&(navigationPageApiNames.includes(item.apiName)||word(item.apiName))).slice(0,30);
+    &&(navigationPageApiNames.includes(item.apiName)||word(item.apiName)))].slice(0,30);
   const queue=targets.map(item=>{
     const inScreen=item.pageType==='In-Screen Page';
     const key=pageDefinitionCacheKey(appId,inScreen?'window:'+item.apiName:item.apiName,layout,viewportWidth);
     return {item,inScreen,key};
-  }).filter(entry=>!done.has(entry.key)&&!readPageDefinitionCache(cache,entry.key));
+  }).filter(entry=>{
+    const ready=readPageDefinitionCache(cache,entry.key);
+    if(ready&&entry.inScreen)preloadPageRenderers(ready,libraryComponents);
+    return !done.has(entry.key)&&!ready;
+  });
   let running=0;
   const next=()=>{
     while(running<3&&queue.length){
@@ -1068,6 +1081,7 @@ function prefetchLinkedPages(page:LightningPageMetadata,pages:readonly Lightning
         const stored=cache.get(key)?.page??payload.page;
         if(stored===payload.page)primeAppPageScript(stored,issuedAppPageScript(payload.script));
         preloadAppPageScript(apiRequest,appId,stored);
+        if(inScreen)preloadPageRenderers(stored,libraryComponents);
       }).catch(()=>{done.delete(key);}).finally(()=>{running--;next();});
     }
   };
@@ -1339,13 +1353,13 @@ function LightningAppRuntime({
   useEffect(()=>{
     if(!page||!pageReady||previewPage||printPreview||compiledPageProp)return;
     const navigation=apps.find(item=>item.apiName===appId)?.navigationPageApiNames??[];
-    const run=()=>prefetchLinkedPages(page,pages,appId,requestedLayout,viewportWidth,pageDefinitionCache,navigation);
+    const run=()=>prefetchLinkedPages(page,pages,appId,requestedLayout,viewportWidth,pageDefinitionCache,navigation,libraryComponents);
     const idle=(globalThis as {requestIdleCallback?:(run:()=>void,options?:{timeout:number})=>number}).requestIdleCallback;
-    // Wait until this page's own components and data have loaded: preloading ~14
-    // popup pages at 0.8 s competed with them and slowed the first screen.
-    const timer=window.setTimeout(()=>idle?idle(run,{timeout:3000}):run(),4000);
+    // After this page's own components and data (preloading ~14 popup pages at 0.8 s
+    // competed with them); only the popups it opens itself and its linked pages load.
+    const timer=window.setTimeout(()=>idle?idle(run,{timeout:2000}):run(),1500);
     return()=>window.clearTimeout(timer);
-  },[page,pageReady,pages,apps,appId,requestedLayout,viewportWidth,pageDefinitionCache,previewPage,printPreview,compiledPageProp]);
+  },[page,pageReady,pages,apps,appId,requestedLayout,viewportWidth,pageDefinitionCache,previewPage,printPreview,compiledPageProp,libraryComponents]);
   // PRINT() waits until the template is on screen (or reports why it is not).
   useEffect(()=>{
     if(!printPreview||loading)return;

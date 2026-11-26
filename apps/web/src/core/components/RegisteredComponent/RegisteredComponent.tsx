@@ -7,7 +7,7 @@ import type { LibraryComponentMetadata } from '../../metadata/Definitions/metada
 import ComponentSandbox from '../ComponentSandbox/ComponentSandbox';
 import {availableComponentSettings,type PropertyDevice,resolveComponentSettings,validateComponentDefinitions,validateComponentSettings} from '../Properties/componentSettingDefinitions';
 import {compileComponentModule} from './componentRuntimeModule';
-import {loadBundledRenderer} from './bundledAssetCache';
+import {loadBundledRenderer,peekBundledRenderer} from './bundledAssetCache';
 import {applyRecordViewAdapter} from '../../records/RecordWorkspace/recordViewAdapterRegistry';
 import {registeredComponentAppearance, registeredComponentAppearanceClasses} from './registeredComponentAppearance';
 import './registeredComponentAppearance.css';
@@ -20,6 +20,58 @@ import {loadSharedSmartRenderer} from './sharedSmartRenderer';
 
 /** Set once the shared Smart runtime fails to load in this tab: use full renderers. */
 let sharedSmartFailed=false;
+
+type BundledAsset={apiName:string;version:number;compiledJs:string;scopedCss:string;defaultProps?:Record<string,unknown>;sharedSmartRuntime?:boolean;sharedRuntimePath?:string};
+function sharedSmartOptIn():boolean{
+ if(typeof window==='undefined')return true;
+ try{return window.sessionStorage.getItem('metadrive:shared-smart-runtime')!=='0';}
+ catch{return true;}
+}
+/** Which renderer file a bundled component uses, its cache key and how to load it.
+ * One place for components and for preloading, so both share one cache entry. */
+function rendererRequest(definition:LibraryComponentMetadata){
+ const assetApiName=definition.apiName;
+ const sharedPath=(definition as LibraryComponentMetadata & {sharedAssetPath?:unknown}).sharedAssetPath;
+ const selectedPath=sharedSmartOptIn()&&!sharedSmartFailed&&typeof sharedPath==='string'&&assetApiName.startsWith('smart_')
+  ?sharedPath:(definition as LibraryComponentMetadata & {assetPath?:unknown}).assetPath;
+ // Content hashes are immutable; legacy URLs are shared only in-flight.
+ const match=typeof selectedPath==='string'
+  ?/^component-library\/components\/([A-Za-z][A-Za-z0-9_]*)\.([0-9a-f]{16})\.json$/.exec(selectedPath):null;
+ const trustedHashed=match?.[1]===assetApiName;
+ const assetPath=trustedHashed?selectedPath as string:
+  'component-library/components/'+encodeURIComponent(assetApiName)+'.json';
+ // The key includes the component version, so the result is safe to keep for the session.
+ const key=assetPath+'@'+definition.version;
+ const load=()=>loadBundledRenderer(key,()=>fetch(`${import.meta.env.BASE_URL}${assetPath}`,
+  {cache:trustedHashed?'force-cache':'no-cache'})
+  .then(async response=>{
+   if(!response.ok)throw Error('Bundled renderer is unavailable');
+   return response.json();
+  }).then(async(value:unknown)=>{
+   if(!value||typeof value!=='object')throw Error('Invalid bundled renderer');
+   const entry=value as Record<string,unknown>;
+   if(entry.apiName!==assetApiName||entry.version!==definition.version||
+     typeof entry.compiledJs!=='string'||typeof entry.scopedCss!=='string')
+     throw Error('Bundled renderer revision mismatch');
+   if(entry.sharedSmartRuntime===true){
+    if(!assetApiName.startsWith('smart_')||entry.compiledJs!=='')
+     throw Error('Invalid shared Smart renderer');
+    entry.compiledJs=await loadSharedSmartRenderer(entry.sharedRuntimePath,import.meta.env.BASE_URL);
+   }else if(!entry.compiledJs)throw Error('Bundled renderer revision mismatch');
+   if(entry.defaultProps!==undefined&&(!entry.defaultProps||
+     typeof entry.defaultProps!=='object'||Array.isArray(entry.defaultProps)))
+     throw Error('Invalid application component defaults');
+   return entry as BundledAsset;
+  }),true);
+ return {key,load,usesShared:selectedPath===sharedPath};
+}
+const needsRendererFile=(definition:LibraryComponentMetadata)=>definition.trustedBundled===true&&!definition.compiledJs;
+/** Download (once) the renderers a screen will need before it opens, e.g. a popup's
+ * components while the page that opens it is idle: the popup then draws at once. */
+export function preloadComponentRenderers(definitions:readonly LibraryComponentMetadata[]):void{
+ for(const definition of definitions)
+  if(needsRendererFile(definition))void rendererRequest(definition).load().catch(()=>undefined);
+}
 
 type ComponentBoundaryState = { error?: string };
 
@@ -129,7 +181,10 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   const [rendered,setRendered]=useState<Readonly<Record<string,string>>>({});
   const formulaScope=usePageFormulaScope();
   useFormulaDependencyVersion(formulaScope,props);
-  const [asset, setAsset] = useState<{apiName:string;version:number;compiledJs:string;scopedCss:string;defaultProps?:Record<string,unknown>;sharedSmartRuntime?:boolean;sharedRuntimePath?:string}|null>(null);
+  // A renderer already downloaded (this page, an earlier screen or a preload) draws on the
+  // first paint: no "loading" frame between opening a screen and seeing it.
+  const [asset, setAsset] = useState<BundledAsset|null>(()=>needsRendererFile(definition)
+    ?peekBundledRenderer<BundledAsset>(rendererRequest(definition).key)??null:null);
   const [assetError, setAssetError] = useState('');
   // Optional off-screen lazy hydration. Printing, editor previews and ordinary
   // pages keep their pre-existing eager behavior unless explicitly opted in.
@@ -158,72 +213,28 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
    return()=>observer.disconnect();
   },[deferRenderer,enteredViewport]);
   const assetApiName=definition.apiName;
-  // Session storage is origin/tenant-domain scoped. Shared runtime pilots are
-  // explicitly OFF until the tenant operator opts in on that tenant origin.
-  // The shared Smart runtime (one download for every Smart component) is the
-  // default; sessionStorage 'metadrive:shared-smart-runtime'='0' turns it off.
-  let sharedOptIn=true;
-  if(typeof window!=='undefined'){
-   try{sharedOptIn=window.sessionStorage.getItem('metadrive:shared-smart-runtime')!=='0';}
-   catch{/* Storage can be blocked; keep the default. */}
-  }
-  const sharedPath=(definition as LibraryComponentMetadata & {sharedAssetPath?:unknown}).sharedAssetPath;
   const [sharedRetry,setSharedRetry]=useState(0);
-  const selectedPath=sharedOptIn&&!sharedSmartFailed&&typeof sharedPath==='string'&&assetApiName.startsWith('smart_')
-    ?sharedPath:(definition as LibraryComponentMetadata & {assetPath?:unknown}).assetPath;
+  const request=rendererRequest(definition);
   useEffect(() => {
     if (!definition.trustedBundled || definition.compiledJs || deferRenderer&&!enteredViewport) {
       setAsset(null); setAssetError(''); return;
     }
     let active=true;
-    setAsset(null);
     setAssetError('');
-    // Content hashes are immutable; legacy URLs are shared only in-flight.
-    const publishedPath=selectedPath;
-    const match=typeof publishedPath==='string'
-      ?/^component-library\/components\/([A-Za-z][A-Za-z0-9_]*)\.([0-9a-f]{16})\.json$/.exec(publishedPath)
-      :null;
-    const trustedHashed=match?.[1]===assetApiName;
-    const assetPath=trustedHashed?publishedPath:
-      'component-library/components/'+encodeURIComponent(assetApiName)+'.json';
-    // FIX: the key already includes the component version, so the result is safe to
-    // keep for the whole session (even for the old non-hashed URL). Without this,
-    // every mount/click re-downloaded the same ~200 KB renderer file.
-    // The cache owns the request. Unmounting a single repeated component cannot
-    // cancel the shared fetch required by sibling components on the same page.
-    const key=assetPath+'@'+definition.version;
-    void loadBundledRenderer(key,()=>fetch(`${import.meta.env.BASE_URL}${assetPath}`,
-      {cache:trustedHashed?'force-cache':'no-cache'})
-      .then(async response=>{
-        if(!response.ok)throw Error('Bundled renderer is unavailable');
-        return response.json();
-      }).then(async(value:unknown)=>{
-        if(!value||typeof value!=='object')throw Error('Invalid bundled renderer');
-        const entry=value as Record<string,unknown>;
-        if(entry.apiName!==assetApiName||entry.version!==definition.version||
-          typeof entry.compiledJs!=='string'||typeof entry.scopedCss!=='string')
-          throw Error('Bundled renderer revision mismatch');
-        if(entry.sharedSmartRuntime===true){
-          if(!assetApiName.startsWith('smart_')||entry.compiledJs!=='')
-            throw Error('Invalid shared Smart renderer');
-          entry.compiledJs=await loadSharedSmartRenderer(entry.sharedRuntimePath,
-            import.meta.env.BASE_URL);
-        }else if(!entry.compiledJs)throw Error('Bundled renderer revision mismatch');
-        if(entry.defaultProps!==undefined&&(!entry.defaultProps||
-          typeof entry.defaultProps!=='object'||Array.isArray(entry.defaultProps)))
-          throw Error('Invalid application component defaults');
-        return entry as {apiName:string;version:number;compiledJs:string;scopedCss:string;
-          defaultProps?:Record<string,unknown>;sharedSmartRuntime?:boolean;sharedRuntimePath?:string};
-      }),true).then(value=>{if(active)setAsset(value);})
+    const ready=peekBundledRenderer<BundledAsset>(request.key);
+    if(ready){setAsset(current=>current===ready?current:ready);return;}
+    setAsset(null);
+    // The cache owns the request: unmounting one component never cancels a shared fetch.
+    void request.load().then(value=>{if(active)setAsset(value);})
       .catch((error:unknown)=>{
         if(!active)return;
         // The shared runtime failed: use the component's own full renderer instead.
-        if(selectedPath===sharedPath&&!sharedSmartFailed){sharedSmartFailed=true;setSharedRetry(n=>n+1);return;}
+        if(request.usesShared&&!sharedSmartFailed){sharedSmartFailed=true;setSharedRetry(n=>n+1);return;}
         setAssetError(error instanceof Error?error.message:'Renderer load failed');
       });
     return()=>{active=false;};
   }, [definition.apiName,assetApiName,definition.version,definition.trustedBundled,
-    definition.compiledJs,selectedPath,deferRenderer,enteredViewport,sharedRetry]);
+    definition.compiledJs,request.key,deferRenderer,enteredViewport,sharedRetry]); // eslint-disable-line react-hooks/exhaustive-deps
   if (definition.status === 'Draft') return <div role="status" className="registered-component-error">Component is a draft. Publish it before use.</div>;
   if(deferRenderer&&!enteredViewport)return <div ref={placeholderRef}
     className="registered-component-lazy-placeholder"
@@ -231,7 +242,8 @@ function RegisteredComponent({ definition, props, formulaInstanceId, layoutTrans
   if (definition.trustedBundled && !definition.compiledJs && assetError)
     return <div role="alert" className="registered-component-error">{assetError}</div>;
   if (definition.trustedBundled && !definition.compiledJs && (!asset || asset.apiName!==assetApiName || asset.version!==definition.version))
-    return <div role="status">Loading component…</div>;
+    // Nothing to read while the renderer arrives (no "Loading component…" flash): an empty box.
+    return <div aria-busy="true" style={{width:'100%',height:'100%'}}/>;
   // Pure checks below are cached by their (stable) inputs: a formula value
   // change redraws this component, and re-validating the whole schema and
   // settings each time cost ~5 ms per component on a 50-box till page.

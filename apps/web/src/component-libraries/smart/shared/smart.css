@@ -254,6 +254,10 @@
 .smart-runtime.smart_tabs{position:relative}
 .smart-runtime.smart_tabs>.smart-tabs-shell{scrollbar-width:none}
 .smart-runtime.smart_tabs>.smart-tabs-shell::-webkit-scrollbar{display:none}
+/* Every tab sits on the middle line of the bar, the same line the < > arrows are centred on
+   (a taller tab, such as "All" with its icon, no longer pushes the others to the top). */
+.smart-runtime.smart_tabs>.smart-tabs-shell{align-items:center}
+.smart-runtime.smart_tabs>.smart-tabs-shell>.smart-tabs{align-items:center;align-self:stretch}
 .smart-tabs-arrow{position:absolute;top:0;bottom:0;z-index:2;width:48px;border:0;padding:0;cursor:pointer;
  display:flex;align-items:center;color:#1d1d1f;font-size:28px;line-height:1}
 /* Always a narrow edge: general Smart button sizing (width:100%) must never stretch it,

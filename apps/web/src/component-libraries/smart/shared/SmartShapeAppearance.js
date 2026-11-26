@@ -5,8 +5,9 @@ import {smartShapes} from "../../smart_icon/SmartShapes";
  * Existing controls without shapeId retain their original radius and appearance.
  */
 const shapeMasks=new Map(smartShapes.map(shape=>{
- const markup='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" preserveAspectRatio="none">'+
-   (shape.ellipse?'<ellipse cx="12" cy="12" rx="10" ry="8" fill="white"/>':
+ // A circle stays round in any box (centred, as big as the shorter side); the rest stretch.
+ const markup='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" preserveAspectRatio="'+(shape.circle?'xMidYMid meet':'none')+'">'+
+   (shape.circle?'<circle cx="12" cy="12" r="12" fill="white"/>':shape.ellipse?'<ellipse cx="12" cy="12" rx="10" ry="8" fill="white"/>':
      '<path d="'+shape.path+'" fill="'+(shape.outline?'none':'white')+
      '" stroke="white" stroke-width="'+(shape.outline?'2':'0')+
      '" stroke-linejoin="round" stroke-linecap="round"/>')+'</svg>';

@@ -96,6 +96,8 @@ export type PageCodeHost={
  page?:string;
  /** Ids of the rows of `object` the page shows now (record sets held for shown rows). */
  shownRows?(object:string):string[];
+ /** The record this screen was opened for (SCREEN(page, popup, recordId)), if any. */
+ recordId?():string;
  /** Local copy of the held rows (localCopy.ts): drawn at page open while the server answers. */
  local?:{key():string|null;read<T>(key:string):Promise<T|undefined>;write(key:string,value:unknown):void};
 };
@@ -319,6 +321,20 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   }
   /** Related value the page read for this row (@Product.ImageUrl on a cart line). */
   m(row:unknown,path:string){
+   const found=this.related(row,path);
+   if(found!==''||!/^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$/.test(path))return found;
+   // @Cart.Total on a component with no rows of its own, in a screen opened for a record
+   // (SCREEN(payment, popup, sc.Id)): that record's field, from the rows the screen holds.
+   const id=host.recordId?.()??'';
+   if(!id)return found;
+   const [object,field]=path.split('.');
+   try{
+    const record=this.current(object,id,true);
+    const value=record?.[field];
+    return value===undefined||value===null?'':value;
+   }catch{return found;}
+  }
+  private related(row:unknown,path:string){
    const values=(row as {__mentionValues?:Record<string,unknown>}|null)?.__mentionValues;
    if(!values||typeof values!=='object')return '';
    const exact='@'+path;

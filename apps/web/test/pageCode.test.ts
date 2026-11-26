@@ -610,3 +610,16 @@ test('Download code: the newest version\'s files, read as JSON, in a valid .zip'
  assert.equal(new DataView(zip.buffer).getUint32(0,true),0x04034b50);
  assert.equal(new DataView(zip.buffer).getUint32(zip.length-22,true),0x06054b50);
 });
+
+test('@Cart.Total on a component with no rows of its own reads the record the screen was opened for', async ()=>{
+ const code:PageCode={formulas:{'take:label':((row:unknown,$:{m:(row:unknown,path:string)=>unknown})=>$.m(row,'Cart.Total')) as never},
+  sources:{},actions:{},recordSets:[{key:'Cart|SessionKey=$.sessionId',object:'Cart',criteria:($:unknown)=>({SessionKey:($ as {sessionId:string}).sessionId})}]};
+ const rows={'Cart|SessionKey=$.sessionId':{rows:[{Id:'cart-7',SessionKey:'s-77',Total:1.25}],complete:true}};
+ const host=(recordId:string)=>({endpoint:'/apps/Pay',build:{buildId:'b'},sessionId:()=>'s-77',state:()=>({}),recordId:()=>recordId,
+  request:(async()=>({ok:true,sets:rows})) as never});
+ const popup=createPageCodeRuntime(code,host('cart-7'));
+ await popup.loadSets();
+ assert.equal(popup.formula('take:label')!({}),1.25);
+ // Opened for no record (or another one): blank, as before.
+ assert.equal(createPageCodeRuntime(code,host('')).formula('take:label')!({}),'');
+});

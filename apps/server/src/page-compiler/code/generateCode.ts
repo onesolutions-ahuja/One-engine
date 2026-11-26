@@ -249,16 +249,16 @@ function loopSaveSteps(node:Expression,into:Expression[]=[]):Expression[]|null{
  return into;
 }
 /**
- * FOREACH(Object, …) whose whole body saves rows -> ONE call per step, in order:
- *   CREATERECORD -> $.createFrom(Object, criteria, [[field, (item)=>value], …])
- *   UPDATERECORD -> $.updateWhere(Object, criteria, …)  when the id is the item's Id
- *   DELETERECORD -> $.removeWhere(Object, criteria)     when the id is the item's Id
+ * FOREACH(Object, …) whose whole body saves rows -> the rows are read ONCE, then ONE call
+ * per step, in order (every step works on the same rows, as the loop did):
+ *   CREATERECORD -> $.createFrom(Target, rows, [[field, (item)=>value], …])
+ *   UPDATERECORD -> $.updateWhere(Object, rows, …)  when the id is the item's Id
+ *   DELETERECORD -> $.removeWhere(Object, rows)     when the id is the item's Id
  * Anything else (GETRECORD, IF on item values, CALLOUT, EMAIL, PRINT, SCREEN, AS used
  * later) returns null, so the loop is generated exactly as before.
  */
 function setBasedSteps(body:Expression,object:string,criteria:string,alias:string,
  scope:ActionScope):string[]|null{
- void object;
  const steps=loopSaveSteps(body);
  if(!steps||!steps.length)return null;
  const bound=new Map(scope.aliasCode??[]);
@@ -270,6 +270,8 @@ function setBasedSteps(body:Expression,object:string,criteria:string,alias:strin
   const name=(step as Extract<Expression,{kind:'call'}>).name;
   const target=literalName(args.shift(),name+' Object');
   if(name!=='CREATERECORD'){
+   // item.Id is a row of the loop Object: only that Object can be updated/deleted by it.
+   if(target!==object)return null;
    const id=args.shift();
    if(id?.kind!=='reference'||id.value!==alias+'.Id')return null;
   }
@@ -280,17 +282,20 @@ function setBasedSteps(body:Expression,object:string,criteria:string,alias:strin
   for(let i=0;i<args.length;i+=2){
    const field=literalName(args[i],'field API name');
    if(!itemValueOnly(args[i+1],alias,scope))return null;
-   fields.push('['+q(field)+', function (item) { return '+expression(args[i+1],valueScope)+'; }]');
+   // async: a value may await (BLANKVALUE, a lookup), exactly as in the loop it replaces.
+   fields.push('['+q(field)+', async function (item) { return '+expression(args[i+1],valueScope)+'; }]');
   }
   if(name!=='DELETERECORD'&&!fields.length)return null;
   scope.data=true;scope.writes.add(target);
   lines.push(name==='CREATERECORD'
-   ?'await $.createFrom('+q(target)+', '+criteria+', ['+fields.join(', ')+']);'
+   ?'  await $.createFrom('+q(target)+', rows, ['+fields.join(', ')+']);'
    :name==='UPDATERECORD'
-    ?'await $.updateWhere('+q(target)+', '+criteria+', ['+fields.join(', ')+']);'
-    :'await $.removeWhere('+q(target)+', '+criteria+');');
+    ?'  await $.updateWhere('+q(target)+', rows, ['+fields.join(', ')+']);'
+    :'  await $.removeWhere('+q(target)+', rows);');
  }
- return lines;
+ // Read once: a step that changes the loop's own rows (Status "Sold") never hides them
+ // from the next step.
+ return ['{','  const rows = await $.list('+q(object)+', '+criteria+');',...lines,'}'];
 }
 
 export function expression(node:Expression,scope:Scope):string{

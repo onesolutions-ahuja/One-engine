@@ -6,7 +6,7 @@ import {expandAppProperties} from '../system-support/app-page-seeder.js';
 import type { SqlPersistence } from './sql-persistence.js';
 import {PageLayoutVersionRuntime,runtimeLayoutVariant,type PageLayoutVariant} from './page-layout-version-runtime.js';
 import {recordPublishedPageCode} from '../page-compiler/source/publishedPageCode.js';
-import {rebuildAppPackage} from '../page-compiler/source/appPackage.js';
+import {rebuildAppPackage,appsWithPackagedPage,type AppPackageResolver} from '../page-compiler/source/appPackage.js';
 
 type PropRow=MetadataValueRow;
 type NodeRow={component_key:string;component_type:string;label:string;region:string;visible:boolean};
@@ -151,13 +151,15 @@ export class PageRuntime {
       await this.layouts.publish(tenantId,pageApi,variant,expected,actor);
       await recordPublishedPageCode(this.db,{tenantId,pageApi,variant,actor,
         loadPage:()=>this.metadata(tenantId,pageApi,variant)});
-      // The app's one-file package is rebuilt from the same pages, in the same transaction.
-      // A failure is logged and never blocks publishing.
+      // The app's one-file package is rebuilt from the same pages, in the same transaction
+      // (so a device told "published" at commit already gets the new file). Never blocks.
       const published=await this.metadata(tenantId,pageApi,variant).catch(()=>null);
-      const appApi=(published?.activationAssignments??[])
-        .map((item:{appId?:string|null})=>item?.appId).find((id):id is string=>typeof id==='string'&&Boolean(id))??'';
-      await rebuildAppPackage(this.db,{tenantId,appApi,variant,
-        loadPage:api=>this.metadata(tenantId,api,variant)});
+      this.invalidatePublishedCache(tenantId,pageApi);
+      const apps=new Set((published?.activationAssignments??[])
+        .map((item:{appId?:string|null})=>item?.appId).filter((id):id is string=>typeof id==='string'&&Boolean(id)));
+      // ...and every app whose package already holds this page (e.g. a popup it opens).
+      for(const appApi of await appsWithPackagedPage(this.db,tenantId,pageApi).catch(()=>[]))apps.add(appApi);
+      for(const appApi of apps)await rebuildAppPackage(this.db,{tenantId,appApi,resolver:this.appPackageResolver(tenantId,appApi)});
     });
     this.invalidatePublishedCache(tenantId,pageApi);
     return this.metadata(tenantId,pageApi,variant);
@@ -378,6 +380,19 @@ export class PageRuntime {
    * for Desktop/Tablet/Phone, matching resolveAppPage's Custom preference: an
    * App Page on the Custom layout must be able to open its Custom-only popups.
    */
+  /** The page routes' own rules, for the app package (every layout resolved ahead of time). */
+  appPackageResolver(tenantId:string,appApi:string):AppPackageResolver{
+    return {
+      appPage:async(pageApi,device,strictCustom)=>
+        (await this.resolveAppPage(tenantId,appApi,pageApi,device,undefined,strictCustom))?.page as Record<string,unknown>??null,
+      inScreenPage:async(pageApi,device)=>
+        (await this.resolveInScreenPage(tenantId,appApi,pageApi,device))?.page as Record<string,unknown>??null
+    };
+  }
+  /** Build and store the app's package now (App Manager switch on, or "publish code" for an app). */
+  async rebuildAppPackage(tenantId:string,appApi:string):Promise<string|null>{
+    return this.db.transaction(()=>rebuildAppPackage(this.db,{tenantId,appApi,resolver:this.appPackageResolver(tenantId,appApi)}));
+  }
   async resolveInScreenPage(tenantId:string,appId:string,pageApi:string,device:string,pageType:'In-Screen Page'|'Print Template'='In-Screen Page'):
     Promise<Awaited<ReturnType<PageRuntime['load']>>|null>{
     if(!['Desktop','Phone','Mobile','Tablet','Custom'].includes(device))

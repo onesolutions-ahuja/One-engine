@@ -1,3 +1,4 @@
+import {createRequire} from 'node:module';
 /**
  * Page converter: a saved page -> its real code.
  *
@@ -72,6 +73,32 @@ export function messageScreenParts(source:string){
  return null;
 }
 
+type ModuleParser=(code:string,options:{ecmaVersion:'latest';sourceType:'module'})=>unknown;
+let moduleParser:ModuleParser|null|undefined;
+/** acorn (already installed with the server's packages) parses with the browser's MODULE
+ * rules, e.g. `await` outside an async function. Without it, the engine's own parser. */
+function parserForModules():ModuleParser|null{
+ if(moduleParser!==undefined)return moduleParser;
+ try{moduleParser=(createRequire(import.meta.url)('acorn') as {parse:ModuleParser}).parse;}
+ catch{moduleParser=null;}
+ return moduleParser;
+}
+/**
+ * Every converted piece must be valid JavaScript before it goes in the page file: one bad
+ * piece would stop the WHOLE file from loading (the page then runs the old engine, slowly,
+ * and shows FORMULAERROR). A piece that does not parse is listed in codeIssues instead.
+ * Only parsed here (never run).
+ */
+export function assertCodeParses(js:string):string{
+ try{
+  const parse=parserForModules();
+  if(parse)parse('const piece = '+js+';',{ecmaVersion:'latest',sourceType:'module'});
+  else new Function('F','O','return '+js);
+ }
+ catch(error){throw new Error('Converted code is not valid JavaScript: '+(error instanceof Error?error.message:String(error)));}
+ return js;
+}
+
 export function buildPageCode(compiled:CompiledPage):PageCode{
  const formulas:PageCodeFormula[]=[],actions:PageCodeAction[]=[],issues:PageCodeIssue[]=[];
  const sets:RecordSetNeed[]=[];
@@ -82,6 +109,7 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
    if(formula.property.startsWith('actionFlows.'))continue;
    try{
     const code=compileDisplayFormula(formula.source,object);
+    assertCodeParses(code.js);
     formulas.push({key:component.id+':'+formula.property,componentId:component.id,property:formula.property,
      source:formula.source,objectApiName:object,js:code.js});
     addSets(code.sets);
@@ -94,6 +122,8 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
    const source=action.formula??'';
    if(action.kind!=='Formula'&&action.kind!=='ActionPlan'&&action.kind!=='PageState'&&action.kind!=='Navigate')continue;
    if(!source.trim())continue;
+   // One action and its answer branches go in together or not at all.
+   const actionsBefore=actions.length;
    try{
     const key=component.id+':'+action.event;
     const box=messageScreenParts(source);
@@ -103,6 +133,7 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
      const branch=(suffix:string,branchSource:string)=>{
       if(!branchSource.trim())return '';
       const code=compileActionFormula(branchSource,object);
+      assertCodeParses(code.js);
       actions.push({key:key+suffix,componentId:component.id,event:action.event+suffix,objectApiName:object,
        js:code.js,data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
       addSets(code.sets);
@@ -111,15 +142,15 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
      const yes=branch('__yes',box.yes),no=branch('__no',box.no);
      const text=(part:string)=>part.trim()?'('+compileDisplayFormula(part,object).js+')($.row, $)':'""';
      actions.push({key,componentId:component.id,event:action.event,objectApiName:object,
-      js:'async ($) => {\n  await $.ui('+q(box.kind)+', '+text(box.message)+', '+q(yes)+', '+q(no)+', '
-       +text(box.yesLabel)+', '+text(box.noLabel)+');\n}',
+      js:assertCodeParses('async ($) => {\n  await $.ui('+q(box.kind)+', '+text(box.message)+', '+q(yes)+', '+q(no)+', '
+       +text(box.yesLabel)+', '+text(box.noLabel)+');\n}'),
       data:false,reads:[],writes:[],ui:[box.kind]});
      continue;
     }
     // Message boxes inside the action: each answer (Yes/No/OK steps) is its own action.
     const add=(actionKey:string,event:string,code:ReturnType<typeof compileActionFormula>)=>{
      actions.push({key:actionKey,componentId:component.id,event,objectApiName:object,
-      js:code.js.split(ACTION_KEY_MARK).join(actionKey),data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
+      js:assertCodeParses(code.js.split(ACTION_KEY_MARK).join(actionKey)),data:code.data,reads:code.reads,writes:code.writes,ui:code.ui});
      addSets(code.sets);
      for(const box of code.boxes)for(const [part,branch] of [['__yes',box.yes],['__no',box.no]] as const)
       if(branch)add(actionKey+box.suffix+part,event+box.suffix+part,compileActionNode(branch,object));
@@ -127,6 +158,7 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
     add(key,action.event,compileActionFormula(source,object));
    }catch(error){
     if(!(error instanceof FormulaCodeError)&&!(error instanceof Error))throw error;
+    actions.length=actionsBefore;
     issues.push({componentId:component.id,where:'actionFlows.'+action.event,source,error:error instanceof Error?error.message:String(error)});
    }
   }

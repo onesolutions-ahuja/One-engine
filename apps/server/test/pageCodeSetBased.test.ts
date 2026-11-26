@@ -19,17 +19,17 @@ function counting(rows:Row[]){
   update:async()=>{statements.push('update-one');return {};},
   getRecord:async()=>{statements.push('getRecord');return {};},
   list:async()=>{statements.push('list');return rows;},
-  createFrom:async(object:string,_criteria:unknown,fields:Array<[string,(row:Row)=>unknown]>)=>{
+  createFrom:async(object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
    statements.push('create:'+object);
-   for(const row of rows)created.push(Object.fromEntries(fields.map(([field,make])=>[field,make(row)])));
+   for(const row of given)created.push(Object.fromEntries(await Promise.all(fields.map(async([field,make])=>[field,await make(row)]))));
    return created.length;
   },
-  updateWhere:async(object:string,_criteria:unknown,fields:Array<[string,(row:Row)=>unknown]>)=>{
+  updateWhere:async(object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
    statements.push('update:'+object);
-   for(const row of rows)updated.push({Id:row.Id,...Object.fromEntries(fields.map(([field,make])=>[field,make(row)]))});
+   for(const row of given)updated.push({Id:row.Id,...Object.fromEntries(await Promise.all(fields.map(async([field,make])=>[field,await make(row)])))});
    return updated.length;
   },
-  removeWhere:async(object:string)=>{statements.push('delete:'+object);return rows.length;}
+  removeWhere:async(object:string,given:Row[])=>{statements.push('delete:'+object);return given.length;}
  };
  return {$,statements,created,updated};
 }
@@ -56,7 +56,7 @@ test('3 lines and 300 lines make the same number of statements and the same rows
  await run(small.$);
  await run(large.$);
  // One CREATE and one UPDATE, whatever the number of rows.
- assert.deepEqual(small.statements,['create:InvoiceLine','update:CartLine']);
+ assert.deepEqual(small.statements,['list','create:InvoiceLine','update:CartLine']);
  assert.deepEqual(large.statements,small.statements);
  // The saved rows are what the old loop produced, row for row.
  const expected=(count:number)=>lines(count).map(line=>({Item:line.Id,Qty:line.Quantity,Total:Number(line.Quantity)*10}));
@@ -87,4 +87,46 @@ test('DELETE through the loop deletes the matching rows once',async()=>{
  const counting=fn(code.js);
  const state=counting.length;
  assert.ok(state>0);
+});
+
+test('the rows are read once: a step that changes them never hides them from the next step',async()=>{
+ // Update first, then create: in a per-row loop every line gets its invoice line. Reading
+ // the loop's rows again after Status became "Sold" would find none.
+ const formula='=FOREACH(CartLine, Status, "Open", AS(line), ACTIONS(UPDATERECORD(CartLine, line.Id, Status, "Sold"), '+
+  'CREATERECORD(InvoiceLine, Item, line.Id)))';
+ const code=compileActionFormula(formula,'CartLine');
+ assert.equal(code.js.split('$.list(').length-1,1);
+ const run=counting(lines(4));
+ await fn(code.js)(run.$);
+ assert.deepEqual(run.statements,['list','update:CartLine','create:InvoiceLine']);
+ assert.equal(run.created.length,4);
+});
+
+test('an update of another Object by the loop item keeps today\'s loop',()=>{
+ const other='=FOREACH(CartLine, Cart, @ThisPage.Cart.Id, AS(line), UPDATERECORD(Product, line.Id, Status, "Sold"))';
+ const code=compileActionFormula(other,'CartLine');
+ assert.match(code.js,/for \(const item of await \$\.list/);
+ assert.doesNotMatch(code.js,/\$\.updateWhere/);
+});
+
+test('a value that awaits (BLANKVALUE) still converts, parses and runs per row',async()=>{
+ const formula='=FOREACH(CartLine, Status, "Open", AS(line), CREATERECORD(InvoiceLine, Product, BLANKVALUE(line.Product, ""), Qty, line.Quantity))';
+ const code=compileActionFormula(formula,'CartLine');
+ assert.match(code.js,/\$\.createFrom\(/);
+ assert.match(code.js,/async function \(item\)/);
+ const run=counting(lines(2).map(line=>({...line,Product:'p-'+line.Id})));
+ // The fake saves call make(row) without awaiting: await the values here as the runtimes do.
+ const created:Row[]=[];
+ run.$.createFrom=async(_object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
+  for(const row of given){const values:Row={};for(const [field,make] of fields)values[field]=await make(row);created.push(values);}
+  return created.length;
+ };
+ await fn(code.js)(run.$);
+ assert.deepEqual(created,[{Product:'p-line-0',Qty:1},{Product:'p-line-1',Qty:2}]);
+});
+
+import {assertCodeParses} from '../src/page-compiler/code/pageCode.js';
+test('converted code that does not parse is refused (listed as an issue, never put in the page file)',()=>{
+ assert.equal(assertCodeParses('async ($) => { await $.x(); }'),'async ($) => { await $.x(); }');
+ assert.throws(()=>assertCodeParses('async ($) => { [1].map(function (i) { return await i; }); }'),/not valid JavaScript/);
 });

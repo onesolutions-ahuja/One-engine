@@ -8,7 +8,8 @@ import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js'
 import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import {registerPublishedCodeBuilder} from '../page-compiler/source/publishedPageCodeSetup.js';
-import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,appPackagePages} from '../page-compiler/source/appPackage.js';
+import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,PACKAGE_VARIANT} from '../page-compiler/source/appPackage.js';
+import {recordPublishedPageCode} from '../page-compiler/source/publishedPageCode.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
@@ -73,7 +74,9 @@ export function registerPageScriptPublicRoute(app:Express,deps:PageScriptDeps){
  // Design only: it holds no records, so data still needs a login and its access checks.
  app.get('/api/app-packages/:appId/:variant/:hash',wrap(async(req,res)=>{
   const appId=String(req.params.appId??'');
-  const variant=pageLayoutVariant(String(req.params.variant??'Desktop'));
+  // One package holds every layout ("All"); older per-layout packages are still served.
+  const asked=String(req.params.variant??'');
+  const variant=asked===PACKAGE_VARIANT?PACKAGE_VARIANT:pageLayoutVariant(asked||'Desktop');
   const hash=String(req.params.hash??'').replace(/\.js$/,'');
   res.setHeader('X-Content-Type-Options','nosniff');
   const found=api.test(appId)&&/^[A-Za-z0-9_-]{32}$/.test(hash)
@@ -152,13 +155,45 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  // The package is built from the same Object definitions the page script uses.
  setAppPackageObjectsLoader(tenantId=>deps.definitions.list(tenantId) as unknown as
   Promise<readonly CompilerObject[]>);
+ /**
+  * The server's own copy of every screen in an app's package (its actions run here), built
+  * from the page design stored WITH the package: exactly what the device runs. Kept per
+  * package hash; rebuilt after a restart the first time a device of that app taps.
+  */
+ const packageBuilds=new Map<string,Promise<Record<string,string>>>();
+ const appPackageBuilds=(tenantId:string,appId:string,found:{hash:string;pages:Record<string,Record<string,unknown>>})=>{
+  const memo=tenantId+'\u0000'+appId+'\u0000'+found.hash;
+  let pending=packageBuilds.get(memo);
+  if(!pending){
+   pending=(async()=>{
+    const objects=asCompilerObjects(await deps.definitions.list(tenantId));
+    const builds:Record<string,string>={};
+    for(const [key,page] of Object.entries(found.pages)){
+     try{builds[key]=deps.scripts.buildAppPage(tenantId,appId,asCompilerPage(page),objects).buildId;}
+     catch(error){console.error('app package build failed',key,error);}
+    }
+    return builds;
+   })();
+   pending.catch(()=>packageBuilds.delete(memo));
+   if(packageBuilds.size>=200)packageBuilds.delete(packageBuilds.keys().next().value!);
+   packageBuilds.set(memo,pending);
+  }
+  return pending;
+ };
  // Page code (v2). The build is the server's own copy of the saved/published page
  // (or this user's own Preview of unsaved edits); the browser names only the action.
  const codeBuild=async(actor:{tenant_id:string;user_id:string},appId:string,body:Record<string,unknown>)=>{
   if(appId){
    if(!api.test(appId))throw new Error('Invalid app');
    await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
-   return deps.scripts.appBuild(actor.tenant_id,appId,String(body.buildId??''));
+   const buildId=String(body.buildId??'');
+   const built=deps.scripts.appBuild(actor.tenant_id,appId,buildId);
+   if(built||!buildId)return built;
+   // Not in memory (server restarted): a screen of the app's package builds again from
+   // the design stored with it. A build of an older design stays unknown (republished).
+   const found=await latestAppPackage(deps.db,actor.tenant_id,appId).catch(()=>null);
+   if(found)await appPackageBuilds(actor.tenant_id,appId,found);
+   return deps.scripts.appBuild(actor.tenant_id,appId,buildId);
   }
   await deps.rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');
   return typeof body.previewId==='string'?deps.scripts.preview(actor.tenant_id,actor.user_id,body.previewId):null;
@@ -322,27 +357,50 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  codeRoutes('/api/apps/:appId',true);
  codeRoutes('/api/pages/:apiName',false);
  // The published code this app's devices keep: the newest stored package, by hash.
+ // One package holds every layout; the device picks the layout as the page routes do.
  app.get('/api/apps/:appId/package',wrap(async(req,res)=>{
-  const actor=authenticated(req);
-  if(!api.test(req.params.appId))throw new Error('Invalid app');
-  await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+req.params.appId,'read');
-  const variant=pageLayoutVariant(req.query.variant??'Desktop');
-  const found=await latestAppPackage(deps.db,actor.tenant_id,req.params.appId,variant);
+  const actor=authenticated(req),appId=String(req.params.appId);
+  if(!api.test(appId))throw new Error('Invalid app');
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
+  let found=await latestAppPackage(deps.db,actor.tenant_id,appId);
+  // First open after the switch was turned on: build it now (once; later publishes rebuild it).
+  if(!found&&await runsPublishedCode(actor.tenant_id,appId)){
+   await deps.pages.rebuildAppPackage(actor.tenant_id,appId);
+   found=await latestAppPackage(deps.db,actor.tenant_id,appId);
+  }
   res.setHeader('Cache-Control','private, no-store');
   res.setHeader('Vary','Authorization, Cookie');
   if(!found){res.json({hash:'',url:'',pages:[],builds:{}});return;}
-  const pages=appPackagePages(found.code);
-  // The server's own copy of each page's code, so a button's action still runs at once.
-  const builds:Record<string,string>={};
-  try{
-   const objects=asCompilerObjects(await deps.definitions.list(actor.tenant_id));
-   for(const pageApi of pages){
-    const page=await deps.pages.metadata(actor.tenant_id,pageApi,variant);
-    builds[pageApi]=deps.scripts.buildAppPage(actor.tenant_id,req.params.appId,asCompilerPage(page),objects).buildId;
+  const builds=await appPackageBuilds(actor.tenant_id,appId,found);
+  res.json({hash:found.hash,pages:Object.keys(found.pages),builds,
+   url:'/api/app-packages/'+encodeURIComponent(appId)+'/'+PACKAGE_VARIANT+'/'+found.hash+'.js'});
+ }));
+ const runsPublishedCode=async(tenantId:string,appApi:string)=>{
+  const {rows}=await deps.db.query<{enabled:boolean}>(`SELECT m.run_published_code AS enabled FROM md_tenant_app_metadata m
+   JOIN md_apps a ON a.id=m.app_id WHERE m.tenant_id=$1 AND COALESCE(m.api_name,a.api_name)=$2`,[tenantId,appApi]);
+  return rows[0]?.enabled===true;
+ };
+ // Publish code for a whole app without republishing any page: rebuilds the package and
+ // stores a code version (the developer files) of every screen in it.
+ app.post('/api/apps/:appId/package/rebuild',wrap(async(req,res)=>{
+  const actor=authenticated(req),appId=String(req.params.appId);
+  if(!api.test(appId))throw new Error('Invalid app');
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
+  const hash=await deps.pages.rebuildAppPackage(actor.tenant_id,appId);
+  const found=hash?await latestAppPackage(deps.db,actor.tenant_id,appId):null;
+  const versions:Record<string,number|null>={};
+  if(found)await deps.db.transaction(async()=>{
+   for(const [key,page] of Object.entries(found.pages)){
+    const variant=String(page.layoutVariant??'Desktop') as 'Desktop'|'Tablet'|'Mobile'|'Custom';
+    const pageApi=String(page.apiName??key.split('.')[0]);
+    if(!['Desktop','Tablet','Mobile','Custom'].includes(variant)||!api.test(pageApi))continue;
+    versions[key]=await recordPublishedPageCode(deps.db,{tenantId:actor.tenant_id,pageApi,variant,
+     actor:actor.user_id,loadPage:async()=>page});
    }
-  }catch(error){console.error('app package builds failed',error);}
-  res.json({hash:found.hash,pages,builds,
-   url:'/api/app-packages/'+encodeURIComponent(req.params.appId)+'/'+encodeURIComponent(variant)+'/'+found.hash+'.js'});
+  });
+  res.setHeader('Cache-Control','private, no-store');
+  res.json({hash:found?.hash??'',screens:Object.keys(found?.pages??{}),versions});
  }));
  app.post('/api/pages/:apiName/script-ticket',wrap(async(req,res)=>{
   const actor=authenticated(req);

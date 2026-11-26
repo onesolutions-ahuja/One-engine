@@ -568,3 +568,9 @@ test('browser: a decision over held rows opens the right popup, an unheld Object
  assert.equal(missing.misses[0].reason,'unheld:Obj');
  assert.equal(missing.misses[0].object,'Obj');
 });
+
+import {sameEffect} from '../src/core/pages/PageCompiler/pageCodeRuntime';
+test('a predicted screen step matches the server\'s even when a number came back as text',()=>{
+ assert.equal(sameEffect({name:'SCREEN',args:['pay','current',2]},{name:'SCREEN',args:['pay','current','2']}),true);
+ assert.equal(sameEffect({name:'SCREEN',args:['pay','popup']},{name:'SCREEN',args:['cash','popup']}),false);
+});

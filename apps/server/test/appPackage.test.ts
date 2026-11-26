@@ -63,3 +63,35 @@ test('unsafe names are refused instead of written into the file',()=>{
  assert.throws(()=>appPackageText({appApi:'Bad App',variant:'Desktop',pages:[]}),/not file safe/);
  assert.throws(()=>appPackageText({appApi:'Shop',variant:'Desktop',pages:[page('Bad/Page','')]}),/not file safe/);
 });
+
+import {resolveAppPackagePages,screenTargets,type AppPackageResolver} from '../src/page-compiler/source/appPackage.js';
+
+/** A database with one app whose only listed page is the till; its popup is reached by SCREEN(). */
+const client={query:async(sql:string)=>({rows:/FROM md_apps a/.test(sql)?[{id:'app-1'}]
+ :/FROM md_page_definitions p/.test(sql)?[{api_name:'till'}]:[]})};
+const screen=(apiName:string,layoutVariant:string,extra:Record<string,unknown>={})=>({apiName,layoutVariant,
+ components:[{id:'b',type:'Custom:smart_button',properties:{actionFlows:{click:'=SCREEN("pay_popup", popup)'}}}],...extra});
+/** The server rules: the till has Desktop and a Custom layout for windows 1000-2000 px wide;
+ * Mobile/Tablet fall back; the popup exists only as an in-screen page. */
+const resolver:AppPackageResolver={
+ appPage:async(page,device,strict)=>page!=='till'?null
+  :device==='Custom'?screen('till','Custom',{customTargetEnabled:true,customTargetMinWidth:1000,customTargetMaxWidth:2000})
+  :strict?null:device==='Desktop'?screen('till','Desktop'):null,
+ inScreenPage:async(page,device)=>page==='pay_popup'?{apiName:'pay_popup',layoutVariant:device==='Custom'?'Custom':'Desktop',components:[]}:null
+};
+
+test('every layout is resolved by the server rules, popups are found through SCREEN()',async()=>{
+ const found=await resolveAppPackagePages(client,{tenantId:'t',appApi:'Shop',resolver});
+ assert.ok(found);
+ assert.deepEqual([...found.pages.keys()].sort(),['pay_popup.Custom','pay_popup.Desktop','till.Custom','till.Desktop']);
+ // Tablet and Mobile use the Desktop layout (the page route's fallbacks).
+ assert.deepEqual(found.routes.app.till,{Desktop:'till.Desktop',Tablet:'till.Desktop',Mobile:'till.Desktop',Custom:'till.Custom'});
+ assert.deepEqual(found.routes.inScreen.pay_popup?.Custom,'pay_popup.Custom');
+ assert.deepEqual(found.routes.custom.till,{key:'till.Custom',min:1000,max:2000});
+ assert.equal(found.routes.app.pay_popup,undefined);
+});
+
+test('SCREEN targets are read from the page formulas',()=>{
+ assert.deepEqual(screenTargets({components:[{properties:{a:'=IF(x, SCREEN(pay_popup), SCREEN("cash_popup", current, 2))'}}]}),
+  ['pay_popup','cash_popup']);
+});

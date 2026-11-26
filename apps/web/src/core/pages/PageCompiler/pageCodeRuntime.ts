@@ -45,6 +45,12 @@ export class NotHeld extends Error {
  constructor(message:string,readonly object='',readonly criteria?:unknown){super(message);}
 }
 const notHeld=(why:string,object='',criteria?:unknown):never=>{throw new NotHeld(why,object,criteria);};
+/** One row's values of a set-based loop step (a value may await, as in the loop it replaces). */
+const rowPairs=async(fields:Array<[string,(row:Record<string,unknown>)=>unknown]>,row:Record<string,unknown>)=>{
+ const pairs:Array<[string,unknown]>=[];
+ for(const [field,make] of fields)pairs.push([field,await make(row)]);
+ return pairs;
+};
 const identityKey=Symbol.for('une.authenticatedFormulaIdentity');
 const identity=()=>(globalThis as Record<symbol,unknown>)[identityKey] as undefined|{
  user?:Record<string,unknown>;organization?:Record<string,unknown>;connections?:unknown};
@@ -367,18 +373,18 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    * saves them together). */
   async createLater(object:string,pairs:Criteria){await this.create(object,pairs);}
   async updateLater(object:string,id:unknown,pairs:Criteria){await this.update(object,id,pairs);}
-  /** A batched FOREACH (set-based loop): the same saves the server makes, over the held rows. */
-  async createFrom(object:string,criteria:Criteria,fields:Array<[string,(row:Row)=>unknown]>){
+  /** A batched FOREACH (set-based loop): the same saves the server makes, over the loop's rows. */
+  async createFrom(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of this.rows(object,criteria))await this.create(object,fields.map(([field,make])=>[field,make(row)]));
+   for(const row of rows)await this.create(object,await rowPairs(fields,row));
   }
-  async updateWhere(object:string,criteria:Criteria,fields:Array<[string,(row:Row)=>unknown]>){
+  async updateWhere(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of this.rows(object,criteria))await this.update(object,row.Id,fields.map(([field,make])=>[field,make(row)]));
+   for(const row of rows)await this.update(object,row.Id,await rowPairs(fields,row));
   }
-  async removeWhere(object:string,criteria:Criteria){
+  async removeWhere(object:string,rows:readonly Row[]){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of this.rows(object,criteria))await this.remove(object,row.Id);
+   for(const row of rows)await this.remove(object,row.Id);
   }
   async remove(object:string,id:unknown){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
@@ -676,11 +682,14 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    }
    // The server took the other branch (it read what this page does not hold): close what the
    // prediction opened and record why, then let the server's own steps run below.
+   // Only a POPUP the prediction opened is closed (CLOSESCREEN closes the top popup): a layer
+   // or page switch is never undone with it, which would close the wrong screen.
    if(predicted&&early.length){
-    const dropped=early.filter(effect=>!result.effects.some(item=>JSON.stringify(item)===JSON.stringify(effect)));
+    const dropped=early.filter(effect=>!result.effects.some(item=>sameEffect(item,effect)));
     if(dropped.length){
      note(key,'server-differs');
-     await io.effects(dropped.map(()=>({name:'CLOSESCREEN',args:[]}))).catch(()=>undefined);
+     const popups=dropped.filter(effect=>effect.args.some(arg=>String(arg).trim().toLowerCase()==='popup'));
+     if(popups.length)await io.effects(popups.map(()=>({name:'CLOSESCREEN',args:[]}))).catch(()=>undefined);
     }
    }
    if(predicted)noteSavedIds(tap.changes,result.changes);
@@ -695,9 +704,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    io.show({changes:result.changes,state:result.state,replaces:predicted?batch:undefined});
    timing.shown(false);timing.saved();
    // Skip the popups already opened from the prediction (same screen, same arguments).
-   const opened=early.map(effect=>JSON.stringify(effect));
+   const opened=[...early];
    await io.effects(result.effects.filter(effect=>{
-    const index=opened.indexOf(JSON.stringify(effect));
+    const index=opened.findIndex(item=>sameEffect(item,effect));
     if(index<0)return true;
     opened.splice(index,1);return false;
    }));
@@ -716,6 +725,11 @@ function note(key:string,reason:string,object?:string,criteria?:unknown){
  return api;
 }
 export type PageCodeRuntime=ReturnType<typeof createPageCodeRuntime>;
+/** The same screen step from the prediction and from the server (2 and "2" are the same). */
+export function sameEffect(a:Effect,b:Effect):boolean{
+ if(a.name!==b.name||a.args.length!==b.args.length)return false;
+ return a.args.every((arg,index)=>String(arg??'').trim().toLowerCase()===String(b.args[index]??'').trim().toLowerCase());
+}
 /** Popups a prediction may open at once: SCREEN steps that name no row this tap creates. */
 export function earlyScreens(effects:readonly Effect[],changes:readonly RecordChange[]):Effect[]{
  const made=changes.filter(change=>change.operation==='create').map(change=>String(change.record.Id??'')).filter(Boolean);

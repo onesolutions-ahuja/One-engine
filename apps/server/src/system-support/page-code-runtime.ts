@@ -338,44 +338,40 @@ class ServerScope{
   this.forget(object);
   this.pending.push({kind:'create',object,values});
  }
-   async updateLater(object:string,id:unknown,pairs:Array<[string,unknown]>){
+  async updateLater(object:string,id:unknown,pairs:Array<[string,unknown]>){
   if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
   const values=this.values(pairs);
   this.forget(object);
   this.pending.push({kind:'update',object,id,values});
  }
  /**
-  * FOREACH(Object) whose body only saves, as ONE statement per step: the matching rows are
-  * read once (same access check as $.list), each row's values are worked out in JavaScript,
-  * then saved through the same bulk path flush() uses for loop saves.
+  * FOREACH(Object) whose body only saves: the loop's rows are read ONCE ($.list, same access
+  * check) and each step saves all of them with the bulk path flush() uses: one statement per
+  * step, whatever the number of rows.
   */
- async createFrom(object:string,criteria:Array<[string,unknown]>,
-  fields:Array<[string,(row:Row)=>unknown]>){
+ async createFrom(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
+  if(!Array.isArray(rows)||!rows.length)return;
   await this.flush();
-  const rows=await this.list(object,criteria);
-  if(!rows.length)return;
   this.forget(object);
-  for(const row of rows)this.pending.push({kind:'create',object,values:this.rowValues(fields,row)});
+  for(const row of rows)this.pending.push({kind:'create',object,values:await this.rowValues(fields,row)});
   await this.flush();
  }
- /** FOREACH(Object) UPDATERECORD(item.Id, …): one bulk update, in one transaction. */
- async updateWhere(object:string,criteria:Array<[string,unknown]>,
-  fields:Array<[string,(row:Row)=>unknown]>){
+ /** FOREACH(Object) UPDATERECORD(item.Id, …): one bulk update of the loop's rows. */
+ async updateWhere(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
+  if(!Array.isArray(rows)||!rows.length)return;
   await this.flush();
-  const rows=await this.list(object,criteria);
-  if(!rows.length)return;
   this.forget(object);
   for(const row of rows){
    const id=String(row.Id??'');
    if(!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
-   this.pending.push({kind:'update',object,id,values:this.rowValues(fields,row)});
+   this.pending.push({kind:'update',object,id,values:await this.rowValues(fields,row)});
   }
   await this.flush();
  }
  /** FOREACH(Object) DELETERECORD(item.Id): the record engine's own remove, once per row. */
- async removeWhere(object:string,criteria:Array<[string,unknown]>){
+ async removeWhere(object:string,rows:readonly Row[]){
+  if(!Array.isArray(rows))return;
   await this.flush();
-  const rows=await this.list(object,criteria);
   for(const row of rows){
    const id=String(row.Id??'');
    if(!uuid.test(id))throw Error('DELETERECORD needs a record Id');
@@ -383,11 +379,11 @@ class ServerScope{
   }
  }
  /** Field values worked out for one row of a set-based loop (field names checked). */
- private rowValues(fields:Array<[string,(row:Row)=>unknown]>,row:Row):Row{
+ private async rowValues(fields:Array<[string,(row:Row)=>unknown]>,row:Row):Promise<Row>{
   const values:Row=Object.create(null);
   for(const [field,make] of fields){
    if(!key.test(field))throw Error('Invalid field '+field);
-   values[field]=make(row);
+   values[field]=await make(row);
   }
   return {...values};
  }

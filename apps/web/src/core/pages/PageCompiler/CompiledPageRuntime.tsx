@@ -138,7 +138,7 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    :script?.previewId?'/pages/'+encodeURIComponent(compiled.apiName):'';
   const code=script?.code&&endpoint?createPageCodeRuntime(script.code,{request,endpoint,
    build:script.app?{buildId:script.app.buildId}:{previewId:script.previewId},
-   sessionId:()=>sessionId,state:store.get,page:compiled.apiName,
+   sessionId:()=>sessionId,state:store.get,page:compiled.apiName,recordId:()=>recordId,
    local:{key:()=>currentSessionUserId()?'sets|'+compiled.apiName+'|'+fingerprint([script!.code!.recordSets.map((set:{key:string})=>set.key),localContext()]):null,
     read:key=>readLocal(currentSessionUserId(),key),write:(key,value)=>writeLocal(currentSessionUserId(),key,value)},
    // Rows of an Object the page shows now (a product grid): held rows follow them.

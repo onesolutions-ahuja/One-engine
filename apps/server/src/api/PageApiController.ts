@@ -16,6 +16,7 @@ import {requirePagePropertyContract} from '../system-support/page-property-contr
 import {validatePageComponentContracts} from '../system-support/component-contract-store.js';
 import {loadPageLayoutSummaries} from '../system-support/page-layout-summary.js';
 import {listPageCodeVersions,readPageCodeFile} from '../page-compiler/source/pageCodeVersionStore.js';
+import {saveEditedPageCode,restorePageCodeVersion} from '../page-compiler/source/editedPageCode.js';
 export function registerPageApiController(app:Express,db:SqlPersistence,rbac:RbacEngine){
   const pages=new PageRuntime(db);
   /** A device layout (Tablet/Mobile/Custom) stores only its look; actions, data bindings and
@@ -414,6 +415,30 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
     res.setHeader('Cache-Control','private, no-store');
     if(content===null){res.status(404).type('text/plain; charset=utf-8').send('Not found');return;}
     res.type('text/plain; charset=utf-8').send(content);
+  }));
+  // A developer's edited code files become the newest version; the app runs them at once.
+  // Publishing from Page Builder later replaces them (the last 10 versions are kept).
+  app.post('/api/metadata/pages/:apiName/code-versions',wrap(async(req,res)=>{
+    const actor=authenticated(req),name=req.params.apiName;
+    if(!api.test(name))throw new Error('Invalid Page API name');
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+    const variant=pageLayoutVariant(req.body?.variant??'Desktop');
+    const result=await saveEditedPageCode(db,pages,{tenantId:actor.tenant_id,pageApi:name,variant,actor:actor.user_id,
+      baseVersion:Number(req.body?.baseVersion),files:req.body?.files});
+    res.setHeader('Cache-Control','private, no-store');
+    res.status(result.ok?200:422).json(result);
+  }));
+  // Go back to an older version (its files become the newest version again).
+  app.post('/api/metadata/pages/:apiName/code-versions/:version/restore',wrap(async(req,res)=>{
+    const actor=authenticated(req),name=req.params.apiName;
+    if(!api.test(name))throw new Error('Invalid Page API name');
+    if(!/^[1-9][0-9]{0,9}$/.test(req.params.version))throw new Error('Invalid code version');
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+    const variant=pageLayoutVariant(req.query.variant??req.body?.variant??'Desktop');
+    const result=await restorePageCodeVersion(db,pages,{tenantId:actor.tenant_id,pageApi:name,variant,actor:actor.user_id,
+      version:Number(req.params.version)});
+    res.setHeader('Cache-Control','private, no-store');
+    res.status(result.ok?200:422).json(result);
   }));
 
 }

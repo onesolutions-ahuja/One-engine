@@ -35,6 +35,7 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
 - Live changes: `system-support/live-changes.ts` (trigger on `md_records` NOTIFYs at commit; `GET /api/live-changes` SSE,
   RBAC-filtered per user). pg types are hand-declared in `system-support/pg-driver.d.ts`.
 - Components: `apps/web/src/component-libraries/<name>/` (SmartComponent.jsx, component.json).
+- Publish to code: `docs/publish-to-code.md` (`page-compiler/source/`: generate/read page code files, app package; web `core/pages/AppPackage/`).
 
 ## Checks
 - No npm install here. For bundle tests link esbuild once: `ln -s /opt/npm-tools/node_modules/esbuild node_modules/esbuild`

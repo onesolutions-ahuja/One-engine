@@ -1,35 +1,33 @@
 import {createHash} from 'node:crypto';
+import {build,type Plugin} from 'esbuild';
 import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} from '../compilePage.js';
-import {generatePageScript} from '../generatePageScript.js';
-import {buildPageCode,pageCodeModule} from '../code/pageCode.js';
-import {generatePageCss} from './generatePageCss.js';
-import type {PageComponentLike} from './generatePageSource.js';
-import type {SqlClient} from './pageCodeVersionStore.js';
+import {recordPublishedPageCode} from './publishedPageCode.js';
+import {latestPageCodeVersion,type SqlClient} from './pageCodeVersionStore.js';
+import {readPageSource} from './readPageSource.js';
 
 /**
- * The app package: ONE script file that holds everything a published app needs to open
- * its screens with no page-definition request:
+ * The app package: ONE script file per app that every device keeps. It is built from the
+ * pages' CODE FILES (each page's newest code version: what Page Builder published, or what a
+ * developer edited after that): the .tsx, .formulas.ts, .actions.ts and .data.ts of every
+ * screen are bundled by esbuild, the .css goes with them. The device runs that code; no page
+ * definition and no page script is fetched.
  *
- *  - `page`   the saved page metadata the runtime renders (same object /pages/… returns),
- *  - `plan`   the compiled page (which rows each component shows, who redraws whom),
- *  - `actions`/`formulas`/`createCode` the page code built from the same compiled page,
- *  - `css`    the page stylesheet generated from the same page (as in its code version).
+ * The server never runs that code. It reads the same files as plain data (readPageSource)
+ * and builds from them the screen plan (which rows each component shows) and its own copy
+ * of every action (from each action's formula), which runs in one transaction with the
+ * user's access checks. Records are never in the package.
  *
- * The file is a classic script (window.__uneAppPackage): the strict Content-Security-Policy
- * allows it, and nothing is evaluated from a string. It holds the page DESIGN only — never
- * records — so data still goes through the record engine with its usual access checks.
- *
- * Kept per tenant + app + layout; the newest 10 are kept, like page code versions.
+ * Kept per tenant + app; the newest 10 are kept.
  */
-
 export type AppPackageObjectsLoader=(tenantId:string)=>Promise<readonly CompilerObject[]>;
 let objectsLoader:AppPackageObjectsLoader|null=null;
 /** Registered once at start-up (the same Object definitions the page script uses). */
 export function setAppPackageObjectsLoader(next:AppPackageObjectsLoader|null):void{objectsLoader=next;}
+/** The tenant's Object definitions (what the page plan is compiled against). */
+export async function appPackageObjects(tenantId:string):Promise<readonly CompilerObject[]>{
+ return objectsLoader?objectsLoader(tenantId):[];
+}
 
-/** One screen in the package: `pageApi` is its key (page + layout, e.g. `till_billing.Custom`). */
-export type AppPackagePage={pageApi:string;page:AppPackagePageMetadata;plan:CompiledPage;
- moduleText:string;codeText:string;css:string};
 /** The layouts the device can ask for (same names as the page routes' formFactor). */
 export const PACKAGE_DEVICES=['Desktop','Tablet','Mobile','Custom'] as const;
 export type PackageDevice=typeof PACKAGE_DEVICES[number];
@@ -50,77 +48,11 @@ export type AppPackageResolver={
  appPage(pageApi:string,device:PackageDevice,strictCustom:boolean):Promise<Record<string,unknown>|null>;
  inScreenPage(pageApi:string,device:PackageDevice):Promise<Record<string,unknown>|null>;
 };
-/** The fields of a saved page the browser runtime reads (a subset of the page route's answer). */
-export type AppPackagePageMetadata={apiName:string;label:string;pageType?:string;layoutMode?:string;
- template?:string|null;canvasWidth?:number;canvasHeight?:number;canvasFillColor?:string;
- components:PageComponentLike[];activationAssignments?:unknown[]};
-
-const PAGE_MARK='// ==== page: ';
-const PAGE_MARK_END=' ====';
-const PAGE_MARK_PATTERN=/^\/\/ ==== page: (.+) ====$/gm;
 const SAFE_PAGE=/^[A-Za-z0-9_.-]{1,120}$/;
-/** One line of generated code must never start an ES module export inside the package. */
-const stripExports=(text:string):string=>{
- if(/^export default\b/m.test(text))throw new Error('Generated page code has a default export');
- return text.replace(/^export (?=(?:const|let|var|function|class)\b)/gm,'');
-};
 
 /** sha256 of the file, base64url, first 32 chars: the same code always has the same URL. */
 export function appPackageHash(code:string):string{
  return createHash('sha256').update(code).digest('base64url').slice(0,32);
-}
-
-/** The page names inside a package file (used by the package route: no code is run). */
-export function appPackagePages(code:string):string[]{
- const names:string[]=[];
- for(const match of String(code??'').matchAll(PAGE_MARK_PATTERN))names.push(match[1]);
- return names;
-}
-
-function pageText(input:AppPackagePage):string{
- const api=input.pageApi;
- if(!SAFE_PAGE.test(api))throw new Error('Page name is not file safe: '+api);
- return [
-  PAGE_MARK+api+PAGE_MARK_END,
-  'pages['+JSON.stringify(api)+']=(function(){',
-  'var page='+JSON.stringify(input.page)+';',
-  'var mod=(function(){',
-  stripExports(input.moduleText),
-  'return {plan:plan,createActions:createActions,createFormulas:createFormulas};',
-  '})();',
-  'var code=(function(){',
-  stripExports(input.codeText),
-  'return {createCode:createCode,codeVersion:codeVersion,codeIssues:codeIssues};',
-  '})();',
-  'return {page:page,css:'+JSON.stringify(input.css)+',plan:mod.plan,',
-  ' createActions:mod.createActions,createFormulas:mod.createFormulas,',
-  ' createCode:code.createCode,codeVersion:code.codeVersion,codeIssues:code.codeIssues};',
-  '})();'
- ].join('\n');
-}
-
-/**
- * Pure: page sources -> the package file text and its hash. Deterministic (no clock, no
- * randomness), so republishing the same pages gives the same hash and the same URL.
- */
-export function appPackageText(input:{appApi:string;variant:string;pages:AppPackagePage[];routes?:AppPackageRoutes}):{code:string;hash:string}{
- const api=String(input.appApi??'');
- if(!SAFE_PAGE.test(api))throw new Error('App name is not file safe: '+api);
- const pages=[...input.pages].sort((a,b)=>a.pageApi.localeCompare(b.pageApi));
- const code=[
-  '/* GENERATED by Une publish from Page Builder. Do not edit: publishing again replaces this file.',
-  ' * One file for the whole app: every published screen, its compiled plan, its page code and its styles.',
-  ' * Design only — records are always read through the record engine with the user\'s access checks. */',
-  'window.__uneAppPackage=(function(){',
-  '"use strict";',
-  'var pages={};',
-  ...pages.map(pageText),
-  'var allCss=[];for(var key in pages)if(pages[key])allCss.push(pages[key].css);',
-  'return {version:2,app:'+JSON.stringify(api)+',variant:'+JSON.stringify(String(input.variant??'Desktop')),
-  ' ,pages:pages,routes:'+JSON.stringify(sortedRoutes(input.routes))+',css:allCss.join("\\n")};',
-  '})();',''
- ].join('\n');
- return {code,hash:appPackageHash(code)};
 }
 
 /** Routes with sorted keys: the same app always gives the same file (and hash). */
@@ -211,55 +143,138 @@ export async function resolveAppPackagePages(client:SqlClient,input:{tenantId:st
  return pages.size?{pages,routes}:null;
 }
 
-/** Read one page the way the page route does, then compile it (same converter as the page script). */
-function packagePageFrom(key:string,page:Record<string,unknown>,objects:readonly CompilerObject[]):AppPackagePage{
- const pageApi=String(page.apiName??key.split('.')[0]);
- const components=Array.isArray(page.components)?page.components as PageComponentLike[]:[];
- const compiled=compilePage(page as CompilerPage,objects,{strictLegacy:true});
- const pageCode=buildPageCode(compiled);
- const pageClass=pageApi.replace(/[^A-Za-z0-9_-]/g,'_');
- const css=generatePageCss({header:'/* GENERATED by Une publish from Page Builder. */',
-  pageClass,canvasWidth:Number(page.canvasWidth),canvasHeight:Number(page.canvasHeight),components},[]);
- return {
-  pageApi:key,
-  page:{
-   apiName:pageApi,label:String(page.label??pageApi),
-   pageType:page.pageType===undefined?undefined:String(page.pageType),
-   layoutMode:page.layoutMode===undefined?undefined:String(page.layoutMode),
-   template:(page.template??null) as string|null,
-   canvasWidth:Number(page.canvasWidth),canvasHeight:Number(page.canvasHeight),
-   canvasFillColor:page.canvasFillColor===undefined?undefined:String(page.canvasFillColor),
-   components:components.map(item=>({id:item.id,type:item.type,label:item.label,visible:item.visible,
-    region:(item as {region?:string}).region,position:item.position,properties:item.properties})),
-   activationAssignments:Array.isArray(page.activationAssignments)?page.activationAssignments:[]
-  },
-  plan:compiled,
-  moduleText:generatePageScript(compiled,'js'),
-  codeText:pageCodeModule(pageCode),
-  css
- };
+/** One screen of the package: its code files and the page read back from them. */
+export type PackageScreen={key:string;pageApi:string;variant:string;version:number;
+ files:Record<string,string>;page:Record<string,unknown>&{components:unknown[]};plan:CompiledPage;issues:string[]};
+
+const VARIANTS=new Set(['Desktop','Tablet','Mobile','Custom']);
+/**
+ * The code files a screen runs from: the page's newest code version, unless the published
+ * page is newer (published before code versions existed): then its code is generated now and
+ * stored as a version, like a publish does.
+ */
+async function screenFiles(client:SqlClient,tenantId:string,key:string,published:Record<string,unknown>):
+ Promise<{pageApi:string;variant:string;version:number;files:Record<string,string>}|null>{
+ const pageApi=String(published.apiName??key.split('.')[0]);
+ const variant=String(published.layoutVariant??key.split('.').slice(1).join('.')??'Desktop');
+ if(!SAFE_PAGE.test(pageApi)||!VARIANTS.has(variant))return null;
+ const revision=Number.isInteger(published.revision)?Number(published.revision):null;
+ let latest=await latestPageCodeVersion(client,tenantId,pageApi,variant);
+ if(!latest||(revision!==null&&latest.pageRevision!==null&&latest.pageRevision<revision)){
+  await recordPublishedPageCode(client,{tenantId,pageApi,variant:variant as 'Desktop',loadPage:async()=>published});
+  latest=await latestPageCodeVersion(client,tenantId,pageApi,variant);
+ }
+ return latest?{pageApi,variant,version:latest.version,files:latest.files}:null;
+}
+
+/** esbuild: the screens' code files are virtual files; React, the components and the formula
+ * library are the ones already on the device (window.__une.modules). */
+function packagePlugin(screens:readonly PackageScreen[]):Plugin{
+ const byDir=new Map(screens.map((screen,index)=>['s'+index,screen.files]));
+ const EXTENSIONS=['','.tsx','.ts','.css'];
+ return {name:'une-app-package',setup(on){
+  on.onResolve({filter:/^(react|@une\/smart|@une\/formula-library)$/},args=>({path:args.path,namespace:'une-global'}));
+  on.onLoad({filter:/.*/,namespace:'une-global'},args=>({loader:'js',
+   contents:'module.exports = window.__une.modules['+JSON.stringify(args.path)+'];'}));
+  on.onResolve({filter:/^screen:/},args=>({path:args.path.slice('screen:'.length),namespace:'screen'}));
+  on.onResolve({filter:/^\.\//,namespace:'screen'},args=>{
+   const dir=args.importer.split('/')[0],files=byDir.get(dir)??{};
+   const name=args.path.slice(2);
+   const found=EXTENSIONS.map(ext=>name+ext).find(candidate=>Object.prototype.hasOwnProperty.call(files,candidate));
+   if(!found)return {errors:[{text:'Not a file of this page: '+args.path}]};
+   return {path:dir+'/'+found,namespace:'screen'};
+  });
+  on.onResolve({filter:/.*/,namespace:'screen'},args=>({errors:[{text:'Only the page\'s own files, react, @une/smart and @une/formula-library can be imported: '+args.path}]}));
+  on.onLoad({filter:/.*/,namespace:'screen'},args=>{
+   const [dir,...rest]=args.path.split('/'),name=rest.join('/');
+   const content=byDir.get(dir)?.[name];
+   if(content===undefined)return {errors:[{text:'Missing file '+name}]};
+   // The .css is delivered as text with the screen (the look is read from it).
+   if(name.endsWith('.css'))return {loader:'js',contents:''};
+   return {loader:name.endsWith('.tsx')?'tsx':'ts',contents:content};
+  });
+ }};
+}
+
+/** The device file: every screen's code bundled into one classic script (window.__uneAppPackage). */
+export async function bundleAppPackage(appApi:string,screens:readonly PackageScreen[],routes:AppPackageRoutes):Promise<string>{
+ const imports:string[]=[],entries:string[]=[];
+ screens.forEach((screen,index)=>{
+  const base='screen:s'+index+'/'+screen.pageApi;
+  imports.push('import P'+index+' from '+JSON.stringify(base+'.tsx')+';',
+   'import {formulas as F'+index+'} from '+JSON.stringify(base+'.formulas.ts')+';',
+   'import {actions as A'+index+'} from '+JSON.stringify(base+'.actions.ts')+';',
+   'import {recordSets as D'+index+'} from '+JSON.stringify(base+'.data.ts')+';');
+  entries.push(JSON.stringify(screen.key)+': {Page: P'+index+', formulas: F'+index+', actions: A'+index
+   +', recordSets: D'+index+', version: '+screen.version+', css: '+JSON.stringify(screen.files[screen.pageApi+'.css']??'')
+   +', settings: '+JSON.stringify(Object.fromEntries(Object.entries(screen.page).filter(([field])=>field!=='components')))
+   +', plan: '+JSON.stringify(screen.plan)+'}');
+ });
+ const entry=imports.join('\n')+'\nwindow.__uneAppPackage = {version: 3, app: '+JSON.stringify(appApi)
+  +', routes: '+JSON.stringify(sortedRoutes(routes))+', screens: {\n'+entries.join(',\n')+'\n}};\n';
+ const result=await build({stdin:{contents:entry,sourcefile:'app-package.js',loader:'js',resolveDir:'/'},
+  bundle:true,write:false,format:'iife',minify:true,target:'es2020',legalComments:'none',charset:'utf8',
+  jsx:'transform',jsxFactory:'__une_h',jsxFragment:'__une_fragment',
+  banner:{js:'/* GENERATED by Une publish: the app\'s screens, built from their code files. */\n'
+   +'var __une_h=window.__une.modules.react.createElement,__une_fragment=window.__une.modules.react.Fragment;'},
+  plugins:[packagePlugin(screens)],logLevel:'silent'});
+ return result.outputFiles[0].text;
 }
 
 /** Build (not store) the package for an app. Returns null when there is nothing to build.
- * `pagesJson` is the page metadata of every screen, kept with the package so the server can
- * rebuild its own copy of each screen's actions (after a restart) from exactly that design. */
+ * `pagesJson` is every screen's page as read from its code: the server builds its own copy
+ * of each screen's actions from it (also after a restart). */
 export async function buildAppPackage(client:SqlClient,input:{tenantId:string;appApi:string;
- resolver:AppPackageResolver}):Promise<{code:string;hash:string;pages:string[];pagesJson:string}|null>{
+ resolver:AppPackageResolver}):Promise<{code:string;hash:string;pages:string[];pagesJson:string;issues:Record<string,string[]>}|null>{
  if(!objectsLoader)return null;
  const resolved=await resolveAppPackagePages(client,input);
  if(!resolved)return null;
  const objects=await objectsLoader(input.tenantId);
  if(!objects.length)return null;
- const pages:AppPackagePage[]=[];
- const kept:Record<string,Record<string,unknown>>={};
+ const screens:PackageScreen[]=[];
+ const issues:Record<string,string[]>={};
  for(const key of [...resolved.pages.keys()].sort()){
-  const page=resolved.pages.get(key)!;
-  try{pages.push(packagePageFrom(key,page,objects));kept[key]=page;}
-  catch(error){console.error('app package page skipped',key,error);}
+  try{
+   const found=await screenFiles(client,input.tenantId,key,resolved.pages.get(key)!);
+   if(!found){issues[key]=['No code files'];continue;}
+   const read=readPageSource(found.files,found.pageApi);
+   const plan=compilePage(read.page as unknown as CompilerPage,objects,{strictLegacy:true});
+   screens.push({key,...found,page:read.page as PackageScreen['page'],plan,issues:read.issues});
+   if(read.issues.length)issues[key]=read.issues;
+  }catch(error){issues[key]=[error instanceof Error?error.message:String(error)];}
  }
- if(!pages.length)return null;
- const built=appPackageText({appApi:input.appApi,variant:PACKAGE_VARIANT,pages,routes:resolved.routes});
- return {...built,pages:pages.map(page=>page.pageApi),pagesJson:JSON.stringify(kept)};
+ if(!screens.length)return null;
+ // A screen whose code does not build is left out (it opens the old way) and reported.
+ let code:string;
+ try{code=await bundleAppPackage(input.appApi,screens,resolved.routes);}
+ catch(error){
+  const kept:PackageScreen[]=[];
+  for(const screen of screens){
+   try{await bundleAppPackage(input.appApi,[screen],{app:{},inScreen:{},custom:{}});kept.push(screen);}
+   catch(single){(issues[screen.key]??=[]).push('Code does not build: '+(single instanceof Error?single.message:String(single)));}
+  }
+  if(!kept.length)throw error;
+  const keys=new Set(kept.map(screen=>screen.key));
+  const routes=filterRoutes(resolved.routes,keys);
+  code=await bundleAppPackage(input.appApi,kept,routes);
+  screens.splice(0,screens.length,...kept);
+ }
+ const pagesJson=JSON.stringify(Object.fromEntries(screens.map(screen=>[screen.key,screen.page])));
+ return {code,hash:appPackageHash(code),pages:screens.map(screen=>screen.key),pagesJson,issues};
+}
+/** Routes that only name screens kept in the package. */
+function filterRoutes(routes:AppPackageRoutes,keys:ReadonlySet<string>):AppPackageRoutes{
+ const keep=(map:Record<string,Partial<Record<PackageDevice,string>>>)=>Object.fromEntries(Object.entries(map)
+  .map(([page,devices])=>[page,Object.fromEntries(Object.entries(devices).filter(([,key])=>keys.has(String(key))))])
+  .filter(([,devices])=>Object.keys(devices as object).length));
+ return {app:keep(routes.app),inScreen:keep(routes.inScreen),
+  custom:Object.fromEntries(Object.entries(routes.custom).filter(([,item])=>keys.has(item.key)))};
+}
+
+/** What the last build of an app reported per screen (shown by the rebuild route). */
+const lastIssues=new Map<string,Record<string,string[]>>();
+export function appPackageIssues(tenantId:string,appApi:string):Record<string,string[]>{
+ return lastIssues.get(tenantId+'\u0000'+appApi)??{};
 }
 
 /** Keep the newest 10 packages per tenant + app + layout (old ones are dropped). */
@@ -293,6 +308,8 @@ export async function rebuildAppPackage(client:SqlClient,input:{tenantId:string;
    await trimAppPackages(client,input.tenantId,input.appApi,PACKAGE_VARIANT);
   }
   await client.query('RELEASE SAVEPOINT app_package');
+  if(built&&Object.keys(built.issues).length)console.warn('app package issues',input.appApi,JSON.stringify(built.issues).slice(0,4000));
+  lastIssues.set(input.tenantId+'\u0000'+input.appApi,built?.issues??{});
   return built?.hash??null;
  }catch(error){
   console.error('app package failed',error);

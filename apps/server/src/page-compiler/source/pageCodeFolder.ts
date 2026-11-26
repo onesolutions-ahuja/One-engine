@@ -1,5 +1,4 @@
 import {createHash} from 'node:crypto';
-import {watch,type FSWatcher} from 'node:fs';
 import {mkdir,readdir,readFile,rm,stat,writeFile} from 'node:fs/promises';
 import {isAbsolute,join,relative,sep} from 'node:path';
 import type {SqlPersistence} from '../../system-files/sql-persistence.js';
@@ -135,31 +134,62 @@ async function importPagesFolder(db:SqlPersistence,pages:PageRuntime,root:string
  }
 }
 
-let watcher:FSWatcher|null=null;
-/** Start once with the server: take in edits made while it was down, then watch for edits. */
-export async function startPageCodeFolder(db:SqlPersistence,pages:PageRuntime):Promise<void>{
- const root=pageCodeRoot();
- if(!root||watcher)return;
- await mkdir(root,{recursive:true});
- const pending=new Map<string,ReturnType<typeof setTimeout>>();
- const queue=(folder:string)=>{
-  clearTimeout(pending.get(folder));
-  pending.set(folder,setTimeout(()=>{
-   pending.delete(folder);
-   void importPagesFolder(db,pages,root,folder).catch(error=>console.error('code folder import failed',folder,error));
-  },1200));
- };
- // Edits made while the server was down (or before a deploy).
+let scanner:ReturnType<typeof setInterval>|null=null;
+const timers=new Set<ReturnType<typeof setTimeout>>();
+/** Stop checking (server shutdown, tests). */
+export function stopPageCodeFolder():void{
+ if(scanner)clearInterval(scanner);
+ scanner=null;
+ for(const timer of timers)clearTimeout(timer);
+ timers.clear();
+}
+
+/** Every pages/<page>/<layout> folder with a signature of its files (name, size, time). */
+async function pagesFolders(root:string):Promise<Map<string,string>>{
+ const out=new Map<string,string>();
  for(const slug of await readdir(root).catch(()=>[] as string[]))
   for(const app of await readdir(join(root,slug)).catch(()=>[] as string[]))
    for(const page of await readdir(join(root,slug,app,'pages')).catch(()=>[] as string[]))
-    for(const variant of await readdir(join(root,slug,app,'pages',page)).catch(()=>[] as string[]))
-     queue(join(root,slug,app,'pages',page,variant));
- watcher=watch(root,{recursive:true},(_event,name)=>{
-  if(typeof name!=='string')return;
-  const parts=name.split(sep);
-  if(parts.length!==6||parts[2]!=='pages'||!FILE.test(parts[5]))return;
-  queue(join(root,...parts.slice(0,5)));
- });
- watcher.on('error',error=>console.error('code folder watch failed',error));
+    for(const variant of await readdir(join(root,slug,app,'pages',page)).catch(()=>[] as string[])){
+     const folder=join(root,slug,app,'pages',page,variant);
+     const parts:string[]=[];
+     for(const name of (await readdir(folder).catch(()=>[] as string[])).sort()){
+      if(!FILE.test(name))continue;
+      const info=await stat(join(folder,name)).catch(()=>null);
+      if(info?.isFile())parts.push(name+':'+info.size+':'+info.mtimeMs);
+     }
+     out.set(folder,parts.join('|'));
+    }
+ return out;
+}
+
+/** Start once with the server: take in edits made while it was down, then check for edits
+ * every 2 seconds (works on any disk, including network disks where change events do not). */
+export async function startPageCodeFolder(db:SqlPersistence,pages:PageRuntime):Promise<void>{
+ const root=pageCodeRoot();
+ if(!root||scanner)return;
+ await mkdir(root,{recursive:true});
+ let seen=new Map<string,string>();
+ let running=false;
+ const check=async(first:boolean)=>{
+  if(running)return;
+  running=true;
+  try{
+   const now=await pagesFolders(root);
+   for(const [folder,signature] of now){
+    if(!first&&seen.get(folder)===signature)continue;
+    // Wait for the editor to finish writing, then take the folder in.
+    const timer=setTimeout(()=>{
+     timers.delete(timer);
+     void importPagesFolder(db,pages,root,folder).catch(error=>console.error('code folder import failed',folder,error));
+    },first?0:1000);
+    timer.unref?.();
+    timers.add(timer);
+   }
+   seen=now;
+  }finally{running=false;}
+ };
+ await check(true);
+ scanner=setInterval(()=>{void check(false).catch(error=>console.error('code folder check failed',error));},2000);
+ scanner.unref?.();
 }

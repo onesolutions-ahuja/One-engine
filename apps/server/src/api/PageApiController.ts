@@ -15,6 +15,7 @@ import {validateExplicitComponentNames} from '../system-support/page-component-n
 import {requirePagePropertyContract} from '../system-support/page-property-contract.js';
 import {validatePageComponentContracts} from '../system-support/component-contract-store.js';
 import {loadPageLayoutSummaries} from '../system-support/page-layout-summary.js';
+import {listPageCodeVersions,readPageCodeFile} from '../page-compiler/source/pageCodeVersionStore.js';
 export function registerPageApiController(app:Express,db:SqlPersistence,rbac:RbacEngine){
   const pages=new PageRuntime(db);
   /** A device layout (Tablet/Mobile/Custom) stores only its look; actions, data bindings and
@@ -390,6 +391,29 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
         [actor.tenant_id,page.id]);
     });
     res.status(204).end();
+  }));
+
+  // Publish to code: generated code files of each published layout (last 10 versions).
+  app.get('/api/metadata/pages/:apiName/code-versions',wrap(async(req,res)=>{
+    const actor=authenticated(req),name=req.params.apiName;
+    if(!api.test(name))throw new Error('Invalid Page API name');
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');
+    const variant=pageLayoutVariant(req.query.variant??'Desktop');
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({versions:await listPageCodeVersions(db,actor.tenant_id,name,variant)});
+  }));
+  app.get('/api/metadata/pages/:apiName/code-versions/:version/file',wrap(async(req,res)=>{
+    const actor=authenticated(req),name=req.params.apiName;
+    if(!api.test(name))throw new Error('Invalid Page API name');
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');
+    const variant=pageLayoutVariant(req.query.variant??'Desktop');
+    if(!/^[1-9][0-9]{0,9}$/.test(req.params.version))throw new Error('Invalid code version');
+    const path=typeof req.query.path==='string'?req.query.path:'';
+    if(!/^[A-Za-z0-9_.-]{1,120}$/.test(path))throw new Error('Invalid file path');
+    const content=await readPageCodeFile(db,actor.tenant_id,name,variant,Number(req.params.version),path);
+    res.setHeader('Cache-Control','private, no-store');
+    if(content===null){res.status(404).type('text/plain; charset=utf-8').send('Not found');return;}
+    res.type('text/plain; charset=utf-8').send(content);
   }));
 
 }

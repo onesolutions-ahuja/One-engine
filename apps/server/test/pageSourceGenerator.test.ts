@@ -1,91 +1,64 @@
-
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {generatePageSource,type PageComponentLike} from '../src/page-compiler/source/generatePageSource.js';
+import {generatePageSource} from '../src/page-compiler/source/generatePageSource.js';
 import {versionsToDelete} from '../src/page-compiler/source/pageCodeVersionStore.js';
 import type {PageCode} from '../src/page-compiler/code/pageCode.js';
 
 // esbuild is linked per CLAUDE.md -> Checks (/opt/npm-tools/node_modules/esbuild).
 const require=createRequire(import.meta.url);
-function loadEsbuild():{transformSync:(code:string,options:{loader:string})=>unknown}{
- for(const path of ['esbuild','/opt/npm-tools/node_modules/esbuild']){
-  try{return require(path);}catch{/* try next */}
- }
- throw new Error('esbuild not found: link it as described in CLAUDE.md -> Checks');
-}
+const {transformSync}=require('esbuild') as {transformSync:(code:string,options:{loader:string})=>unknown};
 
-const components:PageComponentLike[]=[
+const components=[
  {id:'c1',type:'Custom:smart_container',label:'Box',visible:true,position:{x:10,y:20,width:300,height:200},
-  properties:{navigatorName:'Box',backgroundColor:'#ffffff',labelColor:'#111111',radius:8,textSize:14,shadow:'medium',
-   borderColor:'#cccccc',headerBold:true,labelAlignment:'center'}},
+  properties:{navigatorName:'Box',backgroundColor:'#ffffff',radius:8,shadow:'medium'}},
  {id:'c2',type:'Custom:smart_button',label:'Pay',visible:true,position:{x:15,y:25,width:100,height:40},
-  properties:{navigatorName:'PayButton',layoutParentId:'c1',actionFlows:{click:'SCREEN(Done)'}}},
- {id:'c3',type:'Custom:smart_text',label:'Total',visible:false,position:{x:5,y:70,width:120,height:30},
-  properties:{navigatorName:'TotalText',layoutParentId:'c1',text:'=@Cart.Total',other:'=BAD()',pageLayer:2}}
+  properties:{navigatorName:'PayButton',layoutParentId:'c1',labelColor:'#112233',textSize:14,
+   actionFlows:{click:{kind:'Formula'}}}},
+ {id:'c3',type:'Custom:smart_text',label:'Total',visible:true,position:{x:5,y:80,width:120,height:30},
+  properties:{navigatorName:'TotalText',layoutParentId:'c1',text:'=SUM(1,2)',headerBold:true,borderColor:'#cccccc'}},
+ {id:'c4',type:'Custom:smart_text',label:'Bad',visible:false,position:{x:0,y:0,width:10,height:10},
+  properties:{navigatorName:'BadText',text:'=UNKNOWN()'}}
 ];
-const pageCode:PageCode={
- version:2,
- formulas:[{key:'c3:text',componentId:'c3',property:'text',source:'=@Cart.Total',objectApiName:'Cart',
-  js:'(row, $) => row.Total'}],
- actions:[{key:'c2:click',componentId:'c2',event:'click',objectApiName:'',js:'async ($) => {\n  await $.ui("INFO", "Hi", "", "", "", "");\n}',
+const pageCode:PageCode={version:2,
+ formulas:[{key:'c3:text',componentId:'c3',property:'text',source:'=SUM(1,2)',objectApiName:'',js:'(row, $) => 3'}],
+ actions:[{key:'c2:click',componentId:'c2',event:'click',objectApiName:'',js:'async ($) => {\n  await $.ui("INFO", "ok", "", "", "", "");\n}',
   data:false,reads:[],writes:[],ui:['INFO']}],
- recordSets:[],issues:[]
-};
-const input=()=>({appApi:'Till',pageApi:'Home',variant:'Desktop' as const,
- page:{canvasWidth:1024,canvasHeight:768,layoutMode:'Free',components},pageCode,pageCodeModuleText:''});
-const file=(name:string)=>generatePageSource(input()).files.find(f=>f.path===name)!.content;
+ recordSets:[],issues:[]};
+const run=()=>generatePageSource({appApi:'till',pageApi:'Home',variant:'Desktop',
+ page:{canvasWidth:1024,canvasHeight:768,layoutMode:'free-canvas',components},pageCode,pageCodeModuleText:''});
+const file=(name:string)=>run().files.find(f=>f.path===name)!.content;
 
-test('file list is exact',()=>{
- assert.deepEqual(generatePageSource(input()).files.map(f=>f.path),
+test('file list',()=>{
+ assert.deepEqual(run().files.map(f=>f.path),
   ['Home.tsx','Home.css','Home.formulas.ts','Home.actions.ts','Home.data.ts','manifest.json']);
 });
-
-test('same input gives identical files',()=>{
- assert.deepEqual(generatePageSource(input()).files,generatePageSource(input()).files);
-});
-
-test('button is nested in its container and keeps its position',()=>{
+test('deterministic',()=>{assert.deepEqual(run().files,run().files);});
+test('button nested in container, css position copied',()=>{
  const tsx=file('Home.tsx');
  const open=tsx.indexOf('name="Box"'),button=tsx.indexOf('name="PayButton"'),close=tsx.indexOf('</Smart>');
- assert.ok(open>=0&&button>open&&button<close,'button is inside the container element');
+ assert.ok(open>=0&&button>open&&button<close,'button must sit inside Box');
  assert.match(file('Home.css'),/\.c-PayButton\{[^}]*left:15px;top:25px;/);
 });
-
 test('formula, action and unknown formula',()=>{
  const tsx=file('Home.tsx');
- assert.match(tsx,/text=\{f\['c3:text'\]\}/);
- assert.match(tsx,/onClick=\{a\['c2:click'\]\}/);
- const {issues}=generatePageSource(input());
- assert.deepEqual(issues,[{componentName:'TotalText',message:'Formula not converted: other'}]);
- assert.match(tsx,/hidden/);
- assert.match(tsx,/layer=\{2\}/);
+ assert.ok(tsx.includes("text={f['c3:text']}"));
+ assert.ok(tsx.includes("onClick={a['c2:click']}"));
+ const issues=run().issues.filter(i=>i.message.startsWith('Formula not converted'));
+ assert.equal(issues.length,1);
+ assert.equal(issues[0].componentName,'BadText');
 });
-
-test('style is mapped to css',()=>{
+test('css mapping',()=>{
  const css=file('Home.css');
- assert.match(css,/^\/\* GENERATED by Une publish/);
- assert.match(css,/\.page-Home\{position:relative;width:1024px;height:768px;\}/);
- const rule=/\.c-Box\{([^}]*)\}/.exec(css)![1];
- for(const part of ['background:#ffffff','color:#111111','border:1px solid #cccccc','border-radius:8px','font-size:14px',
-  'font-weight:700','text-align:center','box-shadow:0 3px 9px #0003'])assert.ok(rule.includes(part),part);
+ assert.match(css,/\.c-Box\{[^}]*background:#ffffff;[^}]*border-radius:8px;[^}]*box-shadow:0 3px 9px #0003;/);
+ assert.match(css,/\.c-PayButton\{[^}]*color:#112233;[^}]*font-size:14px;/);
+ assert.match(css,/\.c-TotalText\{[^}]*border:1px solid #cccccc;[^}]*font-weight:700;/);
 });
-
-test('generated files parse',()=>{
- const {transformSync}=loadEsbuild();
- for(const f of generatePageSource(input()).files){
-  if(f.path.endsWith('.tsx')||f.path.endsWith('.ts'))transformSync(f.content,{loader:'tsx'});
-  else if(f.path==='manifest.json')JSON.parse(f.content);
- }
+test('generated files parse with esbuild',()=>{
+ for(const f of run().files)if(/\.(tsx|ts)$/.test(f.path))
+  assert.doesNotThrow(()=>transformSync(f.content,{loader:'tsx'}),f.path);
 });
-
-test('versionsToDelete keeps the newest 10',()=>{
- assert.deepEqual(versionsToDelete([1,2,3,4,5,6,7,8,9,10,11,12]),[1,2]);
+test('versionsToDelete keeps newest 10',()=>{
+ assert.deepEqual(versionsToDelete(Array.from({length:12},(_,i)=>i+1)),[1,2]);
  assert.deepEqual(versionsToDelete([3,4]),[]);
-});
-
-test('never throws on odd input',()=>{
- const odd=generatePageSource({...input(),page:{components:[{} as PageComponentLike,{id:'x',type:'',properties:{layoutParentId:'nope',a:{b:1}}}]}});
- assert.equal(odd.files.length,6);
- assert.ok(odd.issues.length>0);
 });

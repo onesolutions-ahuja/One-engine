@@ -4,13 +4,17 @@ Publishing a page writes its code files; an app with **Run app from published co
 (App Manager) runs ONLY from those files - on the device and on the server.
 
 ## Files of a page layout (newest version runs; the last 10 are kept)
-- `<page>.tsx` - the screen: one `<Smart id type name className …props />` per component, page order.
+- `<page>.tsx` - the screen as plain React: one tag per component from `@une/ui` (`<Button>`, `<CardGrid>`, …),
+  its Page Builder name as `className`, its settings as props, `parent="Box"` for the container it sits in,
+  formulas as `f.<name>.<property>`, actions as `onClick={a.<name>.click}`.
 - `<page>.css` - positions (`left/top/width/height`) and look (`background`, `color`, `border`,
   `border-radius`, `font-size`, `font-weight`, `text-align`, `box-shadow`).
-- `<page>.formulas.ts` - every display formula: `source` (the formula) and `run` (its code).
-- `<page>.actions.ts` - every action: `flow` (as set in Page Builder) and `run` (its code). The
+- `<page>.formulas.ts` - display formulas grouped by component name: `source` (the formula) and `run` (its code,
+  plain JavaScript where it gives the same answer: `x === "Open"`, `a && b`, `let sc;` for AS(sc)).
+- `<page>.actions.ts` - actions grouped by component name: `flow` (as set in Page Builder) and `run` (its code). The
   device runs `run` at once; the server runs the SAME `run` in one transaction.
-- `<page>.data.ts` - record sets the screen holds. `manifest.json` - page settings.
+- `<page>.data.ts` - record sets the screen holds. `manifest.json` - page settings and `names`: each
+  component's id/label/region and which type each tag is (what the code does not need to show).
 - Extra `*.ts` helper files may be added next to them and imported (`import {x} from './helpers'`).
 
 In an action: the record API (`$.getRecord/$.create/$.update/…`: access checks, history and

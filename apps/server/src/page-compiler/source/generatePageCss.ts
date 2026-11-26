@@ -52,12 +52,15 @@ export function cssStyleKeys(c:PageComponentLike):{properties:Set<string>;positi
  return {properties,position:new Set(POSITION_RULES.filter(rule=>finite(position[rule.key])).map(rule=>rule.key))};
 }
 
-/** One class per component (c-<name>; a repeated name gets -2, -3, …), in page order. */
+/** One class per component: its name (a repeated name gets -2, -3, …), in page order. */
 export function classNames(components:readonly PageComponentLike[]):Map<PageComponentLike,string>{
  const used=new Set<string>(),out=new Map<PageComponentLike,string>();
  for(const c of components){
   if(!c||typeof c!=='object')continue;
-  const base='c-'+safeName(componentName(c)||'component');
+  // The component's own name (the name it has in Page Builder): it is also its key in the
+  // .formulas.ts / .actions.ts files. A name a class cannot start with gets "c-".
+  const safe=safeName(componentName(c)||'component');
+  const base=/^[A-Za-z_]/.test(safe)?safe:'c-'+safe;
   let name=base,n=1;
   while(used.has(name))name=base+'-'+(++n);
   used.add(name);out.set(c,name);

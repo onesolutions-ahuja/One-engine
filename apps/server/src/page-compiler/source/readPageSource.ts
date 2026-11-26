@@ -1,6 +1,7 @@
 import {createRequire} from 'node:module';
 import {transformSync} from 'esbuild';
 import {componentFromElement,cssRules} from './pageSourceShape.js';
+import {readNames,smartAttrs,uiImports,type PageCodeNames} from './pageCodeNames.js';
 import type {PageComponentLike} from './generatePageSource.js';
 
 /**
@@ -59,9 +60,17 @@ function valueOf(node:Node|null|undefined):unknown{
    return out;
   }
   case 'MemberExpression':{
-   if(node.object.type==='Identifier'&&(node.object.name==='f'||node.object.name==='a')&&node.computed
-    &&node.property.type==='Literal'&&typeof node.property.value==='string')
-    return {ref:node.object.name,key:node.property.value} satisfies Ref;
+   // f.pay.label / a.pay.click (by component name), or f["<id>:<property>"] (older files).
+   const path:string[]=[];
+   let at:Node=node;
+   while(at.type==='MemberExpression'){
+    const part=at.computed?(at.property.type==='Literal'&&typeof at.property.value==='string'?at.property.value:null)
+     :at.property.type==='Identifier'?at.property.name:null;
+    if(part===null)return NOT_PLAIN;
+    path.unshift(part);at=at.object;
+   }
+   if(at.type==='Identifier'&&(at.name==='f'||at.name==='a')&&(path.length===1||path.length===2))
+    return {ref:at.name,key:path.join('.')} satisfies Ref;
    return NOT_PLAIN;
   }
   default:return NOT_PLAIN;
@@ -88,34 +97,48 @@ function exportedObject(code:string,name:string):Node|null{
  return exported?found:null;
 }
 const keyName=(property:Node):string=>property.key.type==='Identifier'?property.key.name:String(property.key.value);
-/** The plain fields of each entry ({ source: "…", flow: {…}, … }); code fields are skipped. */
+/** The plain fields of each entry ({ source: "…", flow: {…}, … }); code fields are skipped.
+ * Entries are grouped by component name ("pay.click"); older files are flat ("<id>:click"). */
 function entries(code:string,name:string):Map<string,Record<string,unknown>>{
  const out=new Map<string,Record<string,unknown>>();
  const object=exportedObject(code,name);
- for(const property of object?.properties??[]){
-  if(property.type!=='Property'||property.value.type!=='ObjectExpression')continue;
+ const fieldsOf=(entry:Node):Record<string,unknown>=>{
   const fields:Record<string,unknown>={};
-  for(const field of property.value.properties){
+  for(const field of entry.properties){
    if(field.type!=='Property')continue;
    const value=valueOf(field.value);
    if(value!==NOT_PLAIN)fields[keyName(field)]=value;
    else fields[keyName(field)+'#code']=true;
   }
-  out.set(keyName(property),fields);
+  return fields;
+ };
+ for(const property of object?.properties??[]){
+  if(property.type!=='Property'||property.value.type!=='ObjectExpression')continue;
+  const group=keyName(property);
+  if(group.includes(':')){out.set(group,fieldsOf(property.value));continue;}
+  for(const part of property.value.properties){
+   if(part.type!=='Property'||part.value.type!=='ObjectExpression')continue;
+   const fields=fieldsOf(part.value);
+   if(fields.event===undefined)fields.event=keyName(part);
+   out.set(group+'.'+keyName(part),fields);
+  }
  }
  return out;
 }
 
-/** The <Smart … /> elements of the page, in order, with their attributes as plain values. */
-function smartElements(tsx:string):Array<{attrs:Record<string,unknown>;notPlain:string[]}>{
+/** The component elements of the page (<Button …/> from '@une/ui', or <Smart …/> in older
+ * files), in order, with their attributes as plain values. */
+function smartElements(tsx:string,names:PageCodeNames|null):Array<{attrs:Record<string,unknown>;notPlain:string[]}>{
+ const tags=uiImports(tsx);
  const js=transformSync(tsx,{loader:'tsx',format:'esm',jsx:'transform',jsxFactory:'h',jsxFragment:'Fragment'}).code;
  const out:Array<{attrs:Record<string,unknown>;notPlain:string[]}>=[];
  const walk=(node:unknown):void=>{
   if(!node||typeof node!=='object')return;
   if(Array.isArray(node)){for(const item of node)walk(item);return;}
   const n=node as Node;
-  if(n.type==='CallExpression'&&n.callee?.type==='Identifier'&&n.callee.name==='h'
-   &&n.arguments[0]?.type==='Identifier'&&n.arguments[0].name==='Smart'){
+  const tagName=n.type==='CallExpression'&&n.callee?.type==='Identifier'&&n.callee.name==='h'
+   &&n.arguments[0]?.type==='Identifier'?String(n.arguments[0].name):'';
+  if(tagName==='Smart'||tags.has(tagName)){
    const attrs:Record<string,unknown>={},notPlain:string[]=[];
    const props=n.arguments[1];
    const take=(object:Node)=>{
@@ -130,7 +153,7 @@ function smartElements(tsx:string):Array<{attrs:Record<string,unknown>;notPlain:
     }
    };
    if(props?.type==='ObjectExpression')take(props);
-   out.push({attrs,notPlain});
+   out.push({attrs:tagName==='Smart'?attrs:smartAttrs(tags.get(tagName)!,attrs,names),notPlain});
   }
   for(const [key,value] of Object.entries(n))if(key!=='type'&&value&&typeof value==='object')walk(value);
  };
@@ -151,7 +174,7 @@ export function readPageSource(files:Record<string,string>,pageApi:string):ReadP
  const actions=entries(file('.actions.ts'),'actions');
  const css=cssRules(file('.css'));
  const components:PageComponentLike[]=[];
- for(const {attrs,notPlain} of smartElements(file('.tsx'))){
+ for(const {attrs,notPlain} of smartElements(file('.tsx'),readNames(files['manifest.json']))){
   const id=typeof attrs.id==='string'?attrs.id:'';
   for(const key of notPlain)issues.push((id||'?')+'.'+key+': not a plain value (it runs on the device; the server cannot use it)');
   const made=componentFromElement(attrs,css,{

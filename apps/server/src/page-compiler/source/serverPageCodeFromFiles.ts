@@ -1,6 +1,7 @@
 import {build,type Plugin} from 'esbuild';
 import {F,O} from '../code/formulaLibrary.js';
 import type {PageCode,ServerPageCode} from '../code/pageCode.js';
+import {flatEntries,readNames} from './pageCodeNames.js';
 
 /**
  * A page's .actions.ts and .data.ts (and any of the page's own files they import) -> the code
@@ -41,17 +42,18 @@ export async function serverCodeFromFiles(files:Record<string,string>,pageApi:st
  const module={exports:{} as Record<string,unknown>};
  // eslint-disable-next-line @typescript-eslint/no-implied-eval
  new Function('module','exports','__une_formula_library',codeText)(module,module.exports,{F,O});
- const raw=(module.exports.actions??{}) as Record<string,Record<string,unknown>>;
+ // Grouped by component name ({ pay: { click: {…} } }); older files are flat ("<id>:click").
+ const raw=flatEntries<Record<string,unknown>>(module.exports.actions as Record<string,unknown>,readNames(files['manifest.json']));
  const sets=Array.isArray(module.exports.recordSets)?module.exports.recordSets as ServerPageCode['recordSets']:[];
  const list=(value:unknown)=>Array.isArray(value)?value.map(String):[];
  const serverActions:ServerPageCode['actions']={};
  const actions:PageCode['actions']=[];
- for(const [key,entryValue] of Object.entries(raw)){
+ for(const {runtimeKey:key,componentId,part,entry:entryValue} of raw){
   if(!entryValue||typeof entryValue.run!=='function')continue;
   const action={data:entryValue.data===true,reads:list(entryValue.reads),writes:list(entryValue.writes),ui:list(entryValue.ui),
    run:entryValue.run as (scope:unknown)=>Promise<void>};
   serverActions[key]=action;
-  actions.push({key,componentId:String(entryValue.component??key.split(':')[0]),event:String(entryValue.event??key.split(':').slice(1).join(':')),
+  actions.push({key,componentId:String(entryValue.component??componentId),event:String(entryValue.event??part),
    objectApiName:'',js:String(entryValue.run),data:action.data,reads:action.reads,writes:action.writes,ui:action.ui});
  }
  return {serverCode:{actions:serverActions,recordSets:sets},actions,codeText};

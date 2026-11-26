@@ -32,15 +32,27 @@ const pure=(min:number,max:number,help:string,clock=false):FormulaEntry=>({kind:
 const action=(min:number,max:number,help:string):FormulaEntry=>({kind:'action',min,max,help});
 const aggregate=(help:string,min:number):FormulaEntry=>({kind:'aggregate',min,max:42,help});
 
+/** Code known to give true/false (a comparison, AND, OR, NOT): it needs no O.t(). The set only
+ * remembers code text this converter wrote, so the same text always means the same value. */
+const BOOLEAN_CODE=new Set<string>();
+export function asBoolean(code:string):string{
+ if(BOOLEAN_CODE.size>5000)BOOLEAN_CODE.clear();
+ BOOLEAN_CODE.add(code);
+ return code;
+}
+export const isBooleanCode=(code:string):boolean=>BOOLEAN_CODE.has(code);
+/** Formula truth of generated code: plain when the code is already true/false. */
+export const truth=(code:string):string=>BOOLEAN_CODE.has(code)?code:'O.t('+code+')';
+
 export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.freeze({
  /* ---------- Logic: compiled to JavaScript control flow ---------- */
  IF:{kind:'inline',min:2,max:3,help:'IF(test, then, else) -> (test ? then : else)',
-  js:a=>'(O.t('+a[0]+') ? '+a[1]+' : '+(a[2]??'false')+')'},
+  js:a=>'('+truth(a[0])+' ? '+a[1]+' : '+(a[2]??'false')+')'},
  AND:{kind:'inline',min:1,max:20,help:'AND(a, b, ...) -> a && b && ...',
-  js:a=>'('+a.map(x=>'O.t('+x+')').join(' && ')+')'},
+  js:a=>asBoolean('('+a.map(truth).join(' && ')+')')},
  OR:{kind:'inline',min:1,max:20,help:'OR(a, b, ...) -> a || b || ...',
-  js:a=>'('+a.map(x=>'O.t('+x+')').join(' || ')+')'},
- NOT:{kind:'inline',min:1,max:1,help:'NOT(a) -> !a',js:a=>'(!O.t('+a[0]+'))'},
+  js:a=>asBoolean('('+a.map(truth).join(' || ')+')')},
+ NOT:{kind:'inline',min:1,max:1,help:'NOT(a) -> !a',js:a=>asBoolean('(!'+truth(a[0])+')')},
  BLANKVALUE:{kind:'inline',min:2,max:2,help:'BLANKVALUE(value, fallback): fallback when value is blank',
   js:(a,m)=>'('+(m.async?'await ':'')+'('+(m.async?'async ':'')+'(x) => O.blank(x) ? '+a[1]+' : x)('+a[0]+'))'},
  NULLVALUE:{kind:'inline',min:2,max:2,help:'NULLVALUE(value, fallback): fallback when value is null',

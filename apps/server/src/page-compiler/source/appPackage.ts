@@ -1,3 +1,4 @@
+import {readNames,uiImports} from './pageCodeNames.js';
 import {createHash} from 'node:crypto';
 import {build,type Plugin} from 'esbuild';
 import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} from '../compilePage.js';
@@ -176,6 +177,16 @@ function packagePlugin(screens:readonly PackageScreen[]):Plugin{
  const EXTENSIONS=['','.tsx','.ts','.css'];
  return {name:'une-app-package',setup(on){
   on.onResolve({filter:/^(react|@une\/smart|@une\/formula-library)$/},args=>({path:args.path,namespace:'une-global'}));
+  // '@une/ui': the components (<Button>, <CardGrid>, …). Each tag the screens import is one
+  // component of the device's own library (window.__une.modules['@une/ui'].tag(name)).
+  on.onResolve({filter:/^@une\/ui$/},()=>({path:'@une/ui',namespace:'une-ui'}));
+  on.onLoad({filter:/.*/,namespace:'une-ui'},()=>{
+   const tags=new Set<string>();
+   for(const screen of screens)for(const content of Object.values(screen.files))
+    for(const tag of uiImports(content).values())tags.add(tag);
+   return {loader:'js',contents:'var ui = window.__une.modules["@une/ui"];\nmodule.exports = {'
+    +[...tags].sort().map(tag=>JSON.stringify(tag)+': ui.tag('+JSON.stringify(tag)+')').join(', ')+'};'};
+  });
   on.onLoad({filter:/.*/,namespace:'une-global'},args=>({loader:'js',
    contents:'module.exports = window.__une.modules['+JSON.stringify(args.path)+'];'}));
   on.onResolve({filter:/^screen:/},args=>({path:args.path.slice('screen:'.length),namespace:'screen'}));
@@ -186,7 +197,7 @@ function packagePlugin(screens:readonly PackageScreen[]):Plugin{
    if(!found)return {errors:[{text:'Not a file of this page: '+args.path}]};
    return {path:dir+'/'+found,namespace:'screen'};
   });
-  on.onResolve({filter:/.*/,namespace:'screen'},args=>({errors:[{text:'Only the page\'s own files, react, @une/smart and @une/formula-library can be imported: '+args.path}]}));
+  on.onResolve({filter:/.*/,namespace:'screen'},args=>({errors:[{text:'Only the page\'s own files, react, @une/ui, @une/smart and @une/formula-library can be imported: '+args.path}]}));
   on.onLoad({filter:/.*/,namespace:'screen'},args=>{
    const [dir,...rest]=args.path.split('/'),name=rest.join('/');
    const content=byDir.get(dir)?.[name];
@@ -210,6 +221,7 @@ export async function bundleAppPackage(appApi:string,screens:readonly PackageScr
   entries.push(JSON.stringify(screen.key)+': {Page: P'+index+', formulas: F'+index+', actions: A'+index
    +', recordSets: D'+index+', version: '+screen.version+', css: '+JSON.stringify(screen.files[screen.pageApi+'.css']??'')
    +', settings: '+JSON.stringify(Object.fromEntries(Object.entries(screen.page).filter(([field])=>field!=='components')))
+   +', names: '+JSON.stringify(readNames(screen.files['manifest.json']))
    +', plan: '+JSON.stringify(screen.plan)+'}');
  });
  const entry=imports.join('\n')+'\nwindow.__uneAppPackage = {version: 3, app: '+JSON.stringify(appApi)

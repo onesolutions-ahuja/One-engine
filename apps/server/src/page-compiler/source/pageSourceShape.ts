@@ -1,5 +1,6 @@
 import {POSITION_RULES,STYLE_RULES} from './generatePageCss.js';
 import type {PageComponentLike} from './generatePageSource.js';
+import {flatEntries,smartAttrs,type PageCodeNames} from './pageCodeNames.js';
 
 /**
  * One <Smart … /> element of a page's .tsx -> the page component it describes. Pure (no
@@ -85,16 +86,26 @@ export function componentFromElement(attrs:Record<string,unknown>,css:Map<string
 }
 
 /** What the device gets for one screen in the app package (its code, bundled). */
+type FormulaEntry={source?:unknown;run?:unknown};
+type ActionEntry={component?:unknown;event?:unknown;flow?:unknown;data?:unknown;reads?:unknown;writes?:unknown;ui?:unknown;run?:unknown};
 export type PackageScreenCode={
  Page:()=>unknown;
- formulas:Record<string,{source?:unknown;run?:unknown}>;
- actions:Record<string,{component?:unknown;event?:unknown;flow?:unknown;data?:unknown;reads?:unknown;writes?:unknown;ui?:unknown;run?:unknown}>;
+ /** Grouped by component name ({ pay: { label: {…} } }), or flat ("<id>:label") in older files. */
+ formulas:Record<string,unknown>;
+ actions:Record<string,unknown>;
  recordSets:unknown[];css:string;settings:Record<string,unknown>;version?:number;
+ /** manifest.json "names": component ids/labels and which type each '@une/ui' tag is. */
+ names?:PageCodeNames|null;
 };
 type ElementLike={type?:unknown;props?:Record<string,unknown>};
 
+/** A component of '@une/ui' (<Button>, <CardGrid>, …) carries its tag. */
+export type UiComponent=((props:unknown)=>null)&{uneTag:string};
+const uiTagOf=(type:unknown):string=>typeof type==='function'&&typeof (type as Partial<UiComponent>).uneTag==='string'
+ ?(type as UiComponent).uneTag:'';
+
 /**
- * Run the screen's Page() and turn its <Smart> elements into the page the runtime draws, and
+ * Run the screen's Page() and turn its component elements (<Button …/>, or <Smart …/> in older files) into the page the runtime draws, and
  * its formulas / actions / record sets into the page code the runtime runs. A function a
  * developer put in the .tsx is not a page value: it is reported and left out.
  */
@@ -105,9 +116,13 @@ export function screenFromCode(screen:PackageScreenCode,smart:unknown):{
  issues:string[];
 }{
  const issues:string[]=[];
+ const names=screen.names??null;
+ const formulaList=flatEntries<FormulaEntry>(screen.formulas as Record<string,unknown>,names);
+ const actionList=flatEntries<ActionEntry>(screen.actions as Record<string,unknown>,names);
+ const formulaByFile=new Map(formulaList.map(item=>[item.fileKey,item])),actionByFile=new Map(actionList.map(item=>[item.fileKey,item]));
  const formulaKey=new Map<unknown,string>(),actionKey=new Map<unknown,string>();
- for(const [key,entry] of Object.entries(screen.formulas??{}))formulaKey.set(entry,key);
- for(const [key,entry] of Object.entries(screen.actions??{}))actionKey.set(entry,key);
+ for(const item of formulaList)formulaKey.set(item.entry,item.fileKey);
+ for(const item of actionList)actionKey.set(item.entry,item.fileKey);
  const css=cssRules(screen.css??'');
  const components:PageComponentLike[]=[];
  const visit=(node:unknown):void=>{
@@ -115,8 +130,9 @@ export function screenFromCode(screen:PackageScreenCode,smart:unknown):{
   if(!node||typeof node!=='object')return;
   const element=node as ElementLike;
   const props=element.props??{};
-  if(element.type===smart){
-   const attrs:Record<string,unknown>={};
+  const tag=uiTagOf(element.type);
+  if(element.type===smart||tag){
+   let attrs:Record<string,unknown>={};
    for(const [key,value] of Object.entries(props)){
     if(key==='children')continue;
     if(formulaKey.has(value)){attrs[key]={ref:'f',key:formulaKey.get(value)};continue;}
@@ -124,9 +140,10 @@ export function screenFromCode(screen:PackageScreenCode,smart:unknown):{
     if(typeof value==='function'){issues.push(String(props.id??'?')+'.'+key+': a function is not a page value: left out');continue;}
     attrs[key]=value;
    }
+   if(tag)attrs=smartAttrs(tag,attrs,names);
    const made=componentFromElement(attrs,css,{
-    formula:key=>screen.formulas[key]?.source,
-    action:key=>{const entry=screen.actions[key];return entry?{event:entry.event,flow:entry.flow}:undefined;}
+    formula:key=>formulaByFile.get(key)?.entry.source,
+    action:key=>{const item=actionByFile.get(key);return item?{event:item.entry.event??item.part,flow:item.entry.flow}:undefined;}
    });
    issues.push(...made.issues);
    if(made.component)components.push(made.component);
@@ -135,13 +152,13 @@ export function screenFromCode(screen:PackageScreenCode,smart:unknown):{
  };
  visit(screen.Page());
  const formulas:Record<string,unknown>={},sources:Record<string,string>={};
- for(const [key,entry] of Object.entries(screen.formulas??{})){
+ for(const {runtimeKey:key,entry} of formulaList){
   if(typeof entry?.run!=='function'||typeof entry.source!=='string')continue;
   formulas[key]=entry.run;sources[key]=entry.source;
  }
  const actions:Record<string,{data:boolean;reads:string[];writes:string[];ui:string[];run:unknown}>={};
  const list=(value:unknown)=>Array.isArray(value)?value.map(String):[];
- for(const [key,entry] of Object.entries(screen.actions??{})){
+ for(const {runtimeKey:key,entry} of actionList){
   if(typeof entry?.run!=='function')continue;
   actions[key]={data:entry.data===true,reads:list(entry.reads),writes:list(entry.writes),ui:list(entry.ui),run:entry.run};
  }

@@ -47,10 +47,13 @@ export class AppRuntime {
       ||!Array.isArray(p.navigationOrder)||!Array.isArray(p.utilityItems)
       ||p.navigationItems.length>100||p.navigationPageApiNames.length>100
       ||p.navigationOrder.length>200||p.utilityItems.length>2
+      ||(p.runPublishedCode!==undefined&&typeof p.runPublishedCode!=='boolean')
       ||(p.homePageApiName!==undefined&&typeof p.homePageApiName!=='string'))
       throw new Error('Invalid App metadata');
     const lock=readLockScreen(p.lockScreen);
     const guest=readGuestAccess(p.guestAccess);
+    // null = leave as it is (like the lock screen flags); true/false sets the switch.
+    const runPublishedCode=typeof p.runPublishedCode==='boolean'?p.runPublishedCode:null;
     const {objects,pages,order,utilityItems}=validateAppNavigation(p);
     // Home Page: the chosen App Page, else the first App Page in navigation order.
     const firstPage=order.find(item=>item.type==='App Page')?.apiName??'';
@@ -112,10 +115,11 @@ export class AppRuntime {
         if(!found.rowCount)throw new Error('Unknown App Page: '+pageApi);
       }
       await client.query(`
-        INSERT INTO md_tenant_app_metadata(tenant_id,app_id,api_name,label,description,brand_color,revision,lock_enabled,lock_idle_minutes,guest_enabled,guest_page,guest_profile,guest_object)
-        VALUES($1,$2,$3,$4,$5,$6,1,COALESCE($7::boolean,false),COALESCE($8::integer,5),COALESCE($9::boolean,false),$10,$11,$12)
+        INSERT INTO md_tenant_app_metadata(tenant_id,app_id,api_name,label,description,brand_color,revision,lock_enabled,lock_idle_minutes,guest_enabled,guest_page,guest_profile,guest_object,run_published_code)
+        VALUES($1,$2,$3,$4,$5,$6,1,COALESCE($7::boolean,false),COALESCE($8::integer,5),COALESCE($9::boolean,false),$10,$11,$12,COALESCE($13::boolean,false))
         ON CONFLICT(tenant_id,app_id) DO UPDATE SET label=EXCLUDED.label,
           description=EXCLUDED.description,brand_color=EXCLUDED.brand_color,
+          run_published_code=COALESCE($13::boolean,md_tenant_app_metadata.run_published_code),
           lock_enabled=COALESCE($7::boolean,md_tenant_app_metadata.lock_enabled),
           lock_idle_minutes=COALESCE($8::integer,md_tenant_app_metadata.lock_idle_minutes),
           guest_enabled=COALESCE($9::boolean,md_tenant_app_metadata.guest_enabled),
@@ -124,7 +128,8 @@ export class AppRuntime {
           guest_object=CASE WHEN $9::boolean IS NULL THEN md_tenant_app_metadata.guest_object ELSE $12 END,
           revision=md_tenant_app_metadata.revision+1
       `,[tenantId,appId,apiName,p.label,p.description,p.brandColor,lock.enabled,lock.idleMinutes,
-        guest?.enabled??null,guest?.pageApiName||null,guest?.profile||null,guest?.objectApiName||null]);
+        guest?.enabled??null,guest?.pageApiName||null,guest?.profile||null,guest?.objectApiName||null,
+        runPublishedCode]);
       // Guest access switched off: every guest link and guest tablet of this app stops now.
       if(guest&&!guest.enabled)await endGuestSessions(client,tenantId,apiName);
       await client.query('DELETE FROM md_tenant_app_navigation WHERE tenant_id=$1 AND app_id=$2',[tenantId,appId]);

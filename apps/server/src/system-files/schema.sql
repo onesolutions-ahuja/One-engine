@@ -1062,6 +1062,8 @@ CREATE TABLE IF NOT EXISTS md_tenant_app_metadata (
  description text NOT NULL DEFAULT '',
  brand_color text NOT NULL DEFAULT '#2563eb',
  revision integer NOT NULL DEFAULT 1 CHECK(revision>0),
+ -- Run this app from the published code kept on the device (per tenant, off by default).
+ run_published_code boolean NOT NULL DEFAULT false,
  PRIMARY KEY(tenant_id,app_id),
  UNIQUE(tenant_id,api_name),
  FOREIGN KEY(app_id) REFERENCES md_apps(id)
@@ -2889,3 +2891,12 @@ CREATE TABLE IF NOT EXISTS md_page_code_version_files(
  PRIMARY KEY(tenant_id,page_api,layout_variant,version,path),
  FOREIGN KEY(tenant_id,page_api,layout_variant,version)
   REFERENCES md_page_code_versions(tenant_id,page_api,layout_variant,version) ON DELETE CASCADE);
+-- One file per published app: every screen, its compiled plan, its page code and its styles.
+-- Design only (never records); the newest 10 per tenant + app + layout are kept.
+CREATE TABLE IF NOT EXISTS md_app_packages(
+ tenant_id uuid NOT NULL REFERENCES md_tenants(id),
+ app_api text NOT NULL, layout_variant text NOT NULL, hash text NOT NULL,
+ code text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(tenant_id,app_api,layout_variant,hash));
+CREATE INDEX IF NOT EXISTS md_app_packages_recent
+ ON md_app_packages(tenant_id,app_api,layout_variant,created_at DESC);

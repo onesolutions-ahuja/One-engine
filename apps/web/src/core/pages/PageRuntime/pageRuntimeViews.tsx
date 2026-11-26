@@ -131,6 +131,7 @@ import {CompiledPageProvider,MemoizedCompiledComponentNode,PageCodeFormulas} fro
 import type {CompiledPage} from '../PageCompiler/compilePage';
 import {issuedAppPageScript,type LoadedPageScript} from '../PageCompiler/serverPageScript';
 import {preloadAppPageScript,primeAppPageScript,useAppPageScript} from '../PageCompiler/useAppPageScript';
+import {appPackageComponentTypes,appPackagePage,loadAppPackage} from '../AppPackage/appPackage';
 import {
   canvasDimensionsForOrientation,
   canvasBoundPosition,
@@ -1196,6 +1197,9 @@ function LightningAppRuntime({
     loading:boolean;
   }>({routeKey:'',identity:'',appId:'',page:null,error:'',loading:true});
   const [publishedTick,setPublishedTick]=useState(0);
+  // The app's published code, kept on this device: its screens open from that one file.
+  const [packageTick,setPackageTick]=useState(0);
+  const runPublishedCode=apps.find(item=>item.apiName===appId)?.runPublishedCode===true;
   const pageLoadRef=useRef(pageLoad);
   pageLoadRef.current=pageLoad;
   const routePending=pageLoad.routeKey!==routeKey;
@@ -1204,14 +1208,19 @@ function LightningAppRuntime({
     ??readStalePageDefinition(pageDefinitionCache,cacheKey)??shownBefore:null;
   // Never run components from the previous route while navigating. Cached
   // definitions render immediately; uncached routes show the loading state.
-  const page=previewPage??(routePending?cached:pageLoad.page);
+  // Published code: this page comes from the app package, so it is never fetched.
+  const packaged=useMemo(()=>!previewPage&&!printPreview&&runPublishedCode
+    ?appPackagePage(appId,pageApiName,requestedLayout):null,
+    [previewPage,printPreview,runPublishedCode,appId,pageApiName,requestedLayout,packageTick]);
+  const page=previewPage??packaged?.page??(routePending?cached:pageLoad.page);
   // A popup page runs under its own SCREEN instance key, so CLOSESCREEN() and
   // page-state events reach that popup instead of another copy of the page.
   const runtimeSessionKey=page?(inScreenPage&&instanceKey?instanceKey:appId+':'+page.apiName):'';
   // Published pages run their server-converted file (classic engine if that fails).
-  const appScript=useAppPageScript(apiRequest,appId,previewPage?null:page,!previewPage&&!compiledPageProp);
-  const compiledScript=compiledScriptProp??(appScript.status==='ready'?appScript.script:null);
-  const compiledPage=compiledPageProp??(appScript.status==='ready'?appScript.script.plan:undefined);
+  const appScript=useAppPageScript(apiRequest,appId,previewPage||packaged?null:page,
+    !previewPage&&!compiledPageProp&&!packaged);
+  const compiledScript=compiledScriptProp??packaged?.script??(appScript.status==='ready'?appScript.script:null);
+  const compiledPage=compiledPageProp??packaged?.script.plan??(appScript.status==='ready'?appScript.script.plan:undefined);
   const compiledById=useMemo(()=>new Map((compiledPage?.components??[]).map(item=>[item.id,item])),[compiledPage]);
   const error=previewPage?'':routePending?'':pageLoad.error;
   const libraryPending=!libraryComponents.length&&Boolean(page?.components.some(item=>item.type.startsWith('Custom:')));
@@ -1223,7 +1232,7 @@ function LightningAppRuntime({
     const timer=window.setTimeout(()=>setLibraryWaitExpired(true),10000);
     return()=>window.clearTimeout(timer);
   },[libraryPending]);
-  const loading=previewPage?false:routePending?!cached:pageLoad.loading;
+  const loading=previewPage?false:packaged?false:routePending?!cached:pageLoad.loading;
   const [activeTabs, setActiveTabs] = useState<Record<string,string>>({});
   const [layoutState,setLayoutState]=useState<Record<string,unknown>>(inScreenPage?inScreenContext?.values??{}:{});
   const allLayoutState=useRef<Record<string,unknown>>(layoutState);
@@ -1281,9 +1290,25 @@ function LightningAppRuntime({
     window.addEventListener('metadrive:page-local-state',listener);
     return()=>window.removeEventListener('metadrive:page-local-state',listener);
   },[runtimeSessionKey]);
+  useEffect(()=>{
+    // Published code: load the app's one file (once per hash) and its renderers ahead of time.
+    if(!runPublishedCode||previewPage||printPreview)return;
+    let live=true;
+    void loadAppPackage(apiRequest,appId,requestedLayout).then(loaded=>{
+      if(!live||!loaded)return;
+      preloadComponentRenderers(appPackageComponentTypes(appId,requestedLayout)
+        .filter(type=>type.startsWith('Custom:'))
+        .map(type=>findRegisteredComponent(libraryComponents,type.slice('Custom:'.length),'page'))
+        .filter((item):item is LibraryComponentMetadata=>Boolean(item)));
+      setPackageTick(tick=>tick+1);
+    });
+    return()=>{live=false;};
+  },[runPublishedCode,previewPage,printPreview,apiRequest,appId,requestedLayout,libraryComponents]);
   useEffect(() => {
     // Draft previews never fetch the published revision or pollute the tenant-scoped page cache.
     if(previewPage)return;
+    // Published code: this page is already on the device, so nothing is fetched for it.
+    if(packaged)return;
     let active = true;
     const cachedPage=readPageDefinitionCache(pageDefinitionCache,cacheKey);
     if(cachedPage){
@@ -1324,7 +1349,7 @@ function LightningAppRuntime({
       });
     });
     return ()=>{active=false;};
-  },[routeKey,pageIdentity,appId,pageApiName,inScreenPage,requestedLayout,viewportWidth,pageDefinitionCache,cacheKey,previewPage,publishedTick]);
+  },[routeKey,pageIdentity,appId,pageApiName,inScreenPage,requestedLayout,viewportWidth,pageDefinitionCache,cacheKey,previewPage,publishedTick,packaged]);
   // A new version of this page was published: the open page switches to it (its page
   // state is carried over), without the user reopening it.
   useEffect(()=>{
@@ -1352,6 +1377,8 @@ function LightningAppRuntime({
   const pageReady=Boolean(page)&&appScript.status!=='loading';
   useEffect(()=>{
     if(!page||!pageReady||previewPage||printPreview||compiledPageProp)return;
+    // Published code: every screen is already in the app package, so nothing is prefetched.
+    if(runPublishedCode)return;
     const navigation=apps.find(item=>item.apiName===appId)?.navigationPageApiNames??[];
     const run=()=>prefetchLinkedPages(page,pages,appId,requestedLayout,viewportWidth,pageDefinitionCache,navigation,libraryComponents);
     const idle=(globalThis as {requestIdleCallback?:(run:()=>void,options?:{timeout:number})=>number}).requestIdleCallback;
@@ -1359,7 +1386,7 @@ function LightningAppRuntime({
     // competed with them); only the popups it opens itself and its linked pages load.
     const timer=window.setTimeout(()=>idle?idle(run,{timeout:2000}):run(),1500);
     return()=>window.clearTimeout(timer);
-  },[page,pageReady,pages,apps,appId,requestedLayout,viewportWidth,pageDefinitionCache,previewPage,printPreview,compiledPageProp,libraryComponents]);
+  },[page,pageReady,pages,apps,appId,requestedLayout,viewportWidth,pageDefinitionCache,previewPage,printPreview,compiledPageProp,libraryComponents,runPublishedCode]);
   // PRINT() waits until the template is on screen (or reports why it is not).
   useEffect(()=>{
     if(!printPreview||loading)return;

@@ -24,6 +24,8 @@ export async function resolveTenantAppMetadata(db:SqlPersistence,tenantId:string
    guestAccess:{enabled:row.guest_enabled===true,pageApiName:row.guest_page??'',profile:row.guest_profile??'',
     objectApiName:row.guest_object??''},
    utilityItems:utilities.filter(item=>item.app_id===row.id).map(item=>item.utility_name),
+   // This tenant runs the app from its published code (one file kept on the device).
+   runPublishedCode:row.run_published_code===true,
    ...(row.revision===null?{}:{revision:row.revision})};
  });
 }

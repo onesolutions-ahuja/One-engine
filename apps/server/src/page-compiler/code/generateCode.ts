@@ -21,7 +21,8 @@ import {screenArguments} from '../../expression-engine/screenLayer.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
 import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
 import {uiProperty} from '../../expression-engine/FormulaComponentState.js';
-import {formulaEntry} from './formulaDictionary.js';
+import {asBoolean,formulaEntry,isBooleanCode,truth} from './formulaDictionary.js';
+import {isIdentifier} from '../source/pageCodeNames.js';
 import {parseActionFormulaAssignment} from '../pageCompilerSupport.js';
 
 const q=(value:unknown)=>JSON.stringify(value);
@@ -298,20 +299,44 @@ function setBasedSteps(body:Expression,object:string,criteria:string,alias:strin
  return ['{','  const rows = await $.list('+q(object)+', '+criteria+');',...lines,'}'];
 }
 
+const COMPARISONS=new Set(['=','==','<>','!=','<','<=','>','>=']);
+/** A literal that = / <> compare exactly like JavaScript === (no date, no wildcard). */
+function plainValue(node:Expression):boolean{
+ if(node.kind!=='literal')return false;
+ const value=node.value;
+ if(typeof value==='number'||typeof value==='boolean')return true;
+ return typeof value==='string'&&!/^\d{4}-\d{2}-\d{2}/.test(value)&&!/[*?~]/.test(value);
+}
+/** Functions that always give text. */
+const TEXT_FUNCTIONS=new Set(['TEXT','LEFT','RIGHT','MID','UPPER','LOWER','PROPER','TRIM','FORMAT','SUBSTITUTE','CONCATENATE']);
+/** A part of a text join (&): text as it is, anything else through O.s() (blank -> ""). */
+function asText(node:Expression,code:string):string{
+ if(node.kind==='literal'&&typeof node.value==='string')return code;
+ if(node.kind==='binary'&&node.operator==='&')return code;
+ if(node.kind==='call'&&TEXT_FUNCTIONS.has(node.name)&&code.startsWith('F.'+node.name+'('))return code;
+ return 'O.s('+code+')';
+}
+
 export function expression(node:Expression,scope:Scope):string{
  switch(node.kind){
   case 'literal':return node.value===null?'null':q(node.value);
   case 'reference':return reference(node.value,scope);
   case 'unary':
-   if(node.operator==='NOT')return '(!O.t('+expression(node.value,scope)+'))';
+   if(node.operator==='NOT')return asBoolean('(!'+truth(expression(node.value,scope))+')');
    return 'O.u('+q(node.operator)+', '+expression(node.value,scope)+')';
   case 'binary':{
    const left=expression(node.left,scope),right=expression(node.right,scope);
-   if(node.operator==='AND')return '(O.t('+left+') && O.t('+right+'))';
-   if(node.operator==='OR')return '(O.t('+left+') || O.t('+right+'))';
-   if(node.operator==='&')return '(O.s('+left+') + O.s('+right+'))';
+   if(node.operator==='AND')return asBoolean('('+truth(left)+' && '+truth(right)+')');
+   if(node.operator==='OR')return asBoolean('('+truth(left)+' || '+truth(right)+')');
+   if(node.operator==='&')return '('+asText(node.left,left)+' + '+asText(node.right,right)+')';
+   const comparison=COMPARISONS.has(node.operator);
+   // = and <> against a plain value (a number, true/false, or text that is not a date and has
+   // no * ? ~) are plain === / !== : the formula gives exactly the same answer.
+   if((node.operator==='='||node.operator==='<>')&&(plainValue(node.left)||plainValue(node.right)))
+    return asBoolean('('+left+(node.operator==='='?' === ':' !== ')+right+')');
    const wildcard=node.left.kind==='reference'&&isExcelWildcardDataReference(node.left.value);
-   return 'O.b('+q(node.operator)+', '+left+', '+right+(wildcard?', true, $.timeZone()':', false, $.timeZone()')+')';
+   const code='O.b('+q(node.operator)+', '+left+', '+right+(wildcard?', true, $.timeZone()':', false, $.timeZone()')+')';
+   return comparison?asBoolean(code):code;
   }
   case 'call':{
    const entry=formulaEntry(node.name);
@@ -338,7 +363,9 @@ export function compileDisplayFormula(source:string,rowObject=''):CompiledFormul
 export function compileDisplayNode(node:Expression,rowObject=''):CompiledFormulaCode{
  const scope:Scope={rowObject,row:'row',aliases:new Set(),async:false,functions:new Set(),references:new Set(),sets:[],reads:new Set()};
  const body=expression(node,scope);
- return {js:'(row, $) => O.out('+body+')',functions:[...scope.functions],references:[...scope.references],
+ // O.out only checks a number is finite: text and true/false need no check.
+ const plain=isBooleanCode(body)||(node.kind==='literal'&&typeof node.value==='string')||(node.kind==='binary'&&node.operator==='&');
+ return {js:'(row, $) => '+(plain?body:'O.out('+body+')'),functions:[...scope.functions],references:[...scope.references],
   sets:scope.sets,reads:[...scope.reads]};
 }
 
@@ -391,8 +418,8 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   const test=expression(node.args[0],scope);
   const then=stepCode(node.args[1],scope),otherwise=node.args[2]?stepCode(node.args[2],scope):[];
   if(!then.length&&!otherwise.length)return [];
-  if(!then.length)return ['if (!O.t('+test+')) {',...indent(otherwise),'}'];
-  return ['if (O.t('+test+')) {',...indent(then),...(otherwise.length?['} else {',...indent(otherwise)]:[]),'}'];
+  if(!then.length)return ['if (!'+truth(test)+') {',...indent(otherwise),'}'];
+  return ['if ('+truth(test)+') {',...indent(then),...(otherwise.length?['} else {',...indent(otherwise)]:[]),'}'];
  }
  if(!entry||entry.kind!=='action')return fail(node.name+' is not an action step');
  if(node.args.length<entry.min||node.args.length>entry.max)
@@ -634,6 +661,18 @@ export function compileActionFormula(source:string,rowObject=''):CompiledActionC
  const root=assignment?parseFormula('='+assignment.value):parseFormula(source);
  return compileActionNode(root,rowObject,source,assignment);
 }
+/** Names generated code itself uses: an AS(...) name like these stays in the v map. */
+const TAKEN=new Set(['$','F','O','v','row','rows','item','x','value','result','Object','Math','Date','String','Number','JSON','Array','Promise','Boolean','Symbol','Error']);
+/** AS(name) results as plain local variables (`let sc;` … `sc = await $.getRecord(…)`), as a
+ * person writes them. An action that WAITs keeps them in the v map (the wait resumes it). */
+function localAliases(lines:string[],aliases:ReadonlySet<string>):string[]{
+ const names=[...aliases].filter(name=>isIdentifier(name)&&!TAKEN.has(name)&&!name.startsWith('__'));
+ if(!names.length||lines.some(line=>line.includes('$.service("WAIT"')))return lines;
+ const used=names.filter(name=>lines.some(line=>line.includes('v['+q(name)+']')));
+ if(!used.length)return lines;
+ const out=lines.map(line=>used.reduce((text,name)=>text.split('v['+q(name)+']').join(name),line));
+ return ['let '+used.join(', ')+';',...out];
+}
 /** An already parsed action (also a message box's Yes/No/OK steps) -> one async function. */
 export function compileActionNode(root:Expression,rowObject='',source='',
  assignment:ReturnType<typeof parseActionFormulaAssignment>=null):CompiledActionCode{
@@ -648,8 +687,9 @@ export function compileActionNode(root:Expression,rowObject='',source='',
   node.args.forEach(collect);
  };
  collect(root);
- const lines=assignment?assignmentCode(assignment,scope):stepCode(root,scope);
- return {js:'async ($) => {\n  const v = Object.create(null);\n'+indent(lines).join('\n')+(lines.length?'\n':'')+'}',
+ const lines=localAliases(assignment?assignmentCode(assignment,scope):stepCode(root,scope),aliases);
+ const usesMap=lines.some(line=>/(^|[^A-Za-z0-9_$.])v\[/.test(line));
+ return {js:'async ($) => {\n'+(usesMap?'  const v = Object.create(null);\n':'')+indent(lines).join('\n')+(lines.length?'\n':'')+'}',
   reads:[...scope.reads],writes:[...scope.writes],ui:[...scope.ui],data:scope.data,sets:scope.sets,
   functions:[...scope.functions],references:[...scope.references],boxes:scope.boxes};
 }

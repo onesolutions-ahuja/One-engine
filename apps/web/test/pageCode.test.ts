@@ -352,7 +352,7 @@ test('messages run on the server; device steps stay with the action engine', ()=
  const pdf=compileActionFormula('=ACTIONS(CREATEPDF(Receipt, @ThisPage.Input.recordId, AS(pdf)), LOCATION(AS(here)))','Cart');
  assert.equal(pdf.data,true);
  assert.match(pdf.js,/\$\.service\("CREATEPDF", \["Receipt", /);
- assert.match(pdf.js,/v\["here"\] = await \$\.service\("LOCATION", \[\]\)/);
+ assert.match(pdf.js,/let [^;]*\bhere\b[\s\S]*\bhere = await \$\.service\("LOCATION", \[\]\)/);
 });
 
 test('assignment actions convert: state, filter and navigation', ()=>{
@@ -416,7 +416,7 @@ test('new-style actions: state, filter, navigation, WAIT, LOCATION, CREATEPDF, m
  assert.match(wait.js,/setValue\("B", \$\.state\("recordId"\)\)/);
  const pdf=compileActionFormula('=ACTIONS(CREATEPDF(Receipt, @ThisPage.Input.recordId, AS(pdf)), LOCATION(AS(here)))','Cart');
  assert.match(pdf.js,/\$\.service\("CREATEPDF", \["Receipt", \$\.state\("recordId"\)\]\)/);
- assert.match(pdf.js,/v\["here"\] = await \$\.service\("LOCATION", \[\]\)/);
+ assert.match(pdf.js,/let [^;]*\bhere\b[\s\S]*\bhere = await \$\.service\("LOCATION", \[\]\)/);
  const email=compileActionFormula('=EMAIL(Mailer, @ThisTenant.User.Email, "Receipt", @ThisTenant.Company.Name)','Cart');
  assert.match(email.js,/\$\.service\("EMAIL", \["Mailer", \$\.session\("user\.email"\), "Receipt", \$\.tenant\("name"\)\]\)/);
  const sms=compileActionFormula('=SMS(Texter, @ThisPage.Input.phone, @ThisPage.MessageBox.value)','Cart');

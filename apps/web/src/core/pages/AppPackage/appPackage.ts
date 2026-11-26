@@ -5,7 +5,7 @@ import type {PageCode} from '../PageCompiler/pageCodeRuntime';
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import * as React from 'react';
 import {F,O} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
-import {screenFromCode,type PackageScreenCode} from '../../../../../server/src/page-compiler/source/pageSourceShape.js';
+import {screenFromCode,type PackageScreenCode,type UiComponent} from '../../../../../server/src/page-compiler/source/pageSourceShape.js';
 
 /**
  * The published app package: ONE script file per app, kept by the device.
@@ -13,7 +13,7 @@ import {screenFromCode,type PackageScreenCode} from '../../../../../server/src/p
  * When a tenant turns "Run app from published code" on (App Manager), opening the app
  * fetches /apps/<app>/package once and adds the file as a script. The file is the app's
  * pages AS CODE (each page's .tsx, .formulas.ts, .actions.ts, .data.ts and .css, as
- * published or as a developer edited them). A screen runs its Page(): its <Smart> elements
+ * published or as a developer edited them). A screen runs its Page(): its component elements (<Button>, <CardGrid>, …)
  * are the components drawn, its formulas and actions are what run. No page definition and
  * no page script is fetched. Records still go through the record API with the user's own
  * access checks; the server runs its own copy of each action.
@@ -46,13 +46,22 @@ const scripts=new Map<string,{hash:string;value:{page:LightningPageMetadata;scri
 
 const keyOf=(appId:string,variant:string):string=>appId+'\u0000'+variant;
 
-/** <Smart> in a page's .tsx: describes one component (the runtime draws it, so it renders nothing itself). */
+/** <Smart> in a page's .tsx (files written before named tags): describes one component (the
+ * runtime draws it, so it renders nothing itself). */
 export function Smart():null{return null;}
-/** What a page's code may import: React, <Smart> and the formula library (nothing is bundled twice). */
+/** '@une/ui': <Button>, <CardGrid>, … Each tag describes one component, like <Smart> (the
+ * runtime draws it); the tag says which type it is. One function per tag, kept. */
+const uiTags=new Map<string,UiComponent>();
+export function uiTag(tag:string):UiComponent{
+ let made=uiTags.get(tag);
+ if(!made){made=Object.assign(()=>null,{uneTag:tag}) as UiComponent;uiTags.set(tag,made);}
+ return made;
+}
+/** What a page's code may import: React, the components and the formula library (nothing is bundled twice). */
 function provideModules():void{
  const holder=window as unknown as {__une?:{modules?:Record<string,unknown>}};
  holder.__une??={};
- holder.__une.modules={...(holder.__une.modules??{}),react:React,'@une/smart':{Smart},'@une/formula-library':{F,O}};
+ holder.__une.modules={...(holder.__une.modules??{}),react:React,'@une/smart':{Smart},'@une/ui':{tag:uiTag},'@une/formula-library':{F,O}};
 }
 
 /** Add the package file once (the URL carries the hash, so the browser keeps it) and keep

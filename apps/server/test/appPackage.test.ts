@@ -55,7 +55,10 @@ async function built(edit?:(files:Record<string,string>)=>void){
  const Smart=()=>null;
  const react={createElement:(type:unknown,props:Record<string,unknown>|null,...children:unknown[])=>
   ({type,props:{...(props??{}),...(children.length?{children:children.length===1?children[0]:children}:{})}}),Fragment:'frag'};
- const window:Record<string,any>={__une:{modules:{react,'@une/smart':{Smart},'@une/formula-library':{F,O}}}};
+ // '@une/ui' as the device gives it: one component per tag, carrying its tag.
+ const tags=new Map<string,unknown>();
+ const tag=(name:string)=>tags.get(name)??tags.set(name,Object.assign(()=>null,{uneTag:name})).get(name);
+ const window:Record<string,any>={__une:{modules:{react,'@une/smart':{Smart},'@une/ui':{tag},'@une/formula-library':{F,O}}}};
  vm.runInNewContext(code,{window});
  return {code,file:window.__uneAppPackage,Smart};
 }

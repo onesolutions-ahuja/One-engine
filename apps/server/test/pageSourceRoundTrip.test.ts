@@ -45,18 +45,29 @@ test('a developer edit in the .css or the .tsx is what the page becomes',()=>{
  assert.match(String(read.components[1].properties!.caption),/^Charge/);
 });
 
-test('the files are the same every time and the .tsx is plain React',()=>{
+test('the files are the same every time and read like hand-written code (names, tags, plain refs)',()=>{
  assert.deepEqual(build().files,build().files);
- const tsx=asFiles(build())['Till.tsx'];
- assert.match(tsx,/export default function Page\(\)/);
- assert.match(tsx,/<Smart id="pay" type="Custom:smart_button" name="Pay" className="c-Pay"/);
- assert.match(tsx,/onClick=\{a\["pay:click"\]\}/);
- assert.match(tsx,/className="c-Pay-2"/);
+ const files=asFiles(build());
+ const tsx=files['Till.tsx'];
+ assert.match(tsx,/export default function TillPage\(\)/);
+ assert.match(tsx,/import \{Button, Container, Text\} from '@une\/ui';/);
+ assert.match(tsx,/<Button className="Pay" layer=\{2\}/);
+ assert.match(tsx,/onClick=\{a\.Pay\.click\}/);
+ assert.match(tsx,/label=\{f\.Pay\.label\}/);
+ assert.match(tsx,/<Text className="Pay-2" name="Pay" hidden/);
+ assert.doesNotMatch(tsx,/<Smart|import-|id="pay"|layoutParentId/);
+ assert.match(files['Till.formulas.ts'],/\n  Pay: \{\n    label: \{\n      source: /);
+ assert.match(files['Till.actions.ts'],/\n  Pay: \{\n    click: \{\n      flow: /);
+ const names=JSON.parse(files['manifest.json']).names;
+ assert.equal(names.ui.Button,'Custom:smart_button');
+ assert.deepEqual(names.components.Pay,{id:'pay',label:'Pay'});
+ assert.match(tsx,/parent="Box"/);
+ assert.equal(names.components['Pay-2'].id,'total');
 });
 
 test('a function a developer wrote is reported (device only), never run by the server',()=>{
  const files=asFiles(build());
  files['Till.tsx']=files['Till.tsx'].replace('caption={"Pay','onTap={() => alert(1)} caption={"Pay');
  const read=readPageSource(files,'Till');
- assert.ok(read.issues.some(issue=>/pay\.onTap: not a plain value/.test(issue)));
+ assert.ok(read.issues.some(issue=>/onTap: not a plain value/.test(issue)));
 });

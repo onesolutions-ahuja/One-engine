@@ -1,5 +1,6 @@
 import type {PageCode} from '../code/pageCode.js';
-import {generatePageCss} from './generatePageCss.js';
+import {classNames,generatePageCss} from './generatePageCss.js';
+import {member,objectKey,type PageCodeNames} from './pageCodeNames.js';
 import {generatePageTsx} from './generatePageTsx.js';
 
 /** The fields of a saved page component that the generator reads (local copy: no web code on the server). */
@@ -16,7 +17,6 @@ const SAFE_PAGE=/^[A-Za-z0-9_.-]{1,120}$/;
 const q=(value:unknown):string=>JSON.stringify(value);
 /** Generated function text goes into an object literal: indent its continuation lines. */
 const indent=(text:string,by='    '):string=>text.replace(/\n/g,'\n'+by);
-const oneLine=(text:string):string=>text.replace(/\*\//g,'').replace(/[\r\n\u2028\u2029]+/g,' ');
 /** Page settings kept in manifest.json (everything about the page except its components). */
 const DROPPED_SETTINGS=new Set(['components','draftRevision','readonlyVersion','updatedAt']);
 
@@ -25,12 +25,13 @@ const DROPPED_SETTINGS=new Set(['components','draftRevision','readonlyVersion','
  * randomness, so the same input gives byte-identical files. Never throws: what it cannot
  * write becomes an issue. Lossless: readPageSource() gives the page back.
  *
- *  <page>.tsx          the screen (React): one <Smart> per component
+ *  <page>.tsx          the screen (React): one tag per component (<Button className="pay" …/>)
  *  <page>.css          positions and look
  *  <page>.formulas.ts  every display formula: its text and its code
  *  <page>.actions.ts   every action: its flow (formula) and its code (runs on this device first)
  *  <page>.data.ts      the record sets the screen holds
- *  manifest.json       page settings (size, type, layout, assignments) and the file list
+ *  manifest.json       page settings (size, type, layout, assignments), the file list and
+ *                      "names" (each component's id, label and region; which type a tag is)
  */
 export function generatePageSource(input:{
  appApi:string;pageApi:string;variant:'Desktop'|'Tablet'|'Mobile'|'Custom';
@@ -55,23 +56,27 @@ export function generatePageSource(input:{
   const flows=c?.properties?.actionFlows;
   if(typeof c?.id==='string'&&flows&&typeof flows==='object'&&!Array.isArray(flows))flowsOf.set(c.id,flows as Record<string,unknown>);
  }
- const formulaKeys=new Map<string,string>();
- for(const f of pageCode?.formulas??[])formulaKeys.set(f.componentId+'\u0000'+f.property,f.key);
+ // Formulas and actions are grouped under their component's name (its className).
+ const classes=classNames(components);
+ const nameOfId=new Map<string,string>();
+ for(const c of components)if(typeof c?.id==='string'&&!nameOfId.has(c.id))nameOfId.set(c.id,classes.get(c)!);
+ const groupOf=(componentId:string)=>nameOfId.get(componentId)??componentId;
+ const formulaRefs=new Map<string,string>();
+ for(const f of pageCode?.formulas??[])formulaRefs.set(f.componentId+'\u0000'+f.property,member('f',groupOf(f.componentId),f.property));
  // Every action flow gets an entry (one that did not convert keeps its flow, with no code).
  type ActionEntry={key:string;componentId:string;event:string;flow?:unknown;code?:PageCode['actions'][number]};
  const actionEntries:ActionEntry[]=[];
- const actionKeys=new Map<string,string>();
+ const actionRefs=new Map<string,string>();
  for(const action of pageCode?.actions??[]){
   const flow=flowsOf.get(action.componentId)?.[action.event];
   actionEntries.push({key:action.key,componentId:action.componentId,event:action.event,
    ...(flow!==undefined?{flow}:{}),code:action});
-  if(flow!==undefined)actionKeys.set(action.componentId+'\u0000'+action.event,action.key);
+  if(flow!==undefined)actionRefs.set(action.componentId+'\u0000'+action.event,member('a',groupOf(action.componentId),action.event));
  }
  for(const [id,flows] of flowsOf)for(const [event,flow] of Object.entries(flows)){
-  if(actionKeys.has(id+'\u0000'+event))continue;
-  const key=id+':'+event;
-  actionEntries.push({key,componentId:id,event,flow});
-  actionKeys.set(id+'\u0000'+event,key);
+  if(actionRefs.has(id+'\u0000'+event))continue;
+  actionEntries.push({key:id+':'+event,componentId:id,event,flow});
+  actionRefs.set(id+'\u0000'+event,member('a',groupOf(id),event));
  }
  actionEntries.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
 
@@ -83,29 +88,38 @@ export function generatePageSource(input:{
   }
  };
 
- const tsx=safe(page+'.tsx',()=>generatePageTsx({header:jsHeader,page,pageClass,components,formulaKeys,actionKeys},issues),jsHeader+'\n');
+ const names:PageCodeNames={ui:{},components:{}};
+ const tsx=safe(page+'.tsx',()=>generatePageTsx({header:jsHeader,page,pageClass,components,formulaRefs,actionRefs,names},issues),jsHeader+'\n');
  const css=safe(page+'.css',()=>generatePageCss({header:'/* '+text+' */',pageClass,
   canvasWidth:input.page?.canvasWidth,canvasHeight:input.page?.canvasHeight,components},issues),'/* '+text+' */\n');
 
+ /** Entries grouped by component name: { name: { part: { … } } }, in page order. */
+ const grouped=<T,>(items:readonly T[],group:(item:T)=>string,write:(item:T)=>string):string=>{
+  const groups=new Map<string,string[]>();
+  for(const item of items){const g=group(item);(groups.get(g)??groups.set(g,[]).get(g)!).push(write(item));}
+  return [...groups].map(([g,parts])=>'  '+objectKey(g)+': {\n'+parts.join('')+'  },\n').join('');
+ };
  const formulas=safe(page+'.formulas.ts',()=>{
-  const body=(pageCode?.formulas??[]).map(f=>'  /** '+oneLine(String(f.property))+' */\n  '+q(f.key)+': {\n    source: '+q(f.source)
-   +',\n    run: '+indent(f.js)+'\n  },\n').join('');
+  const body=grouped(pageCode?.formulas??[],f=>groupOf(f.componentId),f=>
+   '    '+objectKey(f.property)+': {\n'+(f.key!==f.componentId+':'+f.property?'      key: '+q(f.key)+',\n':'')
+   +'      source: '+q(f.source)+',\n      run: '+indent(f.js,'      ')+'\n    },\n');
   return jsHeader+"\nimport {F, O} from '@une/formula-library';\n\n"
-   +'/** Display formulas: `source` is the formula, `run` the code this screen runs. */\n'
+   +'/** Display formulas, by component: `source` is the formula, `run` the code this screen runs. */\n'
    +'export const formulas = {\n'+body+'};\n';
  },jsHeader+'\nexport const formulas = {};\n');
  const actions=safe(page+'.actions.ts',()=>{
-  const body=actionEntries.map(entry=>{
-   const parts=['    component: '+q(entry.componentId),'    event: '+q(entry.event)];
-   if(entry.flow!==undefined)parts.push('    flow: '+q(entry.flow));
-   if(entry.code)parts.push('    data: '+entry.code.data,'    reads: '+q(entry.code.reads),'    writes: '+q(entry.code.writes),
-    '    ui: '+q(entry.code.ui),'    run: '+indent(entry.code.js));
-   else parts.push('    issue: '+q('Not converted to code: this action runs on the server only'));
-   return '  '+q(entry.key)+': {\n'+parts.join(',\n')+'\n  },\n';
-  }).join('');
+  const body=grouped(actionEntries,entry=>groupOf(entry.componentId),entry=>{
+   const parts:string[]=[];
+   if(entry.key!==entry.componentId+':'+entry.event)parts.push('      key: '+q(entry.key));
+   if(entry.flow!==undefined)parts.push('      flow: '+q(entry.flow));
+   if(entry.code)parts.push('      data: '+entry.code.data,'      reads: '+q(entry.code.reads),'      writes: '+q(entry.code.writes),
+    '      ui: '+q(entry.code.ui),'      run: '+indent(entry.code.js,'      '));
+   else parts.push('      issue: '+q('Not converted to code: this action runs on the server only'));
+   return '    '+objectKey(entry.event)+': {\n'+parts.join(',\n')+'\n    },\n';
+  });
   return jsHeader+"\nimport {F, O} from '@une/formula-library';\n\n"
-   +'/** Actions: `flow` is the action as set in Page Builder; `run` is its code. A tap runs `run`\n'
-   +' * on this device at once; the server runs its own copy of the flow in one transaction. */\n'
+   +'/** Actions, by component: `flow` is the action as set in Page Builder; `run` is its code. A tap\n'
+   +' * runs `run` on this device at once; the server runs the same `run` in one transaction. */\n'
    +'export const actions = {\n'+body+'};\n';
  },jsHeader+'\nexport const actions = {};\n');
  const data=safe(page+'.data.ts',()=>{
@@ -127,7 +141,7 @@ export function generatePageSource(input:{
  const settings=Object.fromEntries(Object.entries(input.page??{}).filter(([key])=>!DROPPED_SETTINGS.has(key)).sort(([a],[b])=>a<b?-1:a>b?1:0));
  const manifestPaths=[...files.map(f=>f.path),'manifest.json'];
  const manifest=JSON.stringify({app:input.appApi,page:input.pageApi,variant:input.variant,
-  pageCodeVersion:pageCode?.version??0,files:manifestPaths,settings,issues},null,1)+'\n';
+  pageCodeVersion:pageCode?.version??0,files:manifestPaths,settings,names,issues},null,1)+'\n';
  files.push({path:'manifest.json',content:manifest});
  return {files,issues};
 }

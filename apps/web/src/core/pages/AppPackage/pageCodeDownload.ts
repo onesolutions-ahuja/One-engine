@@ -52,7 +52,7 @@ export async function pageCodeFiles(request:Request,apiName:string,variant:strin
  const list=await request<{versions?:Array<{version:number}>}>(base+'?variant='+encodeURIComponent(variant));
  const version=list.versions?.[0]?.version;
  if(!version)throw Error('This page has no code yet: publish it (or rebuild the app) first.');
- const file=(path:string)=>request<unknown>(base+'/'+version+'/file?variant='+encodeURIComponent(variant)+'&path='+encodeURIComponent(path)).then(text);
+ const file=(path:string)=>request<unknown>(base+'/'+version+'/file?format=json&variant='+encodeURIComponent(variant)+'&path='+encodeURIComponent(path)).then(text);
  const manifest=await file('manifest.json');
  let paths:string[]=[];
  try{paths=(JSON.parse(manifest).files as unknown[]).filter((path):path is string=>typeof path==='string');}catch{paths=[];}

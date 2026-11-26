@@ -100,7 +100,7 @@ export default function PageManagerView({ props, editorState, management, layout
               <button type="button" className="btn" aria-label={"Page properties for "+item.label} disabled={saving} onClick={()=>setPageDetailsApi(item.apiName)}>Page properties</button>
               <button type="button" className="btn" aria-label={"Download component inventory for "+item.label}
                 disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadPageInventory(item)}>Download inventory</button>
-              <button type="button" className="btn" aria-label={"Download compiled script for "+item.label}
+              <button type="button" className="btn" aria-label={"Download code for "+item.label}
                 disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadCompiledPageScript(item)}>Download code</button>
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}

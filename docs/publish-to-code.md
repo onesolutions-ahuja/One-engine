@@ -9,11 +9,14 @@ Publishing a page writes its code files; an app with **Run app from published co
   formulas as `f.<name>.<property>`, actions as `onClick={a.<name>.click}`.
 - `<page>.css` - positions (`left/top/width/height`) and look (`background`, `color`, `border`,
   `border-radius`, `font-size`, `font-weight`, `text-align`, `box-shadow`).
-- `<page>.formulas.ts` - display formulas grouped by component name: `source` (the formula) and `run` (its code,
-  plain JavaScript where it gives the same answer: `x === "Open"`, `a && b`, `let sc;` for AS(sc)).
+- `<page>.formulas.ts` - display formulas grouped by component name: `source` (the formula) and `run` (plain
+  JavaScript using the Object field types: `(row?.StockLevel ?? 0) <= 0`, `sc?.Status === "Open"`, `Math.max(…)`,
+  `$.count("CartLine", {Cart: sc?.Id ?? "", Status: "Open"})`, `$.sum(Object, field, where)`). A blank number
+  counts as 0 in maths (as in a spreadsheet). Only date maths and "*" text matches keep the formula helper.
 - `<page>.actions.ts` - actions grouped by component name: `flow` (as set in Page Builder) and `run` (its code). The
   device runs `run` at once; the server runs the SAME `run` in one transaction.
-- `<page>.data.ts` - record sets the screen holds. `manifest.json` - page settings and `names`: each
+- `<page>.data.ts` - record sets the screen holds (`criteria: ($) => ({SessionKey: $.sessionId, Status: "Open"})`).
+  Open screens of the same session share them: a popup opens with the rows the till already holds. `manifest.json` - page settings and `names`: each
   component's id/label/region and which type each tag is (what the code does not need to show).
 - Extra `*.ts` helper files may be added next to them and imported (`import {x} from './helpers'`).
 
@@ -38,3 +41,9 @@ formulas/actions (`screenFromCode`). The server builds each screen's plan from t
 from the files and loads the screen's `.actions.ts`/`.data.ts` (`serverCodeFromFiles`).
 API: `GET /api/metadata/pages/:page/code-versions[/:v/file?path=]`, `POST …/code-versions`
 `{variant, baseVersion, files}`, `POST …/code-versions/:v/restore`, `POST /api/apps/:app/package/rebuild`.
+
+## Checking a whole app
+`POST /api/apps/:app/package/rebuild` lists, per screen, everything that is not plain code yet (formula
+helpers left, actions not converted, formulas left as text). An empty list = the screen is fully code.
+Files written by an older converter (manifest.json `converter`) are written again on rebuild.
+Page Builder -> Pages -> "Download code" gives a page's newest code files as a .zip.

@@ -101,7 +101,7 @@ export default function PageManagerView({ props, editorState, management, layout
               <button type="button" className="btn" aria-label={"Download component inventory for "+item.label}
                 disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadPageInventory(item)}>Download inventory</button>
               <button type="button" className="btn" aria-label={"Download compiled script for "+item.label}
-                disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadCompiledPageScript(item)}>Download script</button>
+                disabled={Boolean(inventoryDownloading)} onClick={()=>void downloadCompiledPageScript(item)}>Download code</button>
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}
                 onOpenLayout={variant=>void openPageDesignLayout(item.apiName,variant)}/>
@@ -134,7 +134,7 @@ export default function PageManagerView({ props, editorState, management, layout
                 aria-label={'Download component inventory for '+item.label} title="Download page Excel"
                 onClick={()=>void downloadPageInventory(item)}><Download size={16}/></button>
               <button className="page-manager-icon-action" type="button" disabled={Boolean(inventoryDownloading)}
-                aria-label={'Download compiled script for '+item.label} title="Download the compiled page file (.js) the server builds"
+                aria-label={'Download code for '+item.label} title="Download the page code files (.zip): what the app runs"
                 onClick={()=>void downloadCompiledPageScript(item)}><FileCode size={16}/></button>
               <PageDesignSplitAction label={item.label} summary={layoutSummaries[item.apiName]}
                 onOpenDefault={()=>void openPageDesign(item.apiName)}

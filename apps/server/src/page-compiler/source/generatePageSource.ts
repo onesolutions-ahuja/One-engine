@@ -14,6 +14,9 @@ export type GeneratedFile={path:string;content:string};
 export type GeneratedPageSource={files:GeneratedFile[];issues:Array<{componentName:string;message:string}>};
 
 const SAFE_PAGE=/^[A-Za-z0-9_.-]{1,120}$/;
+/** Version of the converter that wrote the files (manifest.json "converter"): files written by an
+ * older one are written again when the app is rebuilt. 2: named tags, typed plain JavaScript. */
+export const PAGE_CODE_CONVERTER=2;
 const q=(value:unknown):string=>JSON.stringify(value);
 /** Generated function text goes into an object literal: indent its continuation lines. */
 const indent=(text:string,by='    '):string=>text.replace(/\n/g,'\n'+by);
@@ -125,7 +128,7 @@ export function generatePageSource(input:{
  const data=safe(page+'.data.ts',()=>{
   const sets=(pageCode?.recordSets??[]).map(set=>'  { key: '+q(set.key)+', object: '+q(set.object)
    +(set.parent?', parent: '+q(set.parent):'')
-   +', criteria: ($) => ['+set.criteria.map(c=>'['+q(c.field)+', '+c.js+']').join(', ')+'] },\n').join('');
+   +', criteria: ($) => ({'+set.criteria.map(c=>objectKey(c.field)+': '+c.js).join(', ')+'}) },\n').join('');
   return jsHeader+"\nimport {F, O} from '@une/formula-library';\n\n"
    +'/** The records this screen keeps on the device (one request when it opens). */\n'
    +'export const recordSets = [\n'+sets+'];\n';
@@ -141,7 +144,7 @@ export function generatePageSource(input:{
  const settings=Object.fromEntries(Object.entries(input.page??{}).filter(([key])=>!DROPPED_SETTINGS.has(key)).sort(([a],[b])=>a<b?-1:a>b?1:0));
  const manifestPaths=[...files.map(f=>f.path),'manifest.json'];
  const manifest=JSON.stringify({app:input.appApi,page:input.pageApi,variant:input.variant,
-  pageCodeVersion:pageCode?.version??0,files:manifestPaths,settings,names,issues},null,1)+'\n';
+  pageCodeVersion:pageCode?.version??0,converter:PAGE_CODE_CONVERTER,files:manifestPaths,settings,names,issues},null,1)+'\n';
  files.push({path:'manifest.json',content:manifest});
  return {files,issues};
 }

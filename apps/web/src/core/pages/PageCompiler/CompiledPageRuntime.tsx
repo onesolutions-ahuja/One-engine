@@ -811,6 +811,10 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
       ()=>previewPrintTemplate(first,second,runtime.pageSessionKey,session,currentAppId));
      else if(effect.name==='FLOW')await runSequenceFlow(first,availableFlows,runtime.request,onLaunchFlow);
      else if(effect.name==='NAVIGATE')await navigateTo(first,effect.args[1]);
+     // A Page Builder navigation (dock, menu) written as code: $.ui("OPEN", {navigation…}).
+     else if(effect.name==='OPEN'&&effect.args[0]&&typeof effect.args[0]==='object')
+      await executeOpenPageActionNode({binding:{...effect.args[0] as Record<string,unknown>,actionType:'Navigate'},
+       context:navigationContext,onNavigate:onNavigate as never});
      else if(effect.name==='FILTER')await selectFilter(first,second,second);
      else if(effect.name==='CONFIRM'||effect.name==='INFO'){
       // CONFIRMSCREEN / INFOSCREEN: ask, then run the answer's own action (key__yes / key__no).

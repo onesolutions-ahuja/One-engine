@@ -19,14 +19,14 @@ function counting(rows:Row[]){
   update:async()=>{statements.push('update-one');return {};},
   getRecord:async()=>{statements.push('getRecord');return {};},
   list:async()=>{statements.push('list');return rows;},
-  createFrom:async(object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
+  createFrom:async(object:string,given:Row[],fields:Record<string,(row:Row)=>unknown>)=>{
    statements.push('create:'+object);
-   for(const row of given)created.push(Object.fromEntries(await Promise.all(fields.map(async([field,make])=>[field,await make(row)]))));
+   for(const row of given)created.push(Object.fromEntries(await Promise.all(Object.entries(fields).map(async([field,make])=>[field,await make(row)]))));
    return created.length;
   },
-  updateWhere:async(object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
+  updateWhere:async(object:string,given:Row[],fields:Record<string,(row:Row)=>unknown>)=>{
    statements.push('update:'+object);
-   for(const row of given)updated.push({Id:row.Id,...Object.fromEntries(await Promise.all(fields.map(async([field,make])=>[field,await make(row)])))});
+   for(const row of given)updated.push({Id:row.Id,...Object.fromEntries(await Promise.all(Object.entries(fields).map(async([field,make])=>[field,await make(row)])))});
    return updated.length;
   },
   removeWhere:async(object:string,given:Row[])=>{statements.push('delete:'+object);return given.length;}
@@ -113,12 +113,13 @@ test('a value that awaits (BLANKVALUE) still converts, parses and runs per row',
  const formula='=FOREACH(CartLine, Status, "Open", AS(line), CREATERECORD(InvoiceLine, Product, BLANKVALUE(line.Product, ""), Qty, line.Quantity))';
  const code=compileActionFormula(formula,'CartLine');
  assert.match(code.js,/\$\.createFrom\(/);
- assert.match(code.js,/async function \(item\)/);
+ // BLANKVALUE of a known field is plain (item?.Product || ""): no await needed per row.
+ assert.match(code.js,/Product: \(item\) => /);
  const run=counting(lines(2).map(line=>({...line,Product:'p-'+line.Id})));
  // The fake saves call make(row) without awaiting: await the values here as the runtimes do.
  const created:Row[]=[];
- run.$.createFrom=async(_object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
-  for(const row of given){const values:Row={};for(const [field,make] of fields)values[field]=await make(row);created.push(values);}
+ run.$.createFrom=async(_object:string,given:Row[],fields:Record<string,(row:Row)=>unknown>)=>{
+  for(const row of given){const values:Row={};for(const [field,make] of Object.entries(fields))values[field]=await make(row);created.push(values);}
   return created.length;
  };
  await fn(code.js)(run.$);

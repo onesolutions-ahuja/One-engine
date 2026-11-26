@@ -11,8 +11,7 @@ import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../
 import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary';
 import { pageActivationAppCandidates, resolvePageActivationApp, pageAppsWithPopups } from '../../pageAppMembership';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
-import { downloadCode } from '../../../../pages/PageCompiler/downloadPageScript';
-import { fetchServerPageScriptSource } from '../../../../pages/PageCompiler/serverPageScript';
+import { downloadPageCode } from '../../../../pages/AppPackage/pageCodeDownload';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -385,16 +384,16 @@ export function usePageManagement(
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the pages');}
     finally{setInventoryDownloading('');}
   };
-  /** Download the page's converted (compiled) TypeScript, from the same layout the inventory uses. */
+  /** Download the page's code files (publish to code: .tsx, .css, .formulas.ts, .actions.ts,
+   * .data.ts, manifest.json, newest version) as one .zip, from the layout the inventory uses. */
   const downloadCompiledPageScript = async (item:LightningPageMetadata) => {
     if(inventoryDownloading)return;
     const variant=inventoryExportVariant==='Auto'
       ?primaryPageLayout(layoutSummaries[item.apiName]):inventoryExportVariant;
     setInventoryDownloading(item.apiName);
     try{
-      // The exact file the server builds from the saved layout (the same file Preview runs).
-      const code=await fetchServerPageScriptSource(request,item.apiName,variant);
-      downloadCode(code,item.apiName+'_'+variant+'.page.js');
+      // The code the app runs from (what publishing wrote, or a developer's edit).
+      await downloadPageCode(request,item.apiName,variant);
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the page script');}
     finally{setInventoryDownloading('');}
   };

@@ -558,8 +558,9 @@ test('browser: a decision over held rows opens the right popup, an unheld Object
  await held.run('pay:Click',{},'Obj',{show:()=>{},effects:async list=>{for(const effect of list)effects.push(effect.name+':'+String(effect.args[0]));}});
  assert.deepEqual(effects,['SCREEN:p']);
  assert.deepEqual(held.misses,[]);
- // Obj is not held: the prediction cannot answer the COUNTIFS, and says which Object.
- const missing=createPageCodeRuntime(code,host({ok:true,sets:{}}));
+ // Obj is not held (another session: rows held by an open screen of THIS session are shared):
+ // the prediction cannot answer the COUNTIFS, and says which Object.
+ const missing=createPageCodeRuntime(code,{...host({ok:true,sets:{}}),sessionId:()=>'s-2'});
  await missing.loadSets();
  await assert.rejects(()=>missing.run('pay:Click',{},'Obj',{show:()=>{},effects:async()=>{}}));
  assert.equal(missing.misses.length,1);
@@ -573,4 +574,21 @@ import {sameEffect} from '../src/core/pages/PageCompiler/pageCodeRuntime';
 test('a predicted screen step matches the server\'s even when a number came back as text',()=>{
  assert.equal(sameEffect({name:'SCREEN',args:['pay','current',2]},{name:'SCREEN',args:['pay','current','2']}),true);
  assert.equal(sameEffect({name:'SCREEN',args:['pay','popup']},{name:'SCREEN',args:['cash','popup']}),false);
+});
+
+test('a popup opens with the rows another screen of the same session holds (no server trip)', async ()=>{
+ const code:PageCode={formulas:{},sources:{},actions:{},
+  recordSets:[{key:'Cart|SessionKey=$.sessionId',object:'Cart',criteria:($:unknown)=>({SessionKey:($ as {sessionId:string}).sessionId})},
+   {key:'Note|F=$.state("x")',object:'Note',criteria:()=>({F:'x'})}]};
+ const rows={'Cart|SessionKey=$.sessionId':{rows:[{Id:'c1',SessionKey:'s-9'}],complete:true},'Note|F=$.state("x")':{rows:[],complete:true}};
+ const host=(session:string)=>({endpoint:'/apps/Y',build:{buildId:'b'},sessionId:()=>session,state:()=>({}),
+  request:(async()=>({ok:true,sets:rows})) as never});
+ const till=createPageCodeRuntime(code,host('s-9'));
+ await till.loadSets();
+ const popup=createPageCodeRuntime(code,host('s-9'));
+ assert.equal(popup.setsFor('Cart|SessionKey=$.sessionId')?.rows[0].Id,'c1');
+ // A set that depends on the screen's own values is never shared.
+ assert.equal(popup.setsFor('Note|F=$.state("x")'),undefined);
+ // Another session sees nothing.
+ assert.equal(createPageCodeRuntime(code,host('s-10')).setsFor('Cart|SessionKey=$.sessionId'),undefined);
 });

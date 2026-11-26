@@ -13,7 +13,7 @@ import type {SqlPersistence} from '../system-files/sql-persistence.js';
 import type {RecordEngine} from '../system-files/record-engine.js';
 import type {RecordFilter} from '../object-engine/QueryBuilder.js';
 import {hasExcelWildcardCriteria} from '../expression-engine/FormulaWildcard.js';
-import {aggregateRows,fieldValue,rowMatches} from '../page-compiler/code/formulaLibrary.js';
+import {aggregateRows,fieldValue,rowMatches,toPairs} from '../page-compiler/code/formulaLibrary.js';
 import {readComponentState} from '../expression-engine/FormulaComponentState.js';
 import {COMPONENT_VALUES} from '../expression-engine/PageReferences.js';
 import {COMPONENT_PROPERTIES,readComponentProperty,uiProperty,uiPropertyValue,withComponentProperties} from '../expression-engine/FormulaComponentState.js';
@@ -296,7 +296,8 @@ class ServerScope{
   }
   });
  }
- async getRecord(object:string,criteria:Array<[string,unknown]>){
+ async getRecord(object:string,where:unknown){
+  const criteria=toPairs(where);
   await this.flush();
   // GETRECORD(Object, Id, x): one row by Id.
   if(criteria.length===1&&criteria[0][0]==='Id'){
@@ -313,13 +314,21 @@ class ServerScope{
    return page.records[0]??{};
   });
  }
- async list(object:string,criteria:Array<[string,unknown]>){
+ async list(object:string,where:unknown){
+  const criteria=toPairs(where);
   await this.flush();
   const result=await this.rows(object,criteria,RECORD_SET_LIMIT);
   if(!result.complete)throw Error('FOREACH matches more than '+RECORD_SET_LIMIT+' records; narrow the criteria');
   return result.rows;
  }
- async agg(kind:string,object:string,field:string,criteria:Array<[string,unknown]>){
+ /** COUNTIFS / SUMIFS / … as the page code writes them: $.count(Object, where), $.sum(Object, field, where). */
+ count(object:string,where:unknown){return this.agg('COUNTIFS',object,'',where);}
+ sum(object:string,field:string,where:unknown){return this.agg('SUMIFS',object,field,where);}
+ average(object:string,field:string,where:unknown){return this.agg('AVERAGEIFS',object,field,where);}
+ min(object:string,field:string,where:unknown){return this.agg('MINIFS',object,field,where);}
+ max(object:string,field:string,where:unknown){return this.agg('MAXIFS',object,field,where);}
+ async agg(kind:string,object:string,field:string,where:unknown){
+  const criteria=toPairs(where);
   await this.flush();
   if(kind==='COUNTIFS'){
    const filters=criteriaFilters(criteria);
@@ -353,12 +362,14 @@ class ServerScope{
   * saved together, in order, before anything else reads or writes records, runs a service,
   * or the action ends: later steps always see them. */
  private pending:Array<{kind:'create'|'update';object:string;id?:string;values:Row}>=[];
- async createLater(object:string,pairs:Array<[string,unknown]>){
+ async createLater(object:string,given:unknown){
+  const pairs=toPairs(given);
   const values=this.values(pairs);
   this.forget(object);
   this.pending.push({kind:'create',object,values});
  }
-  async updateLater(object:string,id:unknown,pairs:Array<[string,unknown]>){
+  async updateLater(object:string,id:unknown,given:unknown){
+  const pairs=toPairs(given);
   if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
   const values=this.values(pairs);
   this.forget(object);
@@ -369,7 +380,8 @@ class ServerScope{
   * check) and each step saves all of them with the bulk path flush() uses: one statement per
   * step, whatever the number of rows.
   */
- async createFrom(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
+ async createFrom(object:string,rows:readonly Row[],given:unknown){
+  const fields=toPairs<(row:Row)=>unknown>(given);
   if(!Array.isArray(rows)||!rows.length)return;
   await this.flush();
   this.forget(object);
@@ -377,7 +389,8 @@ class ServerScope{
   await this.flush();
  }
  /** FOREACH(Object) UPDATERECORD(item.Id, …): one bulk update of the loop's rows. */
- async updateWhere(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
+ async updateWhere(object:string,rows:readonly Row[],given:unknown){
+  const fields=toPairs<(row:Row)=>unknown>(given);
   if(!Array.isArray(rows)||!rows.length)return;
   await this.flush();
   this.forget(object);
@@ -449,13 +462,15 @@ class ServerScope{
   this.written.add(object);
   this.forget(object);
  }
- async create(object:string,pairs:Array<[string,unknown]>){
+ async create(object:string,given:unknown){
+  const pairs=toPairs(given);
   await this.flush();
   this.forget(object);
   const id=await this.records.create(this.actor.tenant_id,this.actor.user_id,object,this.values(pairs)) as unknown as string;
   return this.saved(object,String(id),'create');
  }
- async update(object:string,id:unknown,pairs:Array<[string,unknown]>){
+ async update(object:string,id:unknown,given:unknown){
+  const pairs=toPairs(given);
   await this.flush();
   if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
   this.forget(object);
@@ -565,7 +580,7 @@ async function loadSets(scope:ServerScope,code:ServerPageCode,only?:ReadonlySet<
  const load=async(setKey:string):Promise<{rows:Row[];complete:boolean}>=>{
   if(out[setKey])return out[setKey];
   const set=byKey.get(setKey)!;
-  const criteria=set.criteria(scope);
+  const criteria=toPairs(set.criteria(scope));
   let parentIds:string[]|undefined;
   if(set.parent?.key.startsWith(SHOWN_ROWS)){
    // Held for the rows the page shows (the browser sends their Ids).

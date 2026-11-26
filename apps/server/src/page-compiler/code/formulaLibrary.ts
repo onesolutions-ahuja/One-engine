@@ -68,6 +68,12 @@ export const O={
  out(value:unknown):unknown{if(typeof value==='number')finite(value);return value;}
 };
 
+/** Criteria and saved fields as the page code writes them ({Status: "Open"}) or as pairs. */
+export function toPairs<T=unknown>(value:unknown):Array<[string,T]>{
+ if(Array.isArray(value))return value as Array<[string,T]>;
+ return value&&typeof value==='object'?Object.entries(value as Record<string,T>):[];
+}
+
 /** Criteria matching shared by GETRECORD, COUNTIFS, SUMIFS, FOREACH on rows in memory.
  * Same rules as the server Record API: blank matches blank, text compares
  * case-sensitively unless it has wildcards (* ?), numbers and booleans as text. */

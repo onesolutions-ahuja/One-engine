@@ -303,6 +303,8 @@ export type CompileOptions={
   * compiles, so this only guards against a future regression. */
  strictLegacy?:boolean;
 };
+/** The Objects a page was compiled with: the page code uses their field types (plain JavaScript). */
+export const COMPILED_OBJECTS=new WeakMap<CompiledPage,readonly CompilerObject[]>();
 export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],options:CompileOptions={}):CompiledPage{
  const diagnostics:CompiledPage['diagnostics']=[];
  const aggregateFound=new Map<string,{node:Expression;uses:number}>();
@@ -402,7 +404,7 @@ export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],
    uses:entry.uses,components:[...(aggregateComponents.get(key)??[])].sort()};
  }).sort((a,b)=>b.uses-a.uses||a.formula.localeCompare(b.formula)).map((item,index)=>({...item,id:'agg'+(index+1)}));
  const count=(mode:CompiledComponentMode)=>components.filter(item=>item.mode===mode).length;
- return {compilerVersion:PAGE_COMPILER_VERSION,apiName:page.apiName,label:page.label,targetObject:page.targetObject??'',
+ const compiledPage:CompiledPage={compilerVersion:PAGE_COMPILER_VERSION,apiName:page.apiName,label:page.label,targetObject:page.targetObject??'',
   pageType:page.pageType,layoutMode:page.layoutMode,
   revision:page.draftRevision??page.revision??page.publishedRevision??null,
   components,dataSources,stateReaders,objectReaders,anyObjectReaders,stateKeys,diagnostics,aggregates,
@@ -411,5 +413,7 @@ export function compilePage(page:CompilerPage,objects:readonly CompilerObject[],
    actions:components.reduce((n,item)=>n+item.actions.length,0),
    dataSources:dataSources.length,
    componentsWithData:dataSources.reduce((n,source)=>n+source.components.length,0)}};
+ COMPILED_OBJECTS.set(compiledPage,objects);
+ return compiledPage;
 }
 

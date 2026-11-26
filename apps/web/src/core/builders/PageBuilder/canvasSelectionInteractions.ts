@@ -75,3 +75,15 @@ export function translateCanvasSelection(
     ? {...item,position:{...item.position!,x:item.position!.x+shiftX,y:item.position!.y+shiftY}}
     :item);
 }
+
+/** Area a moved shape may use: its container (or the page), widened to take in where the
+ * shape already is. A shape that sits partly outside a smaller container (older inserts used
+ * page coordinates) then moves smoothly from where it is instead of jumping on the first move. */
+export function reachableMoveArea(
+  limits:PageSize,original:{x:number;y:number;width:number;height:number}
+):PageSize{
+  return {
+    width:Math.max(limits.width,original.x+original.width),
+    height:Math.max(limits.height,original.y+original.height)
+  };
+}

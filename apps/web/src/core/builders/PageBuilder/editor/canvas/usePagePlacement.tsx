@@ -3,7 +3,9 @@ import * as React from 'react';
 import { useRef } from 'react';
 import { isCanvasLocked } from '../../canvasInteractions';
 import { assignTabOnReparent } from '../../pageComponentTree';
-import { canNest, reparentComponent } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
+import { canNest, containerCanvasSize, reparentComponent } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
+import { findRegisteredComponent } from '../../../../components/Registry/componentRegistryLookup';
+import { multiPageInsertParent } from '../../multiPageBuilder';
 import { canvasBoundPosition } from '../../../../pages/PageRuntime/pageCanvas';
 import { type LightningPageTemplate, type PageComponentMetadata } from '../../../../metadata/Definitions/metadata';
 
@@ -21,7 +23,7 @@ export function usePagePlacement(
     applyPage, canvasSnap, previewMode, updateComponent, setDragOverId, openBuilderTabs,
     setSelectedId, setSelectedRegion,
   } = editorState;
-  const { page, onNotify } = props;
+  const { page, onNotify, libraryComponents } = props;
   const { addComponent, addFieldToSection, addField } = componentActions;
 
   const setPageTemplate = (nextTemplate: LightningPageTemplate) => {
@@ -37,18 +39,25 @@ export function usePagePlacement(
       }))
     });
   };
-  const canvasPositionFromEvent = (event: React.DragEvent<HTMLElement>, width = 320, height = 180) => {
+  /** Drop point in the coordinates of where the component will live: the page, or (when
+   * dropped into a container) the container's own top-left, so it lands under the pointer. */
+  const canvasPositionFromEvent = (event: React.DragEvent<HTMLElement>, width = 320, height = 180,
+    parentId: string | null = null) => {
     const canvas = event.currentTarget.closest('.page-stage')?.querySelector<HTMLElement>('.free-canvas-stage');
     if (!canvas) return undefined;
     const bounds = canvas.getBoundingClientRect();
-    const scaleX = page.canvasWidth / bounds.width;
-    const scaleY = page.canvasHeight / bounds.height;
+    const scale = bounds.width / Math.max(1, page.canvasWidth);
+    const host = parentId ? Array.from(canvas.querySelectorAll<HTMLElement>('.free-canvas-component[data-component-id]'))
+      .find(node => node.dataset.componentId === parentId) : undefined;
+    const origin = host?.getBoundingClientRect() ?? bounds;
+    const area = parentId ? containerCanvasSize(page.components, parentId) : { width: page.canvasWidth, height: page.canvasHeight };
+    const size = { width: Math.min(width, area.width), height: Math.min(height, area.height) };
     const bound = canvasBoundPosition({
-      x: (event.clientX - bounds.left) * scaleX,
-      y: (event.clientY - bounds.top) * scaleY,
-      width, height
-    }, { width: page.canvasWidth, height: page.canvasHeight }, canvasSnap);
-    return { ...bound, width, height };
+      x: (event.clientX - origin.left) / scale,
+      y: (event.clientY - origin.top) / scale,
+      ...size
+    }, area, canvasSnap);
+    return { ...bound, ...size };
   };
   const moveCanvasComponent = (event: React.DragEvent<HTMLElement>, component: PageComponentMetadata) => {
     if (page.layoutMode !== 'free-canvas' || previewMode) return;
@@ -70,8 +79,12 @@ export function usePagePlacement(
     if (data.startsWith('component:')) {
       const draggedId = event.dataTransfer.getData('application/x-metadrive-component-id');
       if (!draggedId) {
-        addComponent(data.slice('component:'.length), targetIndex, region,
-          page.layoutMode === 'free-canvas' ? canvasPositionFromEvent(event) : undefined, parentId);
+        const type = data.slice('component:'.length);
+        const target = multiPageInsertParent(page.components, parentId, openBuilderTabs);
+        const custom = type.startsWith('Custom:') ? findRegisteredComponent(libraryComponents, type.slice('Custom:'.length), 'page') : undefined;
+        addComponent(type, targetIndex, region,
+          page.layoutMode === 'free-canvas' ? canvasPositionFromEvent(event,
+            custom?.resize?.defaultWidth ?? 320, custom?.resize?.defaultHeight ?? 180, target) : undefined, target);
         return;
       }
 
@@ -83,8 +96,8 @@ export function usePagePlacement(
         const draggedComponent = page.components.find((component) => component.id === draggedId);
         if (!draggedComponent || isCanvasLocked(draggedComponent)) return;
         const reparented = reparentComponent(page.components, draggedId, parentId);
-        const position = !parentId ? canvasPositionFromEvent(event,
-          draggedComponent.position?.width ?? 320, draggedComponent.position?.height ?? 180) : undefined;
+        const position = canvasPositionFromEvent(event,
+          draggedComponent.position?.width ?? 320, draggedComponent.position?.height ?? 180, parentId);
         applyPage({ ...page, components: assignTabOnReparent(reparented.map((item) =>
           item.id === draggedId && position && item.position
             ? { ...item, position: {

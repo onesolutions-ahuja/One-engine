@@ -325,7 +325,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(found!==''||!/^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$/.test(path))return found;
    // @Cart.Total on a component with no rows of its own, in a screen opened for a record
    // (SCREEN(payment, popup, sc.Id)): that record's field, from the rows the screen holds.
-   const id=host.recordId?.()??'';
+   // The popup's record comes in its page state (recordId), a page's own record from the host.
+   const id=host.recordId?.()||String(this.state('recordId')||'');
    if(!id)return found;
    const [object,field]=path.split('.');
    try{

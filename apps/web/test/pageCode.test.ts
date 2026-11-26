@@ -620,6 +620,10 @@ test('@Cart.Total on a component with no rows of its own reads the record the sc
  const popup=createPageCodeRuntime(code,host('cart-7'));
  await popup.loadSets();
  assert.equal(popup.formula('take:label')!({}),1.25);
- // Opened for no record (or another one): blank, as before.
+ // A popup gets its record in its page state (SCREEN(payment, popup, sc.Id)).
+ const fromState=createPageCodeRuntime(code,{...host(''),state:()=>({recordId:'cart-7'})});
+ await fromState.loadSets();
+ assert.equal(fromState.formula('take:label')!({}),1.25);
+ // Opened for no record: blank, as before.
  assert.equal(createPageCodeRuntime(code,host('')).formula('take:label')!({}),'');
 });

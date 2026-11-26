@@ -20,3 +20,7 @@ export function loadBundledRenderer<T>(key:string,loader:()=>Promise<T>,immutabl
  pending.set(key,next);
  return next;
 }
+/** An already loaded renderer (or undefined): lets a component draw on its first paint. */
+export function peekBundledRenderer<T>(key:string):T|undefined{
+ return settled.get(key) as T|undefined;
+}

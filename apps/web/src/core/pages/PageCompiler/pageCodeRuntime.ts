@@ -596,12 +596,18 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     }).catch(()=>undefined);
    const request=requestFor({},rowObject);
    const answer=await post<{ok:boolean;sets:ServerResult['sets']}>('/page-code/sets',{...host.build,request});
+   // The rows this screen already shows (shared by the screen that opened it, or kept from
+   // last time) and the server's are the same: nothing to redraw.
+   const same=Object.entries(answer.sets??{}).every(([key,value])=>{
+    const held=sets.get(key);
+    return Boolean(held)&&held!.complete===value?.complete&&JSON.stringify(held!.rows)===JSON.stringify(value?.rows);
+   });
    for(const [key,value] of Object.entries(answer.sets??{})){
     sets.set(key,value);
     const parent=byKey.get(key)?.parent?.key;
     if(parent?.startsWith(SHOWN_ROWS))shownCoverage.set(key,new Set(request.shown?.[parent.slice(SHOWN_ROWS.length)]??[]));
    }
-   changed();
+   if(!same||!Object.keys(answer.sets??{}).length)changed();
    if(localKey)host.local!.write(localKey,{sets:Object.fromEntries(sets),
     coverage:Object.fromEntries([...shownCoverage].map(([key,ids])=>[key,[...ids]]))});
   },

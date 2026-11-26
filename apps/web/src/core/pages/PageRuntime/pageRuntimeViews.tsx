@@ -1213,6 +1213,8 @@ function LightningAppRuntime({
   const packaged=useMemo(()=>!previewPage&&!printPreview&&runPublishedCode
     ?appPackagePage(appId,pageApiName,{layout:requestedLayout,inScreen:Boolean(inScreenPage),viewportWidth}):null,
     [previewPage,printPreview,runPublishedCode,appId,pageApiName,requestedLayout,inScreenPage,viewportWidth,packageTick]);
+  const packagedRef=useRef(packaged);
+  packagedRef.current=packaged;
   // Republished: the package was replaced, so this screen shows the new design at once.
   useEffect(()=>runPublishedCode?subscribeAppPackage(()=>setPackageTick(tick=>tick+1)):undefined,[runPublishedCode]);
   const page=previewPage??packaged?.page??(routePending?cached:pageLoad.page);
@@ -1297,8 +1299,11 @@ function LightningAppRuntime({
     // Published code: load the app's one file (once per hash) and its renderers ahead of time.
     if(!runPublishedCode||previewPage||printPreview)return;
     let live=true;
+    // Already drawn from the package: a check that finds the same package redraws nothing
+    // (a new package redraws through subscribeAppPackage).
+    const drawnFromPackage=Boolean(packagedRef.current);
     void loadAppPackage(apiRequest,appId).then(loaded=>{
-      if(!live||!loaded)return;
+      if(!live||!loaded||drawnFromPackage)return;
       preloadComponentRenderers(appPackageComponentTypes(appId)
         .filter(type=>type.startsWith('Custom:'))
         .map(type=>findRegisteredComponent(libraryComponents,type.slice('Custom:'.length),'page'))

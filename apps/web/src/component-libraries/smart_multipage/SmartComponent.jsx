@@ -1,4 +1,5 @@
 import {activePage,shownPages,tabBarLook} from "./multiPageModel.js";
+import {smartIconPaint} from "../smart_icon/iconPaint.js";
 
 /**
  * Smart MultiPage: a card with tabs, like the VBA MultiPage. Each direct child of this
@@ -11,6 +12,8 @@ import {activePage,shownPages,tabBarLook} from "./multiPageModel.js";
  *  - Tab alignment / size / shape: Segmented is a compact macOS-style control (centred by
  *    default); Stretch keeps the old full-width bar.
  *  - Change event: runs with the tapped page key, e.g. =STATE(payTab, @Value).
+ *  - Tab icons: each page's "Tab icon" (pageIcon); Tab icon colour / Selected tab icon colour
+ *    on the MultiPage (blank: grey, and blue on the open tab).
  *  - Designer: click a tab to open and edit it, double-click to rename, + adds a tab
  *    (the Page Builder handles these through the data-multipage-* attributes).
  */
@@ -18,6 +21,7 @@ export default function SmartComponent(p){
  const pages=React.Children.toArray(p.children)
   .filter(child=>child&&child.props&&child.props["data-page-key"]!=null)
   .map(child=>({key:String(child.props["data-page-key"]),label:String(child.props["data-page-label"]??child.props["data-page-key"]),
+   icon:child.props["data-page-icon"]?String(child.props["data-page-icon"]):"",
    selected:child.props["data-page-selected"]==="true",node:child}));
  const builder=p.builderPreview===true;
  const shown=shownPages(pages,p.multiPageVisible,builder);
@@ -70,7 +74,10 @@ export default function SmartComponent(p){
    <div className="smart-multipage-tabs" role="tablist" aria-label={p.label||"Pages"} ref={strip} onScroll={measure}>
     {shown.map(page=><button type="button" role="tab" key={page.key} aria-selected={open?.key===page.key}
      data-multipage-tab={page.key} title={builder?"Click to open this tab; double-click to rename":undefined}
-     className={open?.key===page.key?"active":""} onClick={()=>choose(page.key)}>{page.label}</button>)}
+     className={open?.key===page.key?"active":""} onClick={()=>choose(page.key)}>
+     {page.icon&&<span className="smart-multipage-tab-icon" aria-hidden="true"
+      style={smartIconPaint(page.icon,open?.key===page.key?(p.multiPageSelectedIconColor||"#007aff"):(p.multiPageIconColor||"#3a3a3c"))}/>}
+     <span className="smart-multipage-tab-label">{page.label}</span></button>)}
    </div>
    {more.right&&<button type="button" className="smart-multipage-scroll is-right" aria-label="Show more tabs"
     data-multipage-scroll="1" onClick={()=>scrollTabs(1)}>›</button>}

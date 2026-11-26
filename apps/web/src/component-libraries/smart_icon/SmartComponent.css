@@ -1,3 +1,6 @@
 @import "../smart/shared/smart.css";
 .smart-icon-surface{isolation:isolate}
 .smart-icon-glyph{flex:0 0 auto;pointer-events:none}
+
+/* Spinner icon (and a button while its action runs). */
+@keyframes smart-spin{to{transform:rotate(360deg)}}

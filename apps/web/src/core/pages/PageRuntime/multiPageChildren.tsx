@@ -11,5 +11,6 @@ export function multiPageChildren(parent: PageComponentMetadata, children: PageC
   const open = children.find(child => isSelfOrDescendant(all, child.id, selectedId))?.id ?? openId;
   return children.map((child, index) => <div key={child.id} style={{display: 'contents'}}
     data-page-key={multiPageKey(child)} data-page-label={child.label}
+    data-page-icon={typeof child.properties?.pageIcon === 'string' && child.properties.pageIcon ? child.properties.pageIcon : undefined}
     data-page-selected={child.id === open ? 'true' : undefined}>{nodes[index]}</div>);
 }

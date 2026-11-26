@@ -47,7 +47,7 @@ import type {Expression} from '../../../../../server/src/expression-engine/Formu
 import {createPageCodeRuntime,type PageCodeRuntime,type Effect} from './pageCodeRuntime';
 import {pageStateDependencies} from '../PageRuntime/pageStateDependencies';
 import {componentInstanceNames} from '../../../../../server/src/system-support/page-component-names';
-import {componentStateFromEvent,componentStateName,setComponentProperty,UI_PROPERTIES,COMPONENT_PROPERTIES,type ComponentState} from '../../../../../server/src/expression-engine/FormulaComponentState';
+import {componentStateFromEvent,componentStateName,setComponentProperty,uiPropertyProps,UI_PROPERTIES,TEXT_UI_PROPERTIES,COMPONENT_PROPERTIES,type ComponentState,type UiProperty} from '../../../../../server/src/expression-engine/FormulaComponentState';
 import {usePageCollectionFormula,namedCollectionRows} from '../PageRuntime/usePageCollectionFormula';
 import {resolveMentionProperties,referencedMentionPaths,resolveCollectionMentionRows} from '../../../component-libraries/shared/primitives/SmartFieldInput/smartFieldMentions';
 import {explicitMentionRecordId,useRelationshipMentionContext} from '../../records/RecordFormDialog/useRelationshipMentionContext';
@@ -83,7 +83,7 @@ type Runtime={compiled:CompiledPage;byId:ReadonlyMap<string,CompiledComponent>;s
  /** Caption / Disabled / Visible an action set on this component (by name). */
  setProperties(name:string,values:Record<string,unknown>):void;
  /** Caption / Disabled / Visible an action set on this component (by id): drawn over its own. */
- heldProperties(componentId:string):{Caption?:string;Disabled?:boolean;Visible?:boolean};
+ heldProperties(componentId:string):Partial<Record<UiProperty,string|boolean>>;
  /** What the component worked out itself (Disable when / Show when), for formulas that read it. */
  reportProperties(componentId:string,values:Record<string,unknown>):void;
  sessionId:()=>string;subscribeSession(listener:()=>void):()=>void;
@@ -199,12 +199,11 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    heldProperties(componentId:string){
     const name=stateNames.get(componentId);
     if(!name)return {};
-    const result:{Caption?:string;Disabled?:boolean;Visible?:boolean}={};
+    const result:Partial<Record<UiProperty,string|boolean>>={};
     for(const prop of UI_PROPERTIES){
      const value=setComponentProperty(store.get(),name,prop);
      if(value===undefined)continue;
-     if(prop==='Caption')result.Caption=String(value??'');
-     else result[prop]=value===true;
+     result[prop]=TEXT_UI_PROPERTIES.has(prop)?String(value??''):value===true;
     }
     return result;
    },
@@ -984,7 +983,9 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
     value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{}),
    // `@ThisPage.Name.Value = …`: shown until the user types or picks again.
    ...(given?{textSource:'',defaultValue:'',givenValue:given,value:given.value===null||given.value===undefined?'':String(given.value)}:{}),
-   ...(heldProps.Caption!==undefined?{label:heldProps.Caption}:{})
+   ...(heldProps.Caption!==undefined?{label:heldProps.Caption}:{}),
+   // `@ThisPage.Name.BackgroundColor / TextColor / BorderColor / IconColor / Icon = …`.
+   ...uiPropertyProps(heldProps,definition.apiName)
   }}/>
   {source.loadingMore&&<div className="records-loading" role="status">Loading more…</div>}
  </div>;
@@ -1011,6 +1012,7 @@ export function PageCodeFormulas({componentId,children}:{componentId:string;
   ...(props.Caption!==undefined?{label:props.Caption}:{}),
   ...(props.Disabled!==undefined?{disabled:props.Disabled,disabledFormula:''}:{}),
   ...(props.Visible!==undefined?{visibleFormula:props.Visible}:{}),
+  ...uiPropertyProps(props,runtime?.byId.get(componentId)?.libraryApiName??''),
   ...(runtime?{onFormulaState}:{})};
  const version=useSyncExternalStore(listener=>code?code.subscribe(listener):()=>{},
   ()=>code?.version()??0,()=>code?.version()??0);

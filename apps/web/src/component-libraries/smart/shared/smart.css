@@ -280,3 +280,6 @@
 .smart-image-initials{background:transparent}
 .smart-image-initials>span{width:min(72px,80%);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
  background:#E5F0FF;color:#007AFF;font-weight:700;font-size:clamp(16px,2.2vw,26px);letter-spacing:.02em}
+
+/* Spinner icon (and a button while its action runs). */
+@keyframes smart-spin{to{transform:rotate(360deg)}}

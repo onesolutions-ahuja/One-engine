@@ -78,8 +78,29 @@ export function readComponentState(selections:unknown,name:string,field:Componen
  *  {set: values an action gave, auto: values the page worked out (Disable when / Show when, caption)}.
  * A value an action set wins; else what the page worked out; else the default. */
 export const COMPONENT_PROPERTIES='componentProperties';
-export const UI_PROPERTIES=['Caption','Disabled','Visible'] as const;
+export const UI_PROPERTIES=['Caption','Disabled','Visible',
+ // Look: @ThisPage.PayBtn.BackgroundColor = "#34C759", .TextColor, .BorderColor, .IconColor, .Icon = "check".
+ 'BackgroundColor','TextColor','BorderColor','IconColor','Icon'] as const;
 export type UiProperty=typeof UI_PROPERTIES[number];
+/** Properties whose value is text (the rest are TRUE/FALSE). */
+export const TEXT_UI_PROPERTIES:ReadonlySet<UiProperty>=new Set(['Caption','BackgroundColor','TextColor','BorderColor','IconColor','Icon']);
+const COLOR_PROPERTIES:ReadonlySet<UiProperty>=new Set(['BackgroundColor','TextColor','BorderColor','IconColor']);
+/** A colour a formula may set: #RGB/#RRGGBB(AA), rgb()/rgba()/hsl(), a CSS colour name, or blank (back to the design). */
+const COLOR_VALUE=/^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?)\([0-9.,%\s/]+\)|[a-z]{3,20})$/i;
+/** Component properties the look values above are drawn with (Icon: a button's icon, else an icon component's). */
+export function uiPropertyProps(held:Partial<Record<UiProperty,unknown>>,componentApi:string):Record<string,unknown>{
+ const out:Record<string,unknown>={};
+ const text=(value:unknown)=>value===null||value===undefined?'':String(value);
+ if(held.BackgroundColor!==undefined&&text(held.BackgroundColor)){
+  out.backgroundColor=text(held.BackgroundColor);out.shapeFill=text(held.BackgroundColor);}
+ if(held.TextColor!==undefined&&text(held.TextColor))out.labelColor=text(held.TextColor);
+ if(held.BorderColor!==undefined&&text(held.BorderColor))out.borderColor=text(held.BorderColor);
+ if(held.IconColor!==undefined&&text(held.IconColor))out.iconFillColor=text(held.IconColor);
+ if(held.Icon!==undefined&&text(held.Icon)){
+  if(componentApi==='smart_button')out.shapeId=text(held.Icon);else out.iconId=text(held.Icon);
+ }
+ return out;
+}
 export const uiProperty=(name:unknown):UiProperty|null=>typeof name==='string'
  ?UI_PROPERTIES.find(item=>item.toLowerCase()===name.toLowerCase())??null:null;
 type Held={set?:Record<string,unknown>;auto?:Record<string,unknown>};
@@ -99,12 +120,22 @@ export function readComponentProperty(state:unknown,name:string,property:UiPrope
  const held=heldFor(state,name);
  const pick=(from:Record<string,unknown>|undefined)=>from&&Object.prototype.hasOwnProperty.call(from,property)?from[property]:undefined;
  const value=pick(held.set)??pick(held.auto);
- if(property==='Caption')return value===undefined||value===null?'':String(value);
+ if(TEXT_UI_PROPERTIES.has(property))return value===undefined||value===null?'':String(value);
  if(value===undefined||value===null)return property==='Visible';
  return value===true||value===1||String(value).toUpperCase()==='TRUE';
 }
 /** Check a value given with `@ThisPage.Name.Disabled = …` before it is held. */
 export function uiPropertyValue(property:UiProperty,value:unknown):string|boolean{
+ if(COLOR_PROPERTIES.has(property)){
+  const colour=value===null||value===undefined?'':String(value).trim();
+  if(colour&&!COLOR_VALUE.test(colour))throw Error(property+' must be a colour such as "#34C759" or "green"');
+  return colour;
+ }
+ if(property==='Icon'){
+  const icon=value===null||value===undefined?'':String(value).trim();
+  if(icon&&!/^[a-z0-9][a-z0-9:-]{0,63}$/i.test(icon))throw Error('Icon must be an icon name such as "check"');
+  return icon;
+ }
  if(property==='Caption'){
   if(value!==null&&value!==undefined&&!['string','number','boolean'].includes(typeof value))
    throw Error('A caption must be text');

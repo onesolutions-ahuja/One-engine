@@ -15,6 +15,7 @@ import {TILL_DEVICE_DDL} from './till-device-service.js';
 import {SCREEN_PAIRING_DDL} from './screen-pairing-service.js';
 import {GUEST_ACCESS_DDL} from './guest-access-service.js';
 import {LIVE_CHANGES_DDL} from './live-changes.js';
+import {PAGE_CODE_VERSION_DDL} from '../page-compiler/source/pageCodeVersionDdl.js';
 import {OBJECT_KIND_DDL} from '../system-files/object-schema-lifecycle.js';
 import {OBJECT_WRITE_LOCK_DDL} from '../system-files/object-save-setup.js';
 import {AUTO_NUMBER_SCOPE_DDL} from '../field-engine/types/AutoNumberScope.js';
@@ -155,6 +156,8 @@ export async function applySystemMigrations(db:SqlPersistence) {
   await client.query(GUEST_ACCESS_DDL);
   // Live changes: saved records and paired-screen moves are announced at commit (idempotent).
   await client.query(LIVE_CHANGES_DDL);
+  // Publish to code: last 10 generated code versions per page layout (idempotent).
+  await client.query(PAGE_CODE_VERSION_DDL);
   // Standard Object flag and the trigger that keeps System Objects from ever being deleted.
   await client.query(OBJECT_KIND_DDL);
   // Object write lock in one round trip (idempotent).

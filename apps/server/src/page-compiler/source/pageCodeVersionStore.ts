@@ -19,7 +19,8 @@ export async function recordPageCodeVersion(client:SqlClient,input:{
 }):Promise<number>{
  const key=[input.tenantId,input.pageApi,input.variant];
  // One writer at a time per page + layout, so two publishes never take the same number.
- await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[key.join('\u0000')]);
+ // (PostgreSQL text can never hold a NUL character: the parts are joined with '|'.)
+ await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['page-code|'+key.join('|')]);
  const found=await client.query(
   'SELECT version FROM md_page_code_versions WHERE tenant_id=$1 AND page_api=$2 AND layout_variant=$3',key);
  const existing=found.rows.map(r=>Number(r.version));

@@ -74,3 +74,13 @@ test('the code folder: publish writes pages/ and versions/, a bad edit gets ERRO
  assert.match(await readFile(join(current,'ERRORS.txt'),'utf8'),/keeps running the last good version/);
  delete process.env.UNE_PAGE_CODE_ROOT;
 });
+
+import {recordPageCodeVersion} from '../src/page-compiler/source/pageCodeVersionStore.js';
+test('storing a code version sends PostgreSQL no NUL character (it refuses them)',async()=>{
+ const sent:unknown[]=[];
+ const client={query:async(_sql:string,values:unknown[]=[])=>{sent.push(...values.flat());return {rows:[]};}};
+ const version=await recordPageCodeVersion(client,{tenantId:'t-1',pageApi:'till',variant:'Desktop',appApi:'SHOP',
+  pageRevision:3,actorId:null,source:{files:Object.entries(files()).map(([path,content])=>({path,content})),issues:[]}});
+ assert.equal(version,1);
+ for(const value of sent)assert.ok(!(typeof value==='string'&&value.includes('\u0000')),'NUL sent: '+JSON.stringify(value).slice(0,80));
+});

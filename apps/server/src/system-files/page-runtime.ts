@@ -5,6 +5,7 @@ import {encodeMetadataValue,decodeMetadataValues,type MetadataValueRow} from './
 import {expandAppProperties} from '../system-support/app-page-seeder.js';
 import type { SqlPersistence } from './sql-persistence.js';
 import {PageLayoutVersionRuntime,runtimeLayoutVariant,type PageLayoutVariant} from './page-layout-version-runtime.js';
+import {recordPublishedPageCode} from '../page-compiler/source/publishedPageCode.js';
 
 type PropRow=MetadataValueRow;
 type NodeRow={component_key:string;component_type:string;label:string;region:string;visible:boolean};
@@ -143,7 +144,13 @@ export class PageRuntime {
     return this.layouts.saveDraft(tenantId,pageApi,variant,payload,base,actor);
   }
   async publishLayout(tenantId:string,pageApi:string,variant:PageLayoutVariant,expected?:number,actor?:string){
-    await this.layouts.publish(tenantId,pageApi,variant,expected,actor);
+    // One transaction: the publish and its generated code version commit together.
+    // Publish to code never blocks a publish: its own failures are logged and skipped.
+    await this.db.transaction(async()=>{
+      await this.layouts.publish(tenantId,pageApi,variant,expected,actor);
+      await recordPublishedPageCode(this.db,{tenantId,pageApi,variant,actor,
+        loadPage:()=>this.metadata(tenantId,pageApi,variant)});
+    });
     this.invalidatePublishedCache(tenantId,pageApi);
     return this.metadata(tenantId,pageApi,variant);
   }

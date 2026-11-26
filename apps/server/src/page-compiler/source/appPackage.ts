@@ -4,6 +4,7 @@ import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} fro
 import {recordPublishedPageCode} from './publishedPageCode.js';
 import {latestPageCodeVersion,type SqlClient} from './pageCodeVersionStore.js';
 import {readPageSource} from './readPageSource.js';
+import {serverCodeFromFiles} from './serverPageCodeFromFiles.js';
 
 /**
  * The app package: ONE script file per app that every device keeps. It is built from the
@@ -222,8 +223,8 @@ export async function bundleAppPackage(appApi:string,screens:readonly PackageScr
 }
 
 /** Build (not store) the package for an app. Returns null when there is nothing to build.
- * `pagesJson` is every screen's page as read from its code: the server builds its own copy
- * of each screen's actions from it (also after a restart). */
+ * `pagesJson` keeps every screen's code files (and the page read from them): the server
+ * runs the same code for each screen's actions (also after a restart). */
 export async function buildAppPackage(client:SqlClient,input:{tenantId:string;appApi:string;
  resolver:AppPackageResolver}):Promise<{code:string;hash:string;pages:string[];pagesJson:string;issues:Record<string,string[]>}|null>{
  if(!objectsLoader)return null;
@@ -239,6 +240,8 @@ export async function buildAppPackage(client:SqlClient,input:{tenantId:string;ap
    if(!found){issues[key]=['No code files'];continue;}
    const read=readPageSource(found.files,found.pageApi);
    const plan=compilePage(read.page as unknown as CompilerPage,objects,{strictLegacy:true});
+   // The server runs the screen's own actions: they must build for the server too.
+   await serverCodeFromFiles(found.files,found.pageApi);
    screens.push({key,...found,page:read.page as PackageScreen['page'],plan,issues:read.issues});
    if(read.issues.length)issues[key]=read.issues;
   }catch(error){issues[key]=[error instanceof Error?error.message:String(error)];}
@@ -259,7 +262,8 @@ export async function buildAppPackage(client:SqlClient,input:{tenantId:string;ap
   code=await bundleAppPackage(input.appApi,kept,routes);
   screens.splice(0,screens.length,...kept);
  }
- const pagesJson=JSON.stringify(Object.fromEntries(screens.map(screen=>[screen.key,screen.page])));
+ const pagesJson=JSON.stringify(Object.fromEntries(screens.map(screen=>[screen.key,
+  {pageApi:screen.pageApi,variant:screen.variant,version:screen.version,page:screen.page,files:screen.files}])));
  return {code,hash:appPackageHash(code),pages:screens.map(screen=>screen.key),pagesJson,issues};
 }
 /** Routes that only name screens kept in the package. */
@@ -340,15 +344,22 @@ export async function storedAppPackage(client:SqlClient,appApi:string,variant:st
 }
 
 /** The newest stored package for a tenant's app (the one its devices should keep). */
+/** One screen kept with a package: its code files and the page read from them. */
+export type StoredScreen={pageApi:string;variant:string;version:number;page:Record<string,unknown>;files:Record<string,string>};
 export async function latestAppPackage(client:SqlClient,tenantId:string,appApi:string,variant:string=PACKAGE_VARIANT):
- Promise<{hash:string;code:string;createdAt:string;pages:Record<string,Record<string,unknown>>}|null>{
+ Promise<{hash:string;code:string;createdAt:string;pages:Record<string,StoredScreen>}|null>{
  const found=await client.query(
   `SELECT hash,code,created_at,pages_json FROM md_app_packages WHERE tenant_id=$1 AND app_api=$2 AND layout_variant=$3
    ORDER BY created_at DESC, hash LIMIT 1`,[tenantId,appApi,variant]);
  if(!found.rows.length)return null;
  const row=found.rows[0];
- let pages:Record<string,Record<string,unknown>>={};
- try{pages=JSON.parse(String(row.pages_json??'{}'))??{};}catch{pages={};}
+ let pages:Record<string,StoredScreen>={};
+ try{
+  const parsed=JSON.parse(String(row.pages_json??'{}'))??{};
+  // Only packages built from code files (older ones held page metadata only).
+  for(const [key,value] of Object.entries(parsed as Record<string,StoredScreen>))
+   if(value&&typeof value==='object'&&value.files&&typeof value.files==='object'&&typeof value.pageApi==='string')pages[key]=value;
+ }catch{pages={};}
  return {hash:String(row.hash),code:String(row.code),pages,
   createdAt:row.created_at instanceof Date?row.created_at.toISOString():String(row.created_at)};
 }

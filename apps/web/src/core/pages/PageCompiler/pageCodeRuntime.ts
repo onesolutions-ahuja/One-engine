@@ -225,6 +225,9 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    if(known==='set'||known==='unset'||known==='error')return deviceTillValue(field);
    return notHeld('This device\'s Till is loading');
   }
+  /** Hand-written SQL runs on the server only: the tap waits for the server's answer. */
+  sql():never{return notHeld('SQL runs on the server');}
+  get tenantId():string{return String(sessionValue('tenant.id',host.state())??'');}
   /** @ThisPage.Device.Ip / Agent are seen by the server: blank in the prediction. */
   // MirrorKey too: a customer display's totals (SUMIFS over the till's rows) read it here.
   device(field:string){return field==='Key'?tillDeviceKey():field==='MirrorKey'?mirrorDeviceKey():'';}

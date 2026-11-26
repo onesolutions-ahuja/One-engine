@@ -8,7 +8,9 @@ import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js'
 import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import {registerPublishedCodeBuilder} from '../page-compiler/source/publishedPageCodeSetup.js';
-import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,appPackageIssues,PACKAGE_VARIANT} from '../page-compiler/source/appPackage.js';
+import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,appPackageIssues,PACKAGE_VARIANT,type StoredScreen} from '../page-compiler/source/appPackage.js';
+import {compilePage} from '../page-compiler/compilePage.js';
+import {startPageCodeFolder} from '../page-compiler/source/pageCodeFolder.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
@@ -151,6 +153,8 @@ export async function issueAppPageScript(deps:PageScriptDeps,actor:{tenant_id:st
 
 export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   registerPublishedCodeBuilder(deps.definitions);
+ // The code folder on the server (UNE_PAGE_CODE_ROOT): edits made there run at once.
+ void startPageCodeFolder(deps.db,deps.pages).catch(error=>console.error('code folder failed to start',error));
  // The package is built from the same Object definitions the page script uses.
  setAppPackageObjectsLoader(tenantId=>deps.definitions.list(tenantId) as unknown as
   Promise<readonly CompilerObject[]>);
@@ -160,16 +164,19 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   * package hash; rebuilt after a restart the first time a device of that app taps.
   */
  const packageBuilds=new Map<string,Promise<Record<string,string>>>();
- const appPackageBuilds=(tenantId:string,appId:string,found:{hash:string;pages:Record<string,Record<string,unknown>>})=>{
+ const appPackageBuilds=(tenantId:string,appId:string,found:{hash:string;pages:Record<string,StoredScreen>})=>{
   const memo=tenantId+'\u0000'+appId+'\u0000'+found.hash;
   let pending=packageBuilds.get(memo);
   if(!pending){
    pending=(async()=>{
     const objects=asCompilerObjects(await deps.definitions.list(tenantId));
     const builds:Record<string,string>={};
-    for(const [key,page] of Object.entries(found.pages)){
-     try{builds[key]=deps.scripts.buildAppPage(tenantId,appId,asCompilerPage(page),objects).buildId;}
-     catch(error){console.error('app package build failed',key,error);}
+    for(const [key,screen] of Object.entries(found.pages)){
+     try{
+      // The screen's own code files: the server runs the same actions the device runs.
+      const plan=compilePage(asCompilerPage(screen.page),objects,{strictLegacy:true});
+      builds[key]=(await deps.scripts.buildAppPageFromCode(tenantId,appId,plan,screen.files,screen.pageApi)).buildId;
+     }catch(error){console.error('app package build failed',key,error);}
     }
     return builds;
    })();

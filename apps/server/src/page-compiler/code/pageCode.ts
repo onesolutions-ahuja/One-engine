@@ -1,4 +1,3 @@
-import {createRequire} from 'node:module';
 /**
  * Page converter: a saved page -> its real code.
  *
@@ -76,11 +75,15 @@ export function messageScreenParts(source:string){
 type ModuleParser=(code:string,options:{ecmaVersion:'latest';sourceType:'module'})=>unknown;
 let moduleParser:ModuleParser|null|undefined;
 /** acorn (already installed with the server's packages) parses with the browser's MODULE
- * rules, e.g. `await` outside an async function. Without it, the engine's own parser. */
+ * rules, e.g. `await` outside an async function. Without it, the engine's own parser.
+ * (Node's module loader is reached at run time: this file is also type-checked for the web.) */
 function parserForModules():ModuleParser|null{
  if(moduleParser!==undefined)return moduleParser;
- try{moduleParser=(createRequire(import.meta.url)('acorn') as {parse:ModuleParser}).parse;}
- catch{moduleParser=null;}
+ try{
+  const node=(globalThis as {process?:{getBuiltinModule?:(name:string)=>unknown}}).process;
+  const loader=node?.getBuiltinModule?.('node:module') as {createRequire?:(url:string)=>(id:string)=>unknown}|undefined;
+  moduleParser=loader?.createRequire?(loader.createRequire(import.meta.url)('acorn') as {parse:ModuleParser}).parse:null;
+ }catch{moduleParser=null;}
  return moduleParser;
 }
 /**

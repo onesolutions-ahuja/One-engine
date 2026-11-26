@@ -120,7 +120,7 @@ function watchRepublish(request:Request,appId:string):void{
  void import('../PageCompiler/liveChanges').then(live=>live.subscribeLiveChanges(event=>{
   if(event.kind!=='page'||event.page.published===null)return;
   const loaded=byApp.get(keyOf(appId,PACKAGE_VARIANT));
-  if(!loaded||!Object.values(loaded.pages).some(entry=>entry.page?.apiName===event.page.page))return;
+  if(!loaded||!Object.values(loaded.pages).some(entry=>entry.settings?.apiName===event.page.page))return;
   if(timer)clearTimeout(timer);
   timer=setTimeout(()=>{void loadAppPackage(request,appId);},300);
  })).catch(()=>watching.delete(appId));

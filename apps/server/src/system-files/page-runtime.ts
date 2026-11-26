@@ -387,11 +387,12 @@ export class PageRuntime {
    */
   /** The page routes' own rules, for the app package (every layout resolved ahead of time). */
   appPackageResolver(tenantId:string,appApi:string):AppPackageResolver{
+    // Each lookup in its own savepoint: one failing lookup never aborts the build's transaction.
     return {
-      appPage:async(pageApi,device,strictCustom)=>
-        (await this.resolveAppPage(tenantId,appApi,pageApi,device,undefined,strictCustom))?.page as Record<string,unknown>??null,
-      inScreenPage:async(pageApi,device)=>
-        (await this.resolveInScreenPage(tenantId,appApi,pageApi,device))?.page as Record<string,unknown>??null
+      appPage:(pageApi,device,strictCustom)=>this.db.transaction(async()=>
+        (await this.resolveAppPage(tenantId,appApi,pageApi,device,undefined,strictCustom))?.page as Record<string,unknown>??null),
+      inScreenPage:(pageApi,device)=>this.db.transaction(async()=>
+        (await this.resolveInScreenPage(tenantId,appApi,pageApi,device))?.page as Record<string,unknown>??null)
     };
   }
   /** Build and store the app's package now (App Manager switch on, or "publish code" for an app). */

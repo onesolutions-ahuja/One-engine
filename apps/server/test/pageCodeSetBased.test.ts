@@ -21,12 +21,12 @@ function counting(rows:Row[]){
   list:async()=>{statements.push('list');return rows;},
   createFrom:async(object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
    statements.push('create:'+object);
-   for(const row of given)created.push(Object.fromEntries(fields.map(([field,make])=>[field,make(row)])));
+   for(const row of given)created.push(Object.fromEntries(await Promise.all(fields.map(async([field,make])=>[field,await make(row)]))));
    return created.length;
   },
   updateWhere:async(object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
    statements.push('update:'+object);
-   for(const row of given)updated.push({Id:row.Id,...Object.fromEntries(fields.map(([field,make])=>[field,make(row)]))});
+   for(const row of given)updated.push({Id:row.Id,...Object.fromEntries(await Promise.all(fields.map(async([field,make])=>[field,await make(row)])))});
    return updated.length;
   },
   removeWhere:async(object:string,given:Row[])=>{statements.push('delete:'+object);return given.length;}
@@ -107,4 +107,26 @@ test('an update of another Object by the loop item keeps today\'s loop',()=>{
  const code=compileActionFormula(other,'CartLine');
  assert.match(code.js,/for \(const item of await \$\.list/);
  assert.doesNotMatch(code.js,/\$\.updateWhere/);
+});
+
+test('a value that awaits (BLANKVALUE) still converts, parses and runs per row',async()=>{
+ const formula='=FOREACH(CartLine, Status, "Open", AS(line), CREATERECORD(InvoiceLine, Product, BLANKVALUE(line.Product, ""), Qty, line.Quantity))';
+ const code=compileActionFormula(formula,'CartLine');
+ assert.match(code.js,/\$\.createFrom\(/);
+ assert.match(code.js,/async function \(item\)/);
+ const run=counting(lines(2).map(line=>({...line,Product:'p-'+line.Id})));
+ // The fake saves call make(row) without awaiting: await the values here as the runtimes do.
+ const created:Row[]=[];
+ run.$.createFrom=async(_object:string,given:Row[],fields:Array<[string,(row:Row)=>unknown]>)=>{
+  for(const row of given){const values:Row={};for(const [field,make] of fields)values[field]=await make(row);created.push(values);}
+  return created.length;
+ };
+ await fn(code.js)(run.$);
+ assert.deepEqual(created,[{Product:'p-line-0',Qty:1},{Product:'p-line-1',Qty:2}]);
+});
+
+import {assertCodeParses} from '../src/page-compiler/code/pageCode.js';
+test('converted code that does not parse is refused (listed as an issue, never put in the page file)',()=>{
+ assert.equal(assertCodeParses('async ($) => { await $.x(); }'),'async ($) => { await $.x(); }');
+ assert.throws(()=>assertCodeParses('async ($) => { [1].map(function (i) { return await i; }); }'),/not valid JavaScript/);
 });

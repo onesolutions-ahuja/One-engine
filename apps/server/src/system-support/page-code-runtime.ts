@@ -353,7 +353,7 @@ class ServerScope{
   if(!Array.isArray(rows)||!rows.length)return;
   await this.flush();
   this.forget(object);
-  for(const row of rows)this.pending.push({kind:'create',object,values:this.rowValues(fields,row)});
+  for(const row of rows)this.pending.push({kind:'create',object,values:await this.rowValues(fields,row)});
   await this.flush();
  }
  /** FOREACH(Object) UPDATERECORD(item.Id, …): one bulk update of the loop's rows. */
@@ -364,7 +364,7 @@ class ServerScope{
   for(const row of rows){
    const id=String(row.Id??'');
    if(!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
-   this.pending.push({kind:'update',object,id,values:this.rowValues(fields,row)});
+   this.pending.push({kind:'update',object,id,values:await this.rowValues(fields,row)});
   }
   await this.flush();
  }
@@ -379,11 +379,11 @@ class ServerScope{
   }
  }
  /** Field values worked out for one row of a set-based loop (field names checked). */
- private rowValues(fields:Array<[string,(row:Row)=>unknown]>,row:Row):Row{
+ private async rowValues(fields:Array<[string,(row:Row)=>unknown]>,row:Row):Promise<Row>{
   const values:Row=Object.create(null);
   for(const [field,make] of fields){
    if(!key.test(field))throw Error('Invalid field '+field);
-   values[field]=make(row);
+   values[field]=await make(row);
   }
   return {...values};
  }

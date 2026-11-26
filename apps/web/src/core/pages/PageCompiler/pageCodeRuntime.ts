@@ -45,6 +45,12 @@ export class NotHeld extends Error {
  constructor(message:string,readonly object='',readonly criteria?:unknown){super(message);}
 }
 const notHeld=(why:string,object='',criteria?:unknown):never=>{throw new NotHeld(why,object,criteria);};
+/** One row's values of a set-based loop step (a value may await, as in the loop it replaces). */
+const rowPairs=async(fields:Array<[string,(row:Record<string,unknown>)=>unknown]>,row:Record<string,unknown>)=>{
+ const pairs:Array<[string,unknown]>=[];
+ for(const [field,make] of fields)pairs.push([field,await make(row)]);
+ return pairs;
+};
 const identityKey=Symbol.for('une.authenticatedFormulaIdentity');
 const identity=()=>(globalThis as Record<symbol,unknown>)[identityKey] as undefined|{
  user?:Record<string,unknown>;organization?:Record<string,unknown>;connections?:unknown};
@@ -370,11 +376,11 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   /** A batched FOREACH (set-based loop): the same saves the server makes, over the loop's rows. */
   async createFrom(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of rows)await this.create(object,fields.map(([field,make])=>[field,make(row)]));
+   for(const row of rows)await this.create(object,await rowPairs(fields,row));
   }
   async updateWhere(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
-   for(const row of rows)await this.update(object,row.Id,fields.map(([field,make])=>[field,make(row)]));
+   for(const row of rows)await this.update(object,row.Id,await rowPairs(fields,row));
   }
   async removeWhere(object:string,rows:readonly Row[]){
    if(this.mode!=='tap')throw Error('Formulas cannot save records');

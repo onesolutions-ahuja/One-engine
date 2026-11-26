@@ -282,7 +282,8 @@ function setBasedSteps(body:Expression,object:string,criteria:string,alias:strin
   for(let i=0;i<args.length;i+=2){
    const field=literalName(args[i],'field API name');
    if(!itemValueOnly(args[i+1],alias,scope))return null;
-   fields.push('['+q(field)+', function (item) { return '+expression(args[i+1],valueScope)+'; }]');
+   // async: a value may await (BLANKVALUE, a lookup), exactly as in the loop it replaces.
+   fields.push('['+q(field)+', async function (item) { return '+expression(args[i+1],valueScope)+'; }]');
   }
   if(name!=='DELETERECORD'&&!fields.length)return null;
   scope.data=true;scope.writes.add(target);

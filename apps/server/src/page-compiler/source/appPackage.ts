@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {build,type Plugin} from 'esbuild';
 import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} from '../compilePage.js';
-import {recordPublishedPageCode} from './publishedPageCode.js';
+import {publishedPageCodeError,recordPublishedPageCode} from './publishedPageCode.js';
 import {latestPageCodeVersion,type SqlClient} from './pageCodeVersionStore.js';
 import {readPageSource} from './readPageSource.js';
 import {serverCodeFromFiles} from './serverPageCodeFromFiles.js';
@@ -164,8 +164,9 @@ async function screenFiles(client:SqlClient,tenantId:string,key:string,published
  if(!latest||(revision!==null&&latest.pageRevision!==null&&latest.pageRevision<revision)){
   await recordPublishedPageCode(client,{tenantId,pageApi,variant:variant as 'Desktop',loadPage:async()=>published});
   latest=await latestPageCodeVersion(client,tenantId,pageApi,variant);
+  if(!latest)throw new Error('Code files could not be made: '+(publishedPageCodeError(tenantId,pageApi,variant)||'unknown'));
  }
- return latest?{pageApi,variant,version:latest.version,files:latest.files}:null;
+ return {pageApi,variant,version:latest.version,files:latest.files};
 }
 
 /** esbuild: the screens' code files are virtual files; React, the components and the formula
@@ -227,11 +228,11 @@ export async function bundleAppPackage(appApi:string,screens:readonly PackageScr
  * runs the same code for each screen's actions (also after a restart). */
 export async function buildAppPackage(client:SqlClient,input:{tenantId:string;appApi:string;
  resolver:AppPackageResolver}):Promise<{code:string;hash:string;pages:string[];pagesJson:string;issues:Record<string,string[]>}|null>{
- if(!objectsLoader)return null;
+ if(!objectsLoader)return {code:'',hash:'',pages:[],pagesJson:'{}',issues:{'(app)':['Page converter not started']}};
  const resolved=await resolveAppPackagePages(client,input);
- if(!resolved)return null;
+ if(!resolved)return {code:'',hash:'',pages:[],pagesJson:'{}',issues:{'(app)':['No screens found for this app (App Page tabs or pages assigned to it)']}};
  const objects=await objectsLoader(input.tenantId);
- if(!objects.length)return null;
+ if(!objects.length)return {code:'',hash:'',pages:[],pagesJson:'{}',issues:{'(app)':['No Objects for this company']}};
  const screens:PackageScreen[]=[];
  const issues:Record<string,string[]>={};
  for(const key of [...resolved.pages.keys()].sort()){
@@ -246,7 +247,7 @@ export async function buildAppPackage(client:SqlClient,input:{tenantId:string;ap
    if(read.issues.length)issues[key]=read.issues;
   }catch(error){issues[key]=[error instanceof Error?error.message:String(error)];}
  }
- if(!screens.length)return null;
+ if(!screens.length)return {code:'',hash:'',pages:[],pagesJson:'{}',issues};
  // A screen whose code does not build is left out (it opens the old way) and reported.
  let code:string;
  try{code=await bundleAppPackage(input.appApi,screens,resolved.routes);}
@@ -303,7 +304,7 @@ export async function rebuildAppPackage(client:SqlClient,input:{tenantId:string;
   await client.query('SAVEPOINT app_package');
   saved=true;
   const built=await buildAppPackage(client,input);
-  if(built){
+  if(built?.code){
    await client.query(
     `INSERT INTO md_app_packages(tenant_id,app_api,layout_variant,hash,code,pages_json)
      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(tenant_id,app_api,layout_variant,hash)
@@ -314,9 +315,10 @@ export async function rebuildAppPackage(client:SqlClient,input:{tenantId:string;
   await client.query('RELEASE SAVEPOINT app_package');
   if(built&&Object.keys(built.issues).length)console.warn('app package issues',input.appApi,JSON.stringify(built.issues).slice(0,4000));
   lastIssues.set(input.tenantId+'\u0000'+input.appApi,built?.issues??{});
-  return built?.hash??null;
+  return built?.code?built.hash:null;
  }catch(error){
   console.error('app package failed',error);
+  lastIssues.set(input.tenantId+'\u0000'+input.appApi,{'(build)':[error instanceof Error?error.message+' | '+String(error.stack??'').split('\n').slice(1,4).join(' | '):String(error)]});
   if(saved){
    try{await client.query('ROLLBACK TO SAVEPOINT app_package');await client.query('RELEASE SAVEPOINT app_package');}
    catch(rollbackError){console.error('app package rollback failed',rollbackError);}

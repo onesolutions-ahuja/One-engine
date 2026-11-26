@@ -25,6 +25,11 @@ function references(formula:unknown,inputs:Set<Channel>,available:ReadonlySet<st
   if(available.has(match[1].toLowerCase()))inputs.add(collection(match[1]));
 }
 
+/** Properties that only decide how a component shows (visible, enabled, its open tab, its
+ * texts and colours). A page value they read never clears what the user picked in it: the Pay
+ * screen's tabs show only the paid method once ok1 = "Y", and the picked "Card" must stay. */
+const DISPLAY_ONLY=/^(?:visibleFormula|disabledFormula|visibleSource|multiPageVisible|multiPageActive|label|caption|title|subtitle|placeholder|helpText|tooltip)$|(?:Color|Label|Caption|Text|Source)$/i;
+
 /** Build a directed dependency graph across any number of tabs/collection layers.
  * A component that reads an upstream state is responsible only for its own
  * selection outputs; independent siblings, cart data and other state survive.
@@ -70,7 +75,7 @@ export function pageStateDependencies(components:readonly Component[]):PageState
   // A named Collection can be authored in any formula-capable Data property.
   // Dependencies on selected parent collections also work in those properties.
   for(const [key,value] of Object.entries(props))
-   if(key!=='collectionFormula'&&key!=='filterFormula')references(value,inputs,available);
+   if(key!=='collectionFormula'&&key!=='filterFormula'&&!DISPLAY_ONLY.test(key))references(value,inputs,available);
   if(typeof props.relatedFilterKey==='string'&&identifier.test(props.relatedFilterKey))
    inputs.add(state(props.relatedFilterKey));
 

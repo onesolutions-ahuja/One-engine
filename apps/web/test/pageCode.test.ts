@@ -627,3 +627,16 @@ test('@Cart.Total on a component with no rows of its own reads the record the sc
  // Opened for no record: blank, as before.
  assert.equal(createPageCodeRuntime(code,host('')).formula('take:label')!({}),'');
 });
+
+import {pageStateDependencies,applyPageSelection} from '../src/core/pages/PageRuntime/pageStateDependencies';
+test('a tab picked in a MultiPage stays picked when its visible-tabs formula reads a page value', ()=>{
+ const deps=pageStateDependencies([
+  {id:'tabs',type:'Custom:smart_multipage',properties:{navigatorName:'PayTabs',
+   multiPageVisible:'=IF(@ThisPage.ok1.Value = "Y", BLANKVALUE(@ThisPage.PayTabs.Value, "Cash"), "")'}},
+  {id:'ok',type:'Custom:smart_button',properties:{navigatorName:'ok1'}},
+  {id:'list',type:'Custom:smart_card_grid',properties:{navigatorName:'Products',filterFormula:'',
+   collectionFormula:'',textSource:'=@ThisPage.ok1.Value'}}]);
+ const picked={collectionSelections:{paytabs:{Value:'Card'}}};
+ const after=applyPageSelection(picked,{kind:'collection',key:'ok1',value:{Value:'Y'}},deps);
+ assert.equal((after.collectionSelections as Record<string,{Value:string}>).paytabs.Value,'Card');
+});

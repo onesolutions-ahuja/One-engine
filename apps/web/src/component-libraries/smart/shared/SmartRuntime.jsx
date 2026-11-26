@@ -1087,9 +1087,22 @@ export default function SmartRuntime(p){
  },[name]);
  const shadowStyle={boxShadow:p.calendarShadowColor?"0 4px 10px "+p.calendarShadowColor:p.shadow==="large"?"0 8px 20px #0003":p.shadow==="medium"?"0 3px 9px #0003":p.shadow==="small"?"0 1px 4px #0002":"none",borderRadius:number(p.radius,12)};
  const fieldRule=useFieldRule(p,name);
+ // A button whose action is still running (a wait, callout, card reader...) shows a spinner
+ // after a moment and ignores more taps, so a payment can never be started twice.
+ const [working,setWorking]=React.useState(false);
+ const workingRef=React.useRef(false);
  const fire=(event,value)=>{if(p.previewOnly||p.builderPreview)return;
   if(isDisabled&&name==="smart_button")return;
-  if(typeof p.onAction==="function")void Promise.resolve(p.onAction({event,value})).catch(()=>{});
+  if(typeof p.onAction!=="function")return;
+  if(name==="smart_button"&&event==="click"){
+   if(workingRef.current)return;
+   workingRef.current=true;
+   const timer=setTimeout(()=>setWorking(true),300);
+   void Promise.resolve(p.onAction({event,value})).catch(()=>{}).finally(()=>{
+    clearTimeout(timer);workingRef.current=false;setWorking(false);});
+   return;
+  }
+  void Promise.resolve(p.onAction({event,value})).catch(()=>{});
  };
  let content;
  // Icon side follows an explicit text alignment: left text puts the icon at the
@@ -1097,7 +1110,7 @@ export default function SmartRuntime(p){
  // centred or unset text keeps the icon just before the caption.
  const iconSide=buttonIcon&&label?(p.labelAlignment==="left"?"end":p.labelAlignment==="right"?"start":"inline"):"inline";
  if(name==="smart_button")content=<button data-md-bind={p.builderPreview?"label":undefined} data-md-bind-titles={p.builderPreview?"Button text":undefined} type="button" className={"smart-button"+(p.wrapText===true?" is-wrapped":"")+(isDisabled?" is-disabled":"")}
-   disabled={isDisabled} aria-disabled={isDisabled||undefined}
+   disabled={isDisabled} aria-disabled={isDisabled||undefined} aria-busy={working||undefined}
    title={label&&label.length>18?label:!label&&buttonIcon?.label?buttonIcon.label:undefined} aria-label={label||buttonIcon?.label||"Button"}
    onClick={()=>fire("click",record)} data-icon-side={iconSide==="inline"?undefined:iconSide}
    style={{...style,...shadowStyle,...smartShapeAppearance(p.shapeId,number(p.radius,12)),
@@ -1107,8 +1120,8 @@ export default function SmartRuntime(p){
     fontWeight:typeof p.headerBold==="boolean"?(p.headerBold?700:400):undefined,
     background:p.backgroundColor||SMART_BLUE,color:readableText(p.backgroundColor||SMART_BLUE,p.labelColor)||"#fff",borderColor:p.borderColor,
     ...(isDisabled?{opacity:.4,filter:"grayscale(.7)",cursor:"not-allowed"}:{})}}>
-   {buttonIcon&&<span className="smart-button-glyph" aria-hidden="true" style={{
-     ...smartIconPaint(buttonIcon.id,p.labelColor||"#fff",p.iconFillColor),
+   {(buttonIcon||working)&&<span className="smart-button-glyph" aria-hidden="true" style={{
+     ...smartIconPaint(working?"spinner":buttonIcon.id,p.labelColor||"#fff",working?"":p.iconFillColor),
      ...(iconSide==="end"?{order:2,marginLeft:"auto"}:iconSide==="start"?{marginRight:"auto"}:{})
    }}/>}
    {label&&<span className="smart-button-label">{label}</span>}

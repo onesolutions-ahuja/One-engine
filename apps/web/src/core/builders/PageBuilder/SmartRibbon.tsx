@@ -547,6 +547,9 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    let editor;
    if(/^dockItem(?:[1-9]|1[0-2])Icon$/.test(property.id))editor=<SmartIconGallery value={String(value||'house')}
      disabled={!enabled} allowIcons onChange={write}/>;
+   // MultiPage tab icon (on each tab/page): any library icon.
+   else if(property.id==='pageIcon')editor=<SmartIconGallery value={String(value||'')}
+     disabled={!enabled} allowIcons onChange={write}/>;
    else if(property.id==='shapeId'||property.id==='numpadKeyShape'||(tab==='Design2'&&property.id==='footerShape'))editor=<SmartIconGallery value={String(value||'shape:rectangle')}
      disabled={!enabled} allowIcons={property.id==='footerShape'?false:(selectedApis?.length?selectedApis:[api]).every(member=>
        (property.choicesOverrides?.[member]??property.choices??[]).includes('icons'))}

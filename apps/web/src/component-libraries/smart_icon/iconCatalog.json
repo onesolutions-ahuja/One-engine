@@ -5,6 +5,12 @@
     "category": "Navigation & interface"
   },
   {
+    "id": "spinner",
+    "label": "Spinner (turns while waiting)",
+    "category": "Navigation & interface",
+    "file": "spinner.svg"
+  },
+  {
     "id": "layout-dashboard",
     "label": "Dashboard",
     "category": "Navigation & interface"

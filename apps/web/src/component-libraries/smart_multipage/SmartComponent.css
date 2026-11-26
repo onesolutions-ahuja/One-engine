@@ -40,3 +40,9 @@
 .smart-multipage-page{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:auto}
 .smart-multipage-page>*{flex:1 1 auto;min-height:0}
 .smart-multipage-empty{display:grid;place-items:center;height:100%;color:#64748b;font-size:13px}
+.smart-multipage-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.smart-multipage-tab-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.smart-multipage-tab-icon{flex:0 0 auto;width:1.25em;height:1.25em;display:inline-block}
+
+/* Spinner icon (and a button while its action runs). */
+@keyframes smart-spin{to{transform:rotate(360deg)}}

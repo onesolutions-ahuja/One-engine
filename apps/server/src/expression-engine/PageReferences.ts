@@ -1,4 +1,4 @@
-import {COMPONENT_STATE_FIELDS,type ComponentStateField} from './FormulaComponentState.js';
+import {COMPONENT_STATE_FIELDS,uiProperty,type ComponentStateField,type UiProperty} from './FormulaComponentState.js';
 
 /** The one reference style builders write (no `$`):
  *
@@ -303,11 +303,11 @@ export function assignedComponent(node:AssignmentNode,aliases:ReadonlySet<string
 }
 
 /** `@ThisPage.Button2.Caption = …` / `.Disabled = …` / `.Visible = …`: the component and property set. */
-export function assignedProperty(node:AssignmentNode):{name:string;property:'Caption'|'Disabled'|'Visible'}|null{
+export function assignedProperty(node:AssignmentNode):{name:string;property:UiProperty}|null{
  if(node.kind!=='binary'||node.operator!=='='||node.left?.kind!=='reference'||typeof node.left.value!=='string')return null;
- const page=/^@?ThisPage\.([A-Za-z][A-Za-z0-9_]{0,79})\.(caption|disabled|visible)$/i.exec(node.left.value);
- if(!page||/^(?:Session|Input|Till|Device|Selected)$/i.test(page[1]))return null;
- const property=page[2].toLowerCase()==='caption'?'Caption':page[2].toLowerCase()==='disabled'?'Disabled':'Visible';
+ const page=/^@?ThisPage\.([A-Za-z][A-Za-z0-9_]{0,79})\.([A-Za-z]+)$/i.exec(node.left.value);
+ const property=page?uiProperty(page[2]):null;
+ if(!page||!property||/^(?:Session|Input|Till|Device|Selected)$/i.test(page[1]))return null;
  return {name:page[1],property};
 }
 

@@ -133,3 +133,44 @@ test('builder: data previews redraw only when what they show changed',async()=>{
  assert.equal(sameBuilderBinding(base,{...base,component:{...component,properties:{a:2}}}),false);
  assert.equal(sameBuilderBinding({...base,builderPreview:false},{...base,builderPreview:false}),false,'never in the live page');
 });
+
+test('actions may set a component look: BackgroundColor, TextColor, BorderColor, IconColor, Icon',async()=>{
+ const {uiProperty,uiPropertyValue,uiPropertyProps,readComponentProperty,withComponentProperties}=
+  await import('../../server/src/expression-engine/FormulaComponentState.ts');
+ const {assignedProperty}=await import('../../server/src/expression-engine/PageReferences.ts');
+ const node=(left)=>({kind:'binary',operator:'=',left:{kind:'reference',value:left},right:{kind:'literal',value:'#34C759'}});
+ assert.deepEqual(assignedProperty(node('@ThisPage.PayBtn.backgroundcolor')),{name:'PayBtn',property:'BackgroundColor'});
+ assert.deepEqual(assignedProperty(node('@ThisPage.PayBtn.Caption')),{name:'PayBtn',property:'Caption'});
+ assert.equal(assignedProperty(node('@ThisPage.PayBtn.Value')),null,'Value stays a component value');
+ assert.equal(uiProperty('ICON'),'Icon');
+ assert.equal(uiPropertyValue('BackgroundColor','green'),'green');
+ assert.equal(uiPropertyValue('TextColor',' #fff '),'#fff');
+ assert.equal(uiPropertyValue('BorderColor',''),'','blank = back to the design');
+ assert.throws(()=>uiPropertyValue('BackgroundColor','red;background:url(x)'),/colour/);
+ assert.equal(uiPropertyValue('Icon','check'),'check');
+ assert.throws(()=>uiPropertyValue('Icon','../x'),/icon/i);
+ const state=withComponentProperties({},'PayBtn','set',{BackgroundColor:'#34C759',Icon:'check'});
+ assert.equal(readComponentProperty(state,'paybtn','BackgroundColor'),'#34C759');
+ assert.deepEqual(uiPropertyProps({BackgroundColor:'#34C759',TextColor:'#fff',Icon:'check'},'smart_button'),
+  {backgroundColor:'#34C759',shapeFill:'#34C759',labelColor:'#fff',shapeId:'check'});
+ assert.deepEqual(uiPropertyProps({Icon:'spinner',IconColor:'#ff9500'},'smart_icon'),{iconFillColor:'#ff9500',iconId:'spinner'});
+ assert.deepEqual(uiPropertyProps({Caption:'x',Disabled:true},'smart_button'),{});
+});
+test('MultiPage tabs show each tab icon; the open tab uses the selected icon colour; spinner icon turns',async()=>{
+ const fs=await import('node:fs');const vm=await import('node:vm');const React=(await import('react')).default;
+ const {renderToStaticMarkup}=await import('react-dom/server');
+ const {buildBundledComponent}=await import('../../../scripts/component-catalog.mjs');
+ const descriptor=JSON.parse(fs.readFileSync(new URL('../src/component-libraries/smart_multipage/component.json',import.meta.url),'utf8'));
+ const built=await buildBundledComponent(descriptor);
+ const sandbox={React,module:{exports:{}},Date,Intl,URL,crypto:globalThis.crypto};
+ vm.runInNewContext(built.compiledJs,sandbox);
+ const kid=(key,icon)=>React.createElement('div',{key,'data-page-key':key,'data-page-label':key,'data-page-icon':icon},key);
+ const html=renderToStaticMarkup(React.createElement(sandbox.module.exports.default,{
+  multiPageSelectedIconColor:'#ff0000',multiPageIconColor:'#00ff00',children:[kid('Cash','banknote'),kid('Card','credit-card'),kid('Gift')]}));
+ assert.match(html,/smart-multipage-tab-icon[^>]*background-color:#ff0000[^>]*banknote/);
+ assert.match(html,/smart-multipage-tab-icon[^>]*background-color:#00ff00[^>]*credit-card/);
+ assert.equal((html.match(/smart-multipage-tab-icon/g)||[]).length,2,'a tab without an icon shows none');
+ const {smartIconPaint}=await import('../src/component-libraries/smart_icon/iconPaint.js');
+ assert.match(String(smartIconPaint('spinner','#000').animation),/smart-spin/);
+ assert.equal(smartIconPaint('check','#000').animation,undefined);
+});

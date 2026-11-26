@@ -414,6 +414,8 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
     const content=await readPageCodeFile(db,actor.tenant_id,name,variant,Number(req.params.version),path);
     res.setHeader('Cache-Control','private, no-store');
     if(content===null){res.status(404).type('text/plain; charset=utf-8').send('Not found');return;}
+    // ?format=json: {path, content} for the app (its API client reads JSON); otherwise the file as text.
+    if(req.query.format==='json'){res.json({path,content});return;}
     res.type('text/plain; charset=utf-8').send(content);
   }));
   // A developer's edited code files become the newest version; the app runs them at once.

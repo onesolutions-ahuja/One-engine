@@ -15,8 +15,8 @@ export type GeneratedPageSource={files:GeneratedFile[];issues:Array<{componentNa
 
 const SAFE_PAGE=/^[A-Za-z0-9_.-]{1,120}$/;
 /** Version of the converter that wrote the files (manifest.json "converter"): files written by an
- * older one are written again when the app is rebuilt. 2: named tags, typed plain JavaScript. */
-export const PAGE_CODE_CONVERTER=2;
+ * older one are written again when the app is rebuilt. 3: no formula helpers left (page values, dates, totals). */
+export const PAGE_CODE_CONVERTER=3;
 const q=(value:unknown):string=>JSON.stringify(value);
 /** Generated function text goes into an object literal: indent its continuation lines. */
 const indent=(text:string,by='    '):string=>text.replace(/\n/g,'\n'+by);

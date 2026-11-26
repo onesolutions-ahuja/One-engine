@@ -61,24 +61,27 @@ type Scope={
 
 /* ---------------- field types: plain JavaScript where the type is known ---------------- */
 /** What a value is: a number field, text, true/false, a date, or not known (page values). */
-export type ValueKind='number'|'text'|'boolean'|'date'|'any';
+export type ValueKind='number'|'text'|'boolean'|'date'|'datetime'|'any';
 /** How a value is used: as a value (blank -> ""), in maths (blank -> 0), or as it is (blank checks). */
 type Want='value'|'number'|'raw';
 type FieldTypes=(object:string,field:string)=>ValueKind;
 let FIELD_TYPES:FieldTypes|null=null;
 const DATA_KIND:Record<string,ValueKind>={number:'number',currency:'number',percent:'number',integer:'number',decimal:'number',
- double:'number',boolean:'boolean',checkbox:'boolean',date:'date',datetime:'date',string:'text',text:'text',textarea:'text',
+ double:'number',boolean:'boolean',checkbox:'boolean',date:'date',datetime:'datetime',string:'text',text:'text',textarea:'text',
  longtext:'text',richtext:'text',email:'text',phone:'text',url:'text',picklist:'text',reference:'text',lookup:'text',
- masterdetail:'text',id:'text',encryptedtext:'text',autonumber:'text'};
-const SYSTEM_KIND:Record<string,ValueKind>={Id:'text',Name:'text',OwnerId:'text',RecordTypeId:'text',CreatedAt:'date',
- LastModifiedDate:'date',CreatedDate:'date'};
+ masterdetail:'text',id:'text',encryptedtext:'text',autonumber:'text',longtextarea:'text',richtextarea:'text',
+ textarea2:'text',picklistmultiselect:'text',multipicklist:'text',multiselectpicklist:'text',rollupsummary:'number',rollup:'number',
+ time:'text'};
+const SYSTEM_KIND:Record<string,ValueKind>={Id:'text',Name:'text',OwnerId:'text',RecordTypeId:'text',CreatedAt:'datetime',
+ LastModifiedDate:'datetime',CreatedDate:'datetime'};
 /** Run `make` with the page's Object fields known (their types decide plain JavaScript). */
 export function withFieldTypes<T>(objects:ReadonlyArray<{apiName:string;fields?:ReadonlyArray<{apiName:string;dataType?:string}>}>|null|undefined,
  make:()=>T):T{
  const byObject=new Map<string,Map<string,ValueKind>>();
  for(const object of objects??[]){
   const fields=new Map<string,ValueKind>();
-  for(const field of object.fields??[])fields.set(field.apiName,DATA_KIND[String(field.dataType??'').toLowerCase()]??'any');
+  // "Date/Time", "Long Text Area", "datetime", "reference": the type name without spaces or signs.
+  for(const field of object.fields??[])fields.set(field.apiName,DATA_KIND[String(field.dataType??'').toLowerCase().replace(/[^a-z]/g,'')]??'any');
   byObject.set(object.apiName,fields);byObject.set(object.apiName.toLowerCase(),fields);
  }
  const before=FIELD_TYPES;
@@ -92,6 +95,8 @@ const IDENT=/^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const access=(base:string,field:string)=>base+(IDENT.test(field)?'?.'+field:'?.['+q(field)+']');
 /** A field of a row or a named record (sc.Total, row.Name): its code as it is and its type. */
 function fieldOf(path:string,scope:Scope):{code:string;kind:ValueKind}|null{
+ const event=eventRecordField(path,scope);
+ if(event)return event;
  const parts=path.split('.');
  if(parts.length!==2||parts.some(part=>!/^[A-Za-z_][A-Za-z0-9_]*$/.test(part)))return null;
  const [root,field]=parts;
@@ -104,6 +109,12 @@ function fieldOf(path:string,scope:Scope):{code:string;kind:ValueKind}|null{
  if(root==='record'&&!scope.aliases.has('record'))return {code:access('$.event("record")',field),kind:'any'};
  return null;
 }
+/** @event.record.Active: a field of the tapped record. */
+function eventRecordField(path:string,scope:Scope):{code:string;kind:ValueKind}|null{
+ const parts=path.split('.');
+ if(parts.length!==3||parts[0]!=='event'||parts[1]!=='record'||scope.aliases.has('event')||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(parts[2]))return null;
+ return {code:access('$.event("record")',parts[2]),kind:'any'};
+}
 /** A value as it is used: blank -> "" as a value, -> 0 in maths. */
 function wanted(code:string,kind:ValueKind,want:Want,blankable:boolean):string{
  if(want==='raw')return code;
@@ -115,7 +126,9 @@ function wanted(code:string,kind:ValueKind,want:Want,blankable:boolean):string{
 }
 const NUMBER_FUNCTIONS=new Set(['ROUND','ROUNDUP','ROUNDDOWN','ABS','MAX','MIN','VALUE','LEN','INT','MOD','CEILING','FLOOR',
  'SUM','HOUR','MINUTE','SECOND','DAY','MONTH','YEAR','WEEKDAY','FIND','SQRT','POWER','EXP','LN','LOG','LOG10','TRUNC']);
-const DATE_FUNCTIONS=new Set(['TODAY','NOW','DATE','DATEVALUE','DATETIMEVALUE','ADDMONTHS','ADDDAYS']);
+const DATE_FUNCTIONS=new Set(['TODAY','DATE','DATEVALUE']);
+const DATETIME_FUNCTIONS=new Set(['NOW','DATETIMEVALUE']);
+const isDate=(kind:ValueKind)=>kind==='date'||kind==='datetime';
 const BOOLEAN_FUNCTIONS=/^(IS[A-Z]+|CONTAINS|BEGINS|ENDS|STARTSWITH|ENDSWITH|INCLUDES)$/;
 /** What an expression gives, when the converter can know it. */
 function kindOf(node:Expression,scope:Scope):ValueKind{
@@ -127,12 +140,12 @@ function kindOf(node:Expression,scope:Scope):ValueKind{
    if(field)return field.kind;
    return node.value==='ThisPage.Session.Id'?'text':'any';
   }
-  case 'unary':return node.operator==='NOT'?'boolean':kindOf(node.value,scope)==='date'?'any':'number';
+  case 'unary':return node.operator==='NOT'?'boolean':'number';
   case 'binary':{
    if(node.operator==='&')return 'text';
    if(COMPARISONS.has(node.operator)||node.operator==='AND'||node.operator==='OR')return 'boolean';
    const l=kindOf(node.left,scope),r=kindOf(node.right,scope);
-   return l==='date'||r==='date'?'any':'number';
+   return isDate(l)&&!isDate(r)&&(node.operator==='+'||node.operator==='-')?l:'number';
   }
   case 'call':{
    const entry=formulaEntry(node.name);
@@ -140,6 +153,9 @@ function kindOf(node:Expression,scope:Scope):ValueKind{
    if(TEXT_FUNCTIONS.has(node.name))return 'text';
    if(NUMBER_FUNCTIONS.has(node.name))return 'number';
    if(DATE_FUNCTIONS.has(node.name))return 'date';
+   if(DATETIME_FUNCTIONS.has(node.name))return 'datetime';
+   // ADDDAYS / ADDMONTHS keep the kind of the date they move.
+   if((node.name==='ADDDAYS'||node.name==='ADDMONTHS')&&node.args[0]){const k=kindOf(node.args[0],scope);return isDate(k)?k:'any';}
    if(BOOLEAN_FUNCTIONS.test(node.name)||['AND','OR','NOT'].includes(node.name))return 'boolean';
    if(node.name==='IF'){
     const a=node.args[1]?kindOf(node.args[1],scope):'any',b=node.args[2]?kindOf(node.args[2],scope):a;
@@ -459,14 +475,32 @@ export function expression(node:Expression,scope:Scope,want:Want='value'):string
    const kl=kindOf(node.left,scope),kr=kindOf(node.right,scope);
    // "*cola*" matching applies only to = / <> on a record field.
    const wildcard=['=','==','<>','!='].includes(node.operator)&&node.left.kind==='reference'
-    &&isExcelWildcardDataReference(node.left.value)&&!plainValue(node.right);
+    &&isExcelWildcardDataReference(node.left.value)&&node.right.kind==='literal'&&typeof node.right.value==='string'
+    &&/[*?~]/.test(node.right.value);
    const helper=()=>{
     const code='O.b('+q(node.operator)+', '+expression(node.left,scope)+', '+expression(node.right,scope)
      +(wildcard?', true, $.timeZone()':', false, $.timeZone()')+')';
     return COMPARISONS.has(node.operator)?asBoolean(code):code;
    };
-   // Dates (date + days, date compares) and "*cola*" matches keep the formula's own rules.
-   if(kl==='date'||kr==='date'||wildcard)return helper();
+   // "*cola*" matches keep the formula's own rule.
+   if(wildcard)return helper();
+   if(isDate(kl)||isDate(kr)){
+    // A date moved by days: ADDDAYS. Dates compare as their text (2026-11-26); a date-time
+    // against a day, by its day.
+    if((node.operator==='+'||node.operator==='-')&&isDate(kl)&&!isDate(kr)){
+     const days=expression(node.right,scope,'number');
+     return 'F.ADDDAYS($, '+expression(node.left,scope)+', '+(node.operator==='-'?'-'+days:days)+')';
+    }
+    if(COMPARISONS.has(node.operator)){
+     const day=(n:Expression,k:ValueKind,other:ValueKind)=>{
+      const code=expression(n,scope);
+      return k==='datetime'&&other==='date'?'String('+code+').slice(0, 10)':code;
+     };
+     const op=node.operator==='='||node.operator==='=='?'===':node.operator==='<>'||node.operator==='!='?'!==':node.operator;
+     return asBoolean('('+day(node.left,kl,kr)+' '+op+' '+day(node.right,kr,kl)+')');
+    }
+    return helper();
+   }
    if(node.operator==='='||node.operator==='<>'||node.operator==='=='||node.operator==='!='){
     const op=node.operator==='='||node.operator==='=='?' === ':' !== ';
     const filled=(n:Expression)=>plainValue(n)&&!(n.kind==='literal'&&n.value==='');
@@ -532,10 +566,21 @@ function plainCall(node:Extract<Expression,{kind:'call'}>,scope:Scope,want:Want)
    return asBoolean(field.kind==='text'?'(!'+field.code+')':'('+field.code+' == null || '+field.code+' === "")');
   }
   case 'BLANKVALUE':case 'NULLVALUE':{
-   if(args.length!==2||args[0].kind!=='reference')return null;
-   const field=fieldOf(args[0].value,scope);
-   if(!field)return null;
-   scope.references.add(args[0].value);
+   if(args.length!==2)return null;
+   const field=args[0].kind==='reference'?fieldOf(args[0].value,scope):null;
+   if(!field){
+    const value=expression(args[0],scope);
+    const fallback=expression(args[1],scope,want==='number'?'number':'value');
+    const blank=(code:string)=>node.name==='NULLVALUE'?code+' == null':code+' == null || '+code+' === ""';
+    // A total or a page value with 0 as the fallback: blank (or 0) gives 0.
+    if(node.name==='BLANKVALUE'&&args[1].kind==='literal'&&args[1].value===0)return '('+value+' || 0)';
+    // A page value: read it twice (cheap) and test it.
+    if(/^\$\.[A-Za-z]+\([^()]*\)$|^\$\.sessionId$/.test(value))return '('+blank(value)+' ? '+fallback+' : '+value+')';
+    // Anything else once, through a small function.
+    const asyncFallback=fallback.includes('await ');
+    return '('+(asyncFallback?'await ':'')+'('+(asyncFallback?'async ':'')+'(given) => ('+blank('given')+' ? '+fallback+' : given))('+value+'))';
+   }
+   if(args[0].kind==='reference')scope.references.add(args[0].value);
    const fallback=expression(args[1],scope,want==='number'?'number':'value');
    const value=field.kind==='number'||field.kind==='boolean'||node.name==='NULLVALUE'
     ?'('+field.code+' ?? '+fallback+')'
@@ -857,7 +902,7 @@ export function compileActionFormula(source:string,rowObject=''):CompiledActionC
  return compileActionNode(root,rowObject,source,assignment);
 }
 /** Names generated code itself uses: an AS(...) name like these stays in the v map. */
-const TAKEN=new Set(['$','F','O','v','row','rows','item','x','value','result','Object','Math','Date','String','Number','JSON','Array','Promise','Boolean','Symbol','Error']);
+const TAKEN=new Set(['$','F','O','v','row','rows','item','given','value','result','Object','Math','Date','String','Number','JSON','Array','Promise','Boolean','Symbol','Error']);
 /** AS(name) results as plain local variables (`let sc;` … `sc = await $.getRecord(…)`), as a
  * person writes them. An action that WAITs keeps them in the v map (the wait resumes it). */
 function localAliases(lines:string[],aliases:ReadonlySet<string>):string[]{

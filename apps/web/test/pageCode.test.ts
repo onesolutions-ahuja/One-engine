@@ -60,7 +60,7 @@ test('display formulas become plain functions that match the formula language', 
 test('event and related references convert', ()=>{
  const action=compileActionFormula('=ACTIONS(@ThisPage.Pick.Value = @event.value, @ThisPage.PickName.Value = @event.record.Name, SCREEN(edit, popup, @event.recordId))','Product');
  assert.match(action.js,/\$\.event\("value"\)/);
- assert.match(action.js,/\$\.f\(\$\.event\("record"\), "Name"\)/);
+ assert.match(action.js,/\$\.event\("record"\)\?\.Name/);
  const image=compileDisplayFormula('=@Product.ImageUrl','CartLine');
  assert.match(image.js,/\.m\(row, "CartLine\.Product\.ImageUrl"\)/);
  assert.equal(fn(image.js)({__mentionValues:{'@CartLine.Product.ImageUrl':'a.png'}},{...display(),m:(row:Row,p:string)=>(row.__mentionValues as Row)['@'+p]}),'a.png');
@@ -591,4 +591,22 @@ test('a popup opens with the rows another screen of the same session holds (no s
  assert.equal(popup.setsFor('Note|F=$.state("x")'),undefined);
  // Another session sees nothing.
  assert.equal(createPageCodeRuntime(code,host('s-10')).setsFor('Cart|SessionKey=$.sessionId'),undefined);
+});
+
+import {pageCodeFiles,zipFiles} from '../src/core/pages/AppPackage/pageCodeDownload';
+test('Download code: the newest version\'s files, read as JSON, in a valid .zip', async ()=>{
+ const asked:string[]=[];
+ const request=(async(path:string)=>{
+  asked.push(path);
+  if(path.endsWith('code-versions?variant=Custom'))return {versions:[{version:3},{version:2}]};
+  const file=new URL('http://x'+path).searchParams.get('path')!;
+  return {path:file,content:file==='manifest.json'?JSON.stringify({files:['till.tsx','manifest.json']}):'export default 1;'};
+ }) as never;
+ const {version,files}=await pageCodeFiles(request,'till','Custom');
+ assert.equal(version,3);
+ assert.deepEqual(files.map(file=>file.path),['till.tsx','manifest.json']);
+ assert.ok(asked.every(path=>!path.includes('/file?')||path.includes('format=json')));
+ const zip=zipFiles(files);
+ assert.equal(new DataView(zip.buffer).getUint32(0,true),0x04034b50);
+ assert.equal(new DataView(zip.buffer).getUint32(zip.length-22,true),0x06054b50);
 });

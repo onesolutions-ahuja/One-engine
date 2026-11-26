@@ -18,6 +18,7 @@ import { standardPageComponents } from '../../../components/Catalog/index';
 import { findRegisteredComponent } from '../../../components/Registry/componentRegistryLookup';
 import { canvasOrientation } from '../../../pages/PageRuntime/pageCanvas';
 import { pageBuilderPaletteCategories } from '../pageBuilderPalette';
+import { multiPageTabsHolding } from '../multiPageBuilder';
 import { loadRecentPageBlocks } from '../pageBuilderUx';
 import {
 type PageActivationAssignmentMetadata, type LightningPageTemplate, type LightningPageMetadata,
@@ -77,6 +78,18 @@ export function usePageEditorState(
   const [selectionIds, setSelectionIds] = useState<string[]>([]);
   const [groupEditId,setGroupEditId]=useState('');
   const [openBuilderTabs,setOpenBuilderTabs]=useState<Record<string,string>>({});
+  // MultiPage: a tab holding the selection stays open after the selection moves elsewhere.
+  useEffect(()=>{
+    const holding=multiPageTabsHolding(page.components,selectedId);
+    if(Object.entries(holding).some(([id,tab])=>openBuilderTabs[id]!==tab))
+      setOpenBuilderTabs(current=>({...current,...holding}));
+  },[selectedId,page.components]); // eslint-disable-line react-hooks/exhaustive-deps
+  // MultiPage tab being renamed in place (double-click a tab, or "Rename tab").
+  const [renamingTabId,setRenamingTabId]=useState('');
+  // Dragging a part (label, icon, badge) of a component only after double-click
+  // ("edit inside"); a plain drag always moves the whole component.
+  const [partEditId,setPartEditId]=useState('');
+  useEffect(()=>{if(partEditId&&partEditId!==selectedId)setPartEditId('');},[selectedId,partEditId]);
   const [previewRecords,setPreviewRecords]=useState<RecordData[]>([]);
   const [previewRecordId,setPreviewRecordId]=useState('');
   const previewRecord=previewRecords.find(item=>String(item.Id)===previewRecordId)??previewRecords[0];
@@ -253,6 +266,8 @@ export function usePageEditorState(
     members:Array<{id:string;original:{x:number;y:number;width:number;height:number};element:HTMLElement}>;
     /** Inside a container: the container's size (positions count from its top-left). */
     limits?:{width:number;height:number};nested?:boolean;
+    /** Set once the pointer has travelled a few pixels: a click never nudges a shape. */
+    dragging?:boolean;
   }|null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<'Design' | 'Data & Actions' | 'Visibility' | 'Position'>('Design');
@@ -491,5 +506,6 @@ export function usePageEditorState(
     showLayoutHistory, setShowLayoutHistory, selectedHistoryVersion, setSelectedHistoryVersion,
     setSavedFeedback, fields, pageLayouts, selected, applyPage, updateComponent, openComponentInspector,
     openAddBlocks, canvasLayer, setCanvasLayer, addedLayers, setAddedLayers,
+    renamingTabId, setRenamingTabId, partEditId, setPartEditId, setOpenDesignSection,
   };
 }

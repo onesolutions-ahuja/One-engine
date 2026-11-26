@@ -160,7 +160,8 @@ export function createPageRibbon(
         disabled={!undoStack.length} onClick={undo}><Undo2 size={17}/></button>;
       case 'redo':return <button className="office-ribbon-icon-button" aria-label="Redo" title="Redo"
         disabled={!redoStack.length} onClick={redo}><Redo2 size={17}/></button>;
-      case 'save':return <button className="office-ribbon-icon-button" aria-label="Save" title="Save page"
+      case 'save':return <button className={'office-ribbon-icon-button'+(undoStack.length?' has-unsaved-changes':'')}
+        aria-label={undoStack.length?'Save (unsaved changes)':'Save'} title={undoStack.length?'Save page: you have unsaved changes':'Save page'}
         disabled={saving} onClick={()=>void savePage()}><Save size={17}/></button>;
       case 'activate':return page.status==='Active'?null:<button className="office-ribbon-icon-button" aria-label="Activate" title="Activate page"
         disabled={saving||switchingLayout}

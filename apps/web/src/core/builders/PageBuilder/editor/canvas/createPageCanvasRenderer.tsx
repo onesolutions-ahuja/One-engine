@@ -3,6 +3,10 @@ import {nestedCanvasStyle} from '../../../../pages/TemplatePageRuntime/pageCompo
 import { loadCanvasAsset } from './canvasAssetCache';
 import CanvasFloatingActions from '../../CanvasFloatingActions';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
+import MultiPageTabRename from '../../MultiPageTabRename';
+import { builderBindingMemo } from '../../builderBindingMemo';
+import { MULTIPAGE_TYPE, isMultiPageTab, moveMultiPageTab, multiPageTabs, openMultiPageTab } from '../../multiPageBuilder';
+import { multiPageKey } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { compactLayoutForRecord } from '../../../../records/RecordWorkspace/recordMetadataUtils';
 import { appRoutePath, type AppRoute } from '../../../../workspace/Navigation/appRouting';
 import * as React from 'react';
@@ -56,7 +60,7 @@ export function createPageCanvasRenderer(
     componentMenuId, componentClipboard, applyPage, fields, previewFieldValue, defaultRelatedLists,
     relatedListOptions, setOpenBuilderTabs, externalPreviewWindowRef, ribbonCatalog, canvasBinding,
     selectCanvasDataBinding, selectedRegion, setActivePanel, openAddBlocks, chooseCanvasDesignArea,
-    updateComponent,
+    updateComponent, renamingTabId, setRenamingTabId, partEditId, setPartEditId, setOpenDesignSection,
   } = editorState;
   const {
     page, libraryComponents, apps, request, dashboards, reports, objects, flows, pages,
@@ -73,9 +77,11 @@ export function createPageCanvasRenderer(
   } = placement;
   const {
     duplicateSelected, copySelected, pasteComponent, moveSelected, removeSelected, addComponent,
+    addMultiPageTab, renameTab,
   } = componentActions;
   const { placeSelectedLayer } = layoutActions;
-  const { MetadataBoundPageComponent } = components;
+  // Designer previews of data-bound components redraw only when what they show changed.
+  const MetadataBoundPageComponent = builderBindingMemo(components.MetadataBoundPageComponent);
 
   const renderPageComponent = (component: LightningPageMetadata['components'][number], index: number, libraryPreview = false, interactivePreview = false) => {
     const showHiddenSelection = ribbonTab === 'Preview' && !previewMode && !libraryPreview && Boolean(selectedId) && (selectedId === component.id || isDescendantOf(page.components,selectedId,component.id));
@@ -92,11 +98,44 @@ export function createPageCanvasRenderer(
       && (!nested || (Boolean(component.position) && nestedParentType !== 'Custom:smart_multipage'));
     const nestedKids = isLayoutContainer(component) && (!libraryPreview || interactivePreview)
       ? childrenOf(page.components, component.id) : [];
+    const isMultiPage = component.type === MULTIPAGE_TYPE;
+    // MultiPage in the designer: the open tab is the one holding the selection, else the
+    // tab last opened (clicked), else the first.
+    const openTab = isMultiPage && !libraryPreview
+      ? openMultiPageTab(page.components, component.id, selectedId, openBuilderTabs[component.id]) : undefined;
     const nestedChildren = isLayoutContainer(component) && (!libraryPreview || interactivePreview)
       ? multiPageChildren(component, nestedKids, nestedKids.map((child) =>
           renderPageComponent(child, page.components.findIndex((item) => item.id === child.id), libraryPreview, interactivePreview)),
-          page.components, selectedId)
+          page.components, selectedId, openTab?.id)
       : undefined;
+    // A MultiPage designer control (tab, "+", scroll arrow) under the pointer, if any.
+    const multiPageControl = (event: React.MouseEvent<HTMLElement>): HTMLElement | undefined => {
+      if (!isMultiPage || previewMode || libraryPreview) return undefined;
+      const host = event.currentTarget;
+      const under = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(event.clientX, event.clientY) : [];
+      for (const node of [event.target as Element, ...under]) {
+        const control = node instanceof Element
+          ? node.closest<HTMLElement>('[data-multipage-tab],[data-multipage-add],[data-multipage-scroll]') : null;
+        if (control && host.contains(control) && control.closest('[data-component-id]') === host) return control;
+      }
+      return undefined;
+    };
+    const tabForKey = (key: string) => multiPageTabs(page.components, component.id)
+      .find(tab => multiPageKey(tab).toLowerCase() === key.toLowerCase());
+    /** Click on a MultiPage tab opens (and selects) that tab; "+" adds a tab; arrows scroll the tabs. */
+    const handleMultiPageControl = (control: HTMLElement) => {
+      if (control.dataset.multipageAdd !== undefined) { addMultiPageTab(component.id); return; }
+      if (control.dataset.multipageScroll) {
+        const strip = control.closest('.smart-multipage')?.querySelector<HTMLElement>('.smart-multipage-tabs');
+        strip?.scrollBy({ left: Number(control.dataset.multipageScroll) * Math.max(120, strip.clientWidth * 0.7), behavior: 'smooth' });
+        return;
+      }
+      const tab = tabForKey(control.dataset.multipageTab ?? '');
+      if (!tab) return;
+      setOpenBuilderTabs(old => ({ ...old, [component.id]: tab.id }));
+      setGroupEditId(''); setSelectionIds([tab.id]); setSelectedRegion(null); setSelectedId(tab.id);
+      setPageSettingsOpen(false); setComponentMenuId('');
+    };
     const visualStyle = resolvePageComponentStyle(component.properties, component.type, device);
     // Unconfigured registered components remain discoverable without authoring
     // any placeholder text, border, or data in SQL.
@@ -144,6 +183,10 @@ export function createPageCanvasRenderer(
       if(suppressCanvasClickRef.current){
         event.preventDefault();suppressCanvasClickRef.current=false;return;
       }
+      const control=multiPageControl(event);
+      if(control&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){
+        handleMultiPageControl(control);return;
+      }
       const mode=event.altKey?'member'
         :event.ctrlKey||event.metaKey||event.shiftKey?'toggle':'replace';
       const next=selectCanvasIds(page.components,selectionIds,component.id,mode);
@@ -188,6 +231,14 @@ export function createPageCanvasRenderer(
       }
     };
     const selectOnlyInDesigner = !previewMode && !libraryPreview;
+    // When this component is a tab of a MultiPage: that MultiPage.
+    const tabOf = !libraryPreview && isMultiPageTab(page.components, component.id)
+      ? page.components.find(item => item.id === rawLayoutParentId(component)) : undefined;
+    const openPositionSection = () => {
+      selectRibbonTab('Component Design 2');
+      // After the Design panel resets its sections for the new tab, open Dimensions.
+      window.requestAnimationFrame(() => setOpenDesignSection('Dimensions & Alignment'));
+    };
     // The canvas frame owns the resize handles; its content owns clipping/scrolling.
     // In template/nested layouts use a Fragment to preserve native direct-child styling.
     const ContentHost = page.layoutMode === 'free-canvas' && !nested && !libraryPreview ? 'div' : React.Fragment;
@@ -198,7 +249,7 @@ export function createPageCanvasRenderer(
       data-page-appearance={isLayoutType(component.type) ? 'layout' : pageAppearanceTarget(component.type)}
       data-page-style={pageAppearanceStyleKeys(visualStyle)}
       ref={libraryPreview && !interactivePreview ? (element) => { if (element) element.inert = true; } : undefined}
-      className={`record-component ${(!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas' ? 'free-canvas-component' : ''} ${isCanvasLocked(component) ? 'canvas-component-locked' : ''} ${nested ? 'nested-page-component' : ''} ${isLayoutContainer(component) ? 'layout-container-component' : ''} ${libraryPreview ? 'component-rendered-preview' : ''} ${selectedId === component.id && !previewMode && !libraryPreview ? 'selected' : ''} ${selectionIds.includes(component.id) && !previewMode && !libraryPreview ? 'multi-selected' : ''} ${showHiddenSelection ? 'canvas-hidden-selection' : ''} ${dragOverId === component.id && !libraryPreview ? 'drop-target' : ''}`}
+      className={`record-component ${(!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas' ? 'free-canvas-component' : ''} ${isCanvasLocked(component) ? 'canvas-component-locked' : ''} ${nested ? 'nested-page-component' : ''} ${isLayoutContainer(component) ? 'layout-container-component' : ''} ${libraryPreview ? 'component-rendered-preview' : ''} ${selectedId === component.id && !previewMode && !libraryPreview ? 'selected' : ''} ${selectionIds.includes(component.id) && !previewMode && !libraryPreview ? 'multi-selected' : ''} ${showHiddenSelection ? 'canvas-hidden-selection' : ''} ${dragOverId === component.id && !libraryPreview ? 'drop-target' : ''} ${partEditId === component.id && !previewMode && !libraryPreview ? 'canvas-part-editing' : ''}`}
       style={{
         ...((!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas'
           ? nested
@@ -243,15 +294,23 @@ export function createPageCanvasRenderer(
             selectCanvasComponent(event);
           } : undefined}
       onDoubleClick={!libraryPreview ? event => { event.stopPropagation(); if(!previewMode){
+        const tabControl=multiPageControl(event);
+        const tabKey=tabControl?.dataset.multipageTab;
+        const tab=tabKey!==undefined?tabForKey(tabKey):undefined;
+        if(tab){setRenamingTabId(tab.id);return;}
+        if(tabControl)return;
         if(canvasGroupKey(component)){setGroupEditId(component.id);setSelectionIds([component.id]);}
         setSelectedRegion(null);setSelectedId(component.id);selectRibbonTab('Component Design 2');
+        // Double-click = edit inside: its parts (label, icon, badge) can now be dragged.
+        setPartEditId(component.id);
       }} : undefined}
       onContextMenu={!libraryPreview && !previewMode ? event => { event.preventDefault(); event.stopPropagation(); setSelectedRegion(null); setSelectedId(component.id); setComponentMenuId(component.id); } : undefined}
-      onPointerDownCapture={!previewMode && !libraryPreview && selectedId === component.id && !isCanvasLocked(component)
+      onPointerDownCapture={!previewMode && !libraryPreview && selectedId === component.id && partEditId === component.id && !isCanvasLocked(component)
         ? event => {
-          // On the selected component, pressing a part (badge, image, buttons,
-          // text) drags that part instead of the component: freely (saved as
-          // its X/Y offset) or, with Shift, snapped to its dropdown places.
+          // After a double-click (edit inside), pressing a part (badge, image,
+          // buttons, text) drags that part instead of the component: freely (saved
+          // as its X/Y offset) or, with Shift, snapped to its dropdown places.
+          // Otherwise a drag anywhere on the component moves the whole component.
           startCanvasPartDrag(event, component.type, component.properties, {
             chooseArea: chooseCanvasDesignArea,
             suppressClick: () => { suppressCanvasClickRef.current = true; },
@@ -299,11 +358,21 @@ export function createPageCanvasRenderer(
           onLostPointerCapture={event => endCanvasMove(event, true)}
           onClick={event => event.stopPropagation()}><Move size={15}/></button>}
         <button type="button" onClick={() => selectRibbonTab('Component Design 2')} title="Edit block"><Pencil size={15}/> Edit</button>
-        {page.layoutMode === 'free-canvas' && <button type="button" onClick={() => selectRibbonTab('Component Layout')} title="Position and size"><Maximize2 size={15}/> Position</button>}
+        {page.layoutMode === 'free-canvas' && <button type="button" onClick={openPositionSection} title="Position and size"><Maximize2 size={15}/> Position</button>}
+        {(isMultiPage || tabOf) && <button type="button" title="Add a tab to this MultiPage" disabled={isCanvasLocked(tabOf ?? component)}
+          onClick={() => addMultiPageTab(tabOf?.id ?? component.id)}><Plus size={15}/> Tab</button>}
         <button type="button" onClick={duplicateSelected} disabled={isCanvasLocked(component)} title="Duplicate"><Copy size={16}/></button>
         <button type="button" onClick={() => setComponentMenuId(current => current === component.id ? '' : component.id)}
           aria-expanded={componentMenuId === component.id} aria-label="More component actions"><MoreHorizontal size={18}/></button>
         {componentMenuId === component.id && <div className="canvas-action-menu" role="menu" aria-label="More component actions">
+          {tabOf && <>
+            <button type="button" role="menuitem" disabled={isCanvasLocked(component)}
+              onClick={() => {setRenamingTabId(component.id);setComponentMenuId('');}}>Rename tab</button>
+            <button type="button" role="menuitem" disabled={isCanvasLocked(component)||multiPageTabs(page.components,tabOf.id)[0]?.id===component.id}
+              onClick={() => {applyPage({...page,components:moveMultiPageTab(page.components,component.id,-1)});setComponentMenuId('');}}>Move tab left</button>
+            <button type="button" role="menuitem" disabled={isCanvasLocked(component)||multiPageTabs(page.components,tabOf.id).at(-1)?.id===component.id}
+              onClick={() => {applyPage({...page,components:moveMultiPageTab(page.components,component.id,1)});setComponentMenuId('');}}>Move tab right</button>
+          </>}
           <button type="button" role="menuitem" onClick={() => {copySelected();setComponentMenuId('');}}>Copy <kbd>Ctrl+C</kbd></button>
           <button type="button" role="menuitem" disabled={!componentClipboard} onClick={() => {pasteComponent();setComponentMenuId('');}}>Paste <kbd>Ctrl+V</kbd></button>
           <button type="button" role="menuitem" disabled={isCanvasLocked(component)} onClick={duplicateSelected}>Duplicate <kbd>Ctrl+D</kbd></button>
@@ -322,7 +391,7 @@ export function createPageCanvasRenderer(
             onClick={() => {moveSelected(-1);setComponentMenuId('');}}>Send backward</button>
           <button type="button" role="menuitem" onClick={() => selectRibbonTab('Component Data')}>Data, links and actions</button>
 
-          <button type="button" role="menuitem" disabled={isCanvasLocked(component)} onClick={() => {removeSelected();setComponentMenuId('');}}>Delete <kbd>Delete</kbd></button>
+          <button type="button" role="menuitem" disabled={isCanvasLocked(component)} onClick={() => {removeSelected();setComponentMenuId('');}}>{tabOf ? 'Delete tab' : 'Delete'} <kbd>Delete</kbd></button>
         </div>}
       </div></CanvasFloatingActions>}
       <ContentHost {...contentHostProps}>
@@ -530,6 +599,14 @@ export function createPageCanvasRenderer(
           onStart={(event,edge)=>startCanvasResize(event,component,edge)}
           onMove={moveCanvasResize} onEnd={endCanvasResize}
           onCancel={event=>endCanvasResize(event,true)}/>}
+      {isMultiPage && renamingTabId && !previewMode && !libraryPreview && (() => {
+        const tab = multiPageTabs(page.components, component.id).find(item => item.id === renamingTabId);
+        return tab ? <MultiPageTabRename key={tab.id} multiPageId={component.id} tabKey={multiPageKey(tab)} name={tab.label}
+          viewportRef={pagePreviewAreaRef} onDone={name => {
+            setRenamingTabId('');
+            if (name !== null) renameTab(tab.id, name);
+          }}/> : null;
+      })()}
     </div>;
   };
   const renderRegion = (region: 'header' | 'main' | 'sidebar') => {

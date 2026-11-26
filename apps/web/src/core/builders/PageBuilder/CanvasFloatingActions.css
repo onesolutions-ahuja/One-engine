@@ -46,3 +46,23 @@
 .canvas-floating-resize-overlay .floating-resize-nw,
 .canvas-floating-resize-overlay .floating-resize-se{cursor:nwse-resize}
 
+
+/* MultiPage: rename a tab in place (drawn over the tab). */
+.multipage-tab-rename{
+ box-sizing:border-box;margin:0;padding:0 8px;border:2px solid var(--md-focus-ring,#2563eb);
+ border-radius:7px;background:#fff;color:#1c1c1e;font:600 13px/1.2 system-ui,sans-serif;
+ box-shadow:0 4px 14px rgba(15,23,42,.18);outline:none;
+}
+/* Double-click "edit inside": parts of this component can be dragged. */
+.builder-editor-mode .modern-canvas-builder .free-canvas-component.canvas-part-editing{
+ outline:2px dashed var(--md-focus-ring,#2563eb)!important;outline-offset:2px;
+}
+/* While a shape is being moved the toolbar fades out instead of jumping around. */
+body[data-canvas-moving="true"] .canvas-floating-actions-host{opacity:0;transition:opacity .08s}
+/* The More menu never runs off the window: it scrolls instead. */
+.canvas-floating-actions-host .canvas-action-menu{max-height:var(--canvas-menu-room,420px);overflow-y:auto;overscroll-behavior:contain}
+.canvas-floating-actions-host[data-menu-up="true"] .canvas-element-actions .canvas-action-menu{top:auto!important;bottom:calc(100% + 5px)!important}
+/* Save shows a dot while the page has unsaved changes. */
+.office-ribbon-icon-button.has-unsaved-changes{position:relative}
+.office-ribbon-icon-button.has-unsaved-changes::after{content:"";position:absolute;top:3px;right:3px;width:7px;height:7px;
+ border-radius:50%;background:#f59e0b;box-shadow:0 0 0 1.5px #fff;pointer-events:none}

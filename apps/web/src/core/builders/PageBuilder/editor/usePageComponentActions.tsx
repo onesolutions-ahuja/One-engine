@@ -1,15 +1,15 @@
 import { placeNewCanvasComponent, visibleCanvasBounds } from '../canvasInsertPlacement';
 import { componentNameStem, nextComponentInstanceName } from '../../../../../../server/src/system-support/page-component-names';
-import { confirmDestructiveAction } from '../../../components/ConfirmAction/confirmDestructiveAction';
 import { libraryComponentLabel } from '../../../components/Registry/componentLibraryDiscovery';
 import { legacyLayoutToRecordComponents } from '../../../records/RecordWorkspace/recordPageLayoutMigration';
 import { useEffect, useRef } from 'react';
 import { isBuilderApi, builderDefaults } from '../builderPropertyInventory';
 import { isLayoutType } from '../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { isCanvasLocked, alignCanvasComponents, distributeCanvasComponents } from '../canvasInteractions';
-import { translateCanvasSelection } from '../canvasSelectionInteractions';
+import { reachableMoveArea, translateCanvasSelection } from '../canvasSelectionInteractions';
 import { copyComponentTree, cloneComponentTree, assignTabOnReparent, removePageComponentSelection } from '../pageComponentTree';
-import { isLayoutContainer, rawLayoutParentId } from '../../../pages/TemplatePageRuntime/pageComponentLayout';
+import { containerCanvasSize, isLayoutContainer, rawLayoutParentId } from '../../../pages/TemplatePageRuntime/pageComponentLayout';
+import { MULTIPAGE_TYPE, multiPageInsertParent, nextTabName, renameMultiPageTab } from '../multiPageBuilder';
 import { findRegisteredComponent } from '../../../components/Registry/componentRegistryLookup';
 import { addRecentPageBlock } from '../pageBuilderUx';
 import {
@@ -38,7 +38,7 @@ export function usePageComponentActions(
     recordFormFactors, recordAppId, recordProfileId, recordTypeId, homeFormFactors, homeAppId,
     homeScope, homeProfileId, setComponentClipboard, componentClipboard, undoStack, setRedoStack,
     setUndoStack, setSelectionRedoStack, selectedId, setSelectionUndoStack, selectionUndoStack,
-    redoStack, selectionRedoStack, previewMode, setGroupEditId,
+    redoStack, selectionRedoStack, previewMode, setGroupEditId, componentMenuId,
   } = editorState;
   const { dynamicFormsEnabled, selectedMigrationLayout, assignedMigrationLayout } = componentProperties;
   const { moveLayer, ungroupSelected, wrapSelectedInContainer } = layoutActions;
@@ -66,7 +66,10 @@ export function usePageComponentActions(
   }, [page.components]);
 
   const componentNameHighWaterRef=useRef<Record<string,number>>({});
-  const addComponent = async (type: string, position = page.components.length, region: 'header' | 'main' | 'sidebar' = 'main', canvasPosition?: PageComponentMetadata['position'], parentId: string | null = null) => {
+  const addComponent = async (type: string, position = page.components.length, region: 'header' | 'main' | 'sidebar' = 'main', canvasPosition?: PageComponentMetadata['position'], requestedParentId: string | null = null,
+    options: {label?: string; asNewTab?: boolean} = {}) => {
+    // Inserting into a MultiPage goes into its open tab; only "Add tab" makes a new tab.
+    const parentId = multiPageInsertParent(page.components, requestedParentId, openBuilderTabs, options.asNewTab);
     const customApiName = type.startsWith('Custom:') ? type.slice('Custom:'.length) : '';
     const custom = findRegisteredComponent(libraryComponents, customApiName, 'page');
     const dynamicFormComponent = type === 'Field Section' && page.pageType === 'Record Page';
@@ -92,24 +95,28 @@ export function usePageComponentActions(
     componentNameHighWaterRef.current[stem]=Math.max(parsed,componentNameHighWaterRef.current[stem]??0);
     const id = `${type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${crypto.randomUUID()}`;
     const components = [...page.components];
-    const defaultWidth = Math.min(page.canvasWidth, custom?.resize?.defaultWidth ?? 320);
-    const defaultHeight = Math.min(page.canvasHeight, custom?.resize?.defaultHeight ?? 180);
+    // Inside a container, place in the container's own area (its coordinates), never
+    // at page coordinates where the new component would sit outside its frame.
+    const area = parentId ? containerCanvasSize(page.components, parentId)
+      : {width: page.canvasWidth, height: page.canvasHeight};
+    const defaultWidth = Math.min(area.width, custom?.resize?.defaultWidth ?? 320);
+    const defaultHeight = Math.min(area.height, custom?.resize?.defaultHeight ?? 180);
     // An inserted component is an independent sibling, not an invisible child
-    // of the previous one. Find free canvas space instead of stacking every
-    // 24px-offset component on top of its neighbours.
-    const usedBounds = page.components.filter(item=>item.position && !rawLayoutParentId(item))
+    // of the previous one. Find free space among its siblings instead of stacking
+    // every component on top of its neighbours.
+    const usedBounds = page.components.filter(item=>item.position && rawLayoutParentId(item)===parentId)
       .map(item=>item.position!);
     const viewport=pagePreviewAreaRef.current;
     const stage=viewport?.querySelector<HTMLElement>('.free-canvas-stage');
-    const visible=viewport&&stage?visibleCanvasBounds(stage.getBoundingClientRect(),
+    const visible=!parentId&&viewport&&stage?visibleCanvasBounds(stage.getBoundingClientRect(),
       viewport.getBoundingClientRect(),page.canvasWidth,page.canvasHeight):undefined;
     const origin=canvasPosition??placeNewCanvasComponent({
-      canvasWidth:page.canvasWidth,canvasHeight:page.canvasHeight,
+      canvasWidth:area.width,canvasHeight:area.height,
       width:defaultWidth,height:defaultHeight,used:usedBounds,visible
     });
     const freeCanvasPosition = page.layoutMode === 'free-canvas'
-      ? {x:Math.max(0,Math.min(origin.x,page.canvasWidth-defaultWidth)),
-         y:Math.max(0,Math.min(origin.y,page.canvasHeight-defaultHeight)),
+      ? {x:Math.max(0,Math.min(Math.round(origin.x),area.width-defaultWidth)),
+         y:Math.max(0,Math.min(Math.round(origin.y),area.height-defaultHeight)),
          width:defaultWidth,height:defaultHeight}
       : undefined;
     // On a free canvas the list order is the stacking order: a new component
@@ -117,7 +124,7 @@ export function usePageComponentActions(
     const insertAt = page.layoutMode === 'free-canvas' ? components.length
       : Math.max(0, Math.min(position, components.length));
     components.splice(insertAt, 0, {
-      id, type, label: custom ? libraryComponentLabel(custom) : type,
+      id, type, label: options.label ?? (custom ? libraryComponentLabel(custom) : type),
       properties: custom
         ? { navigatorName:allocated,libraryComponentId: custom.apiName,
             ...(isBuilderApi(custom.apiName,ribbonCatalog?.components??[]) ?builderDefaults(custom.apiName,ribbonCatalog?.properties??[]):{}),
@@ -168,7 +175,8 @@ export function usePageComponentActions(
     setActivePanel('properties');
     setInspectorTab(componentNeedsData(type)?'Data & Actions':'Design');
     setRibbonTab('Component Design 2');
-    onNotify(`${custom?libraryComponentLabel(custom):type} added and selected`);
+    onNotify(options.asNewTab ? `Tab "${options.label ?? 'Page'}" added and opened`
+      : `${custom?libraryComponentLabel(custom):type} added and selected`);
   };
   const addField = (fieldApiName: string) => {
     if (dynamicFormsEnabled) {
@@ -296,18 +304,33 @@ export function usePageComponentActions(
     }
     if (!result.removed) return;
     const plural = result.removed > 1;
-    if (!confirmDestructiveAction('Delete',
-      plural ? result.removed+' selected page components' : 'Page component "'+deleteTargets[0].label+'"',
-      (plural ? 'All selected components' : 'The component')+
-      ' will be removed from this layout draft. Save and publish to make the change live.')) return;
-    // One history snapshot and one change, so Undo restores the whole selection.
+    // No blocking "Are you sure?" box: this only changes the unsaved draft and one
+    // Undo (Ctrl+Z) brings the whole selection back.
     applyPage({ ...page, components: result.components });
     setSelectionIds([]);
     setSelectedId('');
     setSelectedRegion(null);
     setComponentMenuId('');
-    onNotify((plural ? result.removed+' components' : 'Component')+
-      ' removed from draft. Save the page to keep this change.');
+    onNotify((plural ? result.removed+' components' : 'Component "'+deleteTargets[0].label+'"')+
+      ' deleted. Undo (Ctrl+Z) brings it back; Save keeps the change.');
+  };
+  /** MultiPage "+": a new tab is a new Smart Container page, opened and selected. */
+  const addMultiPageTab = (multiPageId: string) => {
+    const multiPage = page.components.find(item => item.id === multiPageId && item.type === MULTIPAGE_TYPE);
+    if (!multiPage) return;
+    if (isCanvasLocked(multiPage)) { onNotify('Unlock the MultiPage before adding a tab'); return; }
+    if (!findRegisteredComponent(libraryComponents, 'smart_container', 'page')) {
+      onNotify('Smart Container is not available, so a tab cannot be added'); return;
+    }
+    void addComponent('Custom:smart_container', page.components.length, multiPage.region ?? 'main', undefined,
+      multiPageId, {label: nextTabName(page.components, multiPageId), asNewTab: true});
+  };
+  /** Rename a MultiPage tab in place. */
+  const renameTab = (tabId: string, name: string) => {
+    const result = renameMultiPageTab(page.components, tabId, name);
+    if (result.error) { onNotify(result.error); return false; }
+    if (result.components !== page.components) applyPage({ ...page, components: result.components });
+    return true;
   };
   const addRecordAssignment = () => {
     const needsApp = recordScope !== 'Org Default';
@@ -373,7 +396,25 @@ export function usePageComponentActions(
     setComponentClipboard(snapshot);
     const removedIds=new Set(snapshot.components.map(item=>item.id));
     applyPage({...page,components:page.components.filter(item=>!removedIds.has(item.id))});
-    setSelectedId('');
+    // Its container stays selected, so Paste puts it back in the same place.
+    const parentId=rawLayoutParentId(selected)??'';
+    setSelectedId(parentId);setSelectionIds(parentId?[parentId]:[]);
+  };
+  /** Paste keeps the copied place when it is free in the destination (Cut → Paste puts it
+   * back where it was); when that place is taken it steps 24 px down-right. Always inside
+   * the destination (the container's own area, or the page). */
+  const pastePlace = (position: NonNullable<PageComponentMetadata['position']>, parentId: string | null) => {
+    const area = parentId ? containerCanvasSize(page.components, parentId) : {width: page.canvasWidth, height: page.canvasHeight};
+    const sourceParent = componentClipboard
+      ? rawLayoutParentId(componentClipboard.components.find(item => item.id === componentClipboard.rootId)!) : null;
+    const siblings = page.components.filter(item => item.position && rawLayoutParentId(item) === parentId).map(item => item.position!);
+    let x = sourceParent === parentId ? position.x : parentId ? 16 : position.x;
+    let y = sourceParent === parentId ? position.y : parentId ? 16 : position.y;
+    for (let step = 0; step < 20 && siblings.some(other => other.x === x && other.y === y); step++) { x += 24; y += 24; }
+    return {
+      x: Math.max(0, Math.min(area.width - position.width, x)),
+      y: Math.max(0, Math.min(area.height - position.height, y))
+    };
   };
   const pasteComponent = () => {
     if (!componentClipboard) return;
@@ -392,8 +433,7 @@ export function usePageComponentActions(
       ...root.position,
       // Nested content flows inside the container, not at its former page
       // coordinates. Retain dimensions and a useful local position for unnest.
-      x:parentId?16:Math.max(0,Math.min(page.canvasWidth-root.position.width,root.position.x+24)),
-      y:parentId?16:Math.max(0,Math.min(page.canvasHeight-root.position.height,root.position.y+24))
+      ...pastePlace(root.position, parentId)
     }:undefined;
     // A pasted top-level component lands on the layer being designed.
     const layerProps=(item:PageComponentMetadata)=>parentId?item.properties
@@ -512,6 +552,9 @@ export function usePageComponentActions(
         event.preventDefault();
         if (event.shiftKey) ungroupSelected();
         else wrapSelectedInContainer();
+      } else if(event.key==='Escape'&&!previewMode&&componentMenuId){
+        // Esc first closes an open menu; the selection stays.
+        setComponentMenuId('');
       } else if(event.key==='Escape'&&!previewMode){
         setSelectedId('');setSelectionIds([]);setGroupEditId('');
         setSelectedRegion(null);setComponentMenuId('');
@@ -524,8 +567,13 @@ export function usePageComponentActions(
         const step=event.shiftKey?10:1;
         const dx=event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0;
         const dy=event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0;
-        const next=translateCanvasSelection(page.components,ids,dx,dy,
-          {width:page.canvasWidth,height:page.canvasHeight});
+        // Nudge inside the component's own container (or the page), from where it is now.
+        const first=page.components.find(item=>ids.includes(item.id)&&item.position);
+        const parentId=first?rawLayoutParentId(first):null;
+        const area=parentId?containerCanvasSize(page.components,parentId):{width:page.canvasWidth,height:page.canvasHeight};
+        const level=page.components.filter(item=>ids.includes(item.id)&&item.position&&rawLayoutParentId(item)===parentId);
+        const next=translateCanvasSelection(page.components,ids,dx,dy,level.reduce(
+          (limit,item)=>reachableMoveArea(limit,item.position!),area));
         if(next.some((item,index)=>item!==page.components[index]))
           applyPage({...page,components:next});
       }
@@ -542,6 +590,6 @@ export function usePageComponentActions(
     recordPageActionVisibility, recordPageLinks, recordPageRelatedSettings, updateRecordPageRelatedList,
     deleteTargets, deleteBlockedByLock, removeSelected, addRecordAssignment, addHomeAssignment,
     removePageAssignment, copySelected, cutSelected, pasteComponent, duplicateSelected, alignSelected,
-    distributeSelected, moveSelected, undo, redo,
+    distributeSelected, moveSelected, undo, redo, addMultiPageTab, renameTab,
   };
 }

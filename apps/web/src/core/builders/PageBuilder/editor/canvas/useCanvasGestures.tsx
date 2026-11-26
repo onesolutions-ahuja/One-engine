@@ -2,7 +2,8 @@ import * as React from 'react';
 import { isCanvasLocked, snapCanvasPosition } from '../../canvasInteractions';
 import { canvasGroupKey, canvasGroupMembers, canvasGroupBounds } from '../../canvasLayerGroups';
 import { constrainCanvasRect } from '../../canvasPointerInteractions';
-import { marqueeCanvasIds, translateCanvasSelection } from '../../canvasSelectionInteractions';
+import { marqueeCanvasIds, reachableMoveArea, translateCanvasSelection } from '../../canvasSelectionInteractions';
+import { startTransition } from 'react';
 import { useCanvasGroupGestures } from '../../useCanvasGroupGestures';
 import { containerCanvasSize, rawLayoutParentId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { findRegisteredComponent } from '../../../../components/Registry/componentRegistryLookup';
@@ -50,7 +51,7 @@ export function useCanvasGestures(
     const parentId=rawLayoutParentId(component);
     const moving=page.components.filter(item=>memberIds.includes(item.id)
       &&item.position&&rawLayoutParentId(item)===parentId&&!isCanvasLocked(item));
-    const limits=parentId?containerCanvasSize(page.components,parentId):{width:page.canvasWidth,height:page.canvasHeight};
+    const area=parentId?containerCanvasSize(page.components,parentId):{width:page.canvasWidth,height:page.canvasHeight};
     if(!moving.length||moving.some(item=>canvasGroupKey(item)&&groupEditId!==item.id
       &&canvasGroupMembers(page.components,item).some(member=>
         !memberIds.includes(member.id)||isCanvasLocked(member))))return;
@@ -62,6 +63,8 @@ export function useCanvasGestures(
     }));
     if(members.some(item=>!item.element))return;
     const bounds=canvasGroupBounds(moving)??{...component.position};
+    // Never jump on the first move: a shape already (partly) outside its area may stay there.
+    const limits=reachableMoveArea(area,bounds);
     event.preventDefault();event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     canvasMoveStart.current={
@@ -70,13 +73,22 @@ export function useCanvasGestures(
       members:members.map(member=>({...member,element:member.element!})),
       limits,nested:Boolean(parentId)
     };
-    setSelectedRegion(null);setSelectedId(component.id);setSelectionIds(memberIds);
-    setPageSettingsOpen(false);
+    // Selecting re-draws the whole designer; as a transition it never holds up the move.
+    startTransition(()=>{
+      setSelectedRegion(null);setSelectedId(component.id);setSelectionIds(memberIds);
+      setPageSettingsOpen(false);
+    });
     members.forEach(member=>{if(member.element)member.element.style.willChange='translate';});
+    // The floating toolbar fades out while moving (it would jump above/below the shape).
+    document.body.dataset.canvasMoving='true';
   };
   const moveCanvasPointer=(event:React.PointerEvent<HTMLElement>)=>{
     const start=canvasMoveStart.current;
     if(!start||start.pointerId!==event.pointerId)return;
+    if(!start.dragging){
+      if(Math.hypot(event.clientX-start.pointerX,event.clientY-start.pointerY)<4)return;
+      start.dragging=true;
+    }
     const scale=fitCanvas?fitScale:canvasZoom/100;
     const x=start.original.x+canvasUnitsFromScreenDelta(event.clientX-start.pointerX,scale);
     const y=start.original.y+canvasUnitsFromScreenDelta(event.clientY-start.pointerY,scale);
@@ -106,6 +118,7 @@ export function useCanvasGestures(
     const start=canvasMoveStart.current;
     if(!start||start.pointerId!==event.pointerId)return;
     canvasMoveStart.current=null;
+    delete document.body.dataset.canvasMoving;
     const dx=cancelled?0:start.x-start.original.x;
     const dy=cancelled?0:start.y-start.original.y;
     const changed=dx!==0||dy!==0;
@@ -235,7 +248,8 @@ export function useCanvasGestures(
     let x = start.x, y = start.y, width = start.width, height = start.height;
     // Inside a container the container is the limit, not the page.
     const parentId = rawLayoutParentId(component);
-    const area = parentId ? containerCanvasSize(page.components, parentId) : { width: page.canvasWidth, height: page.canvasHeight };
+    const area = reachableMoveArea(parentId ? containerCanvasSize(page.components, parentId)
+      : { width: page.canvasWidth, height: page.canvasHeight }, start);
     if (east) width = Math.max(Math.min(minWidth,area.width-start.x), Math.min(area.width - start.x, start.width + dx));
     if (south) height = Math.max(Math.min(minHeight,area.height-start.y), Math.min(area.height - start.y, start.height + dy));
     if (west) { x = Math.max(0, Math.min(start.x + start.width - minWidth, start.x + dx)); width = start.width + start.x - x; }

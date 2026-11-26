@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState,type ReactNode,type RefObject} from 'react';
+import {useEffect,useRef,useState,type CSSProperties,type ReactNode,type RefObject} from 'react';
 import {createPortal} from 'react-dom';
 import './CanvasFloatingActions.css';
 
@@ -11,7 +11,7 @@ export default function CanvasFloatingActions({componentId,viewportRef,children,
   children:ReactNode;
 }){
   const floatingRef=useRef<HTMLDivElement>(null);
-  const [position,setPosition]=useState({top:0,left:0,visible:false});
+  const [position,setPosition]=useState({top:0,left:0,visible:false,menuUp:false,menuRoom:420});
   // Portal effects must run after the canvas anchor has been attached to its viewport.
   useEffect(()=>{
     const viewport=viewportRef.current;
@@ -39,12 +39,18 @@ export default function CanvasFloatingActions({componentId,viewportRef,children,
       const top=above?visibleTop-height-12
         :below?visibleBottom+12:visibleTop+12;
       const next={
-        top:Math.max(8,Math.min(window.innerHeight-height-8,top)),
-        left:Math.max(8,Math.min(window.innerWidth-width-8,target.left+target.width/2-width/2)),
-        visible:isVisible
+        // Whole pixels: fractional positions blur the toolbar's text and icons.
+        top:Math.round(Math.max(8,Math.min(window.innerHeight-height-8,top))),
+        left:Math.round(Math.max(8,Math.min(window.innerWidth-width-8,target.left+target.width/2-width/2))),
+        visible:isVisible,menuUp:false,menuRoom:420
       };
+      // The More menu opens downwards, or upwards when there is more room above.
+      const roomBelow=window.innerHeight-(next.top+height)-16,aboveRoom=next.top-16;
+      next.menuUp=roomBelow<320&&aboveRoom>roomBelow;
+      next.menuRoom=Math.max(160,Math.round(Math.min(420,next.menuUp?aboveRoom:roomBelow)));
       setPosition(previous=>previous.top===next.top&&previous.left===next.left
-        &&previous.visible===next.visible?previous:next);
+        &&previous.visible===next.visible&&previous.menuUp===next.menuUp
+        &&previous.menuRoom===next.menuRoom?previous:next);
     };
     const schedule=()=>{
       if(frame)return;
@@ -74,7 +80,9 @@ export default function CanvasFloatingActions({componentId,viewportRef,children,
   if(typeof document==='undefined')return null;
   return createPortal(<div className="canvas-unified-builder canvas-floating-actions-host"
     ref={floatingRef} data-canvas-actions-for={componentId}
-    style={{top:position.top,left:position.left,visibility:position.visible?'visible':'hidden'}}>
+    data-menu-up={position.menuUp?'true':undefined}
+    style={{top:position.top,left:position.left,visibility:position.visible?'visible':'hidden',
+      '--canvas-menu-room':position.menuRoom+'px'} as CSSProperties}>
     {children}
   </div>,document.body);
 }

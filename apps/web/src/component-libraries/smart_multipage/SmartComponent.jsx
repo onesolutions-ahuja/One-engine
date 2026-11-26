@@ -11,6 +11,8 @@ import {activePage,shownPages,tabBarLook} from "./multiPageModel.js";
  *  - Tab alignment / size / shape: Segmented is a compact macOS-style control (centred by
  *    default); Stretch keeps the old full-width bar.
  *  - Change event: runs with the tapped page key, e.g. =STATE(payTab, @Value).
+ *  - Designer: click a tab to open and edit it, double-click to rename, + adds a tab
+ *    (the Page Builder handles these through the data-multipage-* attributes).
  */
 export default function SmartComponent(p){
  const pages=React.Children.toArray(p.children)
@@ -34,19 +36,50 @@ export default function SmartComponent(p){
    void Promise.resolve(p.onAction({event:"change",value:key})).catch(()=>{});
  };
  const radius=Number.isFinite(Number(p.radius))?Number(p.radius):12;
+ // Many tabs: the strip scrolls sideways; arrows show only when tabs are hidden that side.
+ const strip=React.useRef(null);
+ const [more,setMore]=React.useState({left:false,right:false});
+ const measure=React.useCallback(()=>{
+  const el=strip.current;if(!el)return;
+  const next={left:el.scrollLeft>1,right:el.scrollLeft+el.clientWidth<el.scrollWidth-1};
+  setMore(old=>old.left===next.left&&old.right===next.right?old:next);
+ },[]);
+ React.useEffect(()=>{
+  const el=strip.current;if(!el)return undefined;
+  measure();
+  const observer=typeof ResizeObserver==="function"?new ResizeObserver(measure):null;
+  observer?.observe(el);
+  return ()=>observer?.disconnect();
+ },[measure,shown.length,tabBar]);
+ // Keep the open tab in view (never scrolls the page itself).
+ React.useEffect(()=>{
+  const el=strip.current;const tab=el?.querySelector("button.active");
+  if(!el||!tab)return;
+  if(tab.offsetLeft<el.scrollLeft)el.scrollLeft=tab.offsetLeft;
+  else if(tab.offsetLeft+tab.offsetWidth>el.scrollLeft+el.clientWidth)el.scrollLeft=tab.offsetLeft+tab.offsetWidth-el.clientWidth;
+  measure();
+ },[open?.key,measure]);
+ const scrollTabs=dir=>{const el=strip.current;if(el)el.scrollBy({left:dir*Math.max(120,el.clientWidth*.7),behavior:"smooth"});};
  return <div className={"smart-multipage is-"+style.toLowerCase()+" align-"+look.align+" size-"+look.size+" shape-"+look.shape}
   data-builder-preview={builder?"true":undefined}
   style={{background:p.backgroundColor||undefined,borderRadius:radius,
    border:p.borderColor?"1px solid "+p.borderColor:undefined}}>
-  {tabBar&&shown.length>0&&<div className="smart-multipage-tabbar">
-   <div className="smart-multipage-tabs" role="tablist" aria-label={p.label||"Pages"}>
+  {tabBar&&(shown.length>0||builder)&&<div className="smart-multipage-tabbar">
+   {more.left&&<button type="button" className="smart-multipage-scroll is-left" aria-label="Show earlier tabs"
+    data-multipage-scroll="-1" onClick={()=>scrollTabs(-1)}>‹</button>}
+   <div className="smart-multipage-tabs" role="tablist" aria-label={p.label||"Pages"} ref={strip} onScroll={measure}>
     {shown.map(page=><button type="button" role="tab" key={page.key} aria-selected={open?.key===page.key}
+     data-multipage-tab={page.key} title={builder?"Click to open this tab; double-click to rename":undefined}
      className={open?.key===page.key?"active":""} onClick={()=>choose(page.key)}>{page.label}</button>)}
    </div>
+   {more.right&&<button type="button" className="smart-multipage-scroll is-right" aria-label="Show more tabs"
+    data-multipage-scroll="1" onClick={()=>scrollTabs(1)}>›</button>}
+   {builder&&<button type="button" className="smart-multipage-add" aria-label="Add tab" title="Add tab"
+    data-multipage-add="">+</button>}
   </div>}
   <div className="smart-multipage-page" role="tabpanel">
    {open?open.node:<span className="smart-multipage-empty">{String(p.multiPageEmptyText??"")||
-    (builder?"Drop a Smart Container here for each page":"")}</span>}
+    (builder?"Click + to add a tab":"")}</span>}
   </div>
  </div>;
 }

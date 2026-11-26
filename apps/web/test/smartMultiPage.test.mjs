@@ -67,3 +67,69 @@ test('page Excel: one workbook (Pages, Guide, Sample) round-trips the page data'
  assert.deepEqual(readLoaderWorkbook(book).map(s=>s.name),['Pages','Pages 2','Guide','Sample']);
  assert.equal(inventoryCsvFromWorkbook(book),csv);
 });
+
+// Page Builder: MultiPage tabs are opened by click, added with +, renamed in place,
+// and new components go INTO the open tab (not a new tab each time).
+const tabsPage=()=>{
+ const c=(id,type,label,parent,extra={})=>({id,type,label,visible:true,position:{x:0,y:0,width:100,height:80},
+  properties:{...(parent?{layoutParentId:parent}:{}),...extra}});
+ return [c('mp','Custom:smart_multipage','Pay'),c('cash','Custom:smart_container','Cash','mp'),
+  c('card','Custom:smart_container','Card','mp'),c('btn','Custom:smart_button','Button','card'),
+  c('label','Custom:smart_label','Label',null,{visibleFormula:'=@ThisPage.payTab="Card"'})];
+};
+test('builder: open tab follows the selection, else the remembered tab, else the first',async()=>{
+ const {openMultiPageTab,multiPageTabsHolding}=await import('../src/core/builders/PageBuilder/multiPageBuilder.ts');
+ const all=tabsPage();
+ assert.equal(openMultiPageTab(all,'mp',null)?.id,'cash');
+ assert.equal(openMultiPageTab(all,'mp',null,'card')?.id,'card');
+ assert.equal(openMultiPageTab(all,'mp','btn','cash')?.id,'card','a selected component opens its tab');
+ assert.deepEqual(multiPageTabsHolding(all,'btn'),{mp:'card'});
+ assert.deepEqual(multiPageTabsHolding(all,'label'),{});
+});
+test('builder: inserting into a MultiPage goes into the open tab; Add tab makes a tab',async()=>{
+ const {multiPageInsertParent,nextTabName}=await import('../src/core/builders/PageBuilder/multiPageBuilder.ts');
+ const all=tabsPage();
+ assert.equal(multiPageInsertParent(all,'mp',{}),'cash');
+ assert.equal(multiPageInsertParent(all,'mp',{mp:'card'}),'card');
+ assert.equal(multiPageInsertParent(all,'mp',{mp:'card'},true),'mp');
+ assert.equal(multiPageInsertParent(all,'card',{}),'card');
+ assert.equal(multiPageInsertParent(all,null,{}),null);
+ assert.equal(nextTabName(all,'mp'),'Page 3');
+});
+test('builder: rename a tab; a key used by a formula is kept as its Page key',async()=>{
+ const {renameMultiPageTab,moveMultiPageTab}=await import('../src/core/builders/PageBuilder/multiPageBuilder.ts');
+ const all=tabsPage();
+ const cash=renameMultiPageTab(all,'cash','Cash money');
+ assert.equal(cash.components.find(x=>x.id==='cash').label,'Cash money');
+ assert.equal(cash.components.find(x=>x.id==='cash').properties.pageKey,undefined);
+ const card=renameMultiPageTab(all,'card','Card payment');
+ assert.equal(card.components.find(x=>x.id==='card').properties.pageKey,'Card','formula keeps working');
+ assert.match(renameMultiPageTab(all,'cash','card').error,/already/);
+ assert.match(renameMultiPageTab(all,'cash','  ').error,/name/);
+ assert.match(renameMultiPageTab(all,'btn','X').error,/tab/);
+ assert.deepEqual(moveMultiPageTab(all,'card',-1).map(x=>x.id).slice(0,3),['mp','card','cash']);
+ assert.equal(moveMultiPageTab(all,'cash',-1),all,'first tab cannot move left');
+});
+test('builder: a shape already outside its container moves from where it is (no jump)',async()=>{
+ const {reachableMoveArea,translateCanvasSelection}=await import('../src/core/builders/PageBuilder/canvasSelectionInteractions.ts');
+ const {canvasBoundPosition}=await import('../src/core/pages/PageRuntime/pageCanvas.ts');
+ const original={x:1152,y:426,width:120,height:40};
+ const area=reachableMoveArea({width:560,height:380},original);
+ assert.deepEqual(area,{width:1272,height:466});
+ assert.deepEqual(canvasBoundPosition({...original,x:1160},area,false),{x:1152,y:426},'cannot go further out');
+ assert.deepEqual(canvasBoundPosition({...original,x:1100,y:400},area,false),{x:1100,y:400});
+ const parts=[{id:'mp',type:'X',label:'c',properties:{},position:{x:0,y:0,width:560,height:380}},
+  {id:'b',type:'X',label:'b',properties:{layoutParentId:'mp'},position:original}];
+ const moved=translateCanvasSelection(parts,['b'],-40,-20,area);
+ assert.deepEqual(moved[1].position,{...original,x:1112,y:406});
+});
+test('builder: data previews redraw only when what they show changed',async()=>{
+ const {sameBuilderBinding}=await import('../src/core/builders/PageBuilder/builderBindingMemo.ts');
+ const properties={a:1};
+ const component={id:'x',type:'T',label:'L',visible:true,properties,position:{x:0,y:0,width:1,height:1}};
+ const base={builderPreview:true,component,pageComponents:[component],availableFlows:[1],onNavigate:()=>1};
+ assert.equal(sameBuilderBinding(base,{...base,component:{...component,position:{x:9,y:9,width:1,height:1}},
+  pageComponents:[{...component,position:{x:9,y:9,width:1,height:1}}],availableFlows:[1],onNavigate:()=>2}),true);
+ assert.equal(sameBuilderBinding(base,{...base,component:{...component,properties:{a:2}}}),false);
+ assert.equal(sameBuilderBinding({...base,builderPreview:false},{...base,builderPreview:false}),false,'never in the live page');
+});

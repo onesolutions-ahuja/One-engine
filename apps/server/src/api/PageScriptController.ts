@@ -7,12 +7,14 @@ import type {ObjectDefinitionService} from '../system-files/object-definition.js
 import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js';
 import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
+import {registerPublishedCodeBuilder} from '../page-compiler/source/publishedPageCodeSetup.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
 import {readLiveRelay,relayChanges,type LiveRelay} from '../system-support/live-changes.js';
 import type {GuestAccessService} from '../system-support/guest-access-service.js';
 import type {ScreenPairingService} from '../system-support/screen-pairing-service.js';
+
 
 /**
  * Compiled page scripts (Page Builder Preview).
@@ -129,6 +131,7 @@ export async function issueAppPageScript(deps:PageScriptDeps,actor:{tenant_id:st
 }
 
 export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
+  registerPublishedCodeBuilder(deps.definitions);
  // Page code (v2). The build is the server's own copy of the saved/published page
  // (or this user's own Preview of unsaved edits); the browser names only the action.
  const codeBuild=async(actor:{tenant_id:string;user_id:string},appId:string,body:Record<string,unknown>)=>{

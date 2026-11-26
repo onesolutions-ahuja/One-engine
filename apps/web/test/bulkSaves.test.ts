@@ -5,11 +5,17 @@ import {compileActionFormula} from '../../server/src/page-compiler/code/generate
 const code=(formula:string)=>JSON.stringify(compileActionFormula(formula,'Cart'));
 
 test('FOREACH saves whose result is not used are queued for one bulk save',()=>{
+ // A body of saves only is now set-based: one statement per step, never one save per row.
  const loop=code('=ACTIONS(FOREACH(CartLine, "CartId", @ThisRecord.Id, AS(line), UPDATERECORD(CartLine, line.Id, "Qty", 0)))');
- assert.match(loop,/\$\.updateLater\(/);
+ assert.match(loop,/\$\.updateWhere\(/);
  assert.doesNotMatch(loop,/\$\.update\(/);
  const created=code('=ACTIONS(FOREACH(CartLine, "CartId", @ThisRecord.Id, AS(line), CREATERECORD(SaleLine, "Name", line.Name)))');
- assert.match(created,/\$\.createLater\(/);
+ assert.match(created,/\$\.createFrom\(/);
+ assert.doesNotMatch(created,/createLater/);
+ // A body that also reads keeps the loop, and its saves are still queued for one bulk save.
+ const queued=code('=ACTIONS(FOREACH(CartLine, "CartId", @ThisRecord.Id, AS(line), ACTIONS(GETRECORD(Product, Id, line.Product, AS(p)), UPDATERECORD(CartLine, line.Id, "Qty", p.Stock))))');
+ assert.match(queued,/\$\.updateLater\(/);
+ assert.doesNotMatch(queued,/\$\.updateWhere\(/);
 });
 
 test('saves outside a loop, or whose result is used, stay single saves',()=>{

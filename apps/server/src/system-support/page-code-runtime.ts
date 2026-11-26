@@ -338,11 +338,58 @@ class ServerScope{
   this.forget(object);
   this.pending.push({kind:'create',object,values});
  }
- async updateLater(object:string,id:unknown,pairs:Array<[string,unknown]>){
+   async updateLater(object:string,id:unknown,pairs:Array<[string,unknown]>){
   if(typeof id!=='string'||!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
   const values=this.values(pairs);
   this.forget(object);
   this.pending.push({kind:'update',object,id,values});
+ }
+ /**
+  * FOREACH(Object) whose body only saves, as ONE statement per step: the matching rows are
+  * read once (same access check as $.list), each row's values are worked out in JavaScript,
+  * then saved through the same bulk path flush() uses for loop saves.
+  */
+ async createFrom(object:string,criteria:Array<[string,unknown]>,
+  fields:Array<[string,(row:Row)=>unknown]>){
+  await this.flush();
+  const rows=await this.list(object,criteria);
+  if(!rows.length)return;
+  this.forget(object);
+  for(const row of rows)this.pending.push({kind:'create',object,values:this.rowValues(fields,row)});
+  await this.flush();
+ }
+ /** FOREACH(Object) UPDATERECORD(item.Id, …): one bulk update, in one transaction. */
+ async updateWhere(object:string,criteria:Array<[string,unknown]>,
+  fields:Array<[string,(row:Row)=>unknown]>){
+  await this.flush();
+  const rows=await this.list(object,criteria);
+  if(!rows.length)return;
+  this.forget(object);
+  for(const row of rows){
+   const id=String(row.Id??'');
+   if(!uuid.test(id))throw Error('UPDATERECORD needs a record Id');
+   this.pending.push({kind:'update',object,id,values:this.rowValues(fields,row)});
+  }
+  await this.flush();
+ }
+ /** FOREACH(Object) DELETERECORD(item.Id): the record engine's own remove, once per row. */
+ async removeWhere(object:string,criteria:Array<[string,unknown]>){
+  await this.flush();
+  const rows=await this.list(object,criteria);
+  for(const row of rows){
+   const id=String(row.Id??'');
+   if(!uuid.test(id))throw Error('DELETERECORD needs a record Id');
+   await this.remove(object,id);
+  }
+ }
+ /** Field values worked out for one row of a set-based loop (field names checked). */
+ private rowValues(fields:Array<[string,(row:Row)=>unknown]>,row:Row):Row{
+  const values:Row=Object.create(null);
+  for(const [field,make] of fields){
+   if(!key.test(field))throw Error('Invalid field '+field);
+   values[field]=make(row);
+  }
+  return {...values};
  }
  /** Save the queued loop saves: each run of the same save on one Object is one bulk save. */
  async flush(){

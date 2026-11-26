@@ -52,6 +52,8 @@ type Scope={
  reads:Set<string>;
  /** AS(x) name -> the record set its GETRECORD row comes from. */
  aliasSets?:Map<string,string>;
+ /** A set-based FOREACH binds its item to the callback parameter instead of v[item]. */
+ aliasCode?:Map<string,string>;
 };
 
 export function parseFormula(source:string):Expression{
@@ -135,6 +137,9 @@ function reference(path:string,scope:Scope):string{
   fail('Invalid event reference @'+path);
  }
  if(scope.aliases.has(parts[0])){
+  // Inside a set-based FOREACH the loop item is the callback parameter (item), not v[item].
+  const bound=scope.aliasCode?.get(parts[0]);
+  if(bound!==undefined)return parts.length===1?bound:'$.f('+bound+', '+q(parts.slice(1).join('.'))+')';
   if(parts.length===1)return 'v['+q(parts[0])+']';
   return '$.f(v['+q(parts[0])+'], '+q(parts.slice(1).join('.'))+')';
  }
@@ -205,6 +210,87 @@ function noteSet(object:string,pairs:readonly Expression[],scope:Scope):string|n
  const key=object+'|'+criteria.map(c=>c.field+'='+c.js).join('&')+(parent?'|'+parent.field+'<'+parent.key:'');
  if(!scope.sets.some(set=>set.key===key))scope.sets.push({key,object,criteria,...(parent?{parent}:{})});
  return key;
+}
+
+/* ---------------- set-based FOREACH ---------------- */
+/** A page value (@ThisPage…, @ThisTenant…); a component's live value is browser only. */
+function isPageValue(path:string):boolean{
+ try{const page=pageReference(path);return Boolean(page)&&page!.kind!=='selected';}
+ catch{return false;}
+}
+/** Values a batched loop may use: the loop item, constants, page values and variables
+ * assigned before the loop. Anything else keeps today's loop. */
+function itemValueOnly(node:Expression,alias:string,scope:ActionScope):boolean{
+ if(node.kind==='literal')return true;
+ if(node.kind==='reference'){
+  const root=node.value.split('.')[0];
+  if(root===alias)return true;
+  if(root!==alias&&scope.aliases.has(root))return true;
+  return isPageValue(node.value);
+ }
+ if(node.kind==='unary')return itemValueOnly(node.value,alias,scope);
+ if(node.kind==='binary')return itemValueOnly(node.left,alias,scope)&&itemValueOnly(node.right,alias,scope);
+ if(node.kind==='call'){
+  const entry=formulaEntry(node.name);
+  if(!entry||entry.kind==='aggregate'||entry.kind==='action')return false;
+  return node.args.every(arg=>itemValueOnly(arg,alias,scope));
+ }
+ return false;
+}
+/** The loop body's steps in order (ACTIONS folded in), or null when a step is not a save. */
+function loopSaveSteps(node:Expression,into:Expression[]=[]):Expression[]|null{
+ if(node.kind==='literal'&&(node.value===''||node.value===null))return into;
+ if(node.kind==='call'&&node.name==='ACTIONS'){
+  for(const arg of node.args)if(!loopSaveSteps(arg,into))return null;
+  return into;
+ }
+ if(node.kind!=='call'||!['CREATERECORD','UPDATERECORD','DELETERECORD'].includes(node.name))return null;
+ into.push(node);
+ return into;
+}
+/**
+ * FOREACH(Object, …) whose whole body saves rows -> ONE call per step, in order:
+ *   CREATERECORD -> $.createFrom(Object, criteria, [[field, (item)=>value], …])
+ *   UPDATERECORD -> $.updateWhere(Object, criteria, …)  when the id is the item's Id
+ *   DELETERECORD -> $.removeWhere(Object, criteria)     when the id is the item's Id
+ * Anything else (GETRECORD, IF on item values, CALLOUT, EMAIL, PRINT, SCREEN, AS used
+ * later) returns null, so the loop is generated exactly as before.
+ */
+function setBasedSteps(body:Expression,object:string,criteria:string,alias:string,
+ scope:ActionScope):string[]|null{
+ void object;
+ const steps=loopSaveSteps(body);
+ if(!steps||!steps.length)return null;
+ const bound=new Map(scope.aliasCode??[]);
+ bound.set(alias,'item');
+ const valueScope:ActionScope={...scope,aliasCode:bound};
+ const lines:string[]=[];
+ for(const step of steps){
+  const args=[...(step as Extract<Expression,{kind:'call'}>).args];
+  const name=(step as Extract<Expression,{kind:'call'}>).name;
+  const target=literalName(args.shift(),name+' Object');
+  if(name!=='CREATERECORD'){
+   const id=args.shift();
+   if(id?.kind!=='reference'||id.value!==alias+'.Id')return null;
+  }
+  const last=args.at(-1);
+  if(last?.kind==='call'&&last.name==='AS')return null;
+  if(args.length%2)return null;
+  const fields:string[]=[];
+  for(let i=0;i<args.length;i+=2){
+   const field=literalName(args[i],'field API name');
+   if(!itemValueOnly(args[i+1],alias,scope))return null;
+   fields.push('['+q(field)+', function (item) { return '+expression(args[i+1],valueScope)+'; }]');
+  }
+  if(name!=='DELETERECORD'&&!fields.length)return null;
+  scope.data=true;scope.writes.add(target);
+  lines.push(name==='CREATERECORD'
+   ?'await $.createFrom('+q(target)+', '+criteria+', ['+fields.join(', ')+']);'
+   :name==='UPDATERECORD'
+    ?'await $.updateWhere('+q(target)+', '+criteria+', ['+fields.join(', ')+']);'
+    :'await $.removeWhere('+q(target)+', '+criteria+');');
+ }
+ return lines;
 }
 
 export function expression(node:Expression,scope:Scope):string{
@@ -368,8 +454,13 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    }
    const object=literalName(args.shift(),'FOREACH Object');
    if(args.length%2)fail('FOREACH needs Field, value pairs');
+   const criteria=criteriaCode(args,scope,'FOREACH');
    scope.data=true;scope.reads.add(object);noteSet(object,args,scope);
-   return ['for (const item of await $.list('+q(object)+', '+criteriaCode(args,scope,'FOREACH')+')) {',
+   // A loop whose whole body is CREATERECORD / UPDATERECORD / DELETERECORD becomes ONE call per
+   // step: the server reads the matching rows once and saves them in one bulk statement.
+   const batched=setBasedSteps(body,object,criteria,alias,scope);
+   if(batched)return batched;
+   return ['for (const item of await $.list('+q(object)+', '+criteria+')) {',
     '  v['+q(alias)+'] = item;',...indent(stepCode(body,inner)),'}'];
   }
   case 'SCREEN':{

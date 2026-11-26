@@ -72,3 +72,20 @@ export async function readPageCodeFile(client:SqlClient,tenantId:string,pageApi:
   [tenantId,pageApi,variant,version,path]);
  return found.rows.length?String(found.rows[0].content):null;
 }
+
+/** The newest code version of a page layout with all its files (what the app runs from). */
+export async function latestPageCodeVersion(client:SqlClient,tenantId:string,pageApi:string,variant:string):
+ Promise<{version:number;pageRevision:number|null;files:Record<string,string>}|null>{
+ const head=await client.query(
+  `SELECT version,page_revision FROM md_page_code_versions WHERE tenant_id=$1 AND page_api=$2 AND layout_variant=$3
+   ORDER BY version DESC LIMIT 1`,[tenantId,pageApi,variant]);
+ if(!head.rows.length)return null;
+ const version=Number(head.rows[0].version);
+ const found=await client.query(
+  `SELECT path,content FROM md_page_code_version_files
+   WHERE tenant_id=$1 AND page_api=$2 AND layout_variant=$3 AND version=$4`,[tenantId,pageApi,variant,version]);
+ const files:Record<string,string>={};
+ for(const row of found.rows)files[String(row.path)]=String(row.content);
+ const revision=head.rows[0].page_revision;
+ return {version,pageRevision:revision===null||revision===undefined?null:Number(revision),files};
+}

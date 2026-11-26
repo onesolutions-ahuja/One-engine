@@ -1,6 +1,6 @@
 import type {PageComponentLike,SourceIssue} from './generatePageSource.js';
 
-/** Style properties that go to the .css file (and never to the TSX props, unless they are formulas). */
+/** Style properties that go to the .css file when their value reads back exactly. */
 export const STYLE_KEYS=['backgroundColor','labelColor','borderColor','radius','textSize','headerBold',
  'labelAlignment','shadow'] as const;
 
@@ -18,67 +18,72 @@ export const isFormula=(value:unknown):value is string=>typeof value==='string'&
 
 const SHADOWS:Record<string,string>={small:'0 1px 4px #0002',medium:'0 3px 9px #0003',large:'0 8px 20px #0003',none:'none'};
 /** A CSS value must not be able to leave its declaration. */
-const SAFE_VALUE=/^[^;{}<>\\\r\n\u2028\u2029]*$/;
+const SAFE_VALUE=/^[^;{}<>\\\r\n\u2028\u2029:]*$/;
+const cleanText=(v:unknown):v is string=>typeof v==='string'&&v!==''&&v===v.trim()&&!isFormula(v)&&SAFE_VALUE.test(v);
+const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
+const fromPx=(v:string):number|undefined=>{const m=/^(-?\d+(?:\.\d+)?)px$/.exec(v.trim());return m?Number(m[1]):undefined;};
 
-function px(value:unknown):string|null{
- const n=typeof value==='number'?value:typeof value==='string'&&value.trim()!==''?Number(value):NaN;
- return Number.isFinite(n)?n+'px':null;
+/**
+ * Look properties <-> CSS declarations. A value is written to the .css file only when
+ * reading the file back gives the SAME value (so the app can run from the files and a
+ * developer can change a colour in the .css). Anything else stays a prop in the .tsx.
+ */
+type StyleRule={key:string;css:string;write:(v:unknown)=>string|null;read:(css:string)=>unknown};
+export const STYLE_RULES:StyleRule[]=[
+ {key:'backgroundColor',css:'background',write:v=>cleanText(v)?v:null,read:v=>v},
+ {key:'labelColor',css:'color',write:v=>cleanText(v)?v:null,read:v=>v},
+ {key:'borderColor',css:'border',write:v=>cleanText(v)?'1px solid '+v:null,
+  read:v=>v.startsWith('1px solid ')?v.slice('1px solid '.length):undefined},
+ {key:'radius',css:'border-radius',write:v=>finite(v)?v+'px':null,read:fromPx},
+ {key:'textSize',css:'font-size',write:v=>finite(v)?v+'px':null,read:fromPx},
+ {key:'headerBold',css:'font-weight',write:v=>v===true?'700':null,read:v=>v==='700'?true:undefined},
+ {key:'labelAlignment',css:'text-align',write:v=>cleanText(v)?v:null,read:v=>v},
+ {key:'shadow',css:'box-shadow',write:v=>typeof v==='string'&&Object.prototype.hasOwnProperty.call(SHADOWS,v)?SHADOWS[v]:null,
+  read:v=>Object.keys(SHADOWS).find(name=>SHADOWS[name]===v)}
+];
+export const POSITION_RULES:Array<{key:string;css:string}>=[
+ {key:'x',css:'left'},{key:'y',css:'top'},{key:'width',css:'width'},{key:'height',css:'height'}];
+
+/** Which properties / position parts of a component the .css file holds. */
+export function cssStyleKeys(c:PageComponentLike):{properties:Set<string>;position:Set<string>}{
+ const props=propsOf(c);
+ const properties=new Set(STYLE_RULES.filter(rule=>rule.write(props[rule.key])!==null).map(rule=>rule.key));
+ const position=c.position&&typeof c.position==='object'?c.position as Record<string,unknown>:{};
+ return {properties,position:new Set(POSITION_RULES.filter(rule=>finite(position[rule.key])).map(rule=>rule.key))};
+}
+
+/** One class per component (c-<name>; a repeated name gets -2, -3, …), in page order. */
+export function classNames(components:readonly PageComponentLike[]):Map<PageComponentLike,string>{
+ const used=new Set<string>(),out=new Map<PageComponentLike,string>();
+ for(const c of components){
+  if(!c||typeof c!=='object')continue;
+  const base='c-'+safeName(componentName(c)||'component');
+  let name=base,n=1;
+  while(used.has(name))name=base+'-'+(++n);
+  used.add(name);out.set(c,name);
+ }
+ return out;
 }
 
 export function generatePageCss(input:{
  header:string;pageClass:string;canvasWidth?:number;canvasHeight?:number;components:PageComponentLike[];
 },issues:SourceIssue[]):string{
+ void issues;
  const lines:string[]=[input.header];
  const page:string[]=['position:relative'];
- const w=px(input.canvasWidth),h=px(input.canvasHeight);
- if(w)page.push('width:'+w);
- if(h)page.push('height:'+h);
- lines.push('.page-'+input.pageClass+'{'+page.join(';')+';}');
-
- const seen=new Set<string>();
+ if(finite(input.canvasWidth))page.push('width:'+input.canvasWidth+'px');
+ if(finite(input.canvasHeight))page.push('height:'+input.canvasHeight+'px');
+ lines.push('.page-'+input.pageClass+' { '+page.join('; ')+'; }');
+ const classes=classNames(input.components);
  for(const c of input.components){
   if(!c||typeof c!=='object')continue;
-  const name=componentName(c),props=propsOf(c);
-  const cls=safeName(name);
-  if(seen.has(cls))issues.push({componentName:name,message:'Duplicate component name: styles are shared'});
-  seen.add(cls);
+  const props=propsOf(c),keys=cssStyleKeys(c);
   const d:string[]=[];
-  const pos=c.position;
-  if(pos&&typeof pos==='object'){
-   d.push('position:absolute');
-   for(const [css,key] of [['left','x'],['top','y'],['width','width'],['height','height']] as const){
-    const v=(pos as Record<string,unknown>)[key];
-    if(v===undefined)continue;
-    const p=px(v);
-    if(p)d.push(css+':'+p);else issues.push({componentName:name,message:'Position not written: '+key});
-   }
-  }
-  const text=(key:string,css:string,make:(v:string)=>string=v=>v)=>{
-   const v=props[key];
-   if(v===undefined||v===null||v===''||isFormula(v))return;
-   if(typeof v!=='string'||!SAFE_VALUE.test(v)){issues.push({componentName:name,message:'Style not written: '+key});return;}
-   d.push(css+':'+make(v.trim()));
-  };
-  const size=(key:string,css:string)=>{
-   const v=props[key];
-   if(v===undefined||v===null||v===''||isFormula(v))return;
-   const p=px(v);
-   if(p)d.push(css+':'+p);else issues.push({componentName:name,message:'Style not written: '+key});
-  };
-  text('backgroundColor','background');
-  text('labelColor','color');
-  text('borderColor','border',v=>'1px solid '+v);
-  size('radius','border-radius');
-  size('textSize','font-size');
-  if(props.headerBold===true)d.push('font-weight:700');
-  text('labelAlignment','text-align');
-  const shadow=props.shadow;
-  if(typeof shadow==='string'&&!isFormula(shadow)&&shadow!==''){
-   if(Object.prototype.hasOwnProperty.call(SHADOWS,shadow))d.push('box-shadow:'+SHADOWS[shadow]);
-   else issues.push({componentName:name,message:'Style not written: shadow'});
-  }
-  if(d.length)lines.push('.c-'+cls+'{'+d.join(';')+';}');
+  const position=c.position&&typeof c.position==='object'?c.position as Record<string,unknown>:{};
+  if(keys.position.size)d.push('position: absolute');
+  for(const rule of POSITION_RULES)if(keys.position.has(rule.key))d.push(rule.css+': '+position[rule.key]+'px');
+  for(const rule of STYLE_RULES)if(keys.properties.has(rule.key))d.push(rule.css+': '+rule.write(props[rule.key]));
+  if(d.length)lines.push('.'+classes.get(c)+' { '+d.join('; ')+'; }');
  }
  return lines.join('\n')+'\n';
 }
-

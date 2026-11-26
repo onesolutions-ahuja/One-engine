@@ -8,8 +8,7 @@ import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js'
 import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import {registerPublishedCodeBuilder} from '../page-compiler/source/publishedPageCodeSetup.js';
-import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,PACKAGE_VARIANT} from '../page-compiler/source/appPackage.js';
-import {recordPublishedPageCode} from '../page-compiler/source/publishedPageCode.js';
+import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,appPackageIssues,PACKAGE_VARIANT} from '../page-compiler/source/appPackage.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
@@ -380,8 +379,8 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
    JOIN md_apps a ON a.id=m.app_id WHERE m.tenant_id=$1 AND COALESCE(m.api_name,a.api_name)=$2`,[tenantId,appApi]);
   return rows[0]?.enabled===true;
  };
- // Publish code for a whole app without republishing any page: rebuilds the package and
- // stores a code version (the developer files) of every screen in it.
+ // Publish code for a whole app without republishing any page: every screen without code
+ // files gets them (a code version), and the package is rebuilt from the code files.
  app.post('/api/apps/:appId/package/rebuild',wrap(async(req,res)=>{
   const actor=authenticated(req),appId=String(req.params.appId);
   if(!api.test(appId))throw new Error('Invalid app');
@@ -389,18 +388,8 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+appId,'read');
   const hash=await deps.pages.rebuildAppPackage(actor.tenant_id,appId);
   const found=hash?await latestAppPackage(deps.db,actor.tenant_id,appId):null;
-  const versions:Record<string,number|null>={};
-  if(found)await deps.db.transaction(async()=>{
-   for(const [key,page] of Object.entries(found.pages)){
-    const variant=String(page.layoutVariant??'Desktop') as 'Desktop'|'Tablet'|'Mobile'|'Custom';
-    const pageApi=String(page.apiName??key.split('.')[0]);
-    if(!['Desktop','Tablet','Mobile','Custom'].includes(variant)||!api.test(pageApi))continue;
-    versions[key]=await recordPublishedPageCode(deps.db,{tenantId:actor.tenant_id,pageApi,variant,
-     actor:actor.user_id,loadPage:async()=>page});
-   }
-  });
   res.setHeader('Cache-Control','private, no-store');
-  res.json({hash:found?.hash??'',screens:Object.keys(found?.pages??{}),versions});
+  res.json({hash:found?.hash??'',screens:Object.keys(found?.pages??{}),issues:appPackageIssues(actor.tenant_id,appId)});
  }));
  app.post('/api/pages/:apiName/script-ticket',wrap(async(req,res)=>{
   const actor=authenticated(req);

@@ -34,25 +34,27 @@ test('file list',()=>{
   ['Home.tsx','Home.css','Home.formulas.ts','Home.actions.ts','Home.data.ts','manifest.json']);
 });
 test('deterministic',()=>{assert.deepEqual(run().files,run().files);});
-test('button nested in container, css position copied',()=>{
+test('one <Smart> per component in page order, the parent named, css position copied',()=>{
  const tsx=file('Home.tsx');
- const open=tsx.indexOf('name="Box"'),button=tsx.indexOf('name="PayButton"'),close=tsx.indexOf('</Smart>');
- assert.ok(open>=0&&button>open&&button<close,'button must sit inside Box');
- assert.match(file('Home.css'),/\.c-PayButton\{[^}]*left:15px;top:25px;/);
+ const box=tsx.indexOf('name="Box"'),button=tsx.indexOf('name="PayButton"');
+ assert.ok(box>=0&&button>box,'page order kept');
+ assert.match(tsx,/name="PayButton"[^\n]*layoutParentId="c1"/);
+ assert.match(file('Home.css'),/\.c-PayButton \{[^}]*left: 15px; top: 25px;/);
 });
 test('formula, action and unknown formula',()=>{
  const tsx=file('Home.tsx');
- assert.ok(tsx.includes("text={f['c3:text']}"));
- assert.ok(tsx.includes("onClick={a['c2:click']}"));
+ assert.ok(tsx.includes('text={f["c3:text"]}'));
+ assert.ok(tsx.includes('onClick={a["c2:click"]}'));
+ assert.match(file('Home.formulas.ts'),/"c3:text": \{\n    source: "=SUM\(1,2\)",\n    run: \(row, \$\) => 3/);
  const issues=run().issues.filter(i=>i.message.startsWith('Formula not converted'));
  assert.equal(issues.length,1);
  assert.equal(issues[0].componentName,'BadText');
 });
 test('css mapping',()=>{
  const css=file('Home.css');
- assert.match(css,/\.c-Box\{[^}]*background:#ffffff;[^}]*border-radius:8px;[^}]*box-shadow:0 3px 9px #0003;/);
- assert.match(css,/\.c-PayButton\{[^}]*color:#112233;[^}]*font-size:14px;/);
- assert.match(css,/\.c-TotalText\{[^}]*border:1px solid #cccccc;[^}]*font-weight:700;/);
+ assert.match(css,/\.c-Box \{[^}]*background: #ffffff;[^}]*border-radius: 8px;[^}]*box-shadow: 0 3px 9px #0003;/);
+ assert.match(css,/\.c-PayButton \{[^}]*color: #112233;[^}]*font-size: 14px;/);
+ assert.match(css,/\.c-TotalText \{[^}]*border: 1px solid #cccccc;[^}]*font-weight: 700;/);
 });
 test('generated files parse with esbuild',()=>{
  for(const f of run().files)if(/\.(tsx|ts)$/.test(f.path))

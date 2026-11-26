@@ -31,8 +31,7 @@ export async function recordPublishedPageCode(client:SqlClient,input:{
   const pageRevision=Number.isInteger(loaded.revision)?Number(loaded.revision):null;
   const {pageCode,moduleText}=await builder(input.tenantId,loaded);
   const source=generatePageSource({appApi,pageApi:input.pageApi,variant:input.variant,
-   page:{canvasWidth:loaded.canvasWidth,canvasHeight:loaded.canvasHeight,layoutMode:loaded.layoutMode,
-    components:Array.isArray(loaded.components)?loaded.components:[]},
+   page:{...(loaded as Record<string,unknown>),components:Array.isArray(loaded.components)?loaded.components:[]},
    pageCode,pageCodeModuleText:moduleText});
   const version=await recordPageCodeVersion(client,{tenantId:input.tenantId,pageApi:input.pageApi,variant:input.variant,
    appApi,pageRevision,actorId:input.actor??null,source});

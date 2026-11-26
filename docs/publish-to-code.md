@@ -1,29 +1,36 @@
 # Publish to code (how it works)
 
 Publishing a page writes its code files; an app with **Run app from published code** on
-(App Manager) runs ONLY from those files.
+(App Manager) runs ONLY from those files - on the device and on the server.
 
-Per page layout (`page_code` versions, last 10 kept, newest runs):
+## Files of a page layout (newest version runs; the last 10 are kept)
 - `<page>.tsx` - the screen: one `<Smart id type name className …props />` per component, page order.
 - `<page>.css` - positions (`left/top/width/height`) and look (`background`, `color`, `border`,
   `border-radius`, `font-size`, `font-weight`, `text-align`, `box-shadow`).
 - `<page>.formulas.ts` - every display formula: `source` (the formula) and `run` (its code).
-- `<page>.actions.ts` - every action: `flow` (as set in Page Builder) and `run` (its code).
+- `<page>.actions.ts` - every action: `flow` (as set in Page Builder) and `run` (its code). The
+  device runs `run` at once; the server runs the SAME `run` in one transaction.
 - `<page>.data.ts` - record sets the screen holds. `manifest.json` - page settings.
+- Extra `*.ts` helper files may be added next to them and imported (`import {x} from './helpers'`).
 
-Lossless: `readPageSource(generatePageSource(page))` gives the page back (test: pageSourceRoundTrip).
+In an action: the record API (`$.getRecord/$.create/$.update/…`: access checks, history and
+live updates) or plain SQL in the same transaction: `await $.sql('… WHERE tenant_id = $1', [$.tenantId])`
+(plain SQL does not check record access or announce live changes).
 
-App package (`md_app_packages`): every screen's files bundled by esbuild into one file the
-device keeps; screens per layout chosen by the page routes' own rules. The device runs
-`Page()` and the formulas/actions code (`screenFromCode`). The server never runs the files:
-it reads them as data and builds the plan and its own copy of each action from each `flow`.
+## The code folder on the server (OCI)
+Set `UNE_PAGE_CODE_ROOT` to a folder on a disk kept across deploys (e.g. `/srv/une-code`):
+- `<root>/<company>/<APP>/pages/<page>/<layout>/` - the code the app runs: edit here.
+- `<root>/<company>/<APP>/versions/<page>/<layout>/vN/` - last 10 versions (copy one back to restore).
+A saved edit is checked (builds for device and server, page compiles) and becomes the newest
+version in ~1 s; the app runs it at once. If refused, `ERRORS.txt` in that folder says why and
+the app keeps the last good code. Publishing from Page Builder writes new files over an edit.
+The database keeps the same versions (also without the folder).
 
-Developer edits: `GET /api/metadata/pages/:page/code-versions[/:v/file?path=]`,
-`POST /api/metadata/pages/:page/code-versions` `{variant, baseVersion, files:{path:content}}`
-(saved as the newest version, checked, app rebuilt), `POST …/code-versions/:v/restore`.
-Publishing from Page Builder writes new files over an edit (restore it from the last 10).
-`POST /api/apps/:app/package/rebuild` builds code for every screen of an app (no republish).
-
-Limits: an edited `run` changes what the device does at once; the database work is always
-the server's own copy built from `flow` (tenant code never runs on the shared server). CSS
-other than the declarations above is reported and not used.
+## Inside
+Lossless: `readPageSource(generatePageSource(page))` gives the page back (test pageSourceRoundTrip).
+App package (`md_app_packages`): every screen's files bundled by esbuild into one file the device
+keeps; screens per layout chosen by the page routes' own rules; the device runs `Page()` and the
+formulas/actions (`screenFromCode`). The server builds each screen's plan from the page read back
+from the files and loads the screen's `.actions.ts`/`.data.ts` (`serverCodeFromFiles`).
+API: `GET /api/metadata/pages/:page/code-versions[/:v/file?path=]`, `POST …/code-versions`
+`{variant, baseVersion, files}`, `POST …/code-versions/:v/restore`, `POST /api/apps/:app/package/rebuild`.

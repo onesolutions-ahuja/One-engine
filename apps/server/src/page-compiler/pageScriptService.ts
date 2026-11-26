@@ -1,7 +1,8 @@
 import {createHash,randomBytes} from 'node:crypto';
 import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} from './compilePage.js';
 import {generatePageScript} from './generatePageScript.js';
-import {buildPageCode,pageCodeModule,serverPageCode,type PageCode,type ServerPageCode} from './code/pageCode.js';
+import {buildPageCode,pageCodeModule,serverPageCode,PAGE_CODE_VERSION,type PageCode,type ServerPageCode} from './code/pageCode.js';
+import {serverCodeFromFiles} from './source/serverPageCodeFromFiles.js';
 
 /**
  * Server-built page scripts.
@@ -153,6 +154,30 @@ export class PageScriptService{
   if(this.appBuilds.size>=MAX_BUILT)this.appBuilds.delete(this.appBuilds.keys().next().value!);
   this.appBuilds.set(buildId,built);
   return {buildId,built};
+ }
+ /**
+  * A published screen built from its CODE FILES (publish to code): the server runs the page's
+  * own .actions.ts / .data.ts, the same code the device runs. `compiled` is the plan the
+  * server compiled from the page read back from the same files.
+  */
+ async buildAppPageFromCode(tenantId:string,appId:string,compiled:CompiledPage,files:Record<string,string>,pageApi:string):Promise<{buildId:string}>{
+  if(!apiNamePattern.test(pageApi))throw new Error('Invalid page API name');
+  const {serverCode,actions:codeActions,codeText}=await serverCodeFromFiles(files,pageApi);
+  const hash=createHash('sha256').update(codeText).update('\u0000').update(JSON.stringify(compiled)).digest('base64url');
+  const buildId=createHash('sha256').update([tenantId,appId,'code',hash].join('\u0000')).digest('base64url').slice(0,32);
+  const hit=this.appBuilds.get(buildId);
+  if(hit){this.appBuilds.delete(buildId);this.appBuilds.set(buildId,hit);return {buildId};}
+  const actions=new Map<string,CompiledServerAction>();
+  for(const component of compiled.components)for(const action of component.actions)
+   if(action.kind==='ActionPlan'&&!action.error&&action.formula)
+    actions.set(component.id+':'+action.event,{formula:action.formula,
+     serverDataSteps:action.serverDataSteps,totalSteps:action.totalSteps});
+  const built={revision:compiled.revision,code:'',etag:'"c.'+hash.slice(0,24)+'"',objectStamp:'',compiled,actions,
+   pageCode:{version:PAGE_CODE_VERSION,formulas:[],actions:codeActions,recordSets:[],issues:[]},serverCode,
+   tenantId,appId,apiName:pageApi};
+  if(this.appBuilds.size>=MAX_BUILT)this.appBuilds.delete(this.appBuilds.keys().next().value!);
+  this.appBuilds.set(buildId,built);
+  return {buildId};
  }
  /** A published build by id alone (the id already binds tenant + app + code). */
  publishedBuild(appId:string,buildId:string):(Built&{apiName:string})|null{

@@ -148,6 +148,26 @@ class ServerScope{
    guests?:Pick<GuestAccessService,'link'>}={}){}
  /** Seconds REPEAT has waited in this action. */
  private slept=0;
+ /** The signed-in company, for hand-written SQL ($.sql): `WHERE tenant_id = $1` with $.tenantId. */
+ get tenantId():string{return this.actor.tenant_id;}
+ get userId():string{return this.actor.user_id;}
+ /**
+  * Plain SQL in a page's code (written by the people who run the server), inside this
+  * action's ONE transaction: `await $.sql('SELECT … WHERE tenant_id = $1', [$.tenantId])`.
+  * Rows come back as objects. Queued record saves are written first, so the SQL sees them.
+  * It is plain SQL: it does not check the user's record access and does not announce live
+  * changes (use the record API for those).
+  */
+ async sql(text:unknown,params:unknown=[]):Promise<Row[]>{
+  if(typeof text!=='string'||!text.trim())throw Error('$.sql needs the SQL text');
+  if(!Array.isArray(params))throw Error('$.sql parameters must be a list');
+  const db=this.services.db;
+  if(!db)throw Error('$.sql is not available here');
+  await this.flush();
+  for(const object of [...this.reads.keys()].map(id=>id.split('\u0000')[0]))this.forget(object);
+  const result=await db.query(text,params);
+  return result.rows as Row[];
+ }
  /** Messages are sent after the transaction commits (never for a rolled-back save). */
  readonly messages:Array<{channel:CommunicationChannel;credential:string;values:unknown[]}>=[];
  get sessionId(){return this.request.sessionId;}

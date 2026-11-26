@@ -6,7 +6,8 @@ import {expandAppProperties} from '../system-support/app-page-seeder.js';
 import type { SqlPersistence } from './sql-persistence.js';
 import {PageLayoutVersionRuntime,runtimeLayoutVariant,type PageLayoutVariant} from './page-layout-version-runtime.js';
 import {recordPublishedPageCode} from '../page-compiler/source/publishedPageCode.js';
-import {rebuildAppPackage,appsWithPackagedPage,type AppPackageResolver} from '../page-compiler/source/appPackage.js';
+import {rebuildAppPackage,appsWithPackagedPage,latestAppPackage,type AppPackageResolver} from '../page-compiler/source/appPackage.js';
+import {mirrorPagesSoon,pageCodeRoot} from '../page-compiler/source/pageCodeFolder.js';
 
 type PropRow=MetadataValueRow;
 type NodeRow={component_key:string;component_type:string;label:string;region:string;visible:boolean};
@@ -147,6 +148,7 @@ export class PageRuntime {
   async publishLayout(tenantId:string,pageApi:string,variant:PageLayoutVariant,expected?:number,actor?:string){
     // One transaction: the publish and its generated code version commit together.
     // Publish to code never blocks a publish: its own failures are logged and skipped.
+    const rebuilt:string[]=[];
     await this.db.transaction(async()=>{
       await this.layouts.publish(tenantId,pageApi,variant,expected,actor);
       await recordPublishedPageCode(this.db,{tenantId,pageApi,variant,actor,
@@ -160,8 +162,11 @@ export class PageRuntime {
       // ...and every app whose package already holds this page (e.g. a popup it opens).
       for(const appApi of await appsWithPackagedPage(this.db,tenantId,pageApi).catch(()=>[]))apps.add(appApi);
       for(const appApi of apps)await rebuildAppPackage(this.db,{tenantId,appApi,resolver:this.appPackageResolver(tenantId,appApi)});
+      rebuilt.push(...apps);
     });
     this.invalidatePublishedCache(tenantId,pageApi);
+    // The code folder on the server gets the new files (after the save is committed).
+    await this.mirrorCode(tenantId,rebuilt,[pageApi]);
     return this.metadata(tenantId,pageApi,variant);
   }
   async rollbackLayout(tenantId:string,pageApi:string,variant:PageLayoutVariant,version:number,actor?:string){
@@ -391,7 +396,19 @@ export class PageRuntime {
   }
   /** Build and store the app's package now (App Manager switch on, or "publish code" for an app). */
   async rebuildAppPackage(tenantId:string,appApi:string):Promise<string|null>{
-    return this.db.transaction(()=>rebuildAppPackage(this.db,{tenantId,appApi,resolver:this.appPackageResolver(tenantId,appApi)}));
+    const hash=await this.db.transaction(()=>rebuildAppPackage(this.db,{tenantId,appApi,resolver:this.appPackageResolver(tenantId,appApi)}));
+    await this.mirrorCode(tenantId,[appApi],[]);
+    return hash;
+  }
+  /** Write the code of these pages, and of every screen in these apps, to the server's code folder. */
+  private async mirrorCode(tenantId:string,apps:readonly string[],pagesToo:readonly string[]):Promise<void>{
+    if(!pageCodeRoot())return;
+    const list=new Set(pagesToo);
+    for(const appApi of new Set(apps)){
+      const found=await latestAppPackage(this.db,tenantId,appApi).catch(()=>null);
+      for(const screen of Object.values(found?.pages??{}))list.add(screen.pageApi);
+    }
+    mirrorPagesSoon(this.db,tenantId,list);
   }
   async resolveInScreenPage(tenantId:string,appId:string,pageApi:string,device:string,pageType:'In-Screen Page'|'Print Template'='In-Screen Page'):
     Promise<Awaited<ReturnType<PageRuntime['load']>>|null>{

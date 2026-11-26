@@ -89,7 +89,8 @@ export function generatePageTsx(input:{
    if(prop==='layoutParentId'&&typeof value==='string'&&nameOfId.has(value)){
     attrs.push(elementAttr('parent',nameOfId.get(value)!));continue;
    }
-   if(isFormula(value)){
+   // A list's data source (TABLE(@Order, …)) is a setting the list reads, not a formula to run.
+   if(isFormula(value)&&!/^=\s*TABLE\s*\(/i.test(value)){
     const ref=input.formulaRefs.get(id+'\u0000'+prop);
     if(ref!==undefined){attrs.push(attr(prop,ref));continue;}
     issues.push({componentName:componentName(c),message:'Formula not converted: '+prop});

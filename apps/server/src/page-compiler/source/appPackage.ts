@@ -1,4 +1,6 @@
 import {readNames,uiImports} from './pageCodeNames.js';
+import {auditPageCode} from './pageCodeAudit.js';
+import {PAGE_CODE_CONVERTER} from './generatePageSource.js';
 import {createHash} from 'node:crypto';
 import {build,type Plugin} from 'esbuild';
 import {compilePage,type CompiledPage,type CompilerObject,type CompilerPage} from '../compilePage.js';
@@ -89,11 +91,11 @@ export async function appPackagePageApis(client:SqlClient,tenantId:string,appId:
  return found.rows.map(row=>String(row.api_name));
 }
 
-/** Pages a page opens by name: SCREEN(name, …) in any of its formulas. */
+/** Pages a page opens by name: SCREEN(name, …) and PRINT(name, …) in any of its formulas. */
 export function screenTargets(page:unknown):string[]{
  const text=JSON.stringify((page as {components?:unknown})?.components??[]);
  const names=new Set<string>();
- for(const match of text.matchAll(/SCREEN\(\s*(?:\\?["'])?([A-Za-z][A-Za-z0-9_]*)/g))names.add(match[1]);
+ for(const match of text.matchAll(/\b(?:SCREEN|PRINT)\(\s*(?:\\?["'])?([A-Za-z][A-Za-z0-9_]*)/g))names.add(match[1]);
  return [...names];
 }
 
@@ -162,7 +164,10 @@ async function screenFiles(client:SqlClient,tenantId:string,key:string,published
  if(!SAFE_PAGE.test(pageApi)||!VARIANTS.has(variant))return null;
  const revision=Number.isInteger(published.revision)?Number(published.revision):null;
  let latest=await latestPageCodeVersion(client,tenantId,pageApi,variant);
- if(!latest||(revision!==null&&latest.pageRevision!==null&&latest.pageRevision<revision)){
+ // Files written by an older converter are written again from the published page.
+ let converter=0;
+ try{converter=Number(JSON.parse(latest?.files['manifest.json']??'{}').converter)||0;}catch{converter=0;}
+ if(!latest||converter<PAGE_CODE_CONVERTER||(revision!==null&&latest.pageRevision!==null&&latest.pageRevision<revision)){
   await recordPublishedPageCode(client,{tenantId,pageApi,variant:variant as 'Desktop',loadPage:async()=>published});
   latest=await latestPageCodeVersion(client,tenantId,pageApi,variant);
   if(!latest)throw new Error('Code files could not be made: '+(publishedPageCodeError(tenantId,pageApi,variant)||'unknown'));
@@ -256,7 +261,9 @@ export async function buildAppPackage(client:SqlClient,input:{tenantId:string;ap
    // The server runs the screen's own actions: they must build for the server too.
    await serverCodeFromFiles(found.files,found.pageApi);
    screens.push({key,...found,page:read.page as PackageScreen['page'],plan,issues:read.issues});
-   if(read.issues.length)issues[key]=read.issues;
+   // Everything not converted to plain code is reported ([] = this screen is fully code).
+   const notCode=[...read.issues,...auditPageCode(found.files,found.pageApi)];
+   if(notCode.length)issues[key]=notCode;
   }catch(error){issues[key]=[error instanceof Error?error.message:String(error)];}
  }
  if(!screens.length)return {code:'',hash:'',pages:[],pagesJson:'{}',issues};

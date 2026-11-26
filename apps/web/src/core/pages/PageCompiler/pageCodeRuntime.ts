@@ -12,7 +12,7 @@ import {formulaShape} from '../../../component-libraries/shared/formulaCodeLooku
  *
  * There is no formula interpreter here: every formula is already JavaScript.
  */
-import {F,O,aggregateRows,fieldValue,rowMatches} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
+import {F,O,aggregateRows,fieldValue,rowMatches,toPairs} from '../../../../../server/src/page-compiler/code/formulaLibrary.js';
 import {readComponentState,readComponentProperty,uiProperty,uiPropertyValue,withComponentProperties,COMPONENT_PROPERTIES} from '../../../../../server/src/expression-engine/FormulaComponentState.js';
 import {COMPONENT_VALUES} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {isConnected} from '../../../../../server/src/expression-engine/FormulaConnections.js';
@@ -29,7 +29,7 @@ type Row=Record<string,unknown>;
 type Criteria=Array<[string,unknown]>;
 type Request=<T>(path:string,init?:RequestInit)=>Promise<T>;
 export type PageCodeAction={data:boolean;reads:string[];writes:string[];ui:string[];run:(scope:unknown)=>Promise<void>};
-export type PageCodeSet={key:string;object:string;parent?:{key:string;field:string};criteria:(scope:unknown)=>Criteria};
+export type PageCodeSet={key:string;object:string;parent?:{key:string;field:string};criteria:(scope:unknown)=>Criteria|Record<string,unknown>};
 export type PageCode={formulas:Record<string,(row:Row,scope:unknown)=>unknown>;sources:Record<string,string>;
  actions:Record<string,PageCodeAction>;recordSets:PageCodeSet[]};
 export type PageCodeModule={codeVersion?:number;createCode?:(f:typeof F,o:typeof O)=>PageCode};
@@ -102,8 +102,49 @@ export type PageCodeHost={
 /** Parent key of a set held for the rows of an Object the page shows (generateCode SHOWN_ROWS). */
 const SHOWN_ROWS='@shown:';
 
+/**
+ * Record sets every open screen of this device shares: a popup (Pay) opens with the rows the
+ * till already holds (the open sale), so its first step needs no server trip. Only sets whose
+ * rows do not depend on the screen itself (signed-in session, device, till, user) are shared;
+ * each screen still reads its own sets from the server right after it opens.
+ */
+const sharedSets=new Map<string,{rows:Row[];complete:boolean}>();
+const SCREEN_OWN=/\$\.(?:componentState|state|pageValue|component|property|event|row)\b|@shown:/;
+const shareable=(set:PageCodeSet|undefined,byKey:ReadonlyMap<string,PageCodeSet>):boolean=>{
+ for(let at=set,hops=0;at&&hops<5;at=at.parent?byKey.get(at.parent.key):undefined,hops++){
+  if(SCREEN_OWN.test(at.key))return false;
+  if(at.parent&&!byKey.has(at.parent.key))return false;
+ }
+ return Boolean(set);
+};
+class HeldSets extends Map<string,{rows:Row[];complete:boolean}>{
+ private readonly byKey:ReadonlyMap<string,PageCodeSet>;
+ /** Shared per app and session: another app or another sign-in never sees these rows. */
+ private readonly scope:()=>string;
+ constructor(code:PageCode,host:PageCodeHost){
+  super();
+  this.byKey=new Map(code.recordSets.map(set=>[set.key,set]));
+  this.scope=()=>host.endpoint+'\u0000'+host.sessionId()+'\u0000';
+  for(const set of code.recordSets){
+   const held=shareable(set,this.byKey)?sharedSets.get(this.scope()+set.key):undefined;
+   if(held?.complete)super.set(set.key,held);
+  }
+ }
+ set(key:string,value:{rows:Row[];complete:boolean}){
+  super.set(key,value);
+  // (Map's constructor calls set before the fields exist: nothing is shared then.)
+  if(this.byKey&&value?.complete&&shareable(this.byKey.get(key),this.byKey)){
+   if(sharedSets.size>200)sharedSets.clear();
+   sharedSets.set(this.scope()+key,value);
+  }
+  return this;
+ }
+}
+/** Tests: forget the rows shared between screens. */
+export function forgetSharedSets(){sharedSets.clear();}
+
 export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
- const sets=new Map<string,{rows:Row[];complete:boolean}>();
+ const sets=new HeldSets(code,host);
  /** Taps sent and not yet answered, in tap order. An answer is the saved state up to its own
   * tap: the predictions of taps still waiting are put back on top, so fast taps never step
   * back (5, 6, 7, 8 never shows 5 again) and the next tap counts from the newest number. */
@@ -297,7 +338,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   connected(name:unknown){return isConnected(identity()?.connections as never,name);}
   verifyPin():never{return notHeld('VERIFYPIN is checked on the server');}
   /** Rows of `object` matching `criteria`, from a held set that has ALL of them. */
-  rows(object:string,criteria:Criteria):Row[]{
+  rows(object:string,where:unknown):Row[]{
+   const criteria=toPairs(where);
    // By Id: one row, exact if this page holds it anywhere.
    const byId=criteria.find(([field])=>field==='Id');
    if(byId){
@@ -308,14 +350,14 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     if(set.object!==object)continue;
     const held=sets.get(set.key);
     if(!held?.complete)continue;
-    const needs=set.criteria(this);
+    const needs=toPairs(set.criteria(this));
     if(!needs.every(([field,value])=>criteria.some(([f,v])=>f===field&&same(v,value))))continue;
     if(set.parent?.key.startsWith(SHOWN_ROWS)){
      // Held for the rows the page showed when loaded: another row (new category) is read again.
      const wanted=criteria.find(([field])=>field===set.parent!.field);
      if(!wanted||!shownCoverage.get(set.key)?.has(String(wanted[1]??''))){api.shownChanged();continue;}
     }else if(set.parent){
-     const parentIds=new Set(this.rows(byKey.get(set.parent.key)!.object,byKey.get(set.parent.key)!.criteria(this))
+     const parentIds=new Set(this.rows(byKey.get(set.parent.key)!.object,toPairs(byKey.get(set.parent.key)!.criteria(this)))
       .map(row=>String(row.Id??'')));
      const wanted=criteria.find(([field])=>field===set.parent!.field);
      if(!wanted||!parentIds.has(String(wanted[1]??'')))continue;
@@ -329,7 +371,14 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    }
    return notHeld('Rows of '+object+' are not on this page',object,criteria);
   }
-  agg(kind:string,object:string,field:string,criteria:Criteria){
+  /** COUNTIFS / SUMIFS / … as the page code writes them: $.count(Object, where), $.sum(Object, field, where). */
+  count(object:string,where:unknown){return this.agg('COUNTIFS',object,'',where);}
+  sum(object:string,field:string,where:unknown){return this.agg('SUMIFS',object,field,where);}
+  average(object:string,field:string,where:unknown){return this.agg('AVERAGEIFS',object,field,where);}
+  min(object:string,field:string,where:unknown){return this.agg('MINIFS',object,field,where);}
+  max(object:string,field:string,where:unknown){return this.agg('MAXIFS',object,field,where);}
+  agg(kind:string,object:string,field:string,where:unknown){
+   const criteria=toPairs(where);
    try{return aggregateRows(kind,this.rows(object,criteria),field);}
    catch(error){
     // Display: totals over rows this page does not hold come from the server (one
@@ -338,8 +387,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     return serverAggregate(kind,object,field,criteria);
    }
   }
-  async getRecord(object:string,criteria:Criteria){return this.rows(object,criteria)[0]??{};}
-  async list(object:string,criteria:Criteria){return this.rows(object,criteria);}
+  async getRecord(object:string,where:unknown){return this.rows(object,where)[0]??{};}
+  async list(object:string,where:unknown){return this.rows(object,where);}
   private write(object:string,id:string,row:Row|null){
    let map=this.overlay.get(object);
    if(!map){map=new Map();this.overlay.set(object,map);}
@@ -356,7 +405,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    }
    return notHeld('Row '+id+' of '+object+' is not on this page',object);
   }
-  async create(object:string,pairs:Criteria){
+  async create(object:string,given:unknown){
+   const pairs=toPairs(given);
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    const id=optimisticIdPrefix(this.batch)+String(++this.created).padStart(4,'0');
    const row:Row={Id:id,CreatedAt:new Date().toISOString(),...Object.fromEntries(pairs.map(([key,value])=>[key,mapValue(value)]))};
@@ -364,7 +414,8 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    this.changes.push({objectApiName:object,operation:'create',record:row});
    return row;
   }
-  async update(object:string,id:unknown,pairs:Criteria){
+  async update(object:string,id:unknown,given:unknown){
+   const pairs=toPairs(given);
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    const key=savedId(String(id));
    const row={...this.current(object,key)!,...Object.fromEntries(pairs.map(([name,value])=>[name,mapValue(value)]))};
@@ -374,14 +425,16 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
   }
   /** Loop saves whose result is not used: here the same as create/update (the server
    * saves them together). */
-  async createLater(object:string,pairs:Criteria){await this.create(object,pairs);}
-  async updateLater(object:string,id:unknown,pairs:Criteria){await this.update(object,id,pairs);}
+  async createLater(object:string,given:unknown){await this.create(object,given);}
+  async updateLater(object:string,id:unknown,given:unknown){await this.update(object,id,given);}
   /** A batched FOREACH (set-based loop): the same saves the server makes, over the loop's rows. */
-  async createFrom(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
+  async createFrom(object:string,rows:readonly Row[],given:unknown){
+   const fields=toPairs<(row:Row)=>unknown>(given);
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    for(const row of rows)await this.create(object,await rowPairs(fields,row));
   }
-  async updateWhere(object:string,rows:readonly Row[],fields:Array<[string,(row:Row)=>unknown]>){
+  async updateWhere(object:string,rows:readonly Row[],given:unknown){
+   const fields=toPairs<(row:Row)=>unknown>(given);
    if(this.mode!=='tap')throw Error('Formulas cannot save records');
    for(const row of rows)await this.update(object,row.Id,await rowPairs(fields,row));
   }
@@ -415,7 +468,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
    const local=overlay.get(set.object);
    const held=sets.get(set.key);
    if(!local||!held)continue;
-   const criteria=set.criteria(scope);
+   const criteria=toPairs(set.criteria(scope));
    const rows=new Map(held.rows.map(row=>[String(row.Id),row]));
    for(const [id,row] of local){
     if(row&&rowMatches(row,criteria))rows.set(id,row);
@@ -578,7 +631,7 @@ export function createPageCodeRuntime(code:PageCode,host:PageCodeHost){
     const held=sets.get(set.key);
     if(!held)continue;
     let criteria:Criteria;
-    try{criteria=set.criteria(scope);}catch{continue;}
+    try{criteria=toPairs(set.criteria(scope));}catch{continue;}
     const parentIds=set.parent?.key.startsWith(SHOWN_ROWS)?shownCoverage.get(set.key)
      :set.parent?new Set((sets.get(set.parent.key)?.rows??[]).map(row=>String(row.Id??''))):null;
     const belongs=(row:Row)=>rowMatches(row,criteria)&&(!set.parent||Boolean(parentIds?.has(String(row[set.parent.field]??''))));

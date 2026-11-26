@@ -137,6 +137,11 @@ class StandaloneScope{
  connected(name:unknown){return isConnected(identity()?.connections as never,name);}
  verifyPin():never{throw new FormulaNotHere('VERIFYPIN is checked on the server');}
  agg(_kind:string,object:string):never{throw new FormulaNotHere('Totals of '+object+' come from the page code');}
+ count(object:string):never{return this.agg('COUNTIFS',object);}
+ sum(object:string):never{return this.agg('SUMIFS',object);}
+ average(object:string):never{return this.agg('AVERAGEIFS',object);}
+ min(object:string):never{return this.agg('MINIFS',object);}
+ max(object:string):never{return this.agg('MAXIFS',object);}
 }
 
 const cache=new Map<string,FormulaFunction|FormulaCodeError>();

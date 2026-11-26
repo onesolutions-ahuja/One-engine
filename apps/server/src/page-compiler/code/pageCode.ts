@@ -13,8 +13,8 @@
  * The code is generated from the page metadata in SQL (the master copy) on save
  * / publish and cached per page revision. The Builder never edits this code.
  */
-import type {CompiledPage} from '../compilePage.js';
-import {ACTION_KEY_MARK,compileActionFormula,compileActionNode,compileDisplayFormula,FormulaCodeError,type RecordSetNeed} from './generateCode.js';
+import {COMPILED_OBJECTS,type CompiledPage} from '../compilePage.js';
+import {ACTION_KEY_MARK,withFieldTypes,compileActionFormula,compileActionNode,compileDisplayFormula,FormulaCodeError,type RecordSetNeed} from './generateCode.js';
 import {F,O} from './formulaLibrary.js';
 
 export const PAGE_CODE_VERSION=2;
@@ -102,7 +102,13 @@ export function assertCodeParses(js:string):string{
  return js;
 }
 
+/** A list's data source formula (TABLE(@Order, @Order.Name, …)), kept as written. */
+export const DATA_SOURCE=/^\s*=?\s*TABLE\s*\(/i;
 export function buildPageCode(compiled:CompiledPage):PageCode{
+ // Field types (number, text, true/false, date) let the code be plain JavaScript.
+ return withFieldTypes(COMPILED_OBJECTS.get(compiled),()=>buildPageCodeTyped(compiled));
+}
+function buildPageCodeTyped(compiled:CompiledPage):PageCode{
  const formulas:PageCodeFormula[]=[],actions:PageCodeAction[]=[],issues:PageCodeIssue[]=[];
  const sets:RecordSetNeed[]=[];
  const addSets=(found:readonly RecordSetNeed[])=>{for(const set of found)if(!sets.some(s=>s.key===set.key))sets.push(set);};
@@ -110,6 +116,8 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
   const object=component.objectApiName??'';
   for(const formula of component.formulas){
    if(formula.property.startsWith('actionFlows.'))continue;
+   // TABLE(@Object, …) is a list's data source: the list reads its rows itself (not a value).
+   if(DATA_SOURCE.test(formula.source))continue;
    try{
     const code=compileDisplayFormula(formula.source,object);
     assertCodeParses(code.js);
@@ -124,6 +132,15 @@ export function buildPageCode(compiled:CompiledPage):PageCode{
   for(const action of component.actions){
    const source=action.formula??'';
    if(action.kind!=='Formula'&&action.kind!=='ActionPlan'&&action.kind!=='PageState'&&action.kind!=='Navigate')continue;
+   // A Page Builder navigation (dock, menu: open a page, a list, the app home): it runs on
+   // this device as code, the same navigation the button did before.
+   if(action.kind==='Navigate'&&!source.trim()){
+    const binding=Object.fromEntries(Object.entries(action.binding??{}).filter(([field])=>field.startsWith('navigation')));
+    if(Object.keys(binding).length)actions.push({key:component.id+':'+action.event,componentId:component.id,event:action.event,
+     objectApiName:object,js:assertCodeParses('async ($) => {\n  await $.ui("OPEN", '+q(binding)+');\n}'),
+     data:false,reads:[],writes:[],ui:['OPEN']});
+    continue;
+   }
    if(!source.trim())continue;
    // One action and its answer branches go in together or not at all.
    const actionsBefore=actions.length;
@@ -198,7 +215,7 @@ export function createCode(F, O) {
 }
 export type ServerPageCode={
  actions:Record<string,{data:boolean;reads:string[];writes:string[];ui:string[];run:(scope:unknown)=>Promise<void>}>;
- recordSets:Array<{key:string;object:string;parent?:{key:string;field:string};criteria:(scope:unknown)=>Array<[string,unknown]>}>;
+ recordSets:Array<{key:string;object:string;parent?:{key:string;field:string};criteria:(scope:unknown)=>Array<[string,unknown]>|Record<string,unknown>}>;
 };
 /** The server's own copy of the page code (built from the saved page, never from the browser). */
 export function serverPageCode(code:PageCode):ServerPageCode{

@@ -22,7 +22,7 @@ import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildc
 import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
 import {uiProperty} from '../../expression-engine/FormulaComponentState.js';
 import {asBoolean,formulaEntry,isBooleanCode,truth} from './formulaDictionary.js';
-import {isIdentifier} from '../source/pageCodeNames.js';
+import {isIdentifier,objectKey} from '../source/pageCodeNames.js';
 import {parseActionFormulaAssignment} from '../pageCompilerSupport.js';
 
 const q=(value:unknown)=>JSON.stringify(value);
@@ -55,7 +55,117 @@ type Scope={
  aliasSets?:Map<string,string>;
  /** A set-based FOREACH binds its item to the callback parameter instead of v[item]. */
  aliasCode?:Map<string,string>;
+ /** AS(x) name -> the Object its row is (GETRECORD, FOREACH, CREATERECORD), for field types. */
+ aliasObjects?:Map<string,string>;
 };
+
+/* ---------------- field types: plain JavaScript where the type is known ---------------- */
+/** What a value is: a number field, text, true/false, a date, or not known (page values). */
+export type ValueKind='number'|'text'|'boolean'|'date'|'any';
+/** How a value is used: as a value (blank -> ""), in maths (blank -> 0), or as it is (blank checks). */
+type Want='value'|'number'|'raw';
+type FieldTypes=(object:string,field:string)=>ValueKind;
+let FIELD_TYPES:FieldTypes|null=null;
+const DATA_KIND:Record<string,ValueKind>={number:'number',currency:'number',percent:'number',integer:'number',decimal:'number',
+ double:'number',boolean:'boolean',checkbox:'boolean',date:'date',datetime:'date',string:'text',text:'text',textarea:'text',
+ longtext:'text',richtext:'text',email:'text',phone:'text',url:'text',picklist:'text',reference:'text',lookup:'text',
+ masterdetail:'text',id:'text',encryptedtext:'text',autonumber:'text'};
+const SYSTEM_KIND:Record<string,ValueKind>={Id:'text',Name:'text',OwnerId:'text',RecordTypeId:'text',CreatedAt:'date',
+ LastModifiedDate:'date',CreatedDate:'date'};
+/** Run `make` with the page's Object fields known (their types decide plain JavaScript). */
+export function withFieldTypes<T>(objects:ReadonlyArray<{apiName:string;fields?:ReadonlyArray<{apiName:string;dataType?:string}>}>|null|undefined,
+ make:()=>T):T{
+ const byObject=new Map<string,Map<string,ValueKind>>();
+ for(const object of objects??[]){
+  const fields=new Map<string,ValueKind>();
+  for(const field of object.fields??[])fields.set(field.apiName,DATA_KIND[String(field.dataType??'').toLowerCase()]??'any');
+  byObject.set(object.apiName,fields);byObject.set(object.apiName.toLowerCase(),fields);
+ }
+ const before=FIELD_TYPES;
+ FIELD_TYPES=(object,field)=>byObject.get(object)?.get(field)??byObject.get(object.toLowerCase())?.get(field)
+  ??SYSTEM_KIND[field]??'any';
+ try{return make();}finally{FIELD_TYPES=before;}
+}
+const fieldKind=(object:string,field:string):ValueKind=>
+ object&&FIELD_TYPES?FIELD_TYPES(object,field):SYSTEM_KIND[field]??'any';
+const IDENT=/^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const access=(base:string,field:string)=>base+(IDENT.test(field)?'?.'+field:'?.['+q(field)+']');
+/** A field of a row or a named record (sc.Total, row.Name): its code as it is and its type. */
+function fieldOf(path:string,scope:Scope):{code:string;kind:ValueKind}|null{
+ const parts=path.split('.');
+ if(parts.length!==2||parts.some(part=>!/^[A-Za-z_][A-Za-z0-9_]*$/.test(part)))return null;
+ const [root,field]=parts;
+ if(scope.aliases.has(root)){
+  const bound=scope.aliasCode?.get(root);
+  return {code:access(bound??'v['+q(root)+']',field),kind:fieldKind(scope.aliasObjects?.get(root)??'',field)};
+ }
+ if(root===scope.rowObject&&root!=='ThisPage'&&root!=='ThisTenant')
+  return {code:access(scope.row,field),kind:fieldKind(scope.rowObject,field)};
+ if(root==='record'&&!scope.aliases.has('record'))return {code:access('$.event("record")',field),kind:'any'};
+ return null;
+}
+/** A value as it is used: blank -> "" as a value, -> 0 in maths. */
+function wanted(code:string,kind:ValueKind,want:Want,blankable:boolean):string{
+ if(want==='raw')return code;
+ if(want==='number'){
+  if(kind==='number')return blankable?'('+code+' ?? 0)':code;
+  return 'Number('+code+' || 0)';
+ }
+ return blankable?'('+code+' ?? "")':code;
+}
+const NUMBER_FUNCTIONS=new Set(['ROUND','ROUNDUP','ROUNDDOWN','ABS','MAX','MIN','VALUE','LEN','INT','MOD','CEILING','FLOOR',
+ 'SUM','HOUR','MINUTE','SECOND','DAY','MONTH','YEAR','WEEKDAY','FIND','SQRT','POWER','EXP','LN','LOG','LOG10','TRUNC']);
+const DATE_FUNCTIONS=new Set(['TODAY','NOW','DATE','DATEVALUE','DATETIMEVALUE','ADDMONTHS','ADDDAYS']);
+const BOOLEAN_FUNCTIONS=/^(IS[A-Z]+|CONTAINS|BEGINS|ENDS|STARTSWITH|ENDSWITH|INCLUDES)$/;
+/** What an expression gives, when the converter can know it. */
+function kindOf(node:Expression,scope:Scope):ValueKind{
+ switch(node.kind){
+  case 'literal':return typeof node.value==='number'?'number':typeof node.value==='boolean'?'boolean'
+   :typeof node.value==='string'?(/^\d{4}-\d{2}-\d{2}/.test(node.value)?'any':'text'):'any';
+  case 'reference':{
+   const field=fieldOf(node.value,scope);
+   if(field)return field.kind;
+   return node.value==='ThisPage.Session.Id'?'text':'any';
+  }
+  case 'unary':return node.operator==='NOT'?'boolean':kindOf(node.value,scope)==='date'?'any':'number';
+  case 'binary':{
+   if(node.operator==='&')return 'text';
+   if(COMPARISONS.has(node.operator)||node.operator==='AND'||node.operator==='OR')return 'boolean';
+   const l=kindOf(node.left,scope),r=kindOf(node.right,scope);
+   return l==='date'||r==='date'?'any':'number';
+  }
+  case 'call':{
+   const entry=formulaEntry(node.name);
+   if(entry?.kind==='aggregate')return 'number';
+   if(TEXT_FUNCTIONS.has(node.name))return 'text';
+   if(NUMBER_FUNCTIONS.has(node.name))return 'number';
+   if(DATE_FUNCTIONS.has(node.name))return 'date';
+   if(BOOLEAN_FUNCTIONS.test(node.name)||['AND','OR','NOT'].includes(node.name))return 'boolean';
+   if(node.name==='IF'){
+    const a=node.args[1]?kindOf(node.args[1],scope):'any',b=node.args[2]?kindOf(node.args[2],scope):a;
+    return a===b?a:'any';
+   }
+   if(node.name==='BLANKVALUE'||node.name==='NULLVALUE'){
+    const a=node.args[0]?kindOf(node.args[0],scope):'any';
+    return a==='any'&&node.args[1]?kindOf(node.args[1],scope):a;
+   }
+   return 'any';
+  }
+ }
+}
+/** A test (IF, AND, OR, NOT) as plain JavaScript: true/false values as they are; a Checkbox
+ * field is `x === true`; anything else is true for true, 1 or "true" (formula truth). */
+function condition(node:Expression,scope:Scope):string{
+ if(node.kind==='reference'){
+  const field=fieldOf(node.value,scope);
+  if(field&&field.kind==='boolean'){scope.references.add(node.value);return asBoolean('('+field.code+' === true)');}
+ }else if(kindOf(node,scope)==='boolean'){
+  const code=expression(node,scope);
+  return isBooleanCode(code)||node.kind==='literal'?code:asBoolean('('+code+' === true)');
+ }
+ return asBoolean('[true, 1, "true"].includes('+expression(node,scope)+')');
+}
+
 
 export function parseFormula(source:string):Expression{
  const body=source.trim();
@@ -164,7 +274,9 @@ function aggregateCall(node:Extract<Expression,{kind:'call'}>,scope:Scope):strin
  const criteria=criteriaCode(pairs,scope,node.name);
  scope.reads.add(object);
  noteSet(object,pairs,scope);
- const call='$.agg('+q(node.name)+', '+q(object)+', '+q(valueField)+', '+criteria+')';
+ const method=({COUNTIFS:'count',SUMIFS:'sum',AVERAGEIFS:'average',MINIFS:'min',MAXIFS:'max'} as Record<string,string>)[node.name];
+ const call=method?'$.'+method+'('+q(object)+', '+(hasValue?q(valueField)+', ':'')+criteria+')'
+  :'$.agg('+q(node.name)+', '+q(object)+', '+q(valueField)+', '+criteria+')';
  return scope.async?'(await '+call+')':call;
 }
 function criteriaCode(pairs:readonly Expression[],scope:Scope,label:string):string{
@@ -174,9 +286,9 @@ function criteriaCode(pairs:readonly Expression[],scope:Scope,label:string):stri
   const field=literalName(pairs[i],label+' field',fieldPath);
   if(seen.has(field))fail('Duplicate field '+field);
   seen.add(field);
-  out.push('['+q(field)+', '+expression(pairs[i+1],scope)+']');
+  out.push(objectKey(field)+': '+expression(pairs[i+1],scope));
  }
- return '['+out.join(', ')+']';
+ return '{'+out.join(', ')+'}';
 }
 /** Parent key of a set held for the rows of an Object the page shows (`@shown:Product`). */
 export const SHOWN_ROWS='@shown:';
@@ -284,14 +396,15 @@ function setBasedSteps(body:Expression,object:string,criteria:string,alias:strin
    const field=literalName(args[i],'field API name');
    if(!itemValueOnly(args[i+1],alias,scope))return null;
    // async: a value may await (BLANKVALUE, a lookup), exactly as in the loop it replaces.
-   fields.push('['+q(field)+', async function (item) { return '+expression(args[i+1],valueScope)+'; }]');
+   const code=expression(args[i+1],valueScope);
+   fields.push(objectKey(field)+': '+(code.includes('await ')?'async (item) => ':'(item) => ')+code);
   }
   if(name!=='DELETERECORD'&&!fields.length)return null;
   scope.data=true;scope.writes.add(target);
   lines.push(name==='CREATERECORD'
-   ?'  await $.createFrom('+q(target)+', rows, ['+fields.join(', ')+']);'
+   ?'  await $.createFrom('+q(target)+', rows, {'+fields.join(', ')+'});'
    :name==='UPDATERECORD'
-    ?'  await $.updateWhere('+q(target)+', rows, ['+fields.join(', ')+']);'
+    ?'  await $.updateWhere('+q(target)+', rows, {'+fields.join(', ')+'});'
     :'  await $.removeWhere('+q(target)+', rows);');
  }
  // Read once: a step that changes the loop's own rows (Status "Sold") never hides them
@@ -317,30 +430,67 @@ function asText(node:Expression,code:string):string{
  return 'O.s('+code+')';
 }
 
-export function expression(node:Expression,scope:Scope):string{
+export function expression(node:Expression,scope:Scope,want:Want='value'):string{
  switch(node.kind){
-  case 'literal':return node.value===null?'null':q(node.value);
-  case 'reference':return reference(node.value,scope);
+  case 'literal':
+   if(want==='number'&&typeof node.value!=='number')
+    return typeof node.value==='string'&&node.value.trim()&&Number.isFinite(Number(node.value))?String(Number(node.value))
+     :node.value===null||node.value===''?'0':'Number('+q(node.value)+')';
+   return node.value===null?'null':q(node.value);
+  case 'reference':{
+   const field=fieldOf(node.value,scope);
+   if(field){scope.references.add(node.value);return wanted(field.code,field.kind,want,true);}
+   const code=reference(node.value,scope);
+   return want==='number'?'Number('+code+' || 0)':code;
+  }
   case 'unary':
-   if(node.operator==='NOT')return asBoolean('(!'+truth(expression(node.value,scope))+')');
+   if(node.operator==='NOT')return asBoolean('(!'+condition(node.value,scope)+')');
+   if(node.operator==='-')return '(-'+expression(node.value,scope,'number')+')';
+   if(node.operator==='+')return expression(node.value,scope,'number');
    return 'O.u('+q(node.operator)+', '+expression(node.value,scope)+')';
   case 'binary':{
-   const left=expression(node.left,scope),right=expression(node.right,scope);
-   if(node.operator==='AND')return asBoolean('('+truth(left)+' && '+truth(right)+')');
-   if(node.operator==='OR')return asBoolean('('+truth(left)+' || '+truth(right)+')');
-   if(node.operator==='&')return '('+asText(node.left,left)+' + '+asText(node.right,right)+')';
-   const comparison=COMPARISONS.has(node.operator);
-   // = and <> against a plain value (a number, true/false, or text that is not a date and has
-   // no * ? ~) are plain === / !== : the formula gives exactly the same answer.
-   if((node.operator==='='||node.operator==='<>')&&(plainValue(node.left)||plainValue(node.right)))
-    return asBoolean('('+left+(node.operator==='='?' === ':' !== ')+right+')');
-   const wildcard=node.left.kind==='reference'&&isExcelWildcardDataReference(node.left.value);
-   const code='O.b('+q(node.operator)+', '+left+', '+right+(wildcard?', true, $.timeZone()':', false, $.timeZone()')+')';
-   return comparison?asBoolean(code):code;
+   if(node.operator==='AND')return asBoolean('('+condition(node.left,scope)+' && '+condition(node.right,scope)+')');
+   if(node.operator==='OR')return asBoolean('('+condition(node.left,scope)+' || '+condition(node.right,scope)+')');
+   if(node.operator==='&'){
+    const left=expression(node.left,scope),right=expression(node.right,scope);
+    const textual=(n:Expression,code:string)=>asText(n,code)===code||kindOf(n,scope)==='text';
+    return '('+(textual(node.left,left)||textual(node.right,right)?left:'String('+left+')')+' + '+right+')';
+   }
+   const kl=kindOf(node.left,scope),kr=kindOf(node.right,scope);
+   // "*cola*" matching applies only to = / <> on a record field.
+   const wildcard=['=','==','<>','!='].includes(node.operator)&&node.left.kind==='reference'
+    &&isExcelWildcardDataReference(node.left.value)&&!plainValue(node.right);
+   const helper=()=>{
+    const code='O.b('+q(node.operator)+', '+expression(node.left,scope)+', '+expression(node.right,scope)
+     +(wildcard?', true, $.timeZone()':', false, $.timeZone()')+')';
+    return COMPARISONS.has(node.operator)?asBoolean(code):code;
+   };
+   // Dates (date + days, date compares) and "*cola*" matches keep the formula's own rules.
+   if(kl==='date'||kr==='date'||wildcard)return helper();
+   if(node.operator==='='||node.operator==='<>'||node.operator==='=='||node.operator==='!='){
+    const op=node.operator==='='||node.operator==='=='?' === ':' !== ';
+    const filled=(n:Expression)=>plainValue(n)&&!(n.kind==='literal'&&n.value==='');
+    // Against a plain value (a number, true/false, text that is not a date, no * ? ~): as it is.
+    if(filled(node.right))return asBoolean('('+expression(node.left,scope,'raw')+op+expression(node.right,scope)+')');
+    if(filled(node.left))return asBoolean('('+expression(node.left,scope)+op+expression(node.right,scope,'raw')+')');
+    const w:Want=kl==='number'&&kr==='number'?'number':'value';
+    return asBoolean('('+expression(node.left,scope,w)+op+expression(node.right,scope,w)+')');
+   }
+   if(COMPARISONS.has(node.operator)){
+    // Numbers compare as numbers (a blank number counts as 0, as in a spreadsheet); text as text.
+    const w:Want=kl==='number'||kr==='number'?'number':'value';
+    return asBoolean('('+expression(node.left,scope,w)+' '+node.operator+' '+expression(node.right,scope,w)+')');
+   }
+   const ops:Record<string,string>={'+':'+','-':'-','*':'*','/':'/','%':'%','^':'**'};
+   if(ops[node.operator])
+    return '('+expression(node.left,scope,'number')+' '+ops[node.operator]+' '+expression(node.right,scope,'number')+')';
+   return helper();
   }
   case 'call':{
    const entry=formulaEntry(node.name);
    if(!entry)return fail(node.name+' is not in the formula dictionary');
+   const plain=plainCall(node,scope,want);
+   if(plain!==null){scope.functions.add(node.name);return plain;}
    if(node.args.length<entry.min||node.args.length>entry.max)
     fail('Invalid argument count for '+node.name+' (expected '+entry.min+'-'+entry.max+')');
    scope.functions.add(node.name);
@@ -348,11 +498,55 @@ export function expression(node:Expression,scope:Scope):string{
    if(entry.kind==='action')return fail(node.name+' is an action; use it in an action formula');
    if(entry.serverOnly&&!scope.async)fail(node.name+' runs on the server; use it in an action formula');
    const args=node.args.map(arg=>expression(arg,scope));
-   if(entry.kind==='inline'||entry.kind==='page')return entry.js!(args,{async:scope.async});
-   return 'F.'+node.name+'('+(entry.clock?['$',...args]:args).join(', ')+')';
+   const code=entry.kind==='inline'||entry.kind==='page'?entry.js!(args,{async:scope.async})
+    :'F.'+node.name+'('+(entry.clock?['$',...args]:args).join(', ')+')';
+   return want==='number'&&kindOf(node,scope)!=='number'?'Number('+code+' || 0)':code;
   }
  }
 }
+/** IF / AND / OR / NOT / ISBLANK / BLANKVALUE as plain JavaScript (null when not one of them). */
+function plainCall(node:Extract<Expression,{kind:'call'}>,scope:Scope,want:Want):string|null{
+ const args=node.args;
+ switch(node.name){
+  case 'IF':
+   if(args.length<2||args.length>3)return null;
+   return '('+condition(args[0],scope)+' ? '+expression(args[1],scope,want)+' : '
+    +(args[2]?expression(args[2],scope,want):want==='number'?'0':'false')+')';
+  case 'AND':case 'OR':
+   if(!args.length)return null;
+   return asBoolean('('+args.map(arg=>condition(arg,scope)).join(node.name==='AND'?' && ':' || ')+')');
+  case 'NOT':return args.length===1?asBoolean('(!'+condition(args[0],scope)+')'):null;
+  case 'MAX':case 'MIN':
+   // Numbers only: Math.max / Math.min (blank numbers count as 0).
+   if(!args.length||args.some(arg=>kindOf(arg,scope)!=='number'))return null;
+   return 'Math.'+node.name.toLowerCase()+'('+args.map(arg=>expression(arg,scope,'number')).join(', ')+')';
+  case 'ISBLANK':{
+   if(args.length!==1||args[0].kind!=='reference')return null;
+   const field=fieldOf(args[0].value,scope);
+   if(!field){
+    // A page value (@ThisPage.Till.Name): blank is "" or nothing.
+    const code=expression(args[0],scope);
+    return /^\$\.[A-Za-z]+\([^()]*\)$|^\$\.sessionId$/.test(code)?asBoolean('('+code+' == null || '+code+' === "")'):null;
+   }
+   scope.references.add(args[0].value);
+   return asBoolean(field.kind==='text'?'(!'+field.code+')':'('+field.code+' == null || '+field.code+' === "")');
+  }
+  case 'BLANKVALUE':case 'NULLVALUE':{
+   if(args.length!==2||args[0].kind!=='reference')return null;
+   const field=fieldOf(args[0].value,scope);
+   if(!field)return null;
+   scope.references.add(args[0].value);
+   const fallback=expression(args[1],scope,want==='number'?'number':'value');
+   const value=field.kind==='number'||field.kind==='boolean'||node.name==='NULLVALUE'
+    ?'('+field.code+' ?? '+fallback+')'
+    :field.kind==='text'?'('+field.code+' || '+fallback+')'
+     :'('+field.code+' == null || '+field.code+' === "" ? '+fallback+' : '+field.code+')';
+   return want==='number'&&field.kind!=='number'?'Number('+value+' || 0)':value;
+  }
+ }
+ return null;
+}
+
 
 export type CompiledFormulaCode={js:string;functions:string[];references:string[];sets:RecordSetNeed[];reads:string[]};
 /** A display formula -> `(row, $) => value`. */
@@ -363,9 +557,7 @@ export function compileDisplayFormula(source:string,rowObject=''):CompiledFormul
 export function compileDisplayNode(node:Expression,rowObject=''):CompiledFormulaCode{
  const scope:Scope={rowObject,row:'row',aliases:new Set(),async:false,functions:new Set(),references:new Set(),sets:[],reads:new Set()};
  const body=expression(node,scope);
- // O.out only checks a number is finite: text and true/false need no check.
- const plain=isBooleanCode(body)||(node.kind==='literal'&&typeof node.value==='string')||(node.kind==='binary'&&node.operator==='&');
- return {js:'(row, $) => '+(plain?body:'O.out('+body+')'),functions:[...scope.functions],references:[...scope.references],
+ return {js:'(row, $) => '+body,functions:[...scope.functions],references:[...scope.references],
   sets:scope.sets,reads:[...scope.reads]};
 }
 
@@ -415,11 +607,11 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
  const entry=formulaEntry(node.name);
  if(node.name==='IF'){
   if(node.args.length<2||node.args.length>3)fail('IF needs a test, a then-step and an else-step');
-  const test=expression(node.args[0],scope);
+  const test=condition(node.args[0],scope);
   const then=stepCode(node.args[1],scope),otherwise=node.args[2]?stepCode(node.args[2],scope):[];
   if(!then.length&&!otherwise.length)return [];
-  if(!then.length)return ['if (!'+truth(test)+') {',...indent(otherwise),'}'];
-  return ['if ('+truth(test)+') {',...indent(then),...(otherwise.length?['} else {',...indent(otherwise)]:[]),'}'];
+  if(!then.length)return ['if (!'+test+') {',...indent(otherwise),'}'];
+  return ['if ('+test+') {',...indent(then),...(otherwise.length?['} else {',...indent(otherwise)]:[]),'}'];
  }
  if(!entry||entry.kind!=='action')return fail(node.name+' is not an action step');
  if(node.args.length<entry.min||node.args.length>entry.max)
@@ -444,6 +636,7 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    scope.data=true;scope.reads.add(object);
    const set=noteSet(object,args,scope);
    if(set)scope.aliasSets!.set(alias,set);else scope.aliasSets!.delete(alias);
+   scope.aliasObjects?.set(alias,object);
    return ['v['+q(alias)+'] = await $.getRecord('+q(object)+', '+criteriaCode(args,scope,'GETRECORD')+');'];
   }
   case 'CREATERECORD':case 'UPDATERECORD':{
@@ -458,15 +651,16 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
     const field=literalName(args[i],'field API name');
     if(seen.has(field))fail('Duplicate field '+field);
     seen.add(field);
-    pairs.push('['+q(field)+', '+value(args[i+1])+']');
+    pairs.push(objectKey(field)+': '+value(args[i+1]));
    }
+   if(alias)scope.aliasObjects?.set(alias,object);
    scope.data=true;scope.writes.add(object);
    // Inside FOREACH, a save whose result is not used is queued: the server saves the
    // loop's saves together (one bulk save) before anything reads records again.
    const later=scope.loop&&!alias?'Later':'';
    const call=node.name==='CREATERECORD'
-    ?'await $.create'+later+'('+q(object)+', ['+pairs.join(', ')+'])'
-    :'await $.update'+later+'('+q(object)+', '+id+', ['+pairs.join(', ')+'])';
+    ?'await $.create'+later+'('+q(object)+', {'+pairs.join(', ')+'})'
+    :'await $.update'+later+'('+q(object)+', '+id+', {'+pairs.join(', ')+'})';
    return [(alias?'v['+q(alias)+'] = ':'')+call+';'];
   }
   case 'DELETERECORD':{
@@ -486,6 +680,7 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
    }
    const object=literalName(args.shift(),'FOREACH Object');
    if(args.length%2)fail('FOREACH needs Field, value pairs');
+   scope.aliasObjects?.set(alias,object);
    const criteria=criteriaCode(args,scope,'FOREACH');
    scope.data=true;scope.reads.add(object);noteSet(object,args,scope);
    // A loop whose whole body is CREATERECORD / UPDATERECORD / DELETERECORD becomes ONE call per
@@ -678,7 +873,7 @@ export function compileActionNode(root:Expression,rowObject='',source='',
  assignment:ReturnType<typeof parseActionFormulaAssignment>=null):CompiledActionCode{
  const aliases=new Set<string>();
  const scope:ActionScope={rowObject,row:'$.row',aliases,aliasesMutable:aliases,async:true,functions:new Set(),
-  references:new Set(),sets:[],reads:new Set(),writes:new Set(),ui:new Set(),data:false,loop:false,aliasSets:new Map(),boxes:[]};
+  references:new Set(),sets:[],reads:new Set(),writes:new Set(),ui:new Set(),data:false,loop:false,aliasSets:new Map(),aliasObjects:new Map(),boxes:[]};
  (scope as {source?:string}).source=source;
  // Aliases are visible to later steps: collect them first (AS names are unique per action).
  const collect=(node:Expression)=>{

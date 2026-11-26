@@ -8,6 +8,7 @@ import {pageLayoutVariant} from '../system-files/page-layout-version-runtime.js'
 import {authenticated,wrap,api} from './ApiAuthenticationGuard.js';
 import {PageScriptService,compiledActionKeyPattern} from '../page-compiler/pageScriptService.js';
 import {registerPublishedCodeBuilder} from '../page-compiler/source/publishedPageCodeSetup.js';
+import {setAppPackageObjectsLoader,storedAppPackage,latestAppPackage,appPackagePages} from '../page-compiler/source/appPackage.js';
 import type {CompilerObject,CompilerPage} from '../page-compiler/compilePage.js';
 import {executePageCodeAction,pageCodeAggregates,loadPageRecordSets,parsePageCodeRequest} from '../system-support/page-code-runtime.js';
 import {deviceTill,setDeviceTill,pairingDevice} from '../system-support/till-assignment-service.js';
@@ -66,6 +67,22 @@ export function registerPageScriptPublicRoute(app:Express,deps:PageScriptDeps){
   res.setHeader('Cache-Control','private, max-age=31536000, immutable');
   res.setHeader('ETag',build.etag);
   res.send(build.code);
+ }));
+ // The app package by hash: one file for the whole published app. The hash already names the
+ // code, so the same code always has the same URL and the device keeps it (immutable).
+ // Design only: it holds no records, so data still needs a login and its access checks.
+ app.get('/api/app-packages/:appId/:variant/:hash',wrap(async(req,res)=>{
+  const appId=String(req.params.appId??'');
+  const variant=pageLayoutVariant(String(req.params.variant??'Desktop'));
+  const hash=String(req.params.hash??'').replace(/\.js$/,'');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  const found=api.test(appId)&&/^[A-Za-z0-9_-]{32}$/.test(hash)
+   ?await storedAppPackage(deps.db,appId,variant,hash):null;
+  if(!found){res.setHeader('Cache-Control','no-store');res.status(404).type('text/plain').send('Not found');return;}
+  res.setHeader('Content-Type','text/javascript; charset=utf-8');
+  res.setHeader('Cache-Control','private, max-age=31536000, immutable');
+  res.setHeader('ETag','"'+found.hash+'"');
+  res.send(found.code);
  }));
  app.get('/api/page-scripts/:ticket',wrap(async(req,res)=>{
   res.setHeader('Cache-Control','private, no-store');
@@ -132,6 +149,9 @@ export async function issueAppPageScript(deps:PageScriptDeps,actor:{tenant_id:st
 
 export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   registerPublishedCodeBuilder(deps.definitions);
+ // The package is built from the same Object definitions the page script uses.
+ setAppPackageObjectsLoader(tenantId=>deps.definitions.list(tenantId) as unknown as
+  Promise<readonly CompilerObject[]>);
  // Page code (v2). The build is the server's own copy of the saved/published page
  // (or this user's own Preview of unsaved edits); the browser names only the action.
  const codeBuild=async(actor:{tenant_id:string;user_id:string},appId:string,body:Record<string,unknown>)=>{
@@ -301,6 +321,29 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
  }));
  codeRoutes('/api/apps/:appId',true);
  codeRoutes('/api/pages/:apiName',false);
+ // The published code this app's devices keep: the newest stored package, by hash.
+ app.get('/api/apps/:appId/package',wrap(async(req,res)=>{
+  const actor=authenticated(req);
+  if(!api.test(req.params.appId))throw new Error('Invalid app');
+  await deps.rbac.require(actor.tenant_id,actor.user_id,'App:'+req.params.appId,'read');
+  const variant=pageLayoutVariant(req.query.variant??'Desktop');
+  const found=await latestAppPackage(deps.db,actor.tenant_id,req.params.appId,variant);
+  res.setHeader('Cache-Control','private, no-store');
+  res.setHeader('Vary','Authorization, Cookie');
+  if(!found){res.json({hash:'',url:'',pages:[],builds:{}});return;}
+  const pages=appPackagePages(found.code);
+  // The server's own copy of each page's code, so a button's action still runs at once.
+  const builds:Record<string,string>={};
+  try{
+   const objects=asCompilerObjects(await deps.definitions.list(actor.tenant_id));
+   for(const pageApi of pages){
+    const page=await deps.pages.metadata(actor.tenant_id,pageApi,variant);
+    builds[pageApi]=deps.scripts.buildAppPage(actor.tenant_id,req.params.appId,asCompilerPage(page),objects).buildId;
+   }
+  }catch(error){console.error('app package builds failed',error);}
+  res.json({hash:found.hash,pages,builds,
+   url:'/api/app-packages/'+encodeURIComponent(req.params.appId)+'/'+encodeURIComponent(variant)+'/'+found.hash+'.js'});
+ }));
  app.post('/api/pages/:apiName/script-ticket',wrap(async(req,res)=>{
   const actor=authenticated(req);
   if(!api.test(req.params.apiName))throw new Error('Invalid page API name');

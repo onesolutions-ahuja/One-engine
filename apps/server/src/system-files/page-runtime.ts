@@ -6,6 +6,7 @@ import {expandAppProperties} from '../system-support/app-page-seeder.js';
 import type { SqlPersistence } from './sql-persistence.js';
 import {PageLayoutVersionRuntime,runtimeLayoutVariant,type PageLayoutVariant} from './page-layout-version-runtime.js';
 import {recordPublishedPageCode} from '../page-compiler/source/publishedPageCode.js';
+import {rebuildAppPackage} from '../page-compiler/source/appPackage.js';
 
 type PropRow=MetadataValueRow;
 type NodeRow={component_key:string;component_type:string;label:string;region:string;visible:boolean};
@@ -150,6 +151,13 @@ export class PageRuntime {
       await this.layouts.publish(tenantId,pageApi,variant,expected,actor);
       await recordPublishedPageCode(this.db,{tenantId,pageApi,variant,actor,
         loadPage:()=>this.metadata(tenantId,pageApi,variant)});
+      // The app's one-file package is rebuilt from the same pages, in the same transaction.
+      // A failure is logged and never blocks publishing.
+      const published=await this.metadata(tenantId,pageApi,variant).catch(()=>null);
+      const appApi=(published?.activationAssignments??[])
+        .map((item:{appId?:string|null})=>item?.appId).find((id):id is string=>typeof id==='string'&&Boolean(id))??'';
+      await rebuildAppPackage(this.db,{tenantId,appApi,variant,
+        loadPage:api=>this.metadata(tenantId,api,variant)});
     });
     this.invalidatePublishedCache(tenantId,pageApi);
     return this.metadata(tenantId,pageApi,variant);

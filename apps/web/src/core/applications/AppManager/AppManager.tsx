@@ -484,6 +484,12 @@ export default function AppManager({
             <p className="permission-help">Only this app's pages lock. Page Builder, Setup and other apps never lock.</p>
           </fieldset>
           <fieldset className="app-manager-lock">
+            <legend>Published code</legend>
+            <label className="form-label"><input type="checkbox" checked={draft.runPublishedCode===true}
+              onChange={event=>update('runPublishedCode',event.target.checked)}/> Run app from published code</label>
+            <p className="permission-help">Screens open from the code published for this app and kept on the device: no page request when a screen opens. Off keeps the current page loading.</p>
+          </fieldset>
+          <fieldset className="app-manager-lock">
             <legend>Guest access</legend>
             <label className="form-label"><input type="checkbox" checked={guest.enabled}
               onChange={event=>update('guestAccess',{...guest,enabled:event.target.checked})}/> Guests can open this app with no sign-in (QR links and table tablets)</label>

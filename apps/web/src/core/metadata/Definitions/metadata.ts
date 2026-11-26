@@ -1073,6 +1073,8 @@ export type LightningAppMetadata = {
   utilityItems: Array<'Notes' | 'History'>;
   /** The App Page users land on; blank means the first App Page in navigation. */
   homePageApiName?: string;
+  /** This tenant runs the app from its published code (one file kept on the device). */
+  runPublishedCode?: boolean;
   /** Lock screen for this app's pages only: PIN lock after idle minutes (0 = only LOCKSCREEN() / Lock button). */
   lockScreen?: { enabled: boolean; idleMinutes: number };
   /** Guest access: /guest/<code> links (QR) and guest tablets open this page with no sign-in,

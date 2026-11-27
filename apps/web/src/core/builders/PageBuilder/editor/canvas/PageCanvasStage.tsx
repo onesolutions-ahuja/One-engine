@@ -25,7 +25,7 @@ import type { useCanvasGestures } from './useCanvasGestures';
 import type { createPageCanvasRenderer } from './createPageCanvasRenderer';
 import type { usePageComponentProperties } from '../inspector/usePageComponentProperties';
 
-export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, onSwitchPage }: {
+export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, onSwitchPage, onAddPage }: {
   ribbon: ReturnType<typeof createPageRibbon>;
   editorState: ReturnType<typeof usePageEditorState>;
   placement: ReturnType<typeof usePagePlacement>;
@@ -36,6 +36,8 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   componentProperties: ReturnType<typeof usePageComponentProperties>;
   /** Switch to another page of the app (asks before discarding unsaved edits). */
   onSwitchPage?: (apiName: string) => void;
+  /** Add an App page or a Popup to the app (bottom bar +). */
+  onAddPage?: (type: 'App Page' | 'In-Screen Page') => void;
 }) {
   const { designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel } = ribbon;
   const {
@@ -45,7 +47,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     previewPageDefinitionCache, device, fitCanvas, fitScale, canvasZoom, canvasSnap,
     marqueeOverlayRef, selected, openAddBlocks, canvasGuideXRef, canvasGuideYRef, targetObject,
     previewRecordId, previewRecord, setPreviewRecordId, previewRecords, fields, previewFieldValue,
-    stringList, template, canvasLayer, setCanvasLayer, addedLayers, setAddedLayers, updateComponent,
+    stringList, template, canvasLayer, setCanvasLayer, addedLayers, setAddedLayers, updateComponent, applyPage,
   } = editorState;
   const { handleDrop } = placement;
   const { page, apps, objects, pages, reports, libraryComponents, flows, onLaunchFlow } = props;
@@ -259,7 +261,8 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
           {onSwitchPage && ['App Page', 'Home Page', 'In-Screen Page'].includes(page.pageType) && (() => {
             const app = apps.find(item => item.apiName === builderAppApiName)
               ?? apps.find(item => item.navigationPageApiNames?.includes(page.apiName));
-            return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} /> : null;
+            return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} onAdd={onAddPage}
+              onRename={label => applyPage({ ...page, label })} /> : null;
           })()}
         </div>
   </>;

@@ -15,3 +15,16 @@
 .app-page-tab small{font-size:10px;opacity:.7}
 .app-page-tab:hover{border-color:#98a2b3}
 .app-page-tab.is-current{background:#2453d6;border-color:#2453d6;color:#fff;font-weight:600}
+
+.app-page-add{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;
+  border:1px dashed #98a2b3;border-radius:8px;background:#fff;color:#5b6575;cursor:pointer}
+.app-page-rename{height:32px;min-width:120px;padding:0 10px;border:2px solid #2453d6;border-radius:8px;font:inherit;flex:none}
+.app-page-add-dialog{position:relative;width:min(460px,92vw);padding:24px}
+.app-page-add-dialog h2{margin:0 0 4px;font-size:18px}
+.app-page-add-dialog p{margin:0 0 16px;color:#5b6575;font-size:13px}
+.app-page-add-close{position:absolute;top:12px;right:12px;border:0;background:none;cursor:pointer;color:#5b6575}
+.app-page-add-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.app-page-add-choices button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;text-align:left;
+  border:1px solid #d0d5dd;border-radius:10px;background:#fff;cursor:pointer;font:inherit}
+.app-page-add-choices button:hover{border-color:#2453d6;background:#f5f7ff}
+.app-page-add-choices small{color:#5b6575}

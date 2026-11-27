@@ -37,7 +37,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   /** Switch to another page of the app (asks before discarding unsaved edits). */
   onSwitchPage?: (apiName: string) => void;
   /** Add an App page or a Popup to the app (bottom bar +). */
-  onAddPage?: (type: 'App Page' | 'In-Screen Page') => void;
+  onAddPage?: (type: 'App Page' | 'In-Screen Page', label: string) => void;
   /** Red X on the page bar: delete the open page permanently. */
   onDeletePage?: (apiName: string) => void;
 }) {

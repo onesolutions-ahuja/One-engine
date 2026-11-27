@@ -524,18 +524,17 @@ export function usePageManagement(
       onNotify(error instanceof Error ? error.message : 'Unable to delete the page');
     } finally { setSaving(false); }
   };
-  const addAppPage = async (type: 'App Page' | 'In-Screen Page') => {
+  /** Bottom bar +: a new App page or Popup with the name typed in the dialog. Its API name is made
+   *  from that name (taken → _2, _3…) and never changes afterwards. */
+  const addAppPage = async (type: 'App Page' | 'In-Screen Page', name: string) => {
     if (saving || !builderAppApiName) return;
     // Editing the whole app keeps this page's edits; a single page still asks first.
     if (appModeId) { if (undoStack.length) keepAppDraft(appModeId, page, undoStack[0]); }
     else if (editorMode && undoStack.length && !window.confirm('Discard unsaved Page Builder edits?')) return;
-    const word = type === 'In-Screen Page' ? 'Popup' : 'Screen';
-    const taken = new Set([page, ...pages].map(item => item.label.toLowerCase()));
-    let count = 1;
-    while (taken.has((word + ' ' + count).toLowerCase())) count += 1;
-    const label = word + ' ' + count;
-    const apiName = suggestMetadataApiName(generateMetadataApiName(label) || 'New_Page', [page.apiName, ...pages.map(item => item.apiName)]);
-    if (!apiName) { onNotify('Unable to name the new screen'); return; }
+    const label = name.trim();
+    if (!label) { onNotify('Give the new screen a name'); return; }
+    const apiName = suggestMetadataApiName(generateMetadataApiName(label), [page.apiName, ...pages.map(item => item.apiName)]);
+    if (!apiName) { onNotify('Use a name that starts with a letter'); return; }
     const devices = page.devices?.length ? [...page.devices] : ['Desktop' as const];
     const nextPage: LightningPageMetadata = {
       apiName, label, targetObject: '', pageType: type, layoutMode: 'free-canvas', template: page.template,

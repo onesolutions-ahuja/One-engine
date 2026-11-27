@@ -15,13 +15,15 @@ export function appPagesOf(app: LightningAppMetadata | undefined, pages: readonl
 
 /** Bottom bar of Page Builder: switch between the pages of the app being edited.
  * + adds an App page or a Popup; double-click a name to rename it (kept as a draft until Save). */
-export default function AppPageBar({ app, pages, current, onPick, onAdd, onRename }: {
+export default function AppPageBar({ app, pages, current, onPick, onAdd, onRename, onDelete }: {
   app: LightningAppMetadata;
   pages: readonly LightningPageMetadata[];
   current: string;
   onPick: (apiName: string) => void;
   onAdd?: (type: 'App Page' | 'In-Screen Page') => void;
   onRename?: (label: string) => void;
+  /** Red X on the open page: delete it permanently (asks first). */
+  onDelete?: (apiName: string) => void;
 }) {
   const list = appPagesOf(app, pages);
   const [renaming, setRenaming] = useState('');
@@ -54,6 +56,12 @@ export default function AppPageBar({ app, pages, current, onPick, onAdd, onRenam
             onClick={() => { if (item.apiName !== current) { setRenaming(''); onPick(item.apiName); } }}
             onDoubleClick={() => { if (!onRename) return; if (item.apiName !== current) onPick(item.apiName); setRenaming(item.apiName); }}>
             <span>{item.label}</span>{item.pageType === 'In-Screen Page' && <small>Popup</small>}
+            {onDelete && item.apiName === current && <span role="button" tabIndex={0} className="app-page-delete"
+              aria-label={'Delete ' + item.label + ' permanently'} title="Delete this page permanently"
+              onClick={event => { event.stopPropagation(); onDelete(item.apiName); }}
+              onDoubleClick={event => event.stopPropagation()}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onDelete(item.apiName); } }}>
+              <X size={12} /></span>}
           </button>)}
       {onAdd && <button type="button" className="app-page-add" aria-label="Add a screen" title="Add a screen"
         onClick={() => setChoosing(true)}><Plus size={15} /></button>}

@@ -38,6 +38,8 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   onSwitchPage?: (apiName: string) => void;
   /** Add an App page or a Popup to the app (bottom bar +). */
   onAddPage?: (type: 'App Page' | 'In-Screen Page') => void;
+  /** Red X on the page bar: delete the open page permanently. */
+  onDeletePage?: (apiName: string) => void;
 }) {
   const { designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel } = ribbon;
   const {
@@ -258,7 +260,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
               const app = apps.find(item => item.apiName === builderAppApiName)
                 ?? apps.find(item => item.navigationPageApiNames?.includes(page.apiName));
               return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} onAdd={onAddPage}
-                onRename={label => applyPage({ ...page, label })} /> : null;
+                onRename={label => applyPage({ ...page, label })} onDelete={onDeletePage} /> : null;
             })()}
           </div>
         </div>

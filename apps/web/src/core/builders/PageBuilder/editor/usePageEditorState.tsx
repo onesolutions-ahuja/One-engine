@@ -296,7 +296,7 @@ export function usePageEditorState(
   const [focusedCardMapping,setFocusedCardMapping] = useState('');
   const ribbonStripRef=useRef<HTMLDivElement|null>(null);
   const [canvasBinding,setCanvasBinding]=useState<CanvasBindingTarget|null>(null);
-  const [ribbonTab, setRibbonTab] = useState<'Add Block' | 'Component Content' | 'Component Design 2' | 'Component Style' | 'Component Data' | 'Component Action' | 'Component Layout' | 'Component Responsive' | 'Preview' | 'Filters' | 'Source' | 'Arrange' | 'Advanced'>('Add Block');
+  const [ribbonTab, setRibbonTab] = useState<'Add Block' | 'Component Content' | 'Component Design 2' | 'Component Style' | 'Component Data' | 'Component Action' | 'Component Layout' | 'Component Responsive' | 'Preview' | 'Filters' | 'Source' | 'Arrange' | 'Advanced' | 'Page Settings'>('Add Block');
   const [inspectorSection,setInspectorSection]=useState<string|null>('Body');
   const [cartColumnSelection,setCartColumnSelection]=useState<{componentId:string;column:number}|null>(null);
   const selectedCartColumn=cartColumnSelection?.componentId===selectedId?cartColumnSelection.column:null;

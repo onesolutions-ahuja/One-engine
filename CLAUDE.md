@@ -7,7 +7,7 @@ deploy and measuring), `docs/real-code-runtime-plan.md`.
 - Short answers. No long summaries or "stories". Plain words: the owner is not a coder.
 - Do the work yourself (you have a signed-in built-in browser on unesolutions.co.uk). Do not hand tasks back.
 - Build the best way, not a quick patch. If a better approach exists, say so up front and build that.
-- One PR per piece of work. Do not add to a PR after saying it is ready.
+- Put all related work in one PR. Do not open many small PRs, one per fix. Do not add to a PR after saying it is ready.
 - Never say "ready" before testing on the live site. Say exactly what was tested and what could not be.
 - If something is truly unclear, ask one short question; otherwise decide and say what you decided.
 - Before changing live business formulas (payments etc.), back up the pages and say what changes.

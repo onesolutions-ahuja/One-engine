@@ -23,3 +23,23 @@ export async function pageCsvFromFile(request:Request,file:File):Promise<string>
   {method:'POST',body:JSON.stringify({base64:btoa(binary)})});
  return csv;
 }
+
+/** Download the ticked pages as ONE workbook (same columns as a single page's download).
+ * Only the chosen pages are read. Returns the labels of pages that could not be read. */
+export async function downloadPagesExcel(request:Request,pages:ReadonlyArray<{apiName:string;label:string}>,
+ variant:string,fileName:string):Promise<string[]>{
+ const parts:string[]=[];
+ const failed:string[]=[];
+ for(const item of pages){
+  try{
+   const {csv}=await request<{csv:string}>('/metadata/pages/'+encodeURIComponent(item.apiName)+'/inventory?variant='+variant);
+   // The header is one line: keep it from the first page only.
+   const rows=csv.replace(/\r?\n$/,'');
+   const cut=rows.search(/\r?\n/);
+   if(cut<0){if(!parts.length)parts.push(rows);continue;}
+   parts.push(parts.length?rows.slice(cut).replace(/^\r?\n/,''):rows);
+  }catch{failed.push(item.label||item.apiName);}
+ }
+ if(parts.length)await downloadPageExcel(request,parts.filter(Boolean).join('\r\n')+'\r\n',fileName);
+ return failed;
+}

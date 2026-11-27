@@ -169,3 +169,8 @@
 
 /* Explicit LTR scroll for the universal inventory; do not suppress property
    controls when their SQL groups exceed the available ribbon width. */
+
+.page-settings-ribbon{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 10px}
+.page-settings-ribbon-field{display:inline-flex;align-items:center;gap:8px;font-size:13px}
+.page-settings-ribbon-field select{height:32px;border:1px solid #d0d5dd;border-radius:6px;padding:0 8px;font:inherit}
+.page-settings-ribbon small{color:#5b6575}

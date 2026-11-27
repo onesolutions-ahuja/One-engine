@@ -24,7 +24,7 @@ import type { useCanvasGestures } from './useCanvasGestures';
 import type { createPageCanvasRenderer } from './createPageCanvasRenderer';
 import type { usePageComponentProperties } from '../inspector/usePageComponentProperties';
 
-export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, componentActions, onSwitchPage, onAddPage }: {
+export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, componentActions, onSwitchPage, onAddPage, onDeletePage }: {
   ribbon: ReturnType<typeof createPageRibbon>;
   editorState: ReturnType<typeof usePageEditorState>;
   placement: ReturnType<typeof usePagePlacement>;
@@ -37,7 +37,9 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   /** Switch to another page of the app (asks before discarding unsaved edits). */
   onSwitchPage?: (apiName: string) => void;
   /** Add an App page or a Popup to the app (bottom bar +). */
-  onAddPage?: (type: 'App Page' | 'In-Screen Page') => void;
+  onAddPage?: (type: 'App Page' | 'In-Screen Page', label: string) => void;
+  /** Red X on the page bar: delete the open page permanently. */
+  onDeletePage?: (apiName: string) => void;
 }) {
   const { designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel } = ribbon;
   const {
@@ -258,7 +260,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
               const app = apps.find(item => item.apiName === builderAppApiName)
                 ?? apps.find(item => item.navigationPageApiNames?.includes(page.apiName));
               return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} onAdd={onAddPage}
-                onRename={label => applyPage({ ...page, label })} /> : null;
+                onRename={label => applyPage({ ...page, label })} onDelete={onDeletePage} /> : null;
             })()}
           </div>
         </div>

@@ -26,6 +26,8 @@ export type PageBuilderProps = {
     devices?:LightningPageMetadata['devices'],expectedDevices?:LightningPageMetadata['devices'])=>Promise<boolean>;
   onDeleteApp: (apiName: string) => Promise<void>;
   onDeletePage: (apiName: string) => Promise<void>;
+  /** Delete a page for good (no archive): the red X on the app's page bar. */
+  onDeletePagePermanently?: (apiName: string) => Promise<void>;
   onExit: () => void;
   onNotify: (message: string) => void;
   onLaunchFlow: (flowApiName: string, inputs?: Record<string, unknown>) => void;

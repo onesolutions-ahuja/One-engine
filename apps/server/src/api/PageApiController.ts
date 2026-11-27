@@ -15,6 +15,7 @@ import {validateExplicitComponentNames} from '../system-support/page-component-n
 import {requirePagePropertyContract} from '../system-support/page-property-contract.js';
 import {validatePageComponentContracts} from '../system-support/component-contract-store.js';
 import {loadPageLayoutSummaries} from '../system-support/page-layout-summary.js';
+import {deletePagePermanently} from '../system-support/page-permanent-delete.js';
 import {listPageCodeVersions,readPageCodeFile} from '../page-compiler/source/pageCodeVersionStore.js';
 import {saveEditedPageCode,restorePageCodeVersion} from '../page-compiler/source/editedPageCode.js';
 export function registerPageApiController(app:Express,db:SqlPersistence,rbac:RbacEngine){
@@ -382,6 +383,12 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
             activeRecord.rows[0].record_mode]);
         if(!replacement[0]?.available)throw new Error(
           'Publish a replacement Record '+activeRecord.rows[0].record_mode+' Page before archiving this one');
+      }
+      // ?permanent=1 (Page Builder's red X): the page, its layouts, versions and history are
+      // removed for good. Business records are never touched.
+      if(req.query.permanent==='1'){
+        await deletePagePermanently(client,actor.tenant_id,page.id,name);
+        return;
       }
       // Soft-deactivate only; preserve layouts, history, component properties and business records.
       await client.query(`

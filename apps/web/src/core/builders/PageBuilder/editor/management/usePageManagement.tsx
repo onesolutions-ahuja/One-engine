@@ -12,7 +12,7 @@ import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary'
 import { pageActivationAppCandidates, resolvePageActivationApp, pageAppsWithPopups } from '../../pageAppMembership';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
 import { downloadPageCode } from '../../../../pages/AppPackage/pageCodeDownload';
-import { dropAppDraft, otherAppDrafts } from './appDraftStore';
+import { dropAppDraft, keepAppDraft, otherAppDrafts } from './appDraftStore';
 import { PAGE_LIST_TYPES } from '../../pageBuilderUx';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
@@ -510,16 +510,31 @@ export function usePageManagement(
   };
 
   /** Bottom bar "+": add a screen to the app being edited as an App page or a Popup (In-Screen page). */
-  const addAppPage = async (type: 'App Page' | 'In-Screen Page') => {
+  /** Red X on the page bar. Warns first: the page is deleted for good, not archived. */
+  const deletePagePermanently = async (apiName: string) => {
+    if (saving || !props.onDeletePagePermanently) return;
+    const label = [page, ...pages].find(item => item.apiName === apiName)?.label ?? apiName;
+    if (!window.confirm('Delete "' + label + '" permanently?\n\nThe page, its layouts and its history are deleted and cannot be recovered. It is not archived.')) return;
+    setSaving(true);
+    try {
+      await props.onDeletePagePermanently(apiName);
+      if (appModeId) dropAppDraft(appModeId, apiName, page.layoutVariant ?? 'Desktop');
+      setUndoStack([]); setRedoStack([]);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : 'Unable to delete the page');
+    } finally { setSaving(false); }
+  };
+  /** Bottom bar +: a new App page or Popup with the name typed in the dialog. Its API name is made
+   *  from that name (taken → _2, _3…) and never changes afterwards. */
+  const addAppPage = async (type: 'App Page' | 'In-Screen Page', name: string) => {
     if (saving || !builderAppApiName) return;
-    if (editorMode && undoStack.length && !window.confirm('Discard unsaved Page Builder edits?')) return;
-    const word = type === 'In-Screen Page' ? 'Popup' : 'Screen';
-    const taken = new Set([page, ...pages].map(item => item.label.toLowerCase()));
-    let count = 1;
-    while (taken.has((word + ' ' + count).toLowerCase())) count += 1;
-    const label = word + ' ' + count;
-    const apiName = suggestMetadataApiName(generateMetadataApiName(label) || 'New_Page', [page.apiName, ...pages.map(item => item.apiName)]);
-    if (!apiName) { onNotify('Unable to name the new screen'); return; }
+    // Editing the whole app keeps this page's edits; a single page still asks first.
+    if (appModeId) { if (undoStack.length) keepAppDraft(appModeId, page, undoStack[0]); }
+    else if (editorMode && undoStack.length && !window.confirm('Discard unsaved Page Builder edits?')) return;
+    const label = name.trim();
+    if (!label) { onNotify('Give the new screen a name'); return; }
+    const apiName = suggestMetadataApiName(generateMetadataApiName(label), [page.apiName, ...pages.map(item => item.apiName)]);
+    if (!apiName) { onNotify('Use a name that starts with a letter'); return; }
     const devices = page.devices?.length ? [...page.devices] : ['Desktop' as const];
     const nextPage: LightningPageMetadata = {
       apiName, label, targetObject: '', pageType: type, layoutMode: 'free-canvas', template: page.template,
@@ -542,7 +557,7 @@ export function usePageManagement(
   };
 
   return {
-    savePage, saveCurrent, activateListedPage, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
+    savePage, saveCurrent, activateListedPage, deletePagePermanently, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
     showRelatedObjectColumn, pageListPageCount, safePageListPage, paginatedPages, openPageDesign,
     layoutBadges, copyLayoutFrom, downloadPageInventory, downloadAllPageFormulas, downloadCompiledPageScript, openCreatePage, createPage, addAppPage,
   };

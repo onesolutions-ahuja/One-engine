@@ -172,6 +172,8 @@ export default function AppManager({
     setNotice('');
   };
   const navigationOrder = reconcileNavigationOrder(draft.navigationItems, draft.navigationPageApiNames, draft.navigationOrder);
+  // Objects only: the app's pages are ordered in Page Builder, never here.
+  const objectOrder = navigationOrder.map((item,index)=>({item,index})).filter(entry=>entry.item.type==='Object');
   const setNavigationSelection = (type: 'Object' | 'App Page', selected: string[]) => {
     setDraft(current => {
       const navigationItems = type === 'Object' ? selected : current.navigationItems;
@@ -185,10 +187,6 @@ export default function AppManager({
     value: object.apiName, label: object.pluralLabel,
     meta: object.kind + (objects.some(other => other.apiName !== object.apiName && other.label === object.label)
       ? ' · Same label' : '')
-  }));
-  const pageChoices: ChecklistChoice[] = pages.filter(page => page.pageType === 'App Page').map(page => ({
-    value: page.apiName, label: page.label, meta: page.pageType + ' · ' + page.status,
-    disabled: page.status !== 'Active'
   }));
   const displayObjectNames = draft.navigationItems.map(name =>
     objects.find(item => item.apiName === name)?.pluralLabel ?? name);
@@ -433,12 +431,7 @@ export default function AppManager({
 
         {activeStep==='app-navigation' && <div id="app-navigation" className="app-manager-form-section">
           <div className="app-manager-selectors">
-            <PlatformPageSlot slotKey="pages">
-              <ChecklistMultiSelect label="App Pages (tabs)" choices={pageChoices}
-                values={draft.navigationPageApiNames} onChange={values => setNavigationSelection('App Page',values)}
-                placeholder="Select App Pages…" searchPlaceholder="Search Pages…"
-                emptyText="No Pages found. Publish an App Page using Page Builder."/>
-            </PlatformPageSlot>
+            {/* App pages are added, removed, renamed and ordered in Page Builder (the app's page bar). */}
             <PlatformPageSlot slotKey="navigation-items">
               <ChecklistMultiSelect label="Objects (records)" choices={objectChoices}
                 values={draft.navigationItems} onChange={values => setNavigationSelection('Object',values)}
@@ -448,24 +441,22 @@ export default function AppManager({
           <PlatformPageSlot slotKey="navigation-order"><fieldset className="app-manager-fieldset">
             <legend>Order</legend>
             <ol className="app-manager-navigation-order">
-              {navigationOrder.map((item,index) => {
-                const label = item.type === 'Object'
-                  ? objects.find(object => object.apiName === item.apiName)?.pluralLabel ?? item.apiName
-                  : pages.find(page => page.apiName === item.apiName)?.label ?? item.apiName;
+              {objectOrder.map(({item,index},position) => {
+                const label = objects.find(object => object.apiName === item.apiName)?.pluralLabel ?? item.apiName;
                 return <li key={item.type + ':' + item.apiName}>
                   <span className="app-manager-navigation-label"><strong>{label}</strong><small>{item.type}</small></span>
                   <div className="app-manager-order-controls">
                     <button type="button" className="btn btn-small" aria-label={'Move ' + label + ' up'}
-                      disabled={index === 0 || busy} onClick={() => moveNavigation(index,index - 1)}><ArrowUp size={14}/></button>
+                      disabled={position === 0 || busy} onClick={() => moveNavigation(index,objectOrder[position - 1].index)}><ArrowUp size={14}/></button>
                     <button type="button" className="btn btn-small" aria-label={'Move ' + label + ' down'}
-                      disabled={index === navigationOrder.length - 1 || busy} onClick={() => moveNavigation(index,index + 1)}><ArrowDown size={14}/></button>
+                      disabled={position === objectOrder.length - 1 || busy} onClick={() => moveNavigation(index,objectOrder[position + 1].index)}><ArrowDown size={14}/></button>
                     <button type="button" className="btn btn-small" disabled={busy}
                       aria-label={'Remove ' + label + ' from navigation'} onClick={() => toggleNavigation(item.type,item.apiName,false)}><Trash2 size={14}/></button>
                   </div>
                 </li>;
               })}
             </ol>
-            {!navigationOrder.length && <span className="permission-help">Select at least one App Page or object.</span>}
+            {!objectOrder.length && <span className="permission-help">No objects yet. App pages are managed in Page Builder.</span>}
           </fieldset></PlatformPageSlot>
         </div>}
 

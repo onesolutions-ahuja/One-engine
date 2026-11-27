@@ -27,3 +27,14 @@
   border:1px solid #d0d5dd;border-radius:10px;background:#fff;cursor:pointer;font:inherit}
 .app-page-add-choices button:hover{border-color:#2453d6;background:#f5f7ff}
 .app-page-add-choices small{color:#5b6575}
+/* Red X on the open page: deletes the page permanently (after a warning). */
+.app-page-delete{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:2px;
+  border-radius:50%;background:#e5484d;color:#fff;cursor:pointer;flex:none}
+.app-page-delete:hover{background:#c62a2f}
+.app-page-delete:focus-visible{outline:2px solid #c62a2f;outline-offset:1px}
+.app-page-add-choices button.is-chosen{border-color:#2453d6;background:#f5f7ff;box-shadow:inset 0 0 0 1px #2453d6}
+.app-page-add-field{display:flex;flex-direction:column;gap:4px;margin-top:14px;font-size:13px;color:#344054}
+.app-page-add-field input{height:34px;padding:0 10px;border:1px solid #d0d5dd;border-radius:8px;font:inherit}
+.app-page-add-field input[readonly]{background:#f2f4f7;color:#475467}
+.app-page-add-hint{display:block;margin-top:6px;color:#667085;font-size:12px}
+.app-page-add-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}

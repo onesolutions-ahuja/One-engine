@@ -1,7 +1,6 @@
 import {multiPageChildren} from '../../../../pages/PageRuntime/multiPageChildren';
 import {nestedCanvasStyle} from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { loadCanvasAsset } from './canvasAssetCache';
-import CanvasFloatingActions from '../../CanvasFloatingActions';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
 import MultiPageTabRename from '../../MultiPageTabRename';
 import { builderBindingMemo } from '../../builderBindingMemo';
@@ -249,7 +248,7 @@ export function createPageCanvasRenderer(
       data-page-appearance={isLayoutType(component.type) ? 'layout' : pageAppearanceTarget(component.type)}
       data-page-style={pageAppearanceStyleKeys(visualStyle)}
       ref={libraryPreview && !interactivePreview ? (element) => { if (element) element.inert = true; } : undefined}
-      className={`record-component ${(!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas' ? 'free-canvas-component' : ''} ${isCanvasLocked(component) ? 'canvas-component-locked' : ''} ${nested ? 'nested-page-component' : ''} ${isLayoutContainer(component) ? 'layout-container-component' : ''} ${libraryPreview ? 'component-rendered-preview' : ''} ${selectedId === component.id && !previewMode && !libraryPreview ? 'selected' : ''} ${selectionIds.includes(component.id) && !previewMode && !libraryPreview ? 'multi-selected' : ''} ${showHiddenSelection ? 'canvas-hidden-selection' : ''} ${dragOverId === component.id && !libraryPreview ? 'drop-target' : ''} ${partEditId === component.id && !previewMode && !libraryPreview ? 'canvas-part-editing' : ''}`}
+      className={`record-component ${(!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas' ? 'free-canvas-component' : ''} ${isCanvasLocked(component) ? 'canvas-component-locked' : ''} ${nested ? 'nested-page-component' : ''} ${isLayoutContainer(component) ? 'layout-container-component' : ''} ${tabOf ? 'multipage-tab-component' : ''} ${libraryPreview ? 'component-rendered-preview' : ''} ${selectedId === component.id && !previewMode && !libraryPreview ? 'selected' : ''} ${selectionIds.includes(component.id) && !previewMode && !libraryPreview ? 'multi-selected' : ''} ${showHiddenSelection ? 'canvas-hidden-selection' : ''} ${dragOverId === component.id && !libraryPreview ? 'drop-target' : ''} ${partEditId === component.id && !previewMode && !libraryPreview ? 'canvas-part-editing' : ''}`}
       style={{
         ...((!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas'
           ? nested
@@ -345,55 +344,7 @@ export function createPageCanvasRenderer(
       role={libraryPreview ? undefined : page.layoutMode === 'free-canvas' ? 'group' : 'button'} tabIndex={previewMode || libraryPreview ? -1 : 0} aria-label={libraryPreview ? undefined : `${component.label} component`}
       aria-hidden={libraryPreview && !interactivePreview || undefined}
     >
-      {!previewMode && !libraryPreview && selectedId === component.id && <CanvasFloatingActions componentId={component.id} viewportRef={pagePreviewAreaRef} enabled={page.layoutMode === 'free-canvas'}><div
-        className="canvas-element-actions" role="toolbar" aria-label={`Actions for ${component.label}`}
-        onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-        {canvasMovable && !isCanvasLocked(component) && <button type="button"
-          className="canvas-move-grip" aria-label={`Drag to move ${component.label}`}
-          title="Drag to move only this component" draggable={false}
-          onPointerDown={event => startCanvasMove(event, component)}
-          onPointerMove={moveCanvasPointer}
-          onPointerUp={event => endCanvasMove(event)}
-          onPointerCancel={event => endCanvasMove(event, true)}
-          onLostPointerCapture={event => endCanvasMove(event, true)}
-          onClick={event => event.stopPropagation()}><Move size={15}/></button>}
-        <button type="button" onClick={() => selectRibbonTab('Component Design 2')} title="Edit block"><Pencil size={15}/> Edit</button>
-        {page.layoutMode === 'free-canvas' && <button type="button" onClick={openPositionSection} title="Position and size"><Maximize2 size={15}/> Position</button>}
-        {(isMultiPage || tabOf) && <button type="button" title="Add a tab to this MultiPage" disabled={isCanvasLocked(tabOf ?? component)}
-          onClick={() => addMultiPageTab(tabOf?.id ?? component.id)}><Plus size={15}/> Tab</button>}
-        <button type="button" onClick={duplicateSelected} disabled={isCanvasLocked(component)} title="Duplicate"><Copy size={16}/></button>
-        <button type="button" onClick={() => setComponentMenuId(current => current === component.id ? '' : component.id)}
-          aria-expanded={componentMenuId === component.id} aria-label="More component actions"><MoreHorizontal size={18}/></button>
-        {componentMenuId === component.id && <div className="canvas-action-menu" role="menu" aria-label="More component actions">
-          {tabOf && <>
-            <button type="button" role="menuitem" disabled={isCanvasLocked(component)}
-              onClick={() => {setRenamingTabId(component.id);setComponentMenuId('');}}>Rename tab</button>
-            <button type="button" role="menuitem" disabled={isCanvasLocked(component)||multiPageTabs(page.components,tabOf.id)[0]?.id===component.id}
-              onClick={() => {applyPage({...page,components:moveMultiPageTab(page.components,component.id,-1)});setComponentMenuId('');}}>Move tab left</button>
-            <button type="button" role="menuitem" disabled={isCanvasLocked(component)||multiPageTabs(page.components,tabOf.id).at(-1)?.id===component.id}
-              onClick={() => {applyPage({...page,components:moveMultiPageTab(page.components,component.id,1)});setComponentMenuId('');}}>Move tab right</button>
-          </>}
-          <button type="button" role="menuitem" onClick={() => {copySelected();setComponentMenuId('');}}>Copy <kbd>Ctrl+C</kbd></button>
-          <button type="button" role="menuitem" disabled={!componentClipboard} onClick={() => {pasteComponent();setComponentMenuId('');}}>Paste <kbd>Ctrl+V</kbd></button>
-          <button type="button" role="menuitem" disabled={isCanvasLocked(component)} onClick={duplicateSelected}>Duplicate <kbd>Ctrl+D</kbd></button>
-          <button type="button" role="menuitem" onClick={() => selectRibbonTab('Component Layout')}>Align and position</button>
-          <button type="button" role="menuitem"
-            disabled={!canMoveCanvasLayer(page.components,component.id,'front')}
-            onClick={() => {placeSelectedLayer('front');setComponentMenuId('');}}>Bring to front</button>
-          <button type="button" role="menuitem"
-            disabled={!canMoveCanvasLayer(page.components,component.id,'forward')}
-            onClick={() => {moveSelected(1);setComponentMenuId('');}}>Bring forward</button>
-          <button type="button" role="menuitem"
-            disabled={!canMoveCanvasLayer(page.components,component.id,'back')}
-            onClick={() => {placeSelectedLayer('back');setComponentMenuId('');}}>Send to back</button>
-          <button type="button" role="menuitem"
-            disabled={!canMoveCanvasLayer(page.components,component.id,'backward')}
-            onClick={() => {moveSelected(-1);setComponentMenuId('');}}>Send backward</button>
-          <button type="button" role="menuitem" onClick={() => selectRibbonTab('Component Data')}>Data, links and actions</button>
-
-          <button type="button" role="menuitem" disabled={isCanvasLocked(component)} onClick={() => {removeSelected();setComponentMenuId('');}}>{tabOf ? 'Delete tab' : 'Delete'} <kbd>Delete</kbd></button>
-        </div>}
-      </div></CanvasFloatingActions>}
+      {/* No floating toolbar on the canvas: editing is from the left panel and the top bar. */}
       <ContentHost {...contentHostProps}>
       {editorGenericHint&&<span className="page-editor-generic-hint" aria-hidden="true">{editorGenericHint}</span>}
       {showHiddenSelection && !component.visible
@@ -543,8 +494,6 @@ export function createPageCanvasRenderer(
                       : <div className="component-demo-fallback"><strong>{component.label}</strong><span>This component is no longer registered. Re-register it to restore its live preview.</span><div><i /><i /><i /></div></div>}
       {!libraryPreview && customDefinition && customDefinition.trustedBundled !== true && isLayoutContainer(component)
         && <div className="metadata-nested-host">{nestedChildren}</div>}
-      {!libraryPreview && !previewMode && isLayoutContainer(component) && !nestedChildren?.length
-        && <div className="page-nested-empty">Drop components into this {component.label} or choose a child from the palette</div>}
       {/* Editing is selection-only. A transparent hit target sits above the actual
           control (including disabled buttons, iframes and action handlers) while
           keeping its rendered appearance and free-canvas move gestures intact. */}

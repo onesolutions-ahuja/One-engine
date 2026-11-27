@@ -24,9 +24,11 @@ export function canvasResizeOverlayGeometry(
   const x=box.left+box.width*xRatio[edge];
   const y=box.top+box.height*yRatio[edge];
   // A PowerPoint-style grip always represents the actual component edge.
-  // Never relocate an off-screen edge into the middle of the component.
-  if(x<clip.left+10||x>clip.right-10||y<clip.top+10||y>clip.bottom-10)continue;
-  points.push({edge,left:x,top:y,proxy:false});
+  // Never relocate an off-screen edge into the middle of the component, but an edge
+  // that sits right on the viewport edge (a full-page component) keeps its grip just inside.
+  const near=30;
+  if(x<clip.left-near||x>clip.right+near||y<clip.top-near||y>clip.bottom+near)continue;
+  points.push({edge,left:clamp(x,clip.left+10,clip.right-10),top:clamp(y,clip.top+10,clip.bottom-10),proxy:false});
  }
  return {points,clip};
 }

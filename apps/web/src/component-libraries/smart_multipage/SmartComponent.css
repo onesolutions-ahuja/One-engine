@@ -37,7 +37,8 @@
 .smart-multipage.is-tabs .smart-multipage-tabs button{border-radius:0;border-bottom:2px solid transparent}
 .smart-multipage.is-tabs .smart-multipage-tabs button.active{border-bottom-color:#0a84ff;color:#0a84ff;font-weight:600}
 .smart-multipage-tabs button:focus-visible{outline:2px solid #0a84ff;outline-offset:1px}
-.smart-multipage-page{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:auto}
+/* A MultiPage page keeps everything inside its own size: it never scrolls. */
+.smart-multipage-page{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
 .smart-multipage-page>*{flex:1 1 auto;min-height:0}
 .smart-multipage-empty{display:grid;place-items:center;height:100%;color:#64748b;font-size:13px}
 .smart-multipage-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:6px}

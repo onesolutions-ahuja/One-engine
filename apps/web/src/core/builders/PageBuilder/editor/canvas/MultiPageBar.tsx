@@ -1,6 +1,5 @@
 import { Plus } from 'lucide-react';
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { coEditorsStore } from '../management/pageCoEditing';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { PageComponentMetadata } from '../../../../metadata/Definitions/metadata';
 import { multiPageName, multiPageTabId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { multiPageTabs, openMultiPageTab, selectedMultiPage } from '../../multiPageBuilder';
@@ -36,11 +35,6 @@ export default function MultiPageBar({ components, selectedId, remembered, layou
     if (tab && name && name !== tab.label && !onRename(tab.id, name)) { finished.current = false; return; }
     setRenaming('');
   };
-  // Co-editing: who else is designing this page, and what they have selected (outlined).
-  const editors = useSyncExternalStore(coEditorsStore.subscribe, coEditorsStore.get, coEditorsStore.get);
-  const colors = ['#E8590C', '#7048E8', '#0CA678', '#D6336C', '#1C7ED6'];
-  const outline = editors.flatMap((editor, index) => editor.selection.filter(id => /^[A-Za-z0-9_-]+$/.test(id))
-    .map(id => '[data-component-id="' + id + '"]{outline:2px dashed ' + colors[index % colors.length] + ';outline-offset:2px}')).join('');
   return <nav className="multi-page-bar" aria-label="MultiPage tabs">
     <span className="multi-page-bar-title">{multiPage ? multiPageName(multiPage) : 'MultiPage'}</span>
     {multiPage ? <div className="multi-page-bar-tabs" role="tablist">
@@ -62,12 +56,6 @@ export default function MultiPageBar({ components, selectedId, remembered, layou
       <button type="button" className="multi-page-add" aria-label="Add tab" title="Add tab"
         onClick={() => onAdd(multiPage.id)}><Plus size={15} /></button>
     </div> : <span className="multi-page-bar-hint">Select a MultiPage to see its tabs</span>}
-    {editors.length > 0 && <span className="multi-page-editors" aria-label="Also designing this page">
-      {editors.map((editor, index) => <span key={editor.clientId} className="multi-page-editor"
-        style={{ background: colors[index % colors.length] }} title={editor.name + ' is designing this page'}>
-        {(editor.name || '?').slice(0, 1).toUpperCase()}</span>)}
-      <style>{outline}</style>
-    </span>}
     <div className="multi-page-bar-layouts">{layouts}</div>
   </nav>;
 }

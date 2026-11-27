@@ -3307,6 +3307,8 @@ export function createSystemServer(db:SqlPersistence) {
     else if(/^(Excel |XLSX |Worksheet |Workbook |The workbook |Corrupted XLSX|Truncated XLSX|Unsafe Excel|Validate the CSV|Desktop parent changed)/.test(err.message)
       ||/^Page layout .+ changed since CSV validation/.test(err.message))
       res.status(400).json({error:err.message});
+    // A formula on the page is wrong (e.g. an old SCREEN form): say so, never "SQL service unavailable".
+    else if(/^SCREEN /.test(err.message))res.status(400).json({error:'A formula on this page needs fixing: '+err.message});
     else if(/^(Administrator email must differ|Tenant developer email is required|Offline briefcase cannot|Flow service user must be|Logo file content does not match)/.test(err.message))
       res.status(400).json({error:err.message});
     else if(err.message==='Tenant login base domain is not configured')

@@ -355,17 +355,19 @@ export function usePageManagement(
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download page inventory');}
     finally{setInventoryDownloading('');}
   };
-  /** One CSV with every property of every page, same columns as a single page's download.
+  /** One CSV with every property of the pages listed now (Application, Page type, Layout,
+   * Object and Search filters), same columns as a single page's download.
    * Edit any value (colours, labels, formulas) and send it back with Upload CSV. */
   const downloadAllPageFormulas = async () => {
-    if(inventoryDownloading||!pages.length)return;
+    const listed=visiblePages;
+    if(inventoryDownloading||!listed.length)return;
     setInventoryDownloading('*');
     try{
-      const summaries=new Map((await fetchLayoutSummaries(pages.map(item=>item.apiName)))
+      const summaries=new Map((await fetchLayoutSummaries(listed.map(item=>item.apiName)))
         .map(row=>[row.apiName,row]));
       const parts:string[]=[];
       const failed:string[]=[];
-      for(const item of pages){
+      for(const item of listed){
         const variant=inventoryExportVariant==='Auto'
           ?primaryPageLayout(summaries.get(item.apiName)??layoutSummaries[item.apiName]):inventoryExportVariant;
         try{
@@ -379,7 +381,13 @@ export function usePageManagement(
         }catch{failed.push(item.label||item.apiName);}
       }
       const csv=parts.filter(Boolean).join('\r\n')+'\r\n';
-      await downloadPageExcel(request,csv,'all_pages');
+      // File name says what was listed, e.g. smart_till_in_screen_pages.
+      const appName=pageListAppTab==='all'?'all':pageListAppTab==='other'?'other'
+        :apps.find(app=>app.apiName===pageListAppTab)?.label??pageListAppTab;
+      const typeName=pageListTypeTab==='all'?'':pageListTypeTab.replace(/ Page$/,'');
+      const fileName=[appName,typeName,'pages'].filter(Boolean).join('_')
+        .toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+      await downloadPageExcel(request,csv,fileName||'all_pages');
       if(failed.length)onNotify('Not included (could not be read): '+failed.slice(0,10).join(', '));
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the pages');}
     finally{setInventoryDownloading('');}

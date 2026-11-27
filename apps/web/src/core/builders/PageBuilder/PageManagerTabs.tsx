@@ -5,6 +5,7 @@ type Tab = { value: string; label: string };
 type AppTab = { apiName: string; label: string };
 
 const pageTypes: ReadonlyArray<Tab> = [
+  { value: 'all', label: 'All' },
   { value: 'Home Page', label: 'Home' },
   { value: 'App Page', label: 'App' },
   { value: 'Record Page', label: 'Record' },

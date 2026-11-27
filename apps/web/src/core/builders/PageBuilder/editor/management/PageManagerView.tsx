@@ -47,9 +47,9 @@ export default function PageManagerView({ props, editorState, management, layout
           <div className="page-manager-header-actions">
             <button ref={createPageTriggerRef} className="btn btn-brand" type="button" onClick={openCreatePage}><Plus size={16}/> New Page</button>
             <button className="btn" type="button" disabled={saving} onClick={()=>setInventoryUploadOpen(true)}><Upload size={16}/> Upload Excel</button>
-            {!recordPageContext && <button className="btn" type="button" disabled={Boolean(inventoryDownloading)}
-              title="One Excel file with every property of every page (colours, labels, formulas…), plus a Guide and a Sample sheet. Edit it, then send it back with Upload Excel."
-              onClick={()=>void downloadAllPageFormulas()}><Download size={16}/> {inventoryDownloading==='*'?'Downloading…':'Download all pages'}</button>}
+            {!recordPageContext && <button className="btn" type="button" disabled={Boolean(inventoryDownloading)||!visiblePages.length}
+              title="One Excel file with every property of the pages listed below (follows the filters), plus a Guide and a Sample sheet. Edit it, then send it back with Upload Excel."
+              onClick={()=>void downloadAllPageFormulas()}><Download size={16}/> {inventoryDownloading==='*'?'Downloading…':'Download '+visiblePages.length+(visiblePages.length===1?' page':' pages')}</button>}
             <select className="form-control" aria-label="Excel download device layout" title="Layout used by page inventory downloads"
               style={{width:'min(172px, 100%)',minWidth:0,maxWidth:'100%',boxSizing:'border-box'}} value={inventoryExportVariant} onChange={event=>setInventoryExportVariant(event.target.value as PageLayoutVariant|'Auto')}>
               <option value="Auto">Excel: Page’s layout</option>

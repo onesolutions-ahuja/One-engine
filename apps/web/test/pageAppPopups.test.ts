@@ -16,3 +16,13 @@ test('a popup belongs to the apps whose pages open it (also popup from popup)',(
  assert.deepEqual(map.get('menu'),['KIOSK']);
  assert.deepEqual(map.get('lonely'),[]);
 });
+
+test('a popup opened only from another layout (e.g. Custom) still belongs to the app',()=>{
+ const apps=[{apiName:'SMARTTILL',navigationPageApiNames:['till'],navigationOrder:[]}];
+ const pages=[
+  // The list carries the Desktop layout (empty here); the server lists what every layout opens.
+  {apiName:'till',components:[],opensPages:['smart_till_confirm']},
+  {apiName:'smart_till_confirm',components:[]}];
+ const map=pageAppsWithPopups(apps as never,pages as never);
+ assert.deepEqual(map.get('smart_till_confirm'),['SMARTTILL']);
+});

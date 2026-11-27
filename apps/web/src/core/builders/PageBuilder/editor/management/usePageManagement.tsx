@@ -471,9 +471,41 @@ export function usePageManagement(
     }
   };
 
+  /** Bottom bar "+": add a screen to the app being edited as an App page or a Popup (In-Screen page). */
+  const addAppPage = async (type: 'App Page' | 'In-Screen Page') => {
+    if (saving || !builderAppApiName) return;
+    if (editorMode && undoStack.length && !window.confirm('Discard unsaved Page Builder edits?')) return;
+    const word = type === 'In-Screen Page' ? 'Popup' : 'Screen';
+    const taken = new Set([page, ...pages].map(item => item.label.toLowerCase()));
+    let count = 1;
+    while (taken.has((word + ' ' + count).toLowerCase())) count += 1;
+    const label = word + ' ' + count;
+    const apiName = suggestMetadataApiName(generateMetadataApiName(label) || 'New_Page', [page.apiName, ...pages.map(item => item.apiName)]);
+    if (!apiName) { onNotify('Unable to name the new screen'); return; }
+    const devices = page.devices?.length ? [...page.devices] : ['Desktop' as const];
+    const nextPage: LightningPageMetadata = {
+      apiName, label, targetObject: '', pageType: type, layoutMode: 'free-canvas', template: page.template,
+      layoutVariant: page.layoutVariant, canvasWidth: page.canvasWidth, canvasHeight: page.canvasHeight,
+      canvasFillColor: '#ffffff', status: 'Draft', devices, components: [],
+      activationAssignments: [{ id: crypto.randomUUID(), scope: 'App Default', appId: builderAppApiName,
+        profileId: null, recordTypeId: null, formFactors: [...devices] }]
+    };
+    setSaving(true);
+    try {
+      const saved = await onSave(nextPage, apiName, 'Lightning page draft created');
+      if (!saved) return;
+      if (type === 'App Page') onPrepareApp(saved.apiName, builderAppApiName);
+      savedPageApiName.current = saved.apiName;
+      setBuilderAppApiName(builderAppApiName);
+      setSelectedId('');
+      setUndoStack([]); setSelectionUndoStack([]); setSelectionRedoStack([]); setRedoStack([]);
+      setPreviewMode(false);
+    } finally { setSaving(false); }
+  };
+
   return {
     savePage, activateListedPage, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
     showRelatedObjectColumn, pageListPageCount, safePageListPage, paginatedPages, openPageDesign,
-    layoutBadges, copyLayoutFrom, downloadPageInventory, downloadAllPageFormulas, downloadCompiledPageScript, openCreatePage, createPage,
+    layoutBadges, copyLayoutFrom, downloadPageInventory, downloadAllPageFormulas, downloadCompiledPageScript, openCreatePage, createPage, addAppPage,
   };
 }

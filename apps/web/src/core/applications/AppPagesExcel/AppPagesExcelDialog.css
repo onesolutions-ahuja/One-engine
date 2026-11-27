@@ -1,0 +1,13 @@
+.app-pages-excel{width:min(640px,94vw);max-height:86vh;display:flex;flex-direction:column;gap:10px;padding:16px}
+.app-pages-excel h2{margin:0;font-size:16px}
+.app-pages-excel-filters{display:flex;gap:8px;flex-wrap:wrap}
+.app-pages-excel-filters select,.app-pages-excel-filters input{height:34px;border:1px solid #d0d5dd;border-radius:6px;padding:0 8px;font:inherit}
+.app-pages-excel-filters input{flex:1;min-width:140px}
+.app-pages-excel-list{overflow:auto;border:1px solid #e3e7ed;border-radius:8px;min-height:120px}
+.app-pages-excel-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid #eef0f3;font-size:13px}
+.app-pages-excel-row label{display:flex;align-items:center;gap:8px;min-width:0}
+.app-pages-excel-row small{color:#5b6575}
+.app-pages-excel-all{background:#f8f9fb}
+.app-pages-excel-actions{display:flex;gap:6px;flex:none}
+.app-pages-excel-empty,.app-pages-excel-message{margin:8px 10px;font-size:13px;color:#5b6575}
+.app-pages-excel-footer{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}

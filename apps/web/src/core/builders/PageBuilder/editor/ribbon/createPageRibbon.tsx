@@ -4,7 +4,7 @@ import * as React from 'react';
 import {
 ArrowLeft, Check, ClipboardPaste, Copy, Database, Eye, EyeOff, Filter, Type, MoveHorizontal,
 MoveVertical, Puzzle, Smartphone, RefreshCw, Save, Scissors, SlidersHorizontal, Undo2, Redo2, Trash2,
-Workflow, Layers3, ChevronDown
+Workflow, Layers3, ChevronDown, FileCog
 } from 'lucide-react';
 import RibbonColorPalette from '../../RibbonColorPalette';
 import PageComponentNavigator from '../../PageComponentNavigator';
@@ -24,7 +24,7 @@ import { updateSharedCanvasProperties, updateSharedCanvasPositions } from '../..
 import { selectCanvasIds } from '../../canvasSelectionInteractions';
 import { childrenOf, isLayoutContainer, rawLayoutParentId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
-import { pageLayoutOptionLabel, PAGE_LAYOUT_ORDER } from '../../pageLayoutSummary';
+import { pageLayoutOptionLabel, PAGE_LAYOUT_ORDER, orderedPageLayouts, designedPageLayouts } from '../../pageLayoutSummary';
 
 import type { usePageEditorState } from '../usePageEditorState';
 import type { usePageLayoutActions } from '../management/usePageLayoutActions';
@@ -217,7 +217,7 @@ export function createPageRibbon(
   };
   const quickAccessOrder=['save','activate','preview','exitPreview','resetIcon','undo','redo','cut','copy','paste','delete'] as const;
   const journeyTabs: Array<typeof ribbonTab> = // Advanced and View controls live in Actions and Design.
-  ['Add Block','Component Design 2','Component Action'];
+  ['Add Block','Component Design 2','Component Action','Page Settings'];
   const ribbonTabsVisible: Array<typeof ribbonTab> = [...journeyTabs];
 
   const addPaletteComponent = (type: string) => {
@@ -353,7 +353,7 @@ export function createPageRibbon(
                   'Component Responsive': Smartphone,
                   'Component Layout': Layers3,
                   'Component Action': Workflow,
-                  Preview: Eye, Filters: Filter, Source: Database
+                  Preview: Eye, Filters: Filter, Source: Database, 'Page Settings': FileCog
                 }[tab];
                 const label = {
                   'Add Block': 'Insert',
@@ -366,7 +366,7 @@ export function createPageRibbon(
                   'Component Responsive': 'Responsive',
                   'Component Layout': 'Layout',
                   'Component Action': 'Actions',
-                  Preview: 'View', Filters: 'Filters', Source: 'Source'
+                  Preview: 'View', Filters: 'Filters', Source: 'Source', 'Page Settings': 'Page settings'
                 }[tab];
                 return <button key={tab} id={`page-builder-tab-${index}`} type="button"
                   role="tab" tabIndex={ribbonTab===tab?0:-1} aria-selected={ribbonTab === tab}
@@ -380,6 +380,18 @@ export function createPageRibbon(
           className="office-ribbon-content" role="tabpanel" aria-hidden={previewMode} aria-label={ribbonTab}
           aria-labelledby={`page-builder-tab-${Math.max(0,ribbonTabsVisible.indexOf(ribbonTab))}`}>
           {ribbonTab==='Add Block' && insertRibbon}
+          {ribbonTab==='Page Settings' && <div className="page-settings-ribbon">
+            <label className="page-settings-ribbon-field"><span>Page type</span>
+              <select aria-label="Page type" value={page.pageType}
+                disabled={page.pageType!=='App Page'&&page.pageType!=='In-Screen Page'}
+                onChange={event=>applyPage({...page,pageType:event.target.value as typeof page.pageType})}>
+                {(page.pageType==='App Page'||page.pageType==='In-Screen Page'
+                  ?['App Page','In-Screen Page'] as const:[page.pageType]).map(type=><option key={type} value={type}>{type}</option>)}
+              </select></label>
+            <small>{page.pageType==='App Page'?'App page: opens from the app menu.'
+              :page.pageType==='In-Screen Page'?'In-screen page: opens on top of another screen with SCREEN(...).'
+              :'This page type is fixed.'}</small>
+          </div>}
           {page.pageType==='Print Template'&&page.layoutMode==='template'&&selected&&ribbonTab==='Component Layout'&&
             <label><input type="checkbox" checked={selected.properties.printBreakBefore===true} onChange={event=>
               updateComponent(selected.id,{properties:{...selected.properties,printBreakBefore:event.target.checked}})}/>Page break before component</label>}
@@ -525,8 +537,23 @@ export function createPageRibbon(
           {ribbonTab==='Component Design 2'&&renderSmartRibbon('designTail')}
         </div>);
 
+  /** Top-bar Desktop / Tablet / Mobile / Custom tabs: layouts with a design come first. */
+  const layoutTabs = (
+    <div className="page-layout-tabs" role="tablist" aria-label="Page layout">
+      {orderedPageLayouts(layoutSummaries[page.apiName]).map(variant => {
+        const designed = designedPageLayouts(layoutSummaries[page.apiName]).some(item => item.variant === variant);
+        return <button key={variant} type="button" role="tab" aria-selected={(page.layoutVariant ?? 'Desktop') === variant}
+          className={'page-layout-tab' + ((page.layoutVariant ?? 'Desktop') === variant ? ' is-current' : '')}
+          disabled={switchingLayout || saving || previewMode}
+          title={pageLayoutOptionLabel(variant, layoutSummaries[page.apiName])}
+          onClick={() => { if ((page.layoutVariant ?? 'Desktop') !== variant) void switchLayoutVariant(variant as PageLayoutVariant); }}>
+          {variant}{designed && <i className="page-layout-dot" aria-label="Has a design" />}
+        </button>;
+      })}
+    </div>
+  );
   return {
     selectedRelatedLists, componentRelatedListOptions, homeValue, quickAccessOrder, dataRibbon,
-    designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel,
+    designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel, layoutTabs,
   };
 }

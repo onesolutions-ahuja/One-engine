@@ -11,11 +11,13 @@ type Props = {
   onClone: (app: LightningAppMetadata) => void;
   /** Opens the app's pages in Page Builder (app name link). */
   onOpenPages?: (app: LightningAppMetadata) => void;
+  /** Opens the pages Excel dialog (tick pages, filter by type, download, upload). */
+  onPagesExcel?: (app: LightningAppMetadata) => void;
   /** Present only for OneEngine holders: publish this app to AppExchange. */
   onPublish?: (app: LightningAppMetadata) => void;
 };
 
-export default function AppManagerList({apps, busy, onEdit, onClone, onOpenPages, onPublish}: Props) {
+export default function AppManagerList({apps, busy, onEdit, onClone, onOpenPages, onPagesExcel, onPublish}: Props) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'label'|'apiName'|'navigation'|'pages'>('label');
   const [descending, setDescending] = useState(false);
@@ -61,6 +63,7 @@ export default function AppManagerList({apps, busy, onEdit, onClone, onOpenPages
         {apiName:'actions',label:'Actions',render:app=><div className="app-manager-list-actions">
          <button type="button" className="btn" disabled={busy} aria-label={"Edit "+app.label} onClick={()=>onEdit(app)}>Edit</button>
          <button type="button" className="btn" disabled={busy} aria-label={"Clone "+app.label} onClick={()=>onClone(app)}>Clone</button>
+         {onPagesExcel&&<button type="button" className="btn" disabled={busy} aria-label={"Pages Excel for "+app.label} onClick={()=>onPagesExcel(app)}>Pages Excel</button>}
          {onPublish&&<button type="button" className="btn" disabled={busy} aria-label={"Publish "+app.label+" to AppExchange"} onClick={()=>onPublish(app)}>Publish</button>}
         </div>}
       ]}/>
@@ -92,6 +95,8 @@ export default function AppManagerList({apps, busy, onEdit, onClone, onOpenPages
               aria-label={'Clone ' + app.label} onClick={() => onClone(app)} title={'Clone ' + app.label}>
               <Copy size={14} aria-hidden="true"/> Clone
             </button>
+            {onPagesExcel && <button type="button" className="btn btn-small" disabled={busy}
+              aria-label={'Pages Excel for ' + app.label} onClick={() => onPagesExcel(app)}>Pages Excel</button>}
             {onPublish && <button type="button" className="btn btn-small" disabled={busy}
               aria-label={'Publish ' + app.label + ' to AppExchange'} onClick={() => onPublish(app)}
               title={'Publish ' + app.label + ' to AppExchange'}>

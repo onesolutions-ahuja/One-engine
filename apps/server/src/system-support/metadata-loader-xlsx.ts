@@ -144,7 +144,8 @@ export function readLoaderWorkbook(buffer:Buffer):LoaderTable[]{
    for(const match of row.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
     const raw=match[2]??'',column=columnNumber(attr(match[1],'r'));
     if(column<0||column>79)continue;
-    if(/<f(?:\s|>)/.test(raw))throw Error('Excel formulas are not accepted in input cells');
+    if(/<f(?:\s|>)/.test(raw))throw Error('Excel formulas are not accepted in input cells (sheet '+name+', cell '
+     +(attr(match[1],'r')||'row '+line)+'). Save the value as text, e.g. type an apostrophe before =');
     const value=attr(match[1],'t')==='inlineStr'
      ?[...raw.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map(m=>unescapeXml(m[1])).join('')
      :unescapeXml(/<v>([\s\S]*?)<\/v>/.exec(raw)?.[1]??'');

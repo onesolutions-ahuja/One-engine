@@ -3290,6 +3290,10 @@ export function createSystemServer(db:SqlPersistence) {
     else if(/^(Domain already |Domain proof was changed|Maximum five tenant domains|Cannot remove platform-owned|Tenant already exists|Tenant developer email already registered|Idempotency key conflict|Invalid tenant status transition)/.test(err.message))
       res.status(409).json({error:err.message});
     else if(err.message.startsWith('DNS ')||err.message.startsWith('Domain DNS '))res.status(422).json({error:err.message});
+    // Excel/CSV upload problems are the file's, never an SQL outage: say what is wrong with it.
+    else if(/^(Excel |XLSX |Worksheet |Workbook |The workbook |Corrupted XLSX|Truncated XLSX|Unsafe Excel|Validate the CSV|Desktop parent changed)/.test(err.message)
+      ||/^Page layout .+ changed since CSV validation/.test(err.message))
+      res.status(400).json({error:err.message});
     else if(/^(Administrator email must differ|Tenant developer email is required|Offline briefcase cannot|Flow service user must be|Logo file content does not match)/.test(err.message))
       res.status(400).json({error:err.message});
     else if(err.message==='Tenant login base domain is not configured')

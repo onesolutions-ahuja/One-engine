@@ -144,6 +144,8 @@ export function moveMultiPageTab(components: Components, tabId: string, directio
   const original = components.find(item => item.id === tabId);
   const parentId = original ? rawLayoutParentId(original) : null;
   if (!original || !parentId) return components;
+  const siblings = multiPageTabs(components, parentId);
+  if (!siblings[siblings.findIndex(item => item.id === tabId) + direction]) return components;
   // Ids stay with their tabs: write them down before the order changes.
   components = stampTabIds(components, parentId);
   const tab = components.find(item => item.id === tabId)!;

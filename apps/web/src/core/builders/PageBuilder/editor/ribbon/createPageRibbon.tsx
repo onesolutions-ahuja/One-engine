@@ -24,7 +24,7 @@ import { updateSharedCanvasProperties, updateSharedCanvasPositions } from '../..
 import { selectCanvasIds } from '../../canvasSelectionInteractions';
 import { childrenOf, isLayoutContainer, rawLayoutParentId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
-import { pageLayoutOptionLabel, PAGE_LAYOUT_ORDER } from '../../pageLayoutSummary';
+import { pageLayoutOptionLabel, PAGE_LAYOUT_ORDER, orderedPageLayouts, designedPageLayouts } from '../../pageLayoutSummary';
 
 import type { usePageEditorState } from '../usePageEditorState';
 import type { usePageLayoutActions } from '../management/usePageLayoutActions';
@@ -537,8 +537,23 @@ export function createPageRibbon(
           {ribbonTab==='Component Design 2'&&renderSmartRibbon('designTail')}
         </div>);
 
+  /** Top-bar Desktop / Tablet / Mobile / Custom tabs: layouts with a design come first. */
+  const layoutTabs = (
+    <div className="page-layout-tabs" role="tablist" aria-label="Page layout">
+      {orderedPageLayouts(layoutSummaries[page.apiName]).map(variant => {
+        const designed = designedPageLayouts(layoutSummaries[page.apiName]).some(item => item.variant === variant);
+        return <button key={variant} type="button" role="tab" aria-selected={(page.layoutVariant ?? 'Desktop') === variant}
+          className={'page-layout-tab' + ((page.layoutVariant ?? 'Desktop') === variant ? ' is-current' : '')}
+          disabled={switchingLayout || saving || previewMode}
+          title={pageLayoutOptionLabel(variant, layoutSummaries[page.apiName])}
+          onClick={() => { if ((page.layoutVariant ?? 'Desktop') !== variant) void switchLayoutVariant(variant as PageLayoutVariant); }}>
+          {variant}{designed && <i className="page-layout-dot" aria-label="Has a design" />}
+        </button>;
+      })}
+    </div>
+  );
   return {
     selectedRelatedLists, componentRelatedListOptions, homeValue, quickAccessOrder, dataRibbon,
-    designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel,
+    designInPanel, ribbonComponentSelector, ribbonNavigation, renderRibbonPanel, layoutTabs,
   };
 }

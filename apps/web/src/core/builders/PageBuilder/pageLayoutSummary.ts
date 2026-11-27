@@ -23,3 +23,17 @@ export const designedPageLayouts=(summary?:PageLayoutSummary|null)=>
 /** The layout a page opens in: its own design, else Desktop. */
 export const primaryPageLayout=(summary?:PageLayoutSummary|null):PageLayoutVariantName=>
   summary?.primary??'Desktop';
+
+/** Layouts for the top-bar tabs: the ones with a design first (the page's main one leading),
+ * then the empty ones in the usual order. */
+export function orderedPageLayouts(summary?:PageLayoutSummary|null):PageLayoutVariantName[]{
+  const designed=new Set(designedPageLayouts(summary).map(item=>item.variant));
+  const first=designed.has(summary?.primary as PageLayoutVariantName)?[summary!.primary]:[];
+  const rest=PAGE_LAYOUT_ORDER.filter(variant=>designed.has(variant)&&!first.includes(variant));
+  const empty=PAGE_LAYOUT_ORDER.filter(variant=>!designed.has(variant));
+  return [...first,...rest,...empty];
+}
+
+/** The layout to open a page in: the one that has a design, else null (keep the usual default). */
+export const designedPrimaryLayout=(summary?:PageLayoutSummary|null):PageLayoutVariantName|null=>
+  orderedPageLayouts(summary).find(variant=>designedPageLayouts(summary).some(item=>item.variant===variant))??null;

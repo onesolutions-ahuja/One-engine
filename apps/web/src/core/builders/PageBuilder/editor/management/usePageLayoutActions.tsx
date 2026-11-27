@@ -8,6 +8,7 @@ import { childrenOf } from '../../../../pages/TemplatePageRuntime/pageComponentL
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
+import { designedPrimaryLayout } from '../../pageLayoutSummary';
 import {takePrefetchedPageEditorDraft} from '../../../../authentication/Client/authClient';
 import type { usePageEditorState } from '../usePageEditorState';
 import { applyOps, coEditorsStore, diffComponents, updateEditors, type CoEditOps, type CoEditor } from './pageCoEditing';
@@ -29,7 +30,7 @@ export function usePageLayoutActions(
     setFitCanvas, savedPageApiName, setLayoutVersions, setSelectedHistoryVersion,
     setMigrationLayoutId, applyPage, selected, selectionIds, paletteResizeStart,
     componentPanelWidth, setComponentPanelWidth, setCustomPropertiesDraft, updateComponent,
-    setCustomPropertiesError,
+    setCustomPropertiesError, layoutSummaries, fetchLayoutSummaries,
   } = editorState;
   const { selectedGroupMembers } = componentProperties;
 
@@ -39,18 +40,32 @@ export function usePageLayoutActions(
   useEffect(() => {
     if (builderAppApiName) setRecordAppId(builderAppApiName);
   }, [builderAppApiName]);
+  const openedPageRef=useRef('');
   /** Editor metadata is separate from the published runtime snapshot. */
   useEffect(() => {
     if (!editorMode) return;
     let active=true;
-    const variant=initialLayoutVariant??page.layoutVariant??'Desktop';
-    // A user-initiated device switch already fetched this draft. Do not fetch
-    // it a second time when the deep-link changes and overwrite new edits.
-    if(loadedEditorVariantRef.current===variant)return;
-    void takePrefetchedPageEditorDraft<{page:LightningPageMetadata}>(
-      `/metadata/pages/${encodeURIComponent(page.apiName)}/layouts/${variant}/editor`,request)
-      .then(result => {if(active){loadedEditorVariantRef.current=variant;onChange(result.page);}})
-      .catch(error => {if(active)onNotify(error instanceof Error?error.message:'Unable to load page draft');});
+    const load=async()=>{
+      // With no link to a specific layout, open the one that has a design (e.g. Custom) first.
+      let variant=initialLayoutVariant??page.layoutVariant??'Desktop';
+      if(!initialLayoutVariant&&openedPageRef.current!==page.apiName){
+        const summary=layoutSummaries[page.apiName]??(await fetchLayoutSummaries([page.apiName]))[0];
+        if(!active)return;
+        openedPageRef.current=page.apiName;
+        variant=designedPrimaryLayout(summary)??variant;
+        // Already showing that layout (the route loaded it): nothing to fetch.
+        if(variant===(page.layoutVariant??'Desktop')){loadedEditorVariantRef.current=variant;return;}
+      }
+      // A user-initiated device switch already fetched this draft. Do not fetch
+      // it a second time when the deep-link changes and overwrite new edits.
+      if(loadedEditorVariantRef.current===variant)return;
+      try{
+        const result=await takePrefetchedPageEditorDraft<{page:LightningPageMetadata}>(
+          `/metadata/pages/${encodeURIComponent(page.apiName)}/layouts/${variant}/editor`,request);
+        if(active){loadedEditorVariantRef.current=variant;onChange(result.page);}
+      }catch(error){if(active)onNotify(error instanceof Error?error.message:'Unable to load page draft');}
+    };
+    void load();
     return ()=>{active=false;};
   },[editorMode,page.apiName,initialLayoutVariant]);
   // Co-design: another person saved this layout. With no edits here it loads at once;

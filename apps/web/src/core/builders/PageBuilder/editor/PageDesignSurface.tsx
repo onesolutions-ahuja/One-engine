@@ -64,7 +64,7 @@ export default function PageDesignSurface({
 
         <div className={`page-builder-layout canvas-unified-builder reference-builder-layout ${page.layoutMode === 'free-canvas' ? 'modern-canvas-builder' : ''} ${activePanel === null ? 'unified-panel-collapsed' : ''} ${designInPanel ? 'has-design-dock' : ''}`}
           style={{ '--component-panel-width': `${componentPanelWidth}px` } as React.CSSProperties}>
-        <PageCanvasStage ribbon={ribbon} editorState={editorState} placement={placement} props={props} components={components} canvasGestures={canvasGestures} canvasRenderer={canvasRenderer} componentProperties={componentProperties} />
+        <PageCanvasStage ribbon={ribbon} editorState={editorState} placement={placement} props={props} components={components} canvasGestures={canvasGestures} canvasRenderer={canvasRenderer} componentProperties={componentProperties} onSwitchPage={layoutActions.selectSavedPage} />
   {editorState.ribbonPropertyHost && <React.Suspense fallback={null}><PagePropertyInspector editorState={editorState} props={props} placement={placement} components={components} componentProperties={componentProperties} ribbon={ribbon} componentActions={componentActions} /></React.Suspense>}
         </div>
         </>}

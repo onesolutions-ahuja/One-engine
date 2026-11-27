@@ -177,3 +177,7 @@
 .builder-page .free-canvas-component:not(.selected) > .free-canvas-content-viewport > .page-nested-empty{
   visibility:hidden;
 }
+
+/* A MultiPage tab is a fixed-size page: it never shows scrollbars of its own.
+ * Containers placed inside the tab keep their normal scrolling. */
+.builder-page .multipage-tab-component .smart-container:not(.multipage-tab-component .free-canvas-component .smart-container){overflow:hidden!important}

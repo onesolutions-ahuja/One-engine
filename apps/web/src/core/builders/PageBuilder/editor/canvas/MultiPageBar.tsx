@@ -32,19 +32,14 @@ export default function MultiPageBar({ components, selectedId, remembered, layou
     finished.current = true;
     const tab = tabs.find(item => item.id === renaming);
     const name = value?.trim();
-    if (tab && name && name !== tabName(tab) && !onRename(tab.id, name)) { finished.current = false; return; }
+    if (tab && name && name !== tab.label && !onRename(tab.id, name)) { finished.current = false; return; }
     setRenaming('');
-  };
-  // A tab shows its own name (Page key, else component name), never the component type.
-  const tabName = (tab: PageComponentMetadata) => {
-    const key = tab.properties?.pageKey, name = tab.properties?.navigatorName;
-    return typeof key === 'string' && key.trim() ? key.trim() : typeof name === 'string' && name.trim() ? name.trim() : tab.label;
   };
   return <nav className="multi-page-bar" aria-label="MultiPage tabs">
     <span className="multi-page-bar-title">{multiPage ? multiPageName(multiPage) : 'MultiPage'}</span>
     {multiPage ? <div className="multi-page-bar-tabs" role="tablist">
       {tabs.map(tab => tab.id === renaming
-        ? <input key={tab.id} ref={input} className="multi-page-rename" aria-label="Tab name" defaultValue={tabName(tab)}
+        ? <input key={tab.id} ref={input} className="multi-page-rename" aria-label="Tab name" defaultValue={tab.label}
             onKeyDown={event => {
               event.stopPropagation();
               if (event.key === 'Enter') { event.preventDefault(); finishRename(event.currentTarget.value); }
@@ -53,10 +48,10 @@ export default function MultiPageBar({ components, selectedId, remembered, layou
             onBlur={event => finishRename(event.currentTarget.value)} />
         : <button key={tab.id} type="button" role="tab" aria-selected={tab.id === open?.id}
             className={'multi-page-tab' + (tab.id === open?.id ? ' is-current' : '')}
-            title={tabName(tab) + ' · SCREEN(page, ' + multiPageName(multiPage) + ', ' + multiPageTabId(tab, tabs) + ') · double-click to rename'}
+            title={tab.label + ' · SCREEN(page, ' + multiPageName(multiPage) + ', ' + multiPageTabId(tab, tabs) + ') · double-click to rename'}
             onClick={() => { setRenaming(''); onOpen(multiPage.id, tab.id); }}
             onDoubleClick={() => { onOpen(multiPage.id, tab.id); setRenaming(tab.id); }}>
-            <b>{multiPageTabId(tab, tabs)}</b><span>{tabName(tab)}</span>
+            <b>{multiPageTabId(tab, tabs)}</b><span>{tab.label}</span>
           </button>)}
       <button type="button" className="multi-page-add" aria-label="Add tab" title="Add tab"
         onClick={() => onAdd(multiPage.id)}><Plus size={15} /></button>

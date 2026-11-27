@@ -24,7 +24,7 @@ import type { useCanvasGestures } from './useCanvasGestures';
 import type { createPageCanvasRenderer } from './createPageCanvasRenderer';
 import type { usePageComponentProperties } from '../inspector/usePageComponentProperties';
 
-export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, componentActions, onSwitchPage, onAddPage }: {
+export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, componentActions, onSwitchPage, onAddPage, onDeletePage }: {
   ribbon: ReturnType<typeof createPageRibbon>;
   editorState: ReturnType<typeof usePageEditorState>;
   placement: ReturnType<typeof usePagePlacement>;

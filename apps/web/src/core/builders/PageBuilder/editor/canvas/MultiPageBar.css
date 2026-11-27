@@ -1,0 +1,40 @@
+/* Bottom bars of Page Builder (MultiPage bar above the page bar): frozen under the canvas. */
+.page-builder-bottom-bars{
+  position:sticky;bottom:0;z-index:20;align-self:stretch;flex:0 0 auto;
+  display:flex;flex-direction:column;gap:6px;margin-top:8px;
+}
+.page-builder-bottom-bars>.app-page-bar{position:static;margin-top:0}
+.multi-page-bar{
+  display:flex;align-items:center;gap:8px;min-height:46px;padding:6px 10px;box-sizing:border-box;
+  background:#fff;border:1px solid #e3e7ed;border-radius:10px;
+  box-shadow:0 1px 3px rgba(16,24,40,.08);font-size:13px;color:#344054;
+}
+.multi-page-bar-title{font-weight:700;color:#101828;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.multi-page-bar-hint{color:#98a2b3;white-space:nowrap}
+.multi-page-bar-tabs{display:flex;align-items:center;gap:6px;overflow-x:auto;min-width:0}
+.multi-page-tab{
+  display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;flex:none;
+  border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#344054;font:inherit;cursor:pointer;
+}
+.multi-page-tab b{min-width:12px;text-align:center;font-size:11px;opacity:.7}
+.multi-page-tab span{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.multi-page-tab:hover{border-color:#98a2b3}
+.multi-page-tab.is-current{background:#2453d6;border-color:#2453d6;color:#fff;font-weight:600}
+.multi-page-add{
+  display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;
+  border:1px dashed #98a2b3;border-radius:8px;background:#fff;color:#5b6575;cursor:pointer;
+}
+.multi-page-rename{height:32px;min-width:120px;padding:0 10px;border:2px solid #2453d6;border-radius:8px;font:inherit;flex:none}
+.multi-page-editors{display:inline-flex;gap:4px;align-items:center}
+.multi-page-editor{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+  color:#fff;font-weight:700;font-size:12px}
+.multi-page-bar-layouts{margin-left:auto;flex:none}
+
+/* Desktop / Tablet / Mobile / Custom: a segmented control with icons. */
+.page-layout-tabs{display:inline-flex;gap:2px;padding:3px;border:1px solid #e9ebf0;border-radius:12px;background:#f5f6f8;flex:none}
+.page-layout-tab{position:relative;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:0;border-radius:9px;
+  background:transparent;color:#667085;font:inherit;font-size:13px;cursor:pointer}
+.page-layout-tab:hover:not(:disabled){color:#344054}
+.page-layout-tab.is-current{background:#fff;color:#4f46e5;font-weight:600;box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.page-layout-tab:disabled{opacity:.6;cursor:default}
+.page-layout-dot{position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:#4f46e5}

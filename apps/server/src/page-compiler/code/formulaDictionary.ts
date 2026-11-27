@@ -117,7 +117,7 @@ export const FORMULA_DICTIONARY:Readonly<Record<string,FormulaEntry>>=Object.fre
  UPDATERECORD:action(4,82,'UPDATERECORD(Object, Id, Field, value, ...) -> update in the same transaction'),
  DELETERECORD:action(2,2,'DELETERECORD(Object, Id) -> delete in the same transaction'),
  FOREACH:action(3,44,'FOREACH(Object, Field, value, ..., AS(x), step) -> for each matching record'),
- SCREEN:action(1,5,'SCREEN(page, [mode], [recordId], [layer 0-9], [seconds]) in any order after the page (seconds right after the layer: show it that long, then layer 0): open a page; SCREEN(page, n) switches page to layer n where it shows (this screen, second screen, customer displays) and never leaves this screen; SCREEN(page, current, n) also opens it here'),
+ SCREEN:action(1,6,'SCREEN(page, [mode], [recordId], [MultiPage, tab id], [seconds]) in any order after the page: open a page; SCREEN(page, MultiPage, n) opens tab n (the tab id, kept when the tab is renamed or moved) of that MultiPage where the page shows (this screen, second screen, customer displays) and never leaves this screen; SCREEN(page, current, MultiPage, n) also opens it here; seconds right after the tab: show it that long, then tab 0'),
  CLOSESCREEN:action(0,1,'CLOSESCREEN(["second"]): close this popup, or the second-monitor screen'),
  INFOSCREEN:action(1,2,'INFOSCREEN(message, [actions after OK]): message box with OK'),
  LOCKSCREEN:action(0,0,'LOCKSCREEN(): lock the till'),

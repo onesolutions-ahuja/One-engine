@@ -27,7 +27,7 @@ export function formulaSignatureAt(source:string,caret:number,actions=false){
   const signatures:Record<string,string[]>={
    EMAIL:['NamedCredential','To','Subject','Body','Attachment'],WHATSAPP:['NamedCredential','Recipient','Message','Attachment'],
    SMS:['NamedCredential','To','Message'],PRINT:['TemplateApiName','RecordId'],
-   CREATEPDF:['TemplateApiName','RecordId','AS(variable)'],WAIT:['Minutes','Seconds'],SCREEN:['PageApiName','Mode','RecordId','Layer','Seconds'],INFOSCREEN:['Message','ActionsAfterOk'],FLOW:['FlowApiName'],ACTIONS:['Action'],CREATERECORD:['Object','Field','Value'],
+   CREATEPDF:['TemplateApiName','RecordId','AS(variable)'],WAIT:['Minutes','Seconds'],SCREEN:['PageApiName','Mode','RecordId','MultiPage','TabId','Seconds'],INFOSCREEN:['Message','ActionsAfterOk'],FLOW:['FlowApiName'],ACTIONS:['Action'],CREATERECORD:['Object','Field','Value'],
    UPDATERECORD:['Object','RecordId','Field','Value'],DELETERECORD:['Object','RecordId'],
    GETRECORD:['Object','Field','Value'],STATE:['Key','Value'],COUNTIFS:['Object','Field','Value'],
    SUMIFS:['Object','ValueField','Field','Value'],AVERAGEIFS:['Object','ValueField','Field','Value'],

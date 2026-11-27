@@ -39,7 +39,7 @@ export function updateEditors(editors:readonly CoEditor[],heard:CoEditor|null,no
  return out;
 }
 
-/** The other designers here now (shown by the Layers bar). */
+/** The other designers here now (shown on the MultiPage bar). */
 let shownEditors:CoEditor[]=[];
 const editorListeners=new Set<()=>void>();
 export const coEditorsStore={

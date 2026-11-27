@@ -501,6 +501,18 @@ export function multiPageKey(child: PageComponentMetadata): string {
   const key = child.properties?.pageKey;
   return typeof key === 'string' && key.trim() ? key.trim() : child.label;
 }
+/** Smart MultiPage tab id (like an Excel sheet id): the tab's own "pageIndex" number, kept
+ * when the tab is renamed or moved. A tab saved before ids existed uses its position. */
+export function multiPageTabId(child: PageComponentMetadata, tabs: readonly PageComponentMetadata[]): number {
+  const own = Number(child.properties?.pageIndex);
+  if (child.properties?.pageIndex !== undefined && child.properties?.pageIndex !== '' && Number.isInteger(own) && own >= 0) return own;
+  return Math.max(0, tabs.findIndex(tab => tab.id === child.id));
+}
+/** MultiPage name used in formulas, e.g. SCREEN(page, ReportsPages, 1). */
+export function multiPageName(component: PageComponentMetadata): string {
+  const name = component.properties?.navigatorName;
+  return typeof name === 'string' && name.trim() ? name.trim() : component.label;
+}
 /** True when `id` is `ancestorId` or sits anywhere inside it. */
 export function isSelfOrDescendant(components: PageComponentMetadata[], ancestorId: string, id: string | null | undefined): boolean {
   if (!id) return false;

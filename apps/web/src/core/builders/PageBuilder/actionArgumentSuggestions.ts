@@ -2,11 +2,14 @@ import {tokenize} from '../../../../../server/src/expression-engine/FormulaToken
 
 type Choice={apiName:string;label:string};
 type Source=Choice&{fields:readonly Choice[]};
+/** A MultiPage on a page and its tabs (id = the tab's own number), for SCREEN(page, MultiPage, id). */
+export type ScreenTarget={name:string;tabs:readonly {id:number;label:string}[]};
 
 /** Inspect complete tokens before the caret, including nested call frames. */
 export function actionArgumentSuggestions(before:string,objects:readonly Source[],flows:readonly Choice[],
  pages:readonly (Choice&{pageType:string;status:string})[]=[],credentials:readonly Choice[]=[],
- callouts:readonly (Choice&{fields?:readonly string[];outputs?:readonly string[]})[]=[]){
+ callouts:readonly (Choice&{fields?:readonly string[];outputs?:readonly string[]})[]=[],
+ screenTargets:(page:string)=>readonly ScreenTarget[]|undefined=()=>undefined){
  const suffix=/[A-Za-z0-9_.]*$/.exec(before)?.[0]??'';
  const prefix=before.slice(0,before.length-suffix.length);
  let tokens;
@@ -44,7 +47,16 @@ export function actionArgumentSuggestions(before:string,objects:readonly Source[
  if(index===0&&['SCREEN','PRINT','CREATEPDF'].includes(frame.name))
   return {query:suffix,choices:pages.filter(item=>item.status==='Active'&&(['PRINT','CREATEPDF'].includes(frame.name)
    ?item.pageType==='Print Template':['App Page','In-Screen Page'].includes(item.pageType)))};
- if(index>=1&&frame.name==='SCREEN'&&!/^[@\d]/.test(suffix))return {query:suffix,choices:['current','popup','newwindow','second'].map(apiName=>({apiName,label:apiName}))};
+ if(index>=1&&frame.name==='SCREEN'){
+  // SCREEN(page, MultiPage, id): after a MultiPage name come its tabs, else the modes and the page's MultiPages.
+  const targets=screenTargets(frame.args[0].join(''))??[];
+  const previous=frame.args[index-1]?.join('').toLowerCase();
+  const multiPage=targets.find(item=>item.name.toLowerCase()===previous);
+  if(multiPage)return {query:suffix,choices:multiPage.tabs.map(tab=>({apiName:String(tab.id),label:tab.id+' · '+tab.label}))};
+  if(/^[@\d]/.test(suffix))return null;
+  return {query:suffix,choices:[...['current','popup','newwindow','second'].map(apiName=>({apiName,label:apiName})),
+   ...targets.map(item=>({apiName:item.name,label:item.name+' (MultiPage)'}))]};
+ }
  if(index===0&&['EMAIL','WHATSAPP','SMS'].includes(frame.name))return {query:suffix,choices:credentials};
  if(frame.name==='FLOW'&&index===0)return {query:suffix,choices:flows};
  if(!['CREATERECORD','UPDATERECORD','DELETERECORD'].includes(frame.name))return null;

@@ -175,8 +175,3 @@
 .page-settings-ribbon-field select{height:32px;border:1px solid #d0d5dd;border-radius:6px;padding:0 8px;font:inherit}
 .page-settings-ribbon small{color:#5b6575}
 
-.page-layout-tabs{display:inline-flex;gap:2px;padding:2px;border:1px solid #e3e7ed;border-radius:8px;background:#f8f9fb;flex:none}
-.page-layout-tab{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#344054;font:inherit;font-size:12px;cursor:pointer}
-.page-layout-tab.is-current{background:#fff;color:#2453d6;font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.12)}
-.page-layout-tab:disabled{opacity:.6;cursor:default}
-.page-layout-dot{width:6px;height:6px;border-radius:50%;background:#2453d6;display:inline-block}

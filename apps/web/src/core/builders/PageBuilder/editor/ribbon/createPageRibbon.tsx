@@ -4,7 +4,7 @@ import * as React from 'react';
 import {
 ArrowLeft, Check, ClipboardPaste, Copy, Database, Eye, EyeOff, Filter, Type, MoveHorizontal,
 MoveVertical, Puzzle, Smartphone, RefreshCw, Save, Scissors, SlidersHorizontal, Undo2, Redo2, Trash2,
-Workflow, Layers3, ChevronDown, FileCog
+Workflow, Layers3, ChevronDown, FileCog, Monitor, Tablet as TabletIcon, LayoutGrid
 } from 'lucide-react';
 import RibbonColorPalette from '../../RibbonColorPalette';
 import PageComponentNavigator from '../../PageComponentNavigator';
@@ -24,7 +24,7 @@ import { updateSharedCanvasProperties, updateSharedCanvasPositions } from '../..
 import { selectCanvasIds } from '../../canvasSelectionInteractions';
 import { childrenOf, isLayoutContainer, rawLayoutParentId } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
-import { pageLayoutOptionLabel, PAGE_LAYOUT_ORDER, orderedPageLayouts, designedPageLayouts } from '../../pageLayoutSummary';
+import { pageLayoutOptionLabel, PAGE_LAYOUT_ORDER, designedPageLayouts } from '../../pageLayoutSummary';
 
 import type { usePageEditorState } from '../usePageEditorState';
 import type { usePageLayoutActions } from '../management/usePageLayoutActions';
@@ -537,17 +537,19 @@ export function createPageRibbon(
           {ribbonTab==='Component Design 2'&&renderSmartRibbon('designTail')}
         </div>);
 
-  /** Top-bar Desktop / Tablet / Mobile / Custom tabs: layouts with a design come first. */
+  /** Desktop / Tablet / Mobile / Custom tabs (right of the MultiPage bar); a dot marks a layout with its own design. */
+  const layoutIcons = { Desktop: Monitor, Tablet: TabletIcon, Mobile: Smartphone, Custom: LayoutGrid } as const;
   const layoutTabs = (
     <div className="page-layout-tabs" role="tablist" aria-label="Page layout">
-      {orderedPageLayouts(layoutSummaries[page.apiName]).map(variant => {
+      {(['Desktop', 'Tablet', 'Mobile', 'Custom'] as const).map(variant => {
         const designed = designedPageLayouts(layoutSummaries[page.apiName]).some(item => item.variant === variant);
+        const Icon = layoutIcons[variant];
         return <button key={variant} type="button" role="tab" aria-selected={(page.layoutVariant ?? 'Desktop') === variant}
           className={'page-layout-tab' + ((page.layoutVariant ?? 'Desktop') === variant ? ' is-current' : '')}
           disabled={switchingLayout || saving || previewMode}
           title={pageLayoutOptionLabel(variant, layoutSummaries[page.apiName])}
           onClick={() => { if ((page.layoutVariant ?? 'Desktop') !== variant) void switchLayoutVariant(variant as PageLayoutVariant); }}>
-          {variant}{designed && <i className="page-layout-dot" aria-label="Has a design" />}
+          <Icon size={15} aria-hidden="true" />{variant}{designed && <i className="page-layout-dot" aria-label="Has a design" />}
         </button>;
       })}
     </div>

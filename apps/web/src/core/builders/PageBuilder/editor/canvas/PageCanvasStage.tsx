@@ -12,9 +12,8 @@ import { appRoutePath, type AppRoute } from '../../../../workspace/Navigation/ap
 import { Grid2X2, Move, Plus } from 'lucide-react';
 import { childrenOf } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import PreviewDeviceFrame from '../../PreviewDeviceFrame';
-import PageLayerBar from './PageLayerBar';
+import MultiPageBar from './MultiPageBar';
 import AppPageBar from './AppPageBar';
-import { componentLayer } from '../../../../pages/PageRuntime/pageLayers';
 
 import type { createPageRibbon } from '../ribbon/createPageRibbon';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -25,7 +24,7 @@ import type { useCanvasGestures } from './useCanvasGestures';
 import type { createPageCanvasRenderer } from './createPageCanvasRenderer';
 import type { usePageComponentProperties } from '../inspector/usePageComponentProperties';
 
-export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, onSwitchPage, onAddPage }: {
+export default function PageCanvasStage({ ribbon, editorState, placement, props, components, canvasGestures, canvasRenderer, componentProperties, componentActions, onSwitchPage, onAddPage }: {
   ribbon: ReturnType<typeof createPageRibbon>;
   editorState: ReturnType<typeof usePageEditorState>;
   placement: ReturnType<typeof usePagePlacement>;
@@ -34,6 +33,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
   canvasGestures: ReturnType<typeof useCanvasGestures>;
   canvasRenderer: ReturnType<typeof createPageCanvasRenderer>;
   componentProperties: ReturnType<typeof usePageComponentProperties>;
+  componentActions: { addMultiPageTab: (multiPageId: string) => void; renameTab: (tabId: string, name: string) => boolean };
   /** Switch to another page of the app (asks before discarding unsaved edits). */
   onSwitchPage?: (apiName: string) => void;
   /** Add an App page or a Popup to the app (bottom bar +). */
@@ -47,7 +47,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     previewPageDefinitionCache, device, fitCanvas, fitScale, canvasZoom, canvasSnap,
     marqueeOverlayRef, selected, openAddBlocks, canvasGuideXRef, canvasGuideYRef, targetObject,
     previewRecordId, previewRecord, setPreviewRecordId, previewRecords, fields, previewFieldValue,
-    stringList, template, canvasLayer, setCanvasLayer, addedLayers, setAddedLayers, updateComponent, applyPage,
+    stringList, template, applyPage, openBuilderTabs, setOpenBuilderTabs, selectedId,
   } = editorState;
   const { handleDrop } = placement;
   const { page, apps, objects, pages, reports, libraryComponents, flows, onLaunchFlow } = props;
@@ -57,20 +57,14 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     endCanvasGroupGesture, startCanvasGroupGesture,
   } = canvasGestures;
   const { renderPageComponent, renderRegion } = canvasRenderer;
+  const { addMultiPageTab, renameTab } = componentActions;
   const { selectedGroupBounds, selectedGroupMembers } = componentProperties;
   // Preview runs the compiled page: compiled once per opened draft, not per component.
-  // Picking a component on another layer (navigator, search) opens that layer.
-  const selectedLayer = selected ? componentLayer(selected, page.components) : null;
-  useEffect(() => {
-    if (selectedLayer !== null && selectedLayer !== canvasLayer) setCanvasLayer(selectedLayer);
-  }, [selected?.id, selectedLayer]); // eslint-disable-line react-hooks/exhaustive-deps
-  const designLayers = page.layoutMode === 'free-canvas' && !previewMode;
+  const designBars = !previewMode;
   const renderTopLevel = () => {
     const top = childrenOf(page.components, null);
     const render = (component: typeof top[number]) => renderPageComponent(component, page.components.findIndex((item) => item.id === component.id));
-    if (page.layoutMode !== 'free-canvas') return top.map(render);
-    // Each layer is its own blank screen: design (and preview) only the open layer's components.
-    return top.filter(component => componentLayer(component, page.components) === canvasLayer).map(render);
+    return top.map(render);
   };
   const compiledPreview = useMemo(() => previewMode ? compilePageCached(page, objects, {strictLegacy:true}) : null, [previewMode, page, objects]);
   // Preview: the server converts the page exactly as shown (no Save needed) and Preview runs that file.
@@ -120,14 +114,17 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
 
   return <>
 {designInPanel && <aside className="page-builder-design-dock" aria-label="Page Builder panel">
-          <div className="page-builder-design-dock-header">
-            {ribbonComponentSelector}
-            {ribbonNavigation}
+          {/* Insert / Design / Actions / Page settings: an icon rail down the left of the panel. */}
+          <div className="page-builder-design-dock-rail">{ribbonNavigation}</div>
+          <div className="page-builder-design-dock-main">
+            <div className="page-builder-design-dock-header">
+              {ribbonComponentSelector}
+            </div>
+            {/* Reuse the shared ribbon editor and SQL-backed Design 2 slot matrix in the left dock. */}
+            <section className="office-builder-ribbon page-builder-design-dock-ribbon" aria-label="Page Builder panel controls">
+              {renderRibbonPanel()}
+            </section>
           </div>
-          {/* Reuse the shared ribbon editor and SQL-backed Design 2 slot matrix in the left dock. */}
-          <section className="office-builder-ribbon page-builder-design-dock-ribbon" aria-label="Page Builder panel controls">
-            {renderRibbonPanel()}
-          </section>
         </aside>}
         <div className="page-preview-area" ref={pagePreviewAreaRef}>
           <div className="page-stage" key={canvasRefreshKey}
@@ -248,22 +245,22 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
               </>}
             </div>)}
           </div>
-          {designLayers && <PageLayerBar components={page.components} current={canvasLayer} added={addedLayers}
-            selected={selected}
-            onPick={layer => { setCanvasLayer(layer); if (selected && componentLayer(selected, page.components) !== layer) { setSelectedId(''); setSelectionIds([]); } }}
-            onAdd={layer => { setAddedLayers(current => [...new Set([...current, layer])]); setSelectedId(''); setSelectionIds([]); setCanvasLayer(layer); }}
-            onMove={(component, layer) => {
-              const properties = { ...component.properties };
-              if (layer === 0) delete properties.pageLayer; else properties.pageLayer = layer;
-              updateComponent(component.id, { properties });
-              setCanvasLayer(layer);
-            }} />}
-          {onSwitchPage && ['App Page', 'Home Page', 'In-Screen Page'].includes(page.pageType) && (() => {
-            const app = apps.find(item => item.apiName === builderAppApiName)
-              ?? apps.find(item => item.navigationPageApiNames?.includes(page.apiName));
-            return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} onAdd={onAddPage}
-              onRename={label => applyPage({ ...page, label })} /> : null;
-          })()}
+          <div className="page-builder-bottom-bars">
+            {designBars && <MultiPageBar components={page.components} selectedId={selectedId} remembered={openBuilderTabs}
+              layouts={ribbon.layoutTabs}
+              onOpen={(multiPageId, tabId) => {
+                setOpenBuilderTabs(old => ({ ...old, [multiPageId]: tabId }));
+                setGroupEditId(''); setSelectionIds([tabId]); setSelectedRegion(null); setSelectedId(tabId);
+              }}
+              onAdd={multiPageId => addMultiPageTab(multiPageId)}
+              onRename={(tabId, name) => renameTab(tabId, name)} />}
+            {onSwitchPage && ['App Page', 'Home Page', 'In-Screen Page'].includes(page.pageType) && (() => {
+              const app = apps.find(item => item.apiName === builderAppApiName)
+                ?? apps.find(item => item.navigationPageApiNames?.includes(page.apiName));
+              return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} onAdd={onAddPage}
+                onRename={label => applyPage({ ...page, label })} /> : null;
+            })()}
+          </div>
         </div>
   </>;
 }

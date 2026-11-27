@@ -342,12 +342,12 @@ export function registerPageScriptRoutes(app:Express,deps:PageScriptDeps){
   res.setHeader('Cache-Control','private, no-store');
   res.json(await screens().currentSession(actor,(req.body??{}).mirrorKey));
  }));
- // SCREEN(page, n): the screens following this device that show page switch to layer n.
- app.post('/api/screens/layer',wrap(async(req,res)=>{
+ // SCREEN(page, MultiPage, n): the screens following this device that show page open tab n of that MultiPage.
+ app.post('/api/screens/tab',wrap(async(req,res)=>{
   const actor=authenticated(req);
   res.setHeader('Cache-Control','private, no-store');
   const body=(req.body??{}) as Record<string,unknown>;
-  res.json(await screens().showLayer(actor,body.deviceKey,body.page,body.layer));
+  res.json(await screens().showTab(actor,body.deviceKey,body.page,body.multiPage,body.tab));
  }));
  app.post('/api/screens/corner',wrap(async(req,res)=>{
   const actor=authenticated(req);

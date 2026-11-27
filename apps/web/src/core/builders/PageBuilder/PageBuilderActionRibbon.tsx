@@ -1,3 +1,4 @@
+import {loadScreenTargets} from './screenTargets';
 import {modernizeFormula} from '../../../../../server/src/expression-engine/PageReferences.js';
 import {isActionPlan} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {useState,useEffect} from 'react';
@@ -242,6 +243,7 @@ export default function PageBuilderActionRibbon({
        <span className="page-action-formula-symbol" aria-hidden="true"
          title={'Formula: @CartLine.Quantity + 1; @ThisPage.'+(ownerName||'Button1')+'.key := @event.value; @filter.key := @event.value; @navigate.page := "App/Page"; IF(@ThisPage.Cart1.Total > 500, FLOW(ApplePay), FLOW(CardMachine))'}>ƒx</span>
        <SmartFormulaField label="Selected action formula" fields={formulaFields} objects={objects} actionPages={pages} actionCredentials={credentials} actionCallouts={callouts}
+         loadScreenTargets={request?page=>loadScreenTargets(request,page):undefined}
          stateOptions={stateOptions}
          flowReferences={availableFlows.map(flow=>({apiName:flow.apiName,label:flow.label}))}
          validate={value=>!isActionPlan(value)&&isFlowActionFormula(value)?validateFlowActionFormula(value,flows):null}

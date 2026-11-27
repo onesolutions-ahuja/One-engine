@@ -65,9 +65,6 @@ const sharedPageSettings:ComponentSettingDefinition[]=[
  {propertyKey:'actionFlows',label:'Configured Actions',kind:'GROUP',section:'Actions'},
  {propertyKey:'editorLocked',label:'Lock component in designer',kind:'BOOLEAN',
   defaultValue:false,section:'Arrange'},
- // Page layer (0-9, 0 = the page itself): which layer of the page the component is on.
- // A nested component follows its container. Opened with SCREEN(page, n).
- {propertyKey:'pageLayer',label:'Page layer',kind:'NUMBER',min:0,max:9,defaultValue:0,section:'Arrange'},
  // Data ribbon "Record filter formula": which rows a list shows, e.g.
  // =IF(ISBLANK(@ThisPage.Tabs.Selected.Id), TRUE, @Product.Category = @ThisPage.Tabs.Selected.Id)
  {propertyKey:'filterFormula',label:'Record filter formula',kind:'TEXT',maxLength:2000,section:'Data'}

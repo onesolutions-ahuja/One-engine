@@ -36,7 +36,7 @@ export class PageRuntime {
    * trips PER PAGE (1,500 for this tenant) and it is read on every app open
    * (landing bootstrap, offline publication): it is kept per tenant and rebuilt
    * only when any page table row of that tenant changed (one cheap stamp query). */
-  private readonly listCache=new Map<string,{stamp:string;value:Promise<Awaited<ReturnType<PageRuntime['metadata']>>[]>}>();
+  private readonly listCache=new Map<string,{stamp:string;value:Promise<Array<Awaited<ReturnType<PageRuntime['metadata']>>&{opensPages:string[]}>>}>();
   private async pagesStamp(tenantId:string):Promise<string>{
     const part=(table:string)=>`(SELECT count(*)::text||'.'||COALESCE(max(xmin::text::bigint),0)::text FROM ${table} WHERE tenant_id=$1)`;
     const {rows}=await this.db.query<{stamp:string}>(`SELECT concat_ws('|',${[
@@ -49,7 +49,29 @@ export class PageRuntime {
     const {rows}=await this.db.query<{api_name:string}>(`SELECT p.api_name FROM md_page_definitions p
       JOIN md_lightning_page_details d ON d.tenant_id=p.tenant_id AND d.page_id=p.id
       WHERE p.tenant_id=$1 AND p.enabled=true ORDER BY p.title,p.api_name`,[tenantId]);
-    return Promise.all(rows.map(row=>this.metadata(tenantId,row.api_name)));
+    const opens=await this.pagesOpened(tenantId);
+    return Promise.all(rows.map(async row=>{
+      const page=await this.metadata(tenantId,row.api_name);
+      return {...page,opensPages:[...(opens.get(row.api_name)??[])].sort()};
+    }));
+  }
+  /** The pages each page opens with SCREEN(page, …), read from every layout (Desktop, Tablet,
+   * Mobile, Custom; draft and published). A page built only in Custom still owns its popups. */
+  private async pagesOpened(tenantId:string):Promise<Map<string,Set<string>>>{
+    const {rows}=await this.db.query<{api_name:string;value_text:string|null}>(`SELECT DISTINCT p.api_name,v.value_text
+      FROM md_page_layout_heads h
+      JOIN md_page_layout_version_properties v ON v.tenant_id=h.tenant_id AND v.page_id=h.page_id
+       AND v.variant=h.variant AND (v.version=h.draft_version OR v.version=h.published_version)
+      JOIN md_page_definitions p ON p.tenant_id=h.tenant_id AND p.id=h.page_id
+      WHERE h.tenant_id=$1 AND p.enabled=true AND v.value_text ILIKE '%SCREEN(%'`,[tenantId]);
+    const result=new Map<string,Set<string>>();
+    for(const row of rows){
+      for(const match of String(row.value_text??'').matchAll(/SCREEN\(\s*([A-Za-z][A-Za-z0-9_]*)/gi)){
+        const found=result.get(row.api_name)??new Set<string>();
+        found.add(match[1]);result.set(row.api_name,found);
+      }
+    }
+    return result;
   }
   async list(tenantId:string) {
     // Inside a transaction the caller may see its own uncommitted page changes.

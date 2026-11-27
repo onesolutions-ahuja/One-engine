@@ -58,13 +58,16 @@ export const resolvePageActivationApp=(
  * app whose pages open it, through popups that open popups. */
 export function pageAppsWithPopups(
  apps:ReadonlyArray<Pick<LightningAppMetadata,'apiName'|'navigationPageApiNames'|'navigationOrder'>>,
- pages:ReadonlyArray<Pick<LightningPageMetadata,'apiName'|'activationAssignments'|'ownerNamespace'>&{components?:unknown}>
+ pages:ReadonlyArray<Pick<LightningPageMetadata,'apiName'|'activationAssignments'|'ownerNamespace'>&{components?:unknown;opensPages?:unknown}>
 ):Map<string,string[]>{
  const result=new Map(pages.map(page=>[page.apiName,new Set(pageActivationAppCandidates(apps,page))]));
  const opens=new Map(pages.map(page=>{
   let text='';try{text=JSON.stringify(page.components??[]);}catch{/* not serialisable */}
   const found=new Set<string>();
   for(const match of text.matchAll(/SCREEN\(\s*([A-Za-z][A-Za-z0-9_]*)/gi))found.add(match[1].toLowerCase());
+  // The server lists the pages opened from every layout (a page built only in Custom too).
+  if(Array.isArray(page.opensPages))for(const name of page.opensPages)
+   if(typeof name==='string'&&name)found.add(name.toLowerCase());
   return [page.apiName,found];
  }));
  const byLower=new Map(pages.map(page=>[page.apiName.toLowerCase(),page.apiName]));

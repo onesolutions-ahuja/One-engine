@@ -12,7 +12,7 @@ import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary'
 import { pageActivationAppCandidates, resolvePageActivationApp, pageAppsWithPopups } from '../../pageAppMembership';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
 import { downloadPageCode } from '../../../../pages/AppPackage/pageCodeDownload';
-import { dropAppDraft, otherAppDrafts } from './appDraftStore';
+import { dropAppDraft, keepAppDraft, otherAppDrafts } from './appDraftStore';
 import { PAGE_LIST_TYPES } from '../../pageBuilderUx';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
@@ -510,9 +510,25 @@ export function usePageManagement(
   };
 
   /** Bottom bar "+": add a screen to the app being edited as an App page or a Popup (In-Screen page). */
+  /** Red X on the page bar. Warns first: the page is deleted for good, not archived. */
+  const deletePagePermanently = async (apiName: string) => {
+    if (saving || !props.onDeletePagePermanently) return;
+    const label = [page, ...pages].find(item => item.apiName === apiName)?.label ?? apiName;
+    if (!window.confirm('Delete "' + label + '" permanently?\n\nThe page, its layouts and its history are deleted and cannot be recovered. It is not archived.')) return;
+    setSaving(true);
+    try {
+      await props.onDeletePagePermanently(apiName);
+      if (appModeId) dropAppDraft(appModeId, apiName, page.layoutVariant ?? 'Desktop');
+      setUndoStack([]); setRedoStack([]);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : 'Unable to delete the page');
+    } finally { setSaving(false); }
+  };
   const addAppPage = async (type: 'App Page' | 'In-Screen Page') => {
     if (saving || !builderAppApiName) return;
-    if (editorMode && undoStack.length && !window.confirm('Discard unsaved Page Builder edits?')) return;
+    // Editing the whole app keeps this page's edits; a single page still asks first.
+    if (appModeId) { if (undoStack.length) keepAppDraft(appModeId, page, undoStack[0]); }
+    else if (editorMode && undoStack.length && !window.confirm('Discard unsaved Page Builder edits?')) return;
     const word = type === 'In-Screen Page' ? 'Popup' : 'Screen';
     const taken = new Set([page, ...pages].map(item => item.label.toLowerCase()));
     let count = 1;
@@ -542,7 +558,7 @@ export function usePageManagement(
   };
 
   return {
-    savePage, saveCurrent, activateListedPage, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
+    savePage, saveCurrent, activateListedPage, deletePagePermanently, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
     showRelatedObjectColumn, pageListPageCount, safePageListPage, paginatedPages, openPageDesign,
     layoutBadges, copyLayoutFrom, downloadPageInventory, downloadAllPageFormulas, downloadCompiledPageScript, openCreatePage, createPage, addAppPage,
   };

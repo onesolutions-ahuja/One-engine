@@ -27,3 +27,8 @@
   border:1px solid #d0d5dd;border-radius:10px;background:#fff;cursor:pointer;font:inherit}
 .app-page-add-choices button:hover{border-color:#2453d6;background:#f5f7ff}
 .app-page-add-choices small{color:#5b6575}
+/* Red X on the open page: deletes the page permanently (after a warning). */
+.app-page-delete{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:2px;
+  border-radius:50%;background:#e5484d;color:#fff;cursor:pointer;flex:none}
+.app-page-delete:hover{background:#c62a2f}
+.app-page-delete:focus-visible{outline:2px solid #c62a2f;outline-offset:1px}

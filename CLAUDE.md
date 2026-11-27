@@ -5,13 +5,8 @@ deploy and measuring), `docs/real-code-runtime-plan.md`.
 
 ## The owner's rules (follow every time)
 - Short answers. No long summaries or "stories". Plain words: the owner is not a coder.
-- Do the work yourself (you have a signed-in built-in browser on unesolutions.co.uk). Do not hand tasks back.
-- Build the best way, not a quick patch. If a better approach exists, say so up front and build that.
 - Put all related work in one PR. Do not open many small PRs, one per fix. Do not add to a PR after saying it is ready.
-- Never say "ready" before testing on the live site. Say exactly what was tested and what could not be.
 - If something is truly unclear, ask one short question; otherwise decide and say what you decided.
-- Before changing live business formulas (payments etc.), back up the pages and say what changes.
-- Everything is generic for every app built in Page Builder (till, kiosk, displays...), never hardcoded to one app.
 
 ## Map
 Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the source of truth).
@@ -49,11 +44,6 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
 - PRs via REST (`gh api repos/onesolutions-ahuja/One-engine/pulls ...`); GraphQL is blocked.
 
 ## Live testing
-- Site: https://unesolutions.co.uk. Till: `/une/apps/SMARTTILL/pages/smart_till_billing`;
-  display: `/une/apps/SMARTTILL/pages/smart_till_customer_display?mirror=<till device key>`; pairing: `/display`.
-- Measure with `Date.now()` in two tabs of the same browser (MutationObserver on the changed text). Background tabs
-  are throttled: front the tab being measured. Smart Till data is dummy: test sales are fine.
-- Never type passwords; if signed out, ask the owner to sign in.
 
 ## Installed apps (Android / Windows)
 - Building or changing an installed app: follow `docs/APP-BUILD-CHECKLIST.md`. The app must set `window.__uneDeviceKey` and `window.__uneAttachedDevices` at start-up, or tills keep asking "Which till is this?".

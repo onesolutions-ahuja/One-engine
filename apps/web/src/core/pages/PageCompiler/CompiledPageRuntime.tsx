@@ -986,7 +986,10 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    ...(toggleBinding?{toggleFieldBound:true,toggleFieldReady:toggleCanWrite,toggleFieldError:toggleBinding.error??'',
     value:toggleBinding.ready?toggleBinding.value:false,onBoundToggleChange:changeBoundToggle}:{}),
    // `@ThisPage.Name.Value = …`: shown until the user types or picks again.
-   ...(given?{textSource:'',defaultValue:'',givenValue:given,value:given.value===null||given.value===undefined?'':String(given.value)}:{}),
+   // A list drawn from records (Tabs, Selector, Card Grid…) keeps its row caption
+   // (textSource): the given value is its selection, not text to show.
+   ...(given?{...(objectApiName||dataCollectionRows?{}:{textSource:''}),defaultValue:'',givenValue:given,
+    value:given.value===null||given.value===undefined?'':String(given.value)}:{}),
    ...(heldProps.Caption!==undefined?{label:heldProps.Caption}:{}),
    // `@ThisPage.Name.BackgroundColor / TextColor / BorderColor / IconColor / Icon = …`.
    ...uiPropertyProps(heldProps,definition.apiName)

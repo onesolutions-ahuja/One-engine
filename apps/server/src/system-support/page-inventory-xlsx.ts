@@ -9,7 +9,7 @@ const GUIDE:Array<[string,string,string]>=[
  ['How to use','Big downloads continue on sheets Pages 2, Pages 3... (all are uploaded). 1. Change values in the Pages sheet (add rows to add properties or components). 2. Save as .xlsx. 3. Page Builder > Upload > choose the file > Validate > Apply.','Only the Pages sheet is uploaded; Guide and Sample are ignored. Blank value = no change.'],
  ['pageapi','Page API name, e.g. smart_till_payment.','Must be an existing page.'],
  ['component_type','Component type without "Custom:", e.g. smart_button, smart_container, smart_multipage.','A new component_name with a type creates the component.'],
- ['component_name','The component name shown in Layers, e.g. PayConfirm.','Unique on the page.'],
+ ['component_name','The component name, e.g. PayConfirm.','Unique on the page.'],
  ['propertyid','The property to set (see rows below for special ones). Ribbon properties use their key, e.g. label, textSource, visibleFormula, backgroundColor.','Download a page to see every property it has.'],
  ['value','The new value. Formulas start with =.','Text that is a formula in the app is sent exactly as written; Excel formulas are not accepted.'],
  ['layout','Desktop, Tablet, Mobile or Custom.','Blank = the layout chosen on upload.'],
@@ -18,7 +18,6 @@ const GUIDE:Array<[string,string,string]>=[
  ['component.position.width / height','Size in pixels.','Must be more than 0.'],
  ['component.parent','Name of the container this component sits in (Smart Container, Smart MultiPage page...). none = on the page.','Containers can be inside containers.'],
  ['component.visible','TRUE or FALSE.',''],
- ['pageLayer','Layer 0-9 (only one layer shows at a time).','0 = default layer.'],
  ['actionFlows','Events as JSON, e.g. {"click":{"actionType":"Formula","formula":"=SCREEN(page, popup)"}}.','Easier: copy from a downloaded page.'],
  ['Smart MultiPage','multiPageVisible (Visible tabs), multiPageActive (Active tab), multiPageTabBar, multiPageTabStyle, multiPageTabAlign (Center/Left/Right/Stretch), multiPageTabSize, multiPageTabShape, multiPageEmptyText. Each child container is one page; its Page key (pageKey) or name is the tab.','See the Sample sheet.']
 ];

@@ -17,7 +17,7 @@
  */
 import {Parser,type Expression} from '../../expression-engine/FormulaParser.js';
 import {tokenize,PAGE_FORMULA_LIMITS} from '../../expression-engine/FormulaTokenizer.js';
-import {screenArguments} from '../../expression-engine/screenLayer.js';
+import {screenArguments} from '../../expression-engine/screenTarget.js';
 import {isExcelWildcardDataReference} from '../../expression-engine/FormulaWildcard.js';
 import {parsePageReference,isBrowserOnlyReference,isFlowMarker,USER_FIELDS,assignedComponent,assignedProperty,type PageReference} from '../../expression-engine/PageReferences.js';
 import {uiProperty} from '../../expression-engine/FormulaComponentState.js';
@@ -737,15 +737,16 @@ function stepCode(node:Expression,scope:ActionScope):string[]{
   }
   case 'SCREEN':{
    const page=literalName(args[0],'SCREEN page');
-   // After the page: mode, record and layer in any order, blanks allowed (screenArguments).
+   // After the page: mode, record and MultiPage tab in any order, blanks allowed (screenArguments).
    let parsed:ReturnType<typeof screenArguments>;
    try{parsed=screenArguments(args.slice(1));}catch(error){fail(error instanceof Error?error.message:String(error));}
-   const {mode,modeGiven,record,layer,seconds}=parsed!;
+   const {mode,modeGiven,record,multiPage,tab,seconds}=parsed!;
    scope.ui.add('SCREEN');
-   // $.ui("SCREEN", page, mode, record, layer): the browser opens it (CompiledPageRuntime).
-   // A layer switch keeps "no mode" blank: SCREEN(page, n) only switches page where it shows.
-   return ['await $.ui("SCREEN", '+q(page)+', '+q(modeGiven||layer===undefined?mode:'')+(record||layer!==undefined?', '+(record?value(record):'""'):'')
-    +(layer!==undefined?', '+q(String(layer)):'')+(seconds!==undefined?', '+q(String(seconds)):'')+');'];
+   // $.ui("SCREEN", page, mode, record, multiPage, tab, seconds): the browser opens it (CompiledPageRuntime).
+   // A tab switch keeps "no mode" blank: SCREEN(page, Pages, n) only switches page where it shows.
+   const target=multiPage!==undefined;
+   return ['await $.ui("SCREEN", '+q(page)+', '+q(modeGiven||!target?mode:'')+(record||target?', '+(record?value(record):'""'):'')
+    +(target?', '+q(multiPage!)+', '+q(String(tab)):'')+(seconds!==undefined?', '+q(String(seconds)):'')+');'];
   }
   case 'PAIRDISPLAY':{
    // PAIRDISPLAY(Page): pair a /display screen with this device; it shows Page of this app.

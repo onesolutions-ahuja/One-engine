@@ -14,21 +14,27 @@ import {smartIconPaint} from "../smart_icon/iconPaint.js";
  *  - Change event: runs with the tapped page key, e.g. =STATE(payTab, @Value).
  *  - Tab icons: each page's "Tab icon" (pageIcon); Tab icon colour / Selected tab icon colour
  *    on the MultiPage (blank: grey, and blue on the open tab).
- *  - Designer: click a tab to open and edit it, double-click to rename, + adds a tab
- *    (the Page Builder handles these through the data-multipage-* attributes).
+ *  - SCREEN(page, MultiPage, n) opens tab n (the tab's id: data-page-requested on that page).
+ *  - Designer: click a tab to open and edit it, double-click to rename; tabs are added from the
+ *    MultiPage bar under the canvas (the Page Builder handles these through data-multipage-*).
  */
 export default function SmartComponent(p){
  const pages=React.Children.toArray(p.children)
   .filter(child=>child&&child.props&&child.props["data-page-key"]!=null)
   .map(child=>({key:String(child.props["data-page-key"]),label:String(child.props["data-page-label"]??child.props["data-page-key"]),
    icon:child.props["data-page-icon"]?String(child.props["data-page-icon"]):"",
-   selected:child.props["data-page-selected"]==="true",node:child}));
+   selected:child.props["data-page-selected"]==="true",
+   requested:child.props["data-page-requested"]?String(child.props["data-page-requested"]):"",node:child}));
  const builder=p.builderPreview===true;
  const shown=shownPages(pages,p.multiPageVisible,builder);
  const formulaActive=String(p.multiPageActive??"").trim();
  const [picked,setPicked]=React.useState(null);
  // A new Active tab value (e.g. the other split row tapped) takes over from a tapped tab.
  React.useEffect(()=>setPicked(null),[formulaActive]);
+ // SCREEN(page, MultiPage, n) opens that tab; a later tap or a newer SCREEN wins.
+ const requested=pages.find(page=>page.requested);
+ const requestKey=requested?requested.requested+":"+requested.key:"";
+ React.useEffect(()=>{if(requested&&!builder)setPicked(requested.key);},[requestKey]);
  const selected=builder?shown.find(page=>page.selected)?.key:undefined;
  const open=activePage(shown,{picked,active:formulaActive,selected});
  const tabBar=p.multiPageTabBar!==false&&p.multiPageTabBar!=="false";
@@ -81,12 +87,10 @@ export default function SmartComponent(p){
    </div>
    {more.right&&<button type="button" className="smart-multipage-scroll is-right" aria-label="Show more tabs"
     data-multipage-scroll="1" onClick={()=>scrollTabs(1)}>›</button>}
-   {builder&&<button type="button" className="smart-multipage-add" aria-label="Add tab" title="Add tab"
-    data-multipage-add="">+</button>}
   </div>}
   <div className="smart-multipage-page" role="tabpanel">
    {open?open.node:<span className="smart-multipage-empty">{String(p.multiPageEmptyText??"")||
-    (builder?"Click + to add a tab":"")}</span>}
+    (builder?"Add a tab from the MultiPage bar below":"")}</span>}
   </div>
  </div>;
 }

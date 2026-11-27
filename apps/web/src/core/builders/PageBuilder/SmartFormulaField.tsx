@@ -1,4 +1,4 @@
-import {actionArgumentSuggestions} from './actionArgumentSuggestions';
+import {actionArgumentSuggestions,type ScreenTarget} from './actionArgumentSuggestions';
 import {isScreenAction,parseScreenAction,compileActionPlan,isActionPlan,normalizeFlowCalls} from '../../../../../server/src/expression-engine/ActionFormulas.js';
 import {usePageFormulaScope} from '../../components/RegisteredComponent/PageFormulaScope';
 import {useState,useRef,useEffect,useLayoutEffect,useId,type KeyboardEvent} from 'react';
@@ -33,7 +33,7 @@ export function splitSmartFormula(value:string){
 function tokenEndsInComponentPrefix(source:string){
  return /@This(?:Page|Tenant)(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.$/i.test(source);
 }
-export default function SmartFormulaField({value,onChange,fields,disabled,label,objects=[],rootObjectApiName='',singleFieldOnly=false,selectedSourceObjects,mentionKind='text',validate,stateOptions=[],flowReferences,actionPages=[],actionCredentials=[],actionCallouts=[]}:{
+export default function SmartFormulaField({value,onChange,fields,disabled,label,objects=[],rootObjectApiName='',singleFieldOnly=false,selectedSourceObjects,mentionKind='text',validate,stateOptions=[],flowReferences,actionPages=[],actionCredentials=[],actionCallouts=[],loadScreenTargets}:{
  value:string;onChange:(next:string)=>void;fields:readonly FieldMetadata[];disabled:boolean;label:string;
  objects?:readonly ObjectMetadata[];rootObjectApiName?:string;singleFieldOnly?:boolean;selectedSourceObjects?:readonly ObjectMetadata[];mentionKind?:MentionKind;
  validate?:(formula:string)=>string|null;
@@ -43,7 +43,9 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  actionPages?:readonly {apiName:string;label:string;pageType:string;status:string}[];
  actionCredentials?:readonly {apiName:string;label:string}[];
  actionCallouts?:readonly {apiName:string;label:string;fields?:readonly string[];outputs?:readonly string[]}[];
- flowReferences?:readonly {apiName:string;label:string}[]
+ flowReferences?:readonly {apiName:string;label:string}[];
+ /** SCREEN(page, ...): the MultiPages of that page and their tabs, for the suggestion list. */
+ loadScreenTargets?:(page:string)=>Promise<readonly ScreenTarget[]>
 }){
  const scope=usePageFormulaScope();
  const input=useRef<HTMLInputElement>(null);
@@ -58,6 +60,17 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  const [functionMatch,setFunctionMatch]=useState<{start:number;end:number;query:string}|null>(null);
  const [activeSuggestion,setActiveSuggestion]=useState(0);
  const suggestionListId=useId();
+ // MultiPages of the pages SCREEN(...) names, loaded once per page while typing.
+ const [screenTargets,setScreenTargets]=useState<Record<string,readonly ScreenTarget[]>>({});
+ const screenPage=flowReferences&&loadScreenTargets?/\bSCREEN\s*\(\s*([A-Za-z][A-Za-z0-9_]*)\s*,/i.exec(draft)?.[1]:undefined;
+ useEffect(()=>{
+  if(!screenPage||!loadScreenTargets||screenTargets[screenPage.toLowerCase()])return;
+  let live=true;
+  void loadScreenTargets(screenPage).then(targets=>{if(live)setScreenTargets(old=>({...old,[screenPage.toLowerCase()]:targets}));})
+   .catch(()=>undefined);
+  return ()=>{live=false;};
+ },[screenPage]); // eslint-disable-line react-hooks/exhaustive-deps
+ const targetsOf=(page:string)=>screenTargets[page.toLowerCase()];
  useEffect(()=>setActiveSuggestion(0),[matches?.query,functionMatch?.query]);
  const functions=getFormulaNamesForEditor(flowReferences?'action':'data');
  const functionSuggestions=functionMatch?matchingFormulaFunctions(functions,functionMatch.query):[];
@@ -117,7 +130,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
  // TABLE's first argument is an @Object; columns are that Object's fields,
  // written like every other field: TABLE(@Product, @Product.Name, @Product.Price).
  const tableArg=Boolean(tableSourcePrompt||tableObject);
- const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials,actionCallouts):null;
+ const actionArgs=flowReferences? actionArgumentSuggestions(draft.slice(0,caret),objects,flowReferences,actionPages,actionCredentials,actionCallouts,targetsOf):null;
  const availableMentions:PageValueSuggestion[]=actionArgs&&matches?.prefix===''?actionArgs.choices.map(item=>({reference:item.apiName,label:item.label}))
   :tableArg?recordMentions:recordMentions;
  const filtered:PageValueSuggestion[]=!matches?[]:pageMentions?pageMentions.slice(0,200):[...rootMentions,...availableMentions
@@ -175,7 +188,7 @@ export default function SmartFormulaField({value,onChange,fields,disabled,label,
    // Picking a column inserts @Object.Field, the same spelling as everywhere else.
    const tableField=tablePart&&/^@?[A-Za-z0-9_]*$/.test(last)
     ?{start:caret-last.length,end:caret,query:last.replace(/^@/,'')}:null;
-   const args=flowReferences?actionArgumentSuggestions(before,objects,flowReferences,actionPages,actionCredentials,actionCallouts):null;
+   const args=flowReferences?actionArgumentSuggestions(before,objects,flowReferences,actionPages,actionCredentials,actionCallouts,targetsOf):null;
    setMatches(args?{start:caret-args.query.length,end:caret,query:args.query,prefix:''}:mention?{start:caret-mention[0].length,end:caret,query:mention[1],prefix:'@'}:
     tableField?{...tableField,prefix:''}:null);
    const name=next.trimStart().startsWith('=')?formulaFunctionPrefix(before):null;

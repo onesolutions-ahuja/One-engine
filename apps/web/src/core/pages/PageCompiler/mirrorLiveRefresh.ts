@@ -38,14 +38,14 @@ export function openedWithScreenSession():boolean{
  * The till may be THIS device (a second monitor on the same computer): it still follows. */
 export async function followMirroredSale(deps:{mirrorKey:string;openedWithSession:boolean;
  request:<T>(path:string,init?:RequestInit)=>Promise<T>;sessionId():string;resetSession(next?:string):void;
- /** SCREEN(page, n) run on the mirrored device: the layer each page shows (lower-case page names). */
- onLayers?(layers:Record<string,number>):void}):Promise<void>{
+ /** SCREEN(page, MultiPage, n) run on the mirrored device: the tab each page's MultiPage shows ("page|multipage", lower case). */
+ onTabs?(tabs:Record<string,number>):void}):Promise<void>{
  if(!deps.mirrorKey){setFollowingSale(deps.openedWithSession);return;}
- const {sessionId,layers}=await deps.request<{sessionId:string;layers?:Record<string,number>}>('/screens/current-session',
+ const {sessionId,tabs}=await deps.request<{sessionId:string;tabs?:Record<string,number>}>('/screens/current-session',
   {method:'POST',body:JSON.stringify({mirrorKey:deps.mirrorKey})});
  // No sale reported yet: a window opened by the till already shares its sale.
  setFollowingSale(Boolean(sessionId)||deps.openedWithSession);
- if(layers&&typeof layers==='object')deps.onLayers?.(layers);
+ if(tabs&&typeof tabs==='object')deps.onTabs?.(tabs);
  if(sessionId&&sessionId!==deps.sessionId())deps.resetSession(sessionId);
 }
 /** Data sources that show another device's rows: their filter reads MirrorKey, or, on a
@@ -66,7 +66,7 @@ type Target={
  subscribeDevice?(listener:()=>void):()=>void;
  /** The live stream is up (changes arrive by themselves). */
  isLive?():boolean;
- /** Live events that concern this display: 'screen' (its device changed sale or layer)
+ /** Live events that concern this display: 'screen' (its device changed sale or tab)
   * or 'resync' (the stream came back; anything may have changed). */
  subscribeLive?(listener:(kind:'screen'|'resync')=>void):()=>void;
  /** Taps are on their way (predicted, not answered yet): a re-read now would draw an older
@@ -126,8 +126,8 @@ export function startMirrorLiveRefresh(sources:readonly CompiledDataSource[],cod
  const unlisten=clock.listen(tick);
  // The server tells a display which Till it follows a moment after the page opens.
  const unsubscribe=target.subscribeDevice?.(tick);
- // Live: the followed device changed sale or layer (SCREEN on the till, often on every tap):
- // only ask which sale and layer; a new sale reloads everything (resetSession), the rows of
+ // Live: the followed device changed sale or tab (SCREEN on the till, often on every tap):
+ // only ask which sale and tab; a new sale reloads everything (resetSession), the rows of
  // the same sale come by the live stream. The stream came back: read everything again.
  let following=false;
  const follow=async()=>{

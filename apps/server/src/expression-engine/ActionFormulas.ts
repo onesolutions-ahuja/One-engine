@@ -1,6 +1,5 @@
 import {Parser,type Expression} from './FormulaParser.js';
-import {screenArguments,screenLayerArg} from './screenLayer.js';
-export {screenLayerArg};
+import {screenArguments} from './screenTarget.js';
 import {tokenize,PAGE_FORMULA_LIMITS} from './FormulaTokenizer.js';
 import {FLOW_MARKER,isFlowMarker,isBrowserOnlyReference,parsePageReference,assignedComponent,assignedProperty} from './PageReferences.js';
 import {validateFormulaFunctions} from './FormulaFunctionRegistry.js';
@@ -274,16 +273,17 @@ export function compileActionPlan(source:string):ActionStep[] {
    return;
   }
   if(['EMAIL','WHATSAPP','SMS','FLOW','SCREEN'].includes(node.name)){
-   const bounds:Record<string,[number,number]>={EMAIL:[3,23],WHATSAPP:[2,22],SMS:[2,2],FLOW:[0,0],SCREEN:[0,4]};
+   const bounds:Record<string,[number,number]>={EMAIL:[3,23],WHATSAPP:[2,22],SMS:[2,2],FLOW:[0,0],SCREEN:[0,5]};
    const [min,max]=bounds[node.name];
    if(args.length<min||args.length>max)throw Error('Invalid '+node.name+' arguments');
    args.forEach(arg=>validateFormulaFunctions(arg,'ribbon_binding'));
    if(node.name==='SCREEN'){
-    // Any order after the page; kept as [mode, record, layer] (blank = not given).
-    const {mode,modeGiven,record:screenRecord,layer,seconds}=screenArguments(args);
+    // Any order after the page; kept as [mode, record, multiPage, tab, seconds] (blank = not given).
+    const {mode,modeGiven,record:screenRecord,multiPage,tab,seconds}=screenArguments(args);
     const none:Expression={kind:'literal',value:null};
     steps.push({name:node.name,object,fields:new Map(),guards,values:[
-     modeGiven?{kind:'reference',value:mode}:none,screenRecord??none,layer!==undefined?{kind:'literal',value:layer}:none,
+     modeGiven?{kind:'reference',value:mode}:none,screenRecord??none,
+     multiPage!==undefined?{kind:'literal',value:multiPage}:none,tab!==undefined?{kind:'literal',value:tab}:none,
      ...(seconds!==undefined?[{kind:'literal' as const,value:seconds}]:[])]});
     return;
    }
@@ -366,16 +366,16 @@ export const isScreenAction=(source:string)=>/^\s*=?\s*SCREEN\s*\(/i.test(source
 export function parseScreenAction(source:string){
  const node=new Parser(tokenize(source,PAGE_FORMULA_LIMITS),PAGE_FORMULA_LIMITS.tokens).parse();
  if(node.kind!=='call'||node.name!=='SCREEN'||node.args.length<1)
-  throw Error('SCREEN requires a page API name, then optional mode, record and layer (any order)');
+  throw Error('SCREEN requires a page API name, then optional mode, record and MultiPage tab (any order)');
  const page=nameOf(node.args[0],'page API name');
- // After the page: mode, record and layer in any order (see screenArguments).
- const {mode,modeGiven,record:recordNode,layer,seconds}=screenArguments(node.args.slice(1));
+ // After the page: mode, record and MultiPage tab in any order (see screenArguments).
+ const {mode,modeGiven,record:recordNode,multiPage,tab,seconds}=screenArguments(node.args.slice(1));
  // The record the screen opens with, e.g. SCREEN(Payment,popup,@ThisPage.Cart2.recordId).
  // The caller evaluates it.
  if(recordNode)validateFormulaFunctions(recordNode,'ribbon_binding');
  const record=recordNode?serializeFormulaSqlExpression(recordNode):undefined;
- // modeGiven only matters with a layer: SCREEN(page, n) switches, SCREEN(page, current, n) may also open.
- return {page,mode,record,...(layer!==undefined?{layer,modeGiven}:{}),...(seconds!==undefined?{seconds}:{})};
+ // modeGiven only matters with a tab: SCREEN(page, Pages, n) switches, SCREEN(page, current, Pages, n) may also open.
+ return {page,mode,record,...(multiPage!==undefined?{multiPage,tab:tab!,modeGiven}:{}),...(seconds!==undefined?{seconds}:{})};
 }
 
 const stepNodes=(step:ActionStep):Expression[]=>[...(step.id?[step.id]:[]),...step.fields.values(),

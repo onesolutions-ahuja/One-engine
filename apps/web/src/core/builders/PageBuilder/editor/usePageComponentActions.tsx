@@ -9,7 +9,7 @@ import { isCanvasLocked, alignCanvasComponents, distributeCanvasComponents } fro
 import { reachableMoveArea, translateCanvasSelection } from '../canvasSelectionInteractions';
 import { copyComponentTree, cloneComponentTree, assignTabOnReparent, removePageComponentSelection } from '../pageComponentTree';
 import { containerCanvasSize, isLayoutContainer, rawLayoutParentId } from '../../../pages/TemplatePageRuntime/pageComponentLayout';
-import { MULTIPAGE_TYPE, multiPageInsertParent, nextTabName, renameMultiPageTab } from '../multiPageBuilder';
+import { MULTIPAGE_TYPE, multiPageInsertParent, nextTabId, nextTabName, keepTabIds, renameMultiPageTab, stampAllTabIds, stampTabIds } from '../multiPageBuilder';
 import { findRegisteredComponent } from '../../../components/Registry/componentRegistryLookup';
 import { addRecentPageBlock } from '../pageBuilderUx';
 import {
@@ -157,8 +157,15 @@ export function usePageComponentActions(
     // Author a visible, editable border only for new components.
     const inserted = components.find(item => item.id === id)!;
     inserted.properties={...inserted.properties,navigatorName:allocated};
-    // A new top-level component goes on the layer being designed (nested ones follow their parent).
-    if(editorState.canvasLayer>0&&!parentId)inserted.properties={...inserted.properties,pageLayer:editorState.canvasLayer};
+    // A new MultiPage tab gets its own id (like an Excel sheet id), never reused after a delete.
+    if(options.asNewTab&&parentId){
+      const stamped=stampTabIds(components,parentId);
+      stamped.forEach((item,index)=>{components[index]=item;});
+      const tabId=nextTabId(components,parentId);
+      inserted.properties={...inserted.properties,pageIndex:tabId};
+      const host=components.findIndex(item=>item.id===parentId);
+      if(host>=0)components[host]={...components[host],properties:{...components[host].properties,multiPageNextTab:tabId+1}};
+    }
     const authored = inserted.properties.visualStyle && typeof inserted.properties.visualStyle === 'object'
       && !Array.isArray(inserted.properties.visualStyle)
       ? inserted.properties.visualStyle as Record<string,unknown> : {};
@@ -306,7 +313,8 @@ export function usePageComponentActions(
     const plural = result.removed > 1;
     // No blocking "Are you sure?" box: this only changes the unsaved draft and one
     // Undo (Ctrl+Z) brings the whole selection back.
-    applyPage({ ...page, components: result.components });
+    // The tabs left keep their SCREEN numbers (tab ids), not their new positions.
+    applyPage({ ...page, components: keepTabIds(page.components, result.components) });
     setSelectionIds([]);
     setSelectedId('');
     setSelectedRegion(null);
@@ -395,7 +403,7 @@ export function usePageComponentActions(
     const snapshot=copyComponentTree(page.components,selected.id);
     setComponentClipboard(snapshot);
     const removedIds=new Set(snapshot.components.map(item=>item.id));
-    applyPage({...page,components:page.components.filter(item=>!removedIds.has(item.id))});
+    applyPage({...page,components:stampAllTabIds(page.components).filter(item=>!removedIds.has(item.id))});
     // Its container stays selected, so Paste puts it back in the same place.
     const parentId=rawLayoutParentId(selected)??'';
     setSelectedId(parentId);setSelectionIds(parentId?[parentId]:[]);
@@ -435,9 +443,8 @@ export function usePageComponentActions(
       // coordinates. Retain dimensions and a useful local position for unnest.
       ...pastePlace(root.position, parentId)
     }:undefined;
-    // A pasted top-level component lands on the layer being designed.
+    // Old page-layer numbers are dropped on paste (layers were replaced by MultiPage tabs).
     const layerProps=(item:PageComponentMetadata)=>parentId?item.properties
-      :editorState.canvasLayer>0?{...item.properties,pageLayer:editorState.canvasLayer}
       :Object.fromEntries(Object.entries(item.properties).filter(([key])=>key!=='pageLayer'));
     const inserted=cloned.components.map(item=>item.id===root.id?{...item,position,region:selected?.region??item.region,properties:layerProps(item)}:item);
     const originalIndex=selected?page.components.findIndex(item=>item.id===selected.id):-1;
@@ -457,8 +464,15 @@ export function usePageComponentActions(
     const clone=cloneComponentTree(snapshot,rawLayoutParentId(selected));
     const ids=new Set(snapshot.components.map(item=>item.id));
     const lastIndex=page.components.reduce((last,item,index)=>ids.has(item.id)?index:last,-1);
-    const components=[...page.components];
-    components.splice(lastIndex+1,0,...clone.components);
+    const host=rawLayoutParentId(selected);
+    const isTab=Boolean(host&&page.components.some(item=>item.id===host&&item.type===MULTIPAGE_TYPE));
+    let components=[...(isTab?stampTabIds(page.components,host!):page.components)];
+    // A copied tab is a new tab: it gets its own id.
+    const copies=isTab?clone.components.map(item=>item.id!==clone.rootId?item
+      :{...item,properties:{...item.properties,pageIndex:nextTabId(components,host!)}}):clone.components;
+    if(isTab)components=components.map(item=>item.id!==host?item:{...item,properties:{...item.properties,
+      multiPageNextTab:nextTabId(components,host!)+1}});
+    components.splice(lastIndex+1,0,...copies);
     applyPage({...page,components});
     setSelectedId(clone.rootId);
     setSelectionIds([clone.rootId]);

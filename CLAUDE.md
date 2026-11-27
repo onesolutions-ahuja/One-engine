@@ -18,7 +18,7 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
 - Records: `system-files/record-engine.ts` (create/update/remove; every write touches `md_records`),
   RBAC `system-files/rbac-engine.ts` (`allowed(tenant,user,resource,action)`, Object read = resource `<Object>`),
   schema `system-files/schema.sql`, upgrade-safe DDL in `system-support/system-migrations.ts`.
-- Formulas: `expression-engine/` (parser, `ActionFormulas.ts` = ACTIONS/SCREEN plans, `screenLayer.ts`).
+- Formulas: `expression-engine/` (parser, `ActionFormulas.ts` = ACTIONS/SCREEN plans, `screenTarget.ts`).
   Allowed shared formula modules for Smart bundles are listed in `scripts/component-catalog.mjs`.
 - Page compile: `page-compiler/compilePage.ts` (data sources, scopes none/key/auto/mirror),
   page code `page-compiler/code/` (`formulaDictionary.ts` arity+help, `generateCode.ts`, `pageCode.ts`);
@@ -26,12 +26,14 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
 - Browser runtime: `core/pages/PageCompiler/` (`CompiledPageRuntime.tsx` wiring, `compiledPageStore.ts` data layer
   `saved()`/`live()`, `compiledSourceLoader.ts`, `pageCodeRuntime.ts` instant taps + totals/sets,
   `mirrorLiveRefresh.ts` displays, `liveChanges.ts` live stream); views `core/pages/PageRuntime/pageRuntimeViews.tsx`.
-- Page layers: `core/pages/PageRuntime/pageLayers.ts` (component property `pageLayer`; each layer is its own screen, only one shows; 0 = default);
-  `SCREEN(page, [mode], [record], [layer 0-9])` any order after the page: `screenFormula.ts`. `SCREEN(page, n)` only switches page where it shows (never leaves this screen); `SCREEN(page, current, n)` may open it here.
+- Page layers are gone: a page's screens are the tabs of a Smart MultiPage (tab bar on or off). Each tab has a fixed id
+  (property `pageIndex`, like an Excel sheet id; kept on rename/move, never reused). `SCREEN(page, [mode], [record], [MultiPage, tabId], [seconds])`
+  any order after the page: `screenTarget.ts`, web `screenFormula.ts` + `multiPageScreens.ts`. `SCREEN(page, Pages, n)` only switches
+  page where it shows (never leaves this screen); `SCREEN(page, current, Pages, n)` may open it here.
 - Page Builder: `core/builders/PageBuilder/editor/` (`usePageEditorState.tsx`, `usePageComponentActions.tsx`,
-  canvas `canvas/PageCanvasStage.tsx`, Layers bar `canvas/PageLayerBar.tsx`). Page CSV: `system-support/page-inventory-csv.ts`.
+  canvas `canvas/PageCanvasStage.tsx`, bottom bars `canvas/MultiPageBar.tsx` (tabs of the selected MultiPage + layout tabs) and `canvas/AppPageBar.tsx`). Page CSV: `system-support/page-inventory-csv.ts`.
 - Screens (customer displays, any app): `system-support/screen-pairing-service.ts` (pair by 4-digit code, current sale,
-  layers), web `core/authentication/PairedScreen/`, `core/authentication/TillDevice/deviceTill.ts` (device/mirror keys).
+  MultiPage tabs), web `core/authentication/PairedScreen/`, `core/authentication/TillDevice/deviceTill.ts` (device/mirror keys).
 - Live changes: `system-support/live-changes.ts` (trigger on `md_records` NOTIFYs at commit; `GET /api/live-changes` SSE,
   RBAC-filtered per user). pg types are hand-declared in `system-support/pg-driver.d.ts`.
 - Components: `apps/web/src/component-libraries/<name>/` (SmartComponent.jsx, component.json).

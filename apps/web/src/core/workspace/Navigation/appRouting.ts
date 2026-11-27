@@ -208,11 +208,11 @@ export function keepScreenParams(path:string,search:string):string{
    const value=from.get(name);
    if(value&&/^[A-Za-z0-9_-]{16,128}$/.test(value))kept.set(name,value);
  }
- // ?layer=n: the page layer this window opens on (SCREEN(page, second, n)).
- const layer=from.get('layer');
- if(layer&&/^\d$/.test(layer))kept.set('layer',layer);
- if(!kept.size)return path;
+ // ?tab=MultiPage:n: the MultiPage tab this window opens on (SCREEN(page, second, MultiPage, n)).
+ const tabs=from.getAll('tab').filter(value=>/^[A-Za-z][A-Za-z0-9_]{0,99}:\d{1,4}$/.test(value));
+ if(!kept.size&&!tabs.length)return path;
  const url=new URL(path,'https://placeholder.invalid');
  kept.forEach((value,name)=>url.searchParams.set(name,value));
+ for(const tab of tabs)url.searchParams.append('tab',tab);
  return url.pathname+url.search;
 }

@@ -1596,3 +1596,34 @@
 .page-builder-design-dock .office-builder-ribbon #page-builder-tab-content .smart-column-control :is(input[type="number"],.smart-office-number){
   width:52px!important;max-width:52px!important;
 }
+
+/* Tab rail: Insert / Design / Actions / Page settings stacked down the left of the panel,
+ * icon above label; the panel content sits to its right. */
+.page-builder-design-dock{display:flex;align-items:stretch;flex-basis:340px;width:340px;padding:0;overflow:hidden}
+.page-builder-design-dock>.page-builder-design-dock-rail{
+  flex:0 0 72px;width:72px;box-sizing:border-box;padding:10px 6px;background:#fff;border-right:1px solid #e6e8ee;
+  overflow-y:auto;scrollbar-width:none;
+}
+.page-builder-design-dock-rail .office-ribbon-tabs{
+  display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:0;height:auto;min-height:0;
+  background:transparent!important;
+}
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab]{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  box-sizing:border-box;width:100%;min-height:58px;padding:8px 2px;border:0;border-radius:12px;
+  background:transparent!important;color:#667085!important;
+  font:500 11px/1.2 "Segoe UI",Arial,sans-serif!important;white-space:normal;text-align:center;cursor:pointer;
+}
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab] svg{width:20px;height:20px}
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab].active,
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab][aria-selected="true"]{
+  background:#eef0ff!important;color:#4f46e5!important;font-weight:600!important;
+}
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab]:hover:not(.active):not(:disabled){
+  background:#f4f5f8!important;color:#344054!important;
+}
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab]:disabled{opacity:.45;cursor:default}
+.page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab]:focus-visible{outline:2px solid #4f46e5!important;outline-offset:-2px}
+.page-builder-design-dock>.page-builder-design-dock-main{
+  flex:1 1 auto;min-width:0;overflow-x:hidden;overflow-y:auto;
+}

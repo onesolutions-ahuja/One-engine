@@ -1,5 +1,5 @@
 import type {PageComponentMetadata} from '../../metadata/Definitions/metadata';
-import {childrenOf, isLayoutContainer, multiPageKey, rawLayoutParentId} from '../../pages/TemplatePageRuntime/pageComponentLayout';
+import {childrenOf, isLayoutContainer, multiPageKey, multiPageTabId, rawLayoutParentId} from '../../pages/TemplatePageRuntime/pageComponentLayout';
 
 /**
  * Page Builder rules for Smart MultiPage (any app). Each direct child of a MultiPage is one
@@ -59,11 +59,53 @@ export function multiPageInsertParent(components: Components, parentId: string |
   return open && isLayoutContainer(open) ? open.id : parentId;
 }
 
+/** The MultiPage the selection is (or sits inside): its tabs show in the MultiPage bar. */
+export function selectedMultiPage(components: readonly PageComponentMetadata[], selectedId?: string | null): PageComponentMetadata | undefined {
+  const byId = new Map(components.map(item => [item.id, item]));
+  const seen = new Set<string>();
+  for (let item = selectedId ? byId.get(selectedId) : undefined; item && !seen.has(item.id); item = byId.get(rawLayoutParentId(item) ?? '')) {
+    seen.add(item.id);
+    if (isMultiPage(item)) return item;
+  }
+  return undefined;
+}
+
 /** "Page 1", "Page 2"... not used by another tab of this MultiPage (case-insensitive). */
 export function nextTabName(components: Components, multiPageId: string): string {
   const used = new Set(multiPageTabs(components, multiPageId)
     .flatMap(tab => [tab.label, multiPageKey(tab)]).map(name => name.trim().toLowerCase()));
   for (let n = used.size + 1; ; n++) if (!used.has(`page ${n}`)) return `Page ${n}`;
+}
+
+/** Id for a new tab: one more than any tab has had (deleted ids are not reused). */
+export function nextTabId(components: Components, multiPageId: string): number {
+  const tabs = multiPageTabs(components, multiPageId);
+  const used = tabs.map(tab => multiPageTabId(tab, tabs));
+  const kept = Number(components.find(item => item.id === multiPageId)?.properties?.multiPageNextTab);
+  return Math.max(tabs.length, ...used.map(id => id + 1), Number.isInteger(kept) ? kept : 0);
+}
+
+/** Every tab of the MultiPage with its id written down, so moving tabs keeps their ids. */
+export function stampTabIds(components: Components, multiPageId: string): Components {
+  const tabs = multiPageTabs(components, multiPageId);
+  const ids = new Map(tabs.map(tab => [tab.id, multiPageTabId(tab, tabs)]));
+  if (tabs.every(tab => tab.properties?.pageIndex === ids.get(tab.id))) return components;
+  return components.map(item => ids.has(item.id) && item.properties?.pageIndex !== ids.get(item.id)
+    ? {...item, properties: {...item.properties, pageIndex: ids.get(item.id)}} : item);
+}
+
+/** Write down the ids of every MultiPage's tabs (before a delete, cut or new tab changes positions). */
+export function stampAllTabIds(components: Components): Components {
+  return components.filter(isMultiPage).reduce((list, multiPage) => stampTabIds(list, multiPage.id), components);
+}
+
+/** After a delete: the tabs left keep the ids they had before it (not their new positions). */
+export function keepTabIds(before: Components, after: Components): Components {
+  const stamped = new Map(stampAllTabIds(before).map(item => [item.id, item.properties?.pageIndex]));
+  return after.map(item => {
+    const id = stamped.get(item.id);
+    return id === undefined || item.properties?.pageIndex === id ? item : {...item, properties: {...item.properties, pageIndex: id}};
+  });
 }
 
 /** Rename a tab. Its key follows its name unless a formula already uses the old key: then the
@@ -99,9 +141,12 @@ export function isMultiPageTab(components: Components, id: string): boolean {
 
 /** Move a tab one place left (-1) or right (+1) among its MultiPage's tabs. */
 export function moveMultiPageTab(components: Components, tabId: string, direction: -1 | 1): Components {
-  const tab = components.find(item => item.id === tabId);
-  const parentId = tab ? rawLayoutParentId(tab) : null;
-  if (!tab || !parentId) return components;
+  const original = components.find(item => item.id === tabId);
+  const parentId = original ? rawLayoutParentId(original) : null;
+  if (!original || !parentId) return components;
+  // Ids stay with their tabs: write them down before the order changes.
+  components = stampTabIds(components, parentId);
+  const tab = components.find(item => item.id === tabId)!;
   const tabs = multiPageTabs(components, parentId);
   const other = tabs[tabs.findIndex(item => item.id === tabId) + direction];
   if (!other) return components;

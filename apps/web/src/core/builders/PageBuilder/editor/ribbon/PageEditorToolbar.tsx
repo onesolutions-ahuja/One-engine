@@ -29,7 +29,6 @@ export default function PageEditorToolbar({ editorState, ribbon, props, componen
           <button type="button" className="office-ribbon-icon-button" aria-label="Edit page properties and versions"
             title="Edit page properties and versions" disabled={saving||previewMode}
             onClick={()=>setPageDetailsApi(page.apiName)}><Pencil size={16}/></button>
-          {ribbon.layoutTabs}
           {/* Always-on Formula Bar (filter, image upload, ƒx and the formula) for the
               selected component's data bindings; disabled when nothing is bindable. */}
           <div className="office-ribbon-topbar-formula" role="group" aria-label="Formula Bar">

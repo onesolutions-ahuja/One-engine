@@ -50,8 +50,9 @@ END $fn$;
 DROP TRIGGER IF EXISTS md_live_page_layout ON md_page_layout_heads;
 CREATE TRIGGER md_live_page_layout AFTER INSERT OR UPDATE OF draft_version,published_version ON md_page_layout_heads
  FOR EACH ROW EXECUTE FUNCTION md_live_page_changes();
+ALTER TABLE md_screen_devices ADD COLUMN IF NOT EXISTS page_tabs jsonb;
 DROP TRIGGER IF EXISTS md_live_screen_device ON md_screen_devices;
-CREATE TRIGGER md_live_screen_device AFTER INSERT OR UPDATE OF session_key,page_layers ON md_screen_devices
+CREATE TRIGGER md_live_screen_device AFTER INSERT OR UPDATE OF session_key,page_tabs ON md_screen_devices
  FOR EACH ROW EXECUTE FUNCTION md_live_screen_changes();
 `;
 

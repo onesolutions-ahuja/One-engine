@@ -35,7 +35,7 @@ import {useFlowStateChannel} from '../../automation/FlowScreen/useFlowStateChann
 import type {CompiledPage,CompiledComponent} from './compilePage';
 import {createCompiledPageStore,createCompiledDataLayer,SOURCE_PAGE_SIZE,type CompiledPageStore,type CompiledDataLayer} from './compiledPageStore';
 import {compiledSourceLoader} from './compiledSourceLoader';
-import {showPageLayer} from '../PageRuntime/pageLayers';
+import {showMirroredTabs} from '../PageRuntime/multiPageScreens';
 import {isLiveConnected,subscribeLiveChanges} from './liveChanges';
 import {connectPageLive,drawOwnTap,newTapLedger,waitingFor,type TapLedger} from './pageLiveWiring';
 import {startMirrorLiveRefresh,followMirroredSale,openedWithScreenSession,sellsBySession,mirrorSources,setFollowingSale} from './mirrorLiveRefresh';
@@ -311,9 +311,8 @@ export function CompiledPageProvider({compiled:browserPlan,script=null,component
    // The display shows the sale the till is on now: it takes the till's page session.
    followSale:()=>followMirroredSale({mirrorKey:mirrorDeviceKey(),request:runtime.request,
     sessionId:runtime.sessionId,resetSession:runtime.resetSession,openedWithSession:openedWithScreenSession(),
-    // SCREEN(this page, n) on the till: this screen shows layer n.
-    onLayers:layers=>{const layer=layers[runtime.compiled.apiName.toLowerCase()];
-     if(typeof layer==='number')showPageLayer(runtime.compiled.apiName,layer);}}),
+    // SCREEN(this page, MultiPage, n) on the till: this screen opens that tab.
+    onTabs:tabs=>showMirroredTabs(runtime.compiled.apiName,tabs)}),
    loadSets:runtime.code?()=>runtime.code!.loadSets():undefined,
    refreshTotals:runtime.code?()=>runtime.code!.refreshTotals():undefined,
    subscribeDevice:subscribeDeviceTill,
@@ -794,10 +793,10 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
   if(runtime.code?.hasAction(codeKey)&&binding.actionType==='Formula'){
    const runEffects=async(effects:Effect[])=>{
     for(const effect of effects){
-     const [first,second,third,fourth]=effect.args.map(value=>value===null||value===undefined?'':String(value));
-     // SCREEN effect: page, mode, record, layer (the record goes in separately below).
-     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+(fourth?','+fourth:'')
-      +(fourth&&effect.args[4]!==undefined&&effect.args[4]!==null&&effect.args[4]!==''?','+String(effect.args[4]):'')+')',navigationContext,
+     const [first,second,third,fourth,fifth,sixth]=effect.args.map(value=>value===null||value===undefined?'':String(value));
+     // SCREEN effect: page, mode, record, MultiPage, tab, seconds (the record goes in separately below).
+     if(effect.name==='SCREEN')await openFormulaScreen('SCREEN('+first+(second?','+second:'')+(fourth?','+fourth+','+(fifth||'0'):'')
+      +(fourth&&sixth?','+sixth:'')+')',navigationContext,
       onNavigate as never,runtime.pageSessionKey,session,third||String(payload.recordId??runtime.store.get().recordId??record?.Id??''));
      else if(effect.name==='CLOSESCREEN'&&first==='second')closeSecondScreen();
      else if(effect.name==='CLOSESCREEN')await closeFormulaScreen(runtime.pageSessionKey);

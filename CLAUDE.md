@@ -32,6 +32,10 @@ Server `apps/server/src`, web `apps/web/src`. Express + Postgres (SQL is the sou
   page where it shows (never leaves this screen); `SCREEN(page, current, Pages, n)` may open it here.
 - Page Builder: `core/builders/PageBuilder/editor/` (`usePageEditorState.tsx`, `usePageComponentActions.tsx`,
   canvas `canvas/PageCanvasStage.tsx`, bottom bars `canvas/MultiPageBar.tsx` (tabs of the selected MultiPage + layout tabs) and `canvas/AppPageBar.tsx`). Page CSV: `system-support/page-inventory-csv.ts`.
+- Page Builder list (Setup) shows only Record + Print template pages. Home/App/In-Screen pages are built per app:
+  App Manager opens `/page-builder/app/<appId>/<page>/<layout>` (route `appId`, prop `appModeId`). There, switching
+  pages keeps edits (`editor/management/appDraftStore.ts`) and Save / Publish write every changed page of the app.
+  A page opens in its default layout (Page settings > Default layout = `creation_layout_variant`, `PUT /api/metadata/pages/:apiName/default-layout/:variant`).
 - Screens (customer displays, any app): `system-support/screen-pairing-service.ts` (pair by 4-digit code, current sale,
   MultiPage tabs), web `core/authentication/PairedScreen/`, `core/authentication/TillDevice/deviceTill.ts` (device/mirror keys).
 - Live changes: `system-support/live-changes.ts` (trigger on `md_records` NOTIFYs at commit; `GET /api/live-changes` SSE,

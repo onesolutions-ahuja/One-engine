@@ -1599,7 +1599,8 @@
 
 /* Tab rail: Insert / Design / Actions / Page settings stacked down the left of the panel,
  * icon above label; the panel content sits to its right. */
-.page-builder-design-dock{display:flex;align-items:stretch;flex-basis:340px;width:340px;padding:0;overflow:hidden}
+/* The rail sits beside the panel content: the content keeps its own 308px (see the dock width above). */
+.page-builder-design-dock{display:flex;align-items:stretch;flex:0 0 380px;width:380px;padding:0;overflow:hidden}
 .page-builder-design-dock>.page-builder-design-dock-rail{
   flex:0 0 72px;width:72px;box-sizing:border-box;padding:10px 6px;background:#fff;border-right:1px solid #e6e8ee;
   overflow-y:auto;scrollbar-width:none;
@@ -1625,5 +1626,5 @@
 .page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab]:disabled{opacity:.45;cursor:default}
 .page-builder-design-dock-rail .office-ribbon-tabs>button[role=tab]:focus-visible{outline:2px solid #4f46e5!important;outline-offset:-2px}
 .page-builder-design-dock>.page-builder-design-dock-main{
-  flex:1 1 auto;min-width:0;overflow-x:hidden;overflow-y:auto;
+  flex:0 0 308px;width:308px;min-width:0;overflow-x:hidden;overflow-y:auto;
 }

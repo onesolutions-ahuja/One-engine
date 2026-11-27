@@ -8,7 +8,8 @@ import { childrenOf } from '../../../../pages/TemplatePageRuntime/pageComponentL
 import { type LightningPageMetadata, type PageLayoutVariant } from '../../../../metadata/Definitions/metadata';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
-import { designedPrimaryLayout } from '../../pageLayoutSummary';
+import { primaryPageLayout } from '../../pageLayoutSummary';
+import { appDraftFor, dropAppDraft, hasAppDrafts, keepAppDraft } from './appDraftStore';
 import {takePrefetchedPageEditorDraft} from '../../../../authentication/Client/authClient';
 import type { usePageEditorState } from '../usePageEditorState';
 import { applyOps, coEditorsStore, diffComponents, updateEditors, type CoEditOps, type CoEditor } from './pageCoEditing';
@@ -21,7 +22,7 @@ export function usePageLayoutActions(
 ) {
   const {
     page, editorMode, initialLayoutVariant, request, onChange, onNotify, onLayoutVariantChange,
-    onSelectPage, onBackToPages, pages, objects, onTargetObjectChange,
+    onSelectPage, onBackToPages, pages, objects, onTargetObjectChange, appModeId,
   } = props;
   const {
     setPaletteTab, builderAppApiName, setRecordAppId, loadedEditorVariantRef, switchingLayout,
@@ -46,23 +47,26 @@ export function usePageLayoutActions(
     if (!editorMode) return;
     let active=true;
     const load=async()=>{
-      // With no link to a specific layout, open the one that has a design (e.g. Custom) first.
+      // With no link to a specific layout, open the page's default layout (Page settings > Default layout).
       let variant=initialLayoutVariant??page.layoutVariant??'Desktop';
-      if(!initialLayoutVariant&&openedPageRef.current!==page.apiName){
-        const summary=layoutSummaries[page.apiName]??(await fetchLayoutSummaries([page.apiName]))[0];
-        if(!active)return;
-        openedPageRef.current=page.apiName;
-        variant=designedPrimaryLayout(summary)??variant;
-        // Already showing that layout (the route loaded it): nothing to fetch.
-        if(variant===(page.layoutVariant??'Desktop')){loadedEditorVariantRef.current=variant;return;}
-      }
-      // A user-initiated device switch already fetched this draft. Do not fetch
-      // it a second time when the deep-link changes and overwrite new edits.
-      if(loadedEditorVariantRef.current===variant)return;
+      const firstOpen=openedPageRef.current!==page.apiName;
+      // The summary also feeds Page settings > Default layout.
+      const summary=layoutSummaries[page.apiName]??(firstOpen?(await fetchLayoutSummaries([page.apiName]))[0]:undefined);
+      if(!active)return;
+      openedPageRef.current=page.apiName;
+      if(!initialLayoutVariant&&firstOpen)variant=primaryPageLayout(summary);
+      // "Already loaded" belongs to this page: a layout loaded for another page never counts.
+      const loadedKey=page.apiName+'/'+variant;
+      if(loadedEditorVariantRef.current===loadedKey)return;
       try{
         const result=await takePrefetchedPageEditorDraft<{page:LightningPageMetadata}>(
           `/metadata/pages/${encodeURIComponent(page.apiName)}/layouts/${variant}/editor`,request);
-        if(active){loadedEditorVariantRef.current=variant;onChange(result.page);}
+        if(!active)return;
+        loadedEditorVariantRef.current=loadedKey;
+        // Editing the whole app: bring back this page's edits kept when another page was opened.
+        const kept=appModeId?appDraftFor(appModeId,page.apiName,variant):undefined;
+        if(kept){onChange(kept.page);setUndoStack([result.page]);setRedoStack([]);}
+        else onChange(result.page);
       }catch(error){if(active)onNotify(error instanceof Error?error.message:'Unable to load page draft');}
     };
     void load();
@@ -151,17 +155,20 @@ export function usePageLayoutActions(
   const switchLayoutVariant=async(variant:'Mobile'|'Desktop'|'Tablet'|'Custom'):Promise<boolean>=>{
     if((page.layoutVariant??'Desktop')===variant)return true;
     if(switchingLayout)return false;
-    if(undoStack.length&&!window.confirm('Discard unsaved edits on this layout? Save before switching.'))return false;
+    if(appModeId){if(undoStack.length)keepAppDraft(appModeId,page,undoStack[0]);else dropAppDraft(appModeId,page.apiName,page.layoutVariant??'Desktop');}
+    else if(undoStack.length&&!window.confirm('Discard unsaved edits on this layout? Save before switching.'))return false;
     setSwitchingLayout(true);
     try {
-      const {page:layout}=await request<{page:LightningPageMetadata}>(
+      const {page:saved}=await request<{page:LightningPageMetadata}>(
         `/metadata/pages/${encodeURIComponent(page.apiName)}/layouts/${variant}/editor`);
-      loadedEditorVariantRef.current=variant;
+      const kept=appModeId?appDraftFor(appModeId,page.apiName,variant):undefined;
+      const layout=kept?.page??saved;
+      loadedEditorVariantRef.current=page.apiName+'/'+variant;
       onChange(layout);
       onLayoutVariantChange?.(variant);
       setSelectedId(layout.components[0]?.id??'');
       setSelectionIds(layout.components[0]?[layout.components[0].id]:[]);
-      setUndoStack([]);setRedoStack([]);setSelectionUndoStack([]);setSelectionRedoStack([]);
+      setUndoStack(kept?[saved]:[]);setRedoStack([]);setSelectionUndoStack([]);setSelectionRedoStack([]);
       setSavedFeedback(false);setShowLayoutHistory(false);setFitCanvas(true);
       return true;
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to change layout');return false;}
@@ -170,7 +177,7 @@ export function usePageLayoutActions(
   /** Open selected device drafts from Page Details with the guarded shared editor. */
   const openPageDesignLayout=async(apiName:string,variant:PageLayoutVariant):Promise<boolean>=>{
     if(editorMode&&page.apiName===apiName)return switchLayoutVariant(variant);
-    if(!confirmDiscardPageChanges())return false;
+    if(!keepEditsBeforeSwitch())return false;
     try{
       const {page:layout}=await request<{page:LightningPageMetadata}>(
         `/metadata/pages/${encodeURIComponent(apiName)}/layouts/${variant}/editor`);
@@ -206,8 +213,20 @@ export function usePageLayoutActions(
   const confirmDiscardPageChanges = () =>
     !editorMode || !undoStack.length ||
     window.confirm('Discard unsaved Page Builder edits?');
+  /** Before opening another page or layout. Editing the whole app keeps this page's edits (saved with
+   *  the app); a single page still asks before its edits are discarded. */
+  const keepEditsBeforeSwitch = () => {
+    if (!appModeId || !editorMode) return confirmDiscardPageChanges();
+    if (undoStack.length) keepAppDraft(appModeId, page, undoStack[0]);
+    else dropAppDraft(appModeId, page.apiName, page.layoutVariant ?? 'Desktop');
+    return true;
+  };
+  /** Leaving Page Builder: in app mode, edits kept on other pages count too. */
+  const confirmLeaveBuilder = () =>
+    !editorMode || (!undoStack.length && !(appModeId && hasAppDrafts(appModeId))) ||
+    window.confirm('Discard unsaved Page Builder edits?');
   useEffect(()=>{
-    if(!editorMode||!undoStack.length)return;
+    if(!editorMode||(!undoStack.length&&!(appModeId&&hasAppDrafts(appModeId))))return;
     const preventClose=(event:BeforeUnloadEvent)=>{
       event.preventDefault();
       event.returnValue='';
@@ -215,9 +234,9 @@ export function usePageLayoutActions(
     window.addEventListener('beforeunload',preventClose);
     return ()=>window.removeEventListener('beforeunload',preventClose);
   },[editorMode,undoStack.length]);
-  const safeBackToPages=()=>{if(confirmDiscardPageChanges())onBackToPages();};
+  const safeBackToPages=()=>{if(confirmLeaveBuilder())onBackToPages();};
   const selectSavedPage = (apiName: string) => {
-    if(!confirmDiscardPageChanges())return;
+    if(!keepEditsBeforeSwitch())return;
     savedPageApiName.current = apiName;
     onSelectPage(apiName);
   };
@@ -289,6 +308,6 @@ export function usePageLayoutActions(
 
   return {
     switchLayoutVariant, openPageDesignLayout, loadLayoutHistory, restoreLayoutVersion, safeBackToPages,
-    selectSavedPage, moveLayer, placeSelectedLayer, wrapSelectedInContainer, ungroupSelected,
+    selectSavedPage, confirmLeaveBuilder, moveLayer, placeSelectedLayer, wrapSelectedInContainer, ungroupSelected,
   };
 }

@@ -3,7 +3,7 @@ import {useModalAccessibility} from '../../../../accessibility/Modal/useModalAcc
 import { Plus, X } from 'lucide-react';
 import PageRouteDirectory from '../../../../pages/PageRouteDirectory/PageRouteDirectory';
 import { inspectPageDependencies } from '../../../../pages/PageRuntime/pageDependencies';
-import { pageBuilderStartOptions } from '../../pageBuilderUx';
+import { PAGE_LIST_TYPES, pageBuilderStartOptions } from '../../pageBuilderUx';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -116,7 +116,7 @@ export default function PageManagerDialogs({ props, editorState, management }: {
               <fieldset className="builder-start-choices">
                 <legend>What do you want to build?</legend>
                 <div role="radiogroup" aria-label="Choose page type" className="builder-choice-grid">
-                  {pageBuilderStartOptions.filter(choice => recordPageContext ? choice.type === 'Record Page' : choice.type !== 'Record Page').map(choice => <label key={choice.type} className={newPageType === choice.type ? 'builder-choice active' : 'builder-choice'}>
+                  {pageBuilderStartOptions.filter(choice => recordPageContext ? choice.type === 'Record Page' : (PAGE_LIST_TYPES as readonly string[]).includes(choice.type)).map(choice => <label key={choice.type} className={newPageType === choice.type ? 'builder-choice active' : 'builder-choice'}>
                     <input type="radio" name="builder-new-page-type" value={choice.type} checked={newPageType === choice.type}
                       onChange={() => {
                         setNewPageType(choice.type);

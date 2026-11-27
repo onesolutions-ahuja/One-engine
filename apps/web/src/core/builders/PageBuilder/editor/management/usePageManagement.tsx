@@ -12,6 +12,8 @@ import { designedPageLayouts, primaryPageLayout } from '../../pageLayoutSummary'
 import { pageActivationAppCandidates, resolvePageActivationApp, pageAppsWithPopups } from '../../pageAppMembership';
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
 import { downloadPageCode } from '../../../../pages/AppPackage/pageCodeDownload';
+import { dropAppDraft, otherAppDrafts } from './appDraftStore';
+import { PAGE_LIST_TYPES } from '../../pageBuilderUx';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
 import type { usePageEditorState } from '../usePageEditorState';
@@ -25,7 +27,7 @@ export function usePageManagement(
   const {
     page, onNotify, libraryComponents, pages, apps, preparedAppId, onSave, onPublish, onSaveApp,
     onAppLinked, onBackToPages, request, onDeletePage, recordPageContext, editorMode, objects,
-    onPrepareApp,
+    onPrepareApp, appModeId,
   } = props;
   const {
     savedPageApiName, builderAppApiName, setSaving, setSavedFeedback, setUndoStack,
@@ -43,6 +45,25 @@ export function usePageManagement(
   } = editorState;
   const { selectSavedPage, openPageDesignLayout } = layoutActions;
 
+  /** Editing the whole app: write the edits kept on the app's other pages (and publish their drafts). */
+  const saveOtherAppPages = async (publish: boolean) => {
+    if (!appModeId) return;
+    const open = { apiName: page.apiName, variant: page.layoutVariant ?? 'Desktop' };
+    const kept = otherAppDrafts(appModeId, open);
+    const failed: string[] = [];
+    for (const { page: draft } of kept) {
+      const variant = draft.layoutVariant ?? 'Desktop';
+      const duplicateId = duplicatePageComponentId(draft.components);
+      if (duplicateId) { failed.push(draft.label + ': ' + duplicateId); continue; }
+      const saved = await onSave(draft, draft.apiName);
+      if (!saved) { failed.push(draft.label); continue; }
+      if (publish && saved.draftRevision !== saved.publishedRevision
+        && !await onPublish(draft.apiName, variant, saved.draftRevision || undefined)) { failed.push(draft.label); continue; }
+      dropAppDraft(appModeId, draft.apiName, variant);
+    }
+    if (failed.length) onNotify('Not saved: ' + failed.join('; '));
+    else if (kept.length) onNotify((publish ? 'Published ' : 'Saved ') + (kept.length + 1) + ' pages of the app');
+  };
   const savePage = async (status?: 'Active' | 'Draft', candidate: LightningPageMetadata = page,
     returnToList = false, listActivation = false) => {
     const duplicateId=duplicatePageComponentId(candidate.components);
@@ -139,6 +160,7 @@ export function usePageManagement(
         }
         // Saving a different list row must not change the editor's persisted page identity.
         if (!listActivation) {
+          if (appModeId) dropAppDraft(appModeId, nextPage.apiName, nextPage.layoutVariant ?? 'Desktop');
           savedPageApiName.current = nextPage.apiName;
           setSavedFeedback(true);
           setUndoStack([]);
@@ -172,8 +194,24 @@ export function usePageManagement(
       onNotify(error instanceof Error?error.message:'Unable to load the page layout for activation');
     }finally{setSaving(false);}
   };
+  /** Save button. Editing the whole app saves every changed page of the app together. */
+  const saveCurrent=async()=>{
+    const saved=await savePage();
+    if(saved&&appModeId)await saveOtherAppPages(false);
+    return saved;
+  };
   const publishCurrentLayout=async()=>{
     if(saving)return;
+    if(appModeId){
+      // Publish the app: this page, then every other changed page of the app.
+      const saved=undoStack.length||!page.draftRevision?await savePage():page;
+      if(!saved)return;
+      if(saved.draftRevision!==saved.publishedRevision
+        &&!await onPublish(saved.apiName,saved.layoutVariant??'Desktop',saved.draftRevision||undefined))return;
+      await saveOtherAppPages(true);
+      setSavedFeedback(true);setShowLayoutHistory(false);
+      return;
+    }
     if(undoStack.length||!page.draftRevision){
       const saved=await savePage();
       if(!saved)return;
@@ -288,7 +326,7 @@ export function usePageManagement(
   const pageTabType = (item: LightningPageMetadata) => item.pageType;
   const visiblePages = pages.filter(item => (recordPageContext
     ? item.pageType === 'Record Page' && item.targetObject === recordPageContext
-    : item.pageType !== 'Record Page') && (recordPageContext || pageListAppTab === 'all' || (pageListAppTab === 'other'
+    : (PAGE_LIST_TYPES as readonly string[]).includes(item.pageType)) && (recordPageContext || pageListAppTab === 'all' || (pageListAppTab === 'other'
       ? pageAppIds(item).length === 0 : pageAppIds(item).includes(pageListAppTab)))
     && (recordPageContext || pageListTypeTab === 'all' || pageTabType(item) === pageListTypeTab)
     && (pageListDeviceTab === 'all' || (pageListDeviceTab === 'Mobile'
@@ -405,7 +443,7 @@ export function usePageManagement(
     }catch(error){onNotify(error instanceof Error?error.message:'Unable to download the page script');}
     finally{setInventoryDownloading('');}
   };
-  const openCreatePage = () => { setNewPageAppId(pageListAppTab!=='all'&&pageListAppTab!=='other'?pageListAppTab:''); setNewPageTargetObject(recordPageContext || ''); setNewPageLayoutMode('free-canvas'); setNewPageType(recordPageContext ? 'Record Page' : 'Home Page'); setNewPageDeviceChoice('Desktop'); setNewPageDevices(['Desktop']); setNewPageCanvasWidth(1440); setNewPageCanvasHeight(900); setCreatePageOpen(true); };
+  const openCreatePage = () => { setNewPageAppId(pageListAppTab!=='all'&&pageListAppTab!=='other'?pageListAppTab:''); setNewPageTargetObject(recordPageContext || ''); setNewPageLayoutMode('free-canvas'); setNewPageType(recordPageContext ? 'Record Page' : 'Print Template'); setNewPageDeviceChoice('Desktop'); setNewPageDevices(['Desktop']); setNewPageCanvasWidth(recordPageContext ? 1440 : 794); setNewPageCanvasHeight(recordPageContext ? 900 : 1123); setCreatePageOpen(true); };
   const createPage = async () => {
     if (saving) return;
     const label = newPageLabel.trim();
@@ -504,7 +542,7 @@ export function usePageManagement(
   };
 
   return {
-    savePage, activateListedPage, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
+    savePage, saveCurrent, activateListedPage, pageAppIds, publishCurrentLayout, pageDeviceLabel, archiveSavedPage, pageAppTabs, visiblePages,
     showRelatedObjectColumn, pageListPageCount, safePageListPage, paginatedPages, openPageDesign,
     layoutBadges, copyLayoutFrom, downloadPageInventory, downloadAllPageFormulas, downloadCompiledPageScript, openCreatePage, createPage, addAppPage,
   };

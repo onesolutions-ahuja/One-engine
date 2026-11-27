@@ -968,7 +968,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
           return next;
         });
         if(route.kind==='setup'&&route.workspace==='page-builder'&&route.resourceApiName===apiName)
-          navigateRoute({kind:'setup',workspace:'page-builder',resourceApiName:updated.apiName});
+          navigateRoute({kind:'setup',workspace:'page-builder',appId:route.appId,resourceApiName:updated.apiName});
       }
       try{
         const fresh=await apiRequest<{apps:LightningAppMetadata[]}>('/metadata/apps');
@@ -1130,7 +1130,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
     if (page.apiName === apiName) setPage(remaining.pages[0] ?? defaultLightningPage);
     pageDefinitionCache.current.clear();
     if (route.kind === 'setup' && route.workspace === 'page-builder' && route.resourceApiName === apiName)
-      navigateRoute({kind:'setup',workspace:'page-builder'});
+      navigateRoute(route.appId?{kind:'setup',workspace:'app-manager'}:{kind:'setup',workspace:'page-builder'});
     notify('Page archived; its SQL metadata and record data are preserved');
   };
   const deleteApp = async (apiName: string) => {

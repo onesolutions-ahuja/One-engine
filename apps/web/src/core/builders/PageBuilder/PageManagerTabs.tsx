@@ -4,13 +4,11 @@ import './PageManagerTabs.css';
 type Tab = { value: string; label: string };
 type AppTab = { apiName: string; label: string };
 
+// Home, App and In-Screen pages are built per app (App Manager > open the app's pages).
 const pageTypes: ReadonlyArray<Tab> = [
   { value: 'all', label: 'All' },
-  { value: 'Home Page', label: 'Home' },
-  { value: 'App Page', label: 'App' },
   { value: 'Record Page', label: 'Record' },
   { value:'Print Template',label:'Print templates' },
-  { value: 'In-Screen Page', label: 'In-Screen' },
 ];
 
 function TabBar({ label, className, tabs, selected, onSelect }: {

@@ -55,7 +55,7 @@ export function createPageRibbon(
     setGroupEditId, setSelectionIds, setSelectedId, setSelectedRegion, setPageSettingsOpen,
     pagePreviewAreaRef, setFitCanvas, setFitFullPage, fitCanvas, fitFullPage, setCanvasZoom,
     canvasZoom, fitScale, advancedEditor, setRibbonPropertyHost, layoutSummaries, layoutCopySource,
-    setLayoutCopySource, setPageDetailsApi, setInlineActionEvent,
+    setLayoutCopySource, setPageDetailsApi, setInlineActionEvent, fetchLayoutSummaries,
   } = editorState;
   const {
     safeBackToPages, restoreLayoutVersion, loadLayoutHistory, placeSelectedLayer,
@@ -73,7 +73,7 @@ export function createPageRibbon(
     cutSelected, copySelected, pasteComponent, deleteTargets, deleteBlockedByLock, removeSelected,
     undo, redo, alignSelected, distributeSelected, moveSelected, addComponent,
   } = componentActions;
-  const { savePage, publishCurrentLayout, copyLayoutFrom } = management;
+  const { saveCurrent, publishCurrentLayout, copyLayoutFrom } = management;
   const { paletteComponents, renderPaletteIcon } = palette;
 
   const selectedRelatedLists = selected
@@ -161,9 +161,11 @@ export function createPageRibbon(
       case 'redo':return <button className="office-ribbon-icon-button" aria-label="Redo" title="Redo"
         disabled={!redoStack.length} onClick={redo}><Redo2 size={17}/></button>;
       case 'save':return <button className={'office-ribbon-icon-button'+(undoStack.length?' has-unsaved-changes':'')}
-        aria-label={undoStack.length?'Save (unsaved changes)':'Save'} title={undoStack.length?'Save page: you have unsaved changes':'Save page'}
-        disabled={saving} onClick={()=>void savePage()}><Save size={17}/></button>;
-      case 'activate':return page.status==='Active'?null:<button className="office-ribbon-icon-button" aria-label="Activate" title="Activate page"
+        aria-label={undoStack.length?'Save (unsaved changes)':'Save'}
+        title={(props.appModeId?'Save all changed pages of the app':'Save page')+(undoStack.length?': you have unsaved changes':'')}
+        disabled={saving} onClick={()=>void saveCurrent()}><Save size={17}/></button>;
+      case 'activate':return page.status==='Active'&&!props.appModeId?null:<button className="office-ribbon-icon-button"
+        aria-label={props.appModeId?'Publish app':'Activate'} title={props.appModeId?'Publish all changed pages of the app':'Activate page'}
         disabled={saving||switchingLayout}
         onClick={()=>void publishCurrentLayout()}><Check size={17}/></button>;
       default:return null;
@@ -391,6 +393,19 @@ export function createPageRibbon(
             <small>{page.pageType==='App Page'?'App page: opens from the app menu.'
               :page.pageType==='In-Screen Page'?'In-screen page: opens on top of another screen with SCREEN(...).'
               :'This page type is fixed.'}</small>
+            <label className="page-settings-ribbon-field"><span>Default layout</span>
+              <select aria-label="Default layout" value={layoutSummaries[page.apiName]?.primary??''}
+                onChange={event=>{
+                  const variant=event.target.value as PageLayoutVariant;
+                  void request(`/metadata/pages/${encodeURIComponent(page.apiName)}/default-layout/${variant}`,{method:'PUT'})
+                    .then(()=>fetchLayoutSummaries([page.apiName]))
+                    .then(()=>onNotify('This page now opens in '+variant))
+                    .catch((error:unknown)=>onNotify(error instanceof Error?error.message:'Unable to change the default layout'));
+                }}>
+                {!layoutSummaries[page.apiName]&&<option value="">Loading…</option>}
+                {PAGE_LAYOUT_ORDER.map(variant=><option key={variant} value={variant}>{variant}</option>)}
+              </select></label>
+            <small>The layout this page opens in, e.g. from the app's page bar.</small>
           </div>}
           {page.pageType==='Print Template'&&page.layoutMode==='template'&&selected&&ribbonTab==='Component Layout'&&
             <label><input type="checkbox" checked={selected.properties.printBreakBefore===true} onChange={event=>

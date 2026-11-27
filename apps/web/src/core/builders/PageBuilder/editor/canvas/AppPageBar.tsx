@@ -39,7 +39,6 @@ export default function AppPageBar({ app, pages, current, onPick, onAdd, onRenam
   };
   if (!list.length && !onAdd) return null;
   return <nav className="app-page-bar" aria-label={'Pages of ' + app.label}>
-    <span className="app-page-bar-title">{app.label}</span>
     <div className="app-page-bar-tabs" role="tablist">
       {list.map(item => item.apiName === renaming && renaming === current
         ? <input key={item.apiName} ref={input} className="app-page-rename" aria-label="Page name" defaultValue={item.label}

@@ -63,7 +63,9 @@ export function settingToRoute(value: string): string {
   return settingRouteNames[value] ?? value.replace(/[^A-Za-z0-9]/g, '');
 }
 export type AppRoute =
-  | { kind: 'setup'; workspace: WorkspaceId; objectApiName?: string; setting?: string; resourceApiName?: string; resourceId?: string; dashboardView?: boolean }
+  | { kind: 'setup'; workspace: WorkspaceId; objectApiName?: string; setting?: string; resourceApiName?: string; resourceId?: string; dashboardView?: boolean;
+      /** Page Builder opened for a whole app (from App Manager): /page-builder/app/<appId>/<page>/<layout>. */
+      appId?: string }
   | { kind: 'app-home'; appId: string }
   | { kind: 'app-page'; appId: string; pageApiName: string }
   | { kind: 'route-alias'; appId: string; slug: string }
@@ -106,6 +108,13 @@ export function parseAppRoute(pathname: string, search = ''): AppRoute {
             && segments[4] && segments[5]
             && recordPageLayoutVariants.some(variant => variant === decodeURIComponent(segments[5]))
             ? { resourceId: decodeURIComponent(segments[5]) } : {})
+        };
+      }
+      if (workspace === 'page-builder' && segments[2] === 'app' && segments[3]) {
+        return {
+          kind: 'setup', workspace, appId: decodeURIComponent(segments[3]),
+          ...(segments[4] ? { resourceApiName: decodeURIComponent(segments[4]) } : {}),
+          ...(segments[4] && segments[5] ? { resourceId: decodeURIComponent(segments[5]) } : {})
         };
       }
       if (segments[2]) {
@@ -164,6 +173,10 @@ export function appRoutePathWithoutBase(route: AppRoute): string {
         if (route.resourceId && recordPageLayoutVariants.some(variant => variant === route.resourceId))
           segments.push(encodeURIComponent(route.resourceId));
       }
+    } else if (route.workspace === 'page-builder' && route.appId) {
+      segments.push('app', encodeURIComponent(route.appId));
+      if (route.resourceApiName) segments.push(encodeURIComponent(route.resourceApiName));
+      if (route.resourceApiName && route.resourceId) segments.push(encodeURIComponent(route.resourceId));
     } else if (route.resourceApiName) {
       segments.push(encodeURIComponent(route.resourceApiName));
       if (route.resourceId) segments.push(encodeURIComponent(route.resourceId));

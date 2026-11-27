@@ -136,7 +136,7 @@ export function usePageEditorState(
   const [pageListObject, setPageListObject] = useState('');
   const [pageListSearch, setPageListSearch] = useState('');
   const [pageListAppTab, setPageListAppTab] = useState('all');
-  const [pageListTypeTab, setPageListTypeTab] = useState('App Page');
+  const [pageListTypeTab, setPageListTypeTab] = useState('all');
   const [pageListDeviceTab, setPageListDeviceTab] = useState('all');
   const [pageListPage,setPageListPage]=useState(1);
   const [pageListSort,setPageListSort]=useState<'updatedAt'|'label'|'apiName'|'status'>('updatedAt');

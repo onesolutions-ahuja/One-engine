@@ -42,6 +42,9 @@ export type PageBuilderProps = {
   initialLayoutVariant?: PageLayoutVariant;
   /** apiName is given when opening another page's layout (e.g. from the page list). */
   onLayoutVariantChange?: (variant:PageLayoutVariant,apiName?:string) => void;
+  /** Set when Page Builder edits a whole app (opened from App Manager): switching pages keeps
+   *  every page's edits, and Save / Publish apply to all changed pages of the app together. */
+  appModeId?: string;
 };
 
 export interface PageBuilderComponents {

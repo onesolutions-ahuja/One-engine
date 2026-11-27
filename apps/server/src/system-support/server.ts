@@ -2081,6 +2081,19 @@ export function createSystemServer(db:SqlPersistence) {
     res.setHeader('Cache-Control','private, no-store');
     res.json({page:await pages.publishLayout(actor.tenant_id,req.params.apiName,variant,expected,actor.user_id)});
   }));
+  // The layout a page opens in (Page settings > Default layout). Stored as the page's creation layout.
+  app.put('/api/metadata/pages/:apiName/default-layout/:variant',route(async(req,res)=>{
+    const actor=req.actor!;
+    await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','manage');
+    await assertMetadataPackageEditable(db,actor.tenant_id,'page',req.params.apiName);
+    const variant=pageLayoutVariant(req.params.variant);
+    const result=await db.query(`UPDATE md_lightning_page_details d SET creation_layout_variant=$3,updated_at=now()
+      FROM md_page_definitions p WHERE p.tenant_id=$1 AND p.api_name=$2 AND p.enabled=true
+        AND d.tenant_id=p.tenant_id AND d.page_id=p.id`,[actor.tenant_id,req.params.apiName,variant]);
+    if(!result.rowCount)throw new Error('Page not found');
+    res.setHeader('Cache-Control','private, no-store');
+    res.json({apiName:req.params.apiName,defaultLayout:variant});
+  }));
   app.get('/api/metadata/pages/:apiName/layouts/:variant/history',route(async(req,res)=>{
     const actor=req.actor!;
     await rbac.require(actor.tenant_id,actor.user_id,'PageDefinition','read');

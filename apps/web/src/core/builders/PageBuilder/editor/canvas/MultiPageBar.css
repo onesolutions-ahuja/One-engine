@@ -1,6 +1,6 @@
-/* Bottom bars of Page Builder (MultiPage bar above the page bar): frozen under the canvas. */
+/* Bottom bars of Page Builder (MultiPage bar above the page bar): below the canvas, never on top of it. */
 .page-builder-bottom-bars{
-  position:sticky;bottom:0;z-index:20;align-self:stretch;flex:0 0 auto;
+  position:static;align-self:stretch;flex:0 0 auto;
   display:flex;flex-direction:column;gap:6px;margin-top:8px;
 }
 .page-builder-bottom-bars>.app-page-bar{position:static;margin-top:0}

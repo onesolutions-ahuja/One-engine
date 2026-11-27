@@ -12,6 +12,10 @@ export const pageBuilderCategoryLabels: Record<PageBuilderPaletteCategory, strin
   Navigation: 'Buttons & links'
 };
 
+/** Page types created from the Page Builder list. Home, App and In-Screen pages are created inside an
+ *  app (App Manager > open the app's pages, then + on the page bar). */
+export const PAGE_LIST_TYPES = ['Record Page', 'Print Template'] as const;
+
 export const pageBuilderStartOptions = [
   { type: 'Home Page', title: 'Home page', description: 'A starting place for your team.' },
   { type: 'Record Page', title: 'Record page', description: 'Display and edit a saved record.' },

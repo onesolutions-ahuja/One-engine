@@ -25,9 +25,6 @@
   border:1px dashed #98a2b3;border-radius:8px;background:#fff;color:#5b6575;cursor:pointer;
 }
 .multi-page-rename{height:32px;min-width:120px;padding:0 10px;border:2px solid #2453d6;border-radius:8px;font:inherit;flex:none}
-.multi-page-editors{display:inline-flex;gap:4px;align-items:center}
-.multi-page-editor{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
-  color:#fff;font-weight:700;font-size:12px}
 .multi-page-bar-layouts{margin-left:auto;flex:none}
 
 /* Desktop / Tablet / Mobile / Custom: a segmented control with icons. */

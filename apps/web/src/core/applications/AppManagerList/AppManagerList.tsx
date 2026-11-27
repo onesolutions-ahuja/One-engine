@@ -9,14 +9,20 @@ type Props = {
   busy: boolean;
   onEdit: (app: LightningAppMetadata) => void;
   onClone: (app: LightningAppMetadata) => void;
+  /** Opens the app's pages in Page Builder (app name link). */
+  onOpenPages?: (app: LightningAppMetadata) => void;
   /** Present only for OneEngine holders: publish this app to AppExchange. */
   onPublish?: (app: LightningAppMetadata) => void;
 };
 
-export default function AppManagerList({apps, busy, onEdit, onClone, onPublish}: Props) {
+export default function AppManagerList({apps, busy, onEdit, onClone, onOpenPages, onPublish}: Props) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'label'|'apiName'|'navigation'|'pages'>('label');
   const [descending, setDescending] = useState(false);
+  const appNameLink=(app: LightningAppMetadata)=>onOpenPages
+    ? <button type="button" className="app-manager-list-link" title={'Open pages of '+app.label+' in Page Builder'}
+        onClick={event=>{event.stopPropagation();onOpenPages(app);}}>{app.label}</button>
+    : app.label;
   const changeSort=(field: typeof sort)=>{if(field===sort)setDescending(value=>!value);else{setSort(field);setDescending(false);}};
   const filtered = apps.filter(app =>
     (app.label + ' ' + app.apiName + ' ' + app.description)
@@ -47,7 +53,7 @@ export default function AppManagerList({apps, busy, onEdit, onClone, onPublish}:
     <ResponsiveDataList rows={filtered} includeTablet includeNarrowDesktop getId={app=>app.apiName} label="Applications"
       onOpen={app=>onEdit(app)} openLabel="Edit application"
       columns={[
-        {apiName:'name',label:'Application',phoneRole:'title',render:app=>app.label},
+        {apiName:'name',label:'Application',phoneRole:'title',render:app=>appNameLink(app)},
         {apiName:'apiName',label:'Developer name',phoneRole:'subtitle',render:app=>app.apiName},
         {apiName:'description',label:'Description',render:app=>app.description || '—'},
         {apiName:'pages',label:'Pages',phoneRole:'badge',render:app=>app.navigationPageApiNames.length+(app.navigationPageApiNames.length===1?' page':' pages')},
@@ -71,7 +77,7 @@ export default function AppManagerList({apps, busy, onEdit, onClone, onPublish}:
         <tbody>{filtered.map(app => <tr key={app.apiName}>
           <td><div className="app-manager-list-name">
             <span className="app-manager-list-color" style={{backgroundColor:app.brandColor}} aria-hidden="true"/>
-            <span><strong>{app.label}</strong></span>
+            <span><strong>{appNameLink(app)}</strong></span>
           </div></td>
           <td><code>{app.apiName}</code></td>
           <td title={app.description || ''}>{app.description || '—'}</td>

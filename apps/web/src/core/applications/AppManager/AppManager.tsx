@@ -51,6 +51,7 @@ export default function AppManager({
   embedded = false,
   onClose,
   onOpenPage,
+  onOpenAppPages,
   initialSelectedApiName = '',
   onSelectedAppChange,
   canPublish = false
@@ -69,6 +70,8 @@ export default function AppManager({
   embedded?: boolean;
   onClose?: () => void;
   onOpenPage?: (apiName: string) => void;
+  /** App name link in the list: open this app's pages in Page Builder. */
+  onOpenAppPages?: (app: LightningAppMetadata) => void;
   initialSelectedApiName?: string;
   onSelectedAppChange?: (apiName: string) => void;
   /** OneEngine holders may publish tenant-built apps to AppExchange. */
@@ -366,7 +369,7 @@ export default function AppManager({
     {!embedded && view === 'list' ? <>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
-      <AppManagerList apps={apps} busy={busy} onEdit={editApp} onClone={cloneApp}
+      <AppManagerList apps={apps} busy={busy} onEdit={editApp} onClone={cloneApp} onOpenPages={onOpenAppPages}
         onPublish={canPublish && request ? (app) => setPublishing(app.apiName) : undefined}/>
       {publishing && request && <AppPublishDialog appApiName={publishing} request={request} onClose={() => setPublishing('')}/>}
     </> : <>

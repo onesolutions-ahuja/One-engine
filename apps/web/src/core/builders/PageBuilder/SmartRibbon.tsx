@@ -58,6 +58,16 @@ const cartSummaryLabels:Record<string,{key:string;slot:string}>={
 // Left/right side of buttons inside a row; also set by dragging the button on the canvas.
 const partSidePropertyIds=['cardButtonPlacement','customButton1Placement','customButton2Placement',
  'qtyIncreasePlacement','qtyDecreasePlacement'];
+
+/** Any "…Shape" setting whose choices are shapes (cart +/− buttons, custom buttons, table and
+ * ticket row buttons…) uses the same shape gallery as a Button, never a short dropdown.
+ * Settings named Shape with their own words (map seats, MultiPage tabs) keep their list. */
+export function usesShapeGallery(p:{id:string;choices?:unknown}):boolean{
+ if(!/Shape$/.test(p.id)||p.id==='shapeId'||p.id==='numpadKeyShape'||p.id==='footerShape')return false;
+ const choices=Array.isArray(p.choices)?p.choices.map(String):[];
+ return choices.length>0&&choices.every(choice=>choice.startsWith('shape:'));
+}
+
 export default function SmartRibbon({tab,api,definitions,properties,onChange,objects,pageObjectApiName='',position,onPositionChange,layoutMode,sharedPropertyIds,mixedPropertyIds,selectedApis,pageComponents=[],componentId='',canvasBinding=null,design2Slots=[],design2SlotRules=[],componentVisible=true,onVisibleChange,design2Arrange,inspectorSection,onInspectorSectionChange,openDesignSection,onToggleDesignSection,selectedCartColumn=null,part}:Props){
  const uploadInput=useRef<HTMLInputElement>(null);
  const [uploadBusy,setUploadBusy]=useState(false);
@@ -430,7 +440,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
    if(p.id==='tabIndex')return p.designWidth??30;
    // Shape's 94px SQL width is exact, unlike other compact choice tracks.
    if(p.id==='shapeId')return p.designWidth??94;
-   if(['cardButtonShape','customButton1Shape','customButton2Shape'].includes(p.id))return p.designWidth??94;
+   if(usesShapeGallery(p))return p.designWidth??94;
    // Shadow/Alignment icon dropdowns must remain at least 35px wide.
    if(p.designDisplay==='dropdown'&&(p.kind==='shadow'||p.kind==='align'))
      return Math.max(35,p.designWidth??0);
@@ -554,7 +564,7 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
      disabled={!enabled} allowIcons={property.id==='footerShape'?false:(selectedApis?.length?selectedApis:[api]).every(member=>
        (property.choicesOverrides?.[member]??property.choices??[]).includes('icons'))}
      onChange={write}/>;
-   else if(['cardButtonShape','customButton1Shape','customButton2Shape','customButton3Shape'].includes(property.id))editor=<SmartIconGallery
+   else if(usesShapeGallery(property))editor=<SmartIconGallery
      value={String(value||'shape:round-rectangle')} disabled={!enabled}
      allowIcons={false} onChange={write}/>;
    else if(property.id==='imageSource'&&supported){

@@ -743,7 +743,13 @@ function SmartTabs({p,record,fire}){
  // A held value that is no tab (e.g. "*" for All) means no tab is selected.
  const heldOtherValue=!hasCollection&&Boolean(stateKey)&&selectedId!==null&&selectedId!==undefined
   &&selectedId!==""&&indexForSelection<0;
- const selectedTabIndex=(hasCollection||stateKey)
+ // A value an action gave (`@ThisPage.Tabs.Value = "*"`) is the selection until the user
+ // picks again: the tab with that Id, or none (e.g. "*" for All).
+ const givenSelection=p.givenValue?String(p.givenValue.value??""):null;
+ const givenIndex=givenSelection===null||givenSelection===""?-1:tabs.findIndex(tab=>
+  String((hasCollection?tab?.record?.Id??tab?.record?.id??tab?.value:tab?.id)??"")===givenSelection);
+ const selectedTabIndex=givenSelection!==null?givenIndex
+  :(hasCollection||stateKey)
   ?indexForSelection>=0?indexForSelection:heldOtherValue?-1:defaultTabIndex
   :tabs.length?Math.max(0,Math.min(active,tabs.length-1)):-1;
  const autoSelected=React.useRef(null);
@@ -791,14 +797,14 @@ function SmartTabs({p,record,fire}){
   // when it changes (e.g. the record's value arrives after the page opened).
   if(indexForSelection>=0&&(userPickedTab.current||!hasDefaultCaption||indexForSelection===defaultTabIndex)){
    autoSelected.current=null;return;}
-  if(heldOtherValue||defaultTabIndex<0)return;
+  if(heldOtherValue||givenSelection!==null||defaultTabIndex<0)return;
   const key=String(p.pageSessionKey??"")+"|"+String(p.componentId??"")+"|"+
    String(hasCollection?p.dataCollection.name:stateKey)+"|"+String(defaultTabIndex)+"|"+String(defaultItemId??"");
   if(autoSelected.current===key)return;
   autoSelected.current=key;
   selectTab(defaultTabIndex,true);
  },[indexForSelection,defaultItemId,defaultTabIndex,tabs.length,p.loading,p.previewOnly,p.builderPreview,
-   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue,hasDefaultCaption]);
+   p.pageSessionKey,p.componentId,p.onAction,hasCollection,stateKey,p.dataCollection?.name,heldOtherValue,hasDefaultCaption,givenSelection]);
  // Focus the actual selected initial tab only if no other control owns focus.
  React.useEffect(()=>{
   if(selectedTabIndex<0||!tabs.length||p.loading||
@@ -1118,7 +1124,7 @@ export default function SmartRuntime(p){
     justifyContent:label?(p.labelAlignment==="right"?"flex-end":p.labelAlignment==="center"?"center":"flex-start"):"center",
     ...(p.wrapText===true?{textAlign:p.labelAlignment==="right"?"right":p.labelAlignment==="center"?"center":"left"}:{}),
     fontWeight:typeof p.headerBold==="boolean"?(p.headerBold?700:400):undefined,
-    background:p.backgroundColor||SMART_BLUE,color:readableText(p.backgroundColor||SMART_BLUE,p.labelColor)||"#fff",borderColor:p.borderColor,
+    background:p.backgroundColor||SMART_BLUE,color:p.labelColor||"#fff",borderColor:p.borderColor,
     ...(isDisabled?{opacity:.4,filter:"grayscale(.7)",cursor:"not-allowed"}:{})}}>
    {(buttonIcon||working)&&<span className="smart-button-glyph" aria-hidden="true" style={{
      ...smartIconPaint(working?"spinner":buttonIcon.id,p.labelColor||"#fff",working?"":p.iconFillColor),

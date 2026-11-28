@@ -1,4 +1,5 @@
 import { useRuntimeFormFactor } from '../Responsive/useFormFactor';
+import { isProblemNotice, NOTICE_MS } from './toastTone';
 import {workspaceShortcut,isTypingShortcutTarget} from '../Navigation/workspaceShortcuts';
 
 
@@ -692,9 +693,12 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
       : connectorProviders;
   }, [quickFind, connectorProviders]);
 
+  // One timer for the current notice: an older notice's timer used to clear a newer one early.
+  const toastTimer = useRef<number | undefined>(undefined);
   const notify = (message: string) => {
+    window.clearTimeout(toastTimer.current);
     setToast(message);
-    window.setTimeout(() => setToast(''), 2400);
+    if (!isProblemNotice(message)) toastTimer.current = window.setTimeout(() => setToast(''), NOTICE_MS);
   };
   const saveAccessControl = async (nextAccessControl: AccessControlMetadata) => {
     const saved=await apiRequest<AccessControlMetadata>('/metadata/permissions',{

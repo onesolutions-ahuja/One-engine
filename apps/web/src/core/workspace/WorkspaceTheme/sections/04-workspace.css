@@ -121,6 +121,9 @@ body, .workspace, .object-manager, .analytics-page, .home-content { background-c
 .modal { max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 18px 50px rgb(46 38 30 / 22%); }
 .toast { background: var(--brand); border-radius: 8px; }
 .toast-message { min-width: 0; flex: 1; }
+/* Something to fix: red, stays until dismissed (toastTone.ts). */
+.toast.toast-problem { background: #b91c1c; max-width: min(720px, calc(100vw - 32px)); align-items: flex-start; }
+.toast-problem-icon { flex: 0 0 auto; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fff; color: #b91c1c; font-weight: 800; font-size: 13px; }
 .toast-dismiss { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 8px; padding: 5px; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
 .toast-dismiss:hover { background: rgb(255 255 255 / 18%); }
 .toast-dismiss:focus-visible { outline: 2px solid white; outline-offset: 2px; }

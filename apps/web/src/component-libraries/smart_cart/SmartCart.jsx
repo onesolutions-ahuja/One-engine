@@ -1,6 +1,7 @@
 
 /** Cart is presentation-only; expressions and actions use the existing shared runtimes. */
 import {groupCartRows} from './cartGrouping.js';
+import SmartEmptyState from '../smart/shared/SmartEmptyState.jsx';
 import {smartCustomButtonAppearance} from '../smart/shared/SmartCustomButtonAppearance.js';
 import {smartPartOffsetStyle,smartPartOrderStyle,smartPartSide} from '../smart/shared/SmartPartPlacement.js';
 
@@ -262,8 +263,9 @@ export default function SmartCart({p,records,Picture,expression,resolveImage,fie
      })}
     </div>
     <div ref={rowsRef} className="smart-cart-rows" role="region" tabIndex={0} aria-label="Cart item rows">
-     {rows.length===0&&!demo&&!p.builderPreview&&<p className="smart-cart-empty">
-      {String(displayFormula('emptyText',p.emptyText,'No items yet')||'No items yet')}</p>}
+     {rows.length===0&&!demo&&!p.builderPreview&&<SmartEmptyState className="smart-cart-empty" icon="bag"
+      title={String(displayFormula('emptyText',p.emptyText,'No items yet')||'No items yet')}
+      subtitle={String(displayFormula('emptySubtitle',p.emptySubtitle,'Tap a product to add it to the sale.')??'')}/>}
      {rows.map((record,i)=>{
       const name=demo?"Sample item "+(i+1):(p.textSource?fieldExpression('textSource',p.textSource,record):"Product "+(i+1));
       const src=p.imageSource?(typeof resolveImage==='function'?resolveImage(record):fieldExpression('imageSource',p.imageSource,record)):"";

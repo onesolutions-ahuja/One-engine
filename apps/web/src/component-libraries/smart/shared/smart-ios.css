@@ -13,7 +13,7 @@
  --smart-ios-separator:rgb(60 60 67 / .14);
  --smart-ios-secondary:#8e8e93;
  --smart-ios-ease:cubic-bezier(.2,.8,.2,1);
- font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+ font-family:var(--md-font-family,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif);
  -webkit-font-smoothing:antialiased;
  letter-spacing:-.005em;
 }
@@ -141,7 +141,7 @@
 }
 
 /* Smart Table (renders outside SmartRuntime): grouped-list look. */
-.smart-table-root.smart-ios{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+.smart-table-root.smart-ios{font-family:var(--md-font-family,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif);
  -webkit-font-smoothing:antialiased}
 .smart-table-root.smart-ios .smart-table-native th{font-size:.78em;letter-spacing:.02em;text-transform:uppercase}
 .smart-table-root.smart-ios .smart-table-native tbody tr{transition:background-color .15s ease}
@@ -155,3 +155,9 @@
 .smart-table-root.smart-ios:not([data-builder-preview]) .smart-table-actions button:not(:disabled):active{transform:scale(.95)}
 .smart-table-root.smart-ios .smart-table-empty{color:#8e8e93;text-align:center}
 @media (prefers-reduced-motion:reduce){.smart-table-root.smart-ios *{transition:none!important}}
+/* Empty Cart / Table (SmartEmptyState.jsx): centred icon, bold title, grey line. */
+.smart-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+ min-height:100%;padding:28px 16px;text-align:center;color:#8e8e93;box-sizing:border-box}
+.smart-empty-state-icon{width:min(64px,30%);height:auto;max-height:64px;color:#9b9ba1;margin-bottom:6px}
+.smart-empty-state-title{color:#1d1d1f;font-size:clamp(15px,1.6em,24px);font-weight:700;line-height:1.2}
+.smart-empty-state-subtitle{color:#8e8e93;font-size:clamp(12px,1em,16px);line-height:1.35;max-width:32em}

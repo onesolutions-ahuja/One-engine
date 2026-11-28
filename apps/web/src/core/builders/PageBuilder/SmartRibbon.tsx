@@ -2,6 +2,7 @@ import {useState,useRef,useEffect,useLayoutEffect,type ChangeEvent,type CSSPrope
 import {createPortal} from 'react-dom';
 import {AlignLeft,AlignCenter,AlignRight,Bold,WrapText,ArrowLeftRight,ArrowUpDown,ImagePlus,SlidersHorizontal,Eye,EyeOff,ChevronDown,Plus,X} from 'lucide-react';
 import {RibbonTextSizeIcon,RibbonCornerRadiusIcon} from './SmartRibbonIcons';
+import {FONT_CHOICES,isTextArea,partFonts} from '../../components/Properties/fontChoices';
 import type {ObjectMetadata} from '../../metadata/Definitions/metadata';
 import type {BuilderRibbonProperty,BuilderTab,Design2Slot,Design2SlotRule} from './builderPropertyInventory';
 import {HIDDEN_RIBBON_PROPERTY_KEYS,hasDesign2LayoutEquivalent} from './layoutRibbonVisibility';
@@ -1004,6 +1005,35 @@ export default function SmartRibbon({tab,api,definitions,properties,onChange,obj
               {sectionRow(activeDesign2Area,row).map(controls)}
             </div>)}
           </div>
+          {isTextArea(activeDesign2Area)&&(()=>{
+            // Font of the part being designed (Body = the whole component; other parts inherit it).
+            const body=activeDesign2Area==='Body';
+            const parts=partFonts(properties);
+            const value=body?(typeof properties.fontFamily==='string'?properties.fontFamily:''):parts[activeDesign2Area]??'';
+            const choose=(key:string)=>{
+              if(body){
+                const next={...properties};
+                if(key)next.fontFamily=key;else delete next.fontFamily;
+                onChange(next,['fontFamily']);return;
+              }
+              const nextParts={...parts};
+              if(key)nextParts[activeDesign2Area]=key;else delete nextParts[activeDesign2Area];
+              const next={...properties};
+              if(Object.keys(nextParts).length)next.partFonts=nextParts;else delete next.partFonts;
+              onChange(next,['partFonts']);
+            };
+            return <div className="smart-design2-supplemental" role="group" aria-label="Font">
+              <div className="smart-design2-supplemental-setting" data-others-property="fontFamily">
+                <span className="smart-design2-supplemental-label" title="Font">Font</span>
+                <select aria-label={'Font ('+activeDesign2Area+')'} value={value}
+                  title={body?'Font of the whole component':'Font of '+activeDesign2Area+' only'}
+                  onChange={event=>choose(event.target.value)}>
+                  <option value="">{body?'Page default (System)':'Same as component'}</option>
+                  {FONT_CHOICES.map(choice=><option key={choice.key} value={choice.key}>{choice.label} — {choice.from}</option>)}
+                </select>
+              </div>
+            </div>;
+          })()}
           {activeDesign2Area==='Cart columns'&&selectedCartColumn&&
             <div className="smart-design2-supplemental" role="group"
               aria-label={`Column ${selectedCartColumn} properties`}>

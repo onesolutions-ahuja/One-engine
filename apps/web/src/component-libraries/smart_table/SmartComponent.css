@@ -15,6 +15,7 @@
 .smart-table-actions button:disabled{opacity:.4;cursor:not-allowed}
 .smart-table-footer{flex:0 0 auto;display:flex;align-items:center;box-sizing:border-box;padding-inline:10px;min-width:0}
 .smart-table-empty{padding:18px}
+.smart-table-empty.smart-empty-state{flex:1 1 auto;padding:28px 16px}
 @media(max-width:640px){.smart-table-native th,.smart-table-native td{padding:5px 7px}}
 
 .smart-table-root [aria-disabled="true"]{opacity:.5;pointer-events:none}

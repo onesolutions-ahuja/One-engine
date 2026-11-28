@@ -3,6 +3,38 @@ import { rawLayoutParentId } from '../../pages/TemplatePageRuntime/pageComponent
 import { isCanvasLocked } from './canvasInteractions';
 
 export type ComponentClipboard = { rootId: string; components: PageComponentMetadata[] };
+/** What Cut / Copy hold: one tree per selected top-level component (Ctrl+A copies them all). */
+export type PageClipboard = ComponentClipboard[];
+
+/** The selected ids that have no selected ancestor (their children come along with them). */
+export function selectionRoots(components: readonly PageComponentMetadata[], ids: readonly string[]): string[] {
+  const selected = new Set(ids);
+  const byId = new Map(components.map(item => [item.id, item]));
+  const hasSelectedAncestor = (id: string) => {
+    const seen = new Set<string>();
+    let parent = rawLayoutParentId(byId.get(id)!);
+    while (parent && !seen.has(parent)) {
+      if (selected.has(parent)) return true;
+      seen.add(parent);
+      const next = byId.get(parent);
+      parent = next ? rawLayoutParentId(next) : null;
+    }
+    return false;
+  };
+  // Page order, so pasted components keep their stacking order.
+  return components.filter(item => selected.has(item.id) && !hasSelectedAncestor(item.id)).map(item => item.id);
+}
+
+/** Copy every selected top-level component with its children. */
+export function copyComponentSelection(components: readonly PageComponentMetadata[], ids: readonly string[]): PageClipboard {
+  return selectionRoots(components, ids).map(id => copyComponentTree(components, id));
+}
+
+/** The clipboard outlives one page: Page Builder remounts per page, so Cut on one page
+ * and Paste on another uses this. */
+let sharedClipboard: PageClipboard | null = null;
+export const readSharedClipboard = () => sharedClipboard;
+export const writeSharedClipboard = (value: PageClipboard | null) => { sharedClipboard = value; };
 
 /**
  * Remove all selected components in one draft edit. Locked items block the

@@ -108,8 +108,9 @@ export function usePageLayoutActions(
   const coSent=useRef(new Map<string,string>());
   const coPage=useRef(page);coPage.current=page;
   const coSelection=useRef<string[]>([]);coSelection.current=editorState.selectionIds;
-  const [coEditors,setCoEditors]=React.useState<CoEditor[]>([]);
-  useEffect(()=>{coEditorsStore.set(coEditors);},[coEditors]);
+  // Presence is kept in coEditorsStore only (never Page Builder state): a 10 s heartbeat
+  // or another designer's ping used to redraw the whole builder and canvas.
+  const setCoEditors=(change:(current:CoEditor[])=>CoEditor[])=>coEditorsStore.update(change);
   useEffect(()=>()=>coEditorsStore.set([]),[]);
   const coVariant=page.layoutVariant??'Desktop';
   useEffect(()=>{

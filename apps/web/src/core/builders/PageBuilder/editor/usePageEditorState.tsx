@@ -30,6 +30,10 @@ import { type PageLayoutSummary } from '../pageLayoutSummary';
 import type { PageBuilderProps } from './PageBuilderTypes';
 import type { CanvasSelectionSnapshot, ResizeEdge } from './PageBuilderTypes';
 
+function sameIdList(a: readonly string[], b: readonly string[]): boolean {
+  return a === b || (a.length === b.length && a.every((id, index) => id === b[index]));
+}
+
 export function usePageEditorState(
   props: PageBuilderProps,
 ) {
@@ -68,11 +72,35 @@ export function usePageEditorState(
     && (component !== 'Chatter' || targetObject?.settings?.allowInChatter)
     && (component !== 'Report Chart' || targetObject?.settings?.allowReports));
   const stringList = pageStringList;
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedIdState] = useState('');
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  // Choosing a component used to commit once, then run several effects that each
+  // reset panel state (Design section, part edit, cart column) and commit again:
+  // two or three full builder renders per click. The resets are now made in the
+  // same batch as the selection; the effects below stay as no-op safety nets.
+  const setSelectedId = useCallback((next: string | ((current: string) => string)) => {
+    const value = typeof next === 'function' ? next(selectedIdRef.current) : next;
+    if (value === selectedIdRef.current) return;
+    selectedIdRef.current = value;
+    setSelectedIdState(value);
+    setSelectionIdsState(current => value && current.includes(value) ? current : value ? [value] : []);
+    setPartEditId(current => current && current !== value ? '' : current);
+    setCartColumnSelection(current => current && current.componentId !== value ? null : current);
+    setOpenDesignSection(current => current === null ? current : null);
+    setInspectorSection(nextDesignAreaRef.current ?? 'Body');
+  }, []);
   // Page layers: the layer being designed (0 = the page itself). Extra layers added with +
   // stay listed until the page changes, even before a component is put on them.
   const [selectedRegion, setSelectedRegion] = useState<'header' | 'main' | 'sidebar' | null>(null);
-  const [selectionIds, setSelectionIds] = useState<string[]>([]);
+  const [selectionIds, setSelectionIdsState] = useState<string[]>([]);
+  // Picking what is already picked (same ids, same order) must not redraw the builder.
+  const setSelectionIds = useCallback((next: string[] | ((current: string[]) => string[])) => {
+    setSelectionIdsState(current => {
+      const value = typeof next === 'function' ? next(current) : next;
+      return sameIdList(current, value) ? current : value;
+    });
+  }, []);
   const [groupEditId,setGroupEditId]=useState('');
   const [openBuilderTabs,setOpenBuilderTabs]=useState<Record<string,string>>({});
   // MultiPage: a tab holding the selection stays open after the selection moves elsewhere.

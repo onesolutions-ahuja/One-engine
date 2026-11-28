@@ -3,8 +3,24 @@
  * found by the same data-design-area name the ribbon group uses ("Footer", "Header
  * Supporting", "Badge"...); "Body" or no area means the component itself. Shown as a grey
  * placeholder only, so nothing is saved until the builder types a value. */
+// Every number box of the ribbon asks on every builder render; one answer per frame
+// is enough (it is only a grey placeholder) and avoids repeated forced layouts.
+const frameCache=new Map<string,number|undefined>();
+let clearScheduled=false;
 export function renderedPartNumber(componentId:string,area:string,propertyId:string):number|undefined{
  if(typeof document==='undefined'||!componentId)return undefined;
+ const key=componentId+'\u0000'+area+'\u0000'+propertyId;
+ if(frameCache.has(key))return frameCache.get(key);
+ const value=measurePartNumber(componentId,area,propertyId);
+ frameCache.set(key,value);
+ if(!clearScheduled){
+  clearScheduled=true;
+  const clear=()=>{frameCache.clear();clearScheduled=false;};
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(clear);else setTimeout(clear,16);
+ }
+ return value;
+}
+function measurePartNumber(componentId:string,area:string,propertyId:string):number|undefined{
  const host=Array.from(document.querySelectorAll<HTMLElement>('[data-component-id]'))
   .find(node=>node.dataset.componentId===componentId);
  if(!host)return undefined;

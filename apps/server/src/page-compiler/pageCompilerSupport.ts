@@ -88,7 +88,18 @@ export function pageComponentReadObjectNames(
  * runtime. A component need not select an Object merely to emit an action.
  * Never execute user-supplied expressions or attach business logic to JSX.
  */
+// Asked for every component on every Page Builder render; properties objects are
+// replaced (never edited in place) when a component changes, so cache per object.
+const metadataRuntimeCache = new WeakMap<object, boolean>();
 export function needsMetadataComponentRuntime(properties: Record<string, unknown>): boolean {
+  if (!properties || typeof properties !== 'object') return false;
+  const cached = metadataRuntimeCache.get(properties);
+  if (cached !== undefined) return cached;
+  const result = computeNeedsMetadataComponentRuntime(properties);
+  metadataRuntimeCache.set(properties, result);
+  return result;
+}
+function computeNeedsMetadataComponentRuntime(properties: Record<string, unknown>): boolean {
   // Any registered component can bind to an Object, not just a named business
   // vertical. Keep legacy *ObjectApiName properties working without per-app code.
   if (Object.entries(properties).some(([key, value]) =>

@@ -77,6 +77,25 @@ const legacyFormula=(binding:Binding,eventName:string,field:string,owner:string)
  * until a user deliberately converts them; no business metadata is deleted.
  * Flow declarations belong to Flow Builder; existing action bindings remain intact.
  */
+
+type CalloutChoice={apiName:string;label:string;fields?:string[];outputs?:string[]};
+const ACTION_LIST_TTL=60_000;
+const actionLists=new Map<string,{at:number;value:Promise<unknown[]>;settled?:unknown[]}>();
+function cachedActionList<T>(path:string):T[]|undefined{
+ const entry=actionLists.get(path);
+ return entry&&Date.now()-entry.at<ACTION_LIST_TTL?entry.settled as T[]|undefined:undefined;
+}
+function loadActionList<T>(request:<R>(path:string)=>Promise<R>,path:string):Promise<T[]>{
+ const entry=actionLists.get(path);
+ if(entry&&Date.now()-entry.at<ACTION_LIST_TTL)return entry.value as Promise<T[]>;
+ const value=request<unknown>(path).then(items=>Array.isArray(items)?items:[]).catch(()=>{actionLists.delete(path);return [];});
+ const next={at:Date.now(),value} as {at:number;value:Promise<unknown[]>;settled?:unknown[]};
+ void value.then(items=>{next.settled=items;});
+ actionLists.set(path,next);
+ return value as Promise<T[]>;
+}
+const sameJson=(a:unknown,b:unknown)=>a===b||JSON.stringify(a)===JSON.stringify(b);
+
 export default function PageBuilderActionRibbon({
  actions,eventDefinitions,flows,selectedEvent,onSelectEvent,onChange,
  api='',selectedApis,mixedEventIds=[],mixedButtonVisibilityKeys=[],objects=[],pages=[],request,dataFields=[],disabled=false,
@@ -99,15 +118,17 @@ export default function PageBuilderActionRibbon({
  showDetails?:boolean;onToggleDetails?:()=>void;
 }) {
  const active=Boolean(selectedEvent&&Object.prototype.hasOwnProperty.call(actions,selectedEvent));
- const [credentials,setCredentials]=useState<Array<{apiName:string;label:string}>>([]);
- const [callouts,setCallouts]=useState<Array<{apiName:string;label:string;fields?:string[];outputs?:string[]}>>([]);
+ // Fetched once per minute, not every time the Actions tab opens: each answer used to
+ // arrive after the tab was drawn and redraw the whole Page Builder again.
+ const [credentials,setCredentials]=useState<Array<{apiName:string;label:string}>>(()=>cachedActionList('/action-formulas/credentials')??[]);
+ const [callouts,setCallouts]=useState<CalloutChoice[]>(()=>cachedActionList('/action-formulas/callouts')??[]);
  useEffect(()=>{
   let active=true;
-  if(request)void request<Array<{apiName:string;label:string}>>('/action-formulas/credentials')
-   .then(items=>{if(active)setCredentials(items);}).catch(()=>{if(active)setCredentials([]);});
   // Installed connector operations for CALLOUT('Connector.Operation', ...): names, blanks and reply fields.
-  if(request)void request<Array<{apiName:string;label:string;fields?:string[];outputs?:string[]}>>('/action-formulas/callouts')
-   .then(items=>{if(active)setCallouts(Array.isArray(items)?items:[]);}).catch(()=>{if(active)setCallouts([]);});
+  if(request)void loadActionList<{apiName:string;label:string}>(request,'/action-formulas/credentials')
+   .then(items=>{if(active)setCredentials(current=>sameJson(current,items)?current:items);});
+  if(request)void loadActionList<CalloutChoice>(request,'/action-formulas/callouts')
+   .then(items=>{if(active)setCallouts(current=>sameJson(current,items)?current:items);});
   return ()=>{active=false;};
  },[request]);
  const selected=asBinding(actions[selectedEvent]);

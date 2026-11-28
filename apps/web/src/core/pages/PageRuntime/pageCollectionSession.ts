@@ -9,10 +9,22 @@ type Snapshot={collections:Readonly<Record<string,SessionCollection>>;errors:Rea
 type Registry={owners:Map<string,Entry>;subscribers:Set<()=>void>;snapshot:Snapshot};
 const empty:Snapshot=Object.freeze({collections:Object.freeze({}),errors:Object.freeze({})});
 const sessions=new Map<string,Registry>();
+// Asked for every property of every component on every page change: memoise the
+// parse per formula text, like formulaKinds.js does (results are never mutated).
+const namesByFormula=new Map<string,readonly string[]>();
+const sourceByFormula=new Map<string,boolean>();
 /** Discover output names at any supported formula nesting depth.
  * An unquoted identifier is allowed only in COLLECTION's name position. */
 export function namedCollectionNames(formula:unknown):string[]{
  if(typeof formula!=='string'||!formula.trim())return [];
+ const cached=namesByFormula.get(formula);
+ if(cached)return [...cached];
+ const result=parseNamedCollectionNames(formula);
+ if(namesByFormula.size>2000)namesByFormula.clear();
+ namesByFormula.set(formula,result);
+ return [...result];
+}
+function parseNamedCollectionNames(formula:string):string[]{
  const found=new Set<string>();
  const outputs=(node:Expression):void=>{
   if(node.kind!=='call')return;
@@ -41,6 +53,14 @@ export function isCollectionSourceExpression(formula:unknown,knownCollections:re
  // Named @Collection references are retired; only explicit data functions
  // produce a collection. Keep the parameter for older callers.
  void knownCollections;
+ const cached=sourceByFormula.get(formula);
+ if(cached!==undefined)return cached;
+ const result=parseCollectionSource(formula);
+ if(sourceByFormula.size>2000)sourceByFormula.clear();
+ sourceByFormula.set(formula,result);
+ return result;
+}
+function parseCollectionSource(formula:string):boolean{
  const returnsCollection=(node:Expression):boolean=>{
   if(node.kind!=='call')return false;
   if(node.name==='COLLECTION'||node.name==='TABLE')return true;

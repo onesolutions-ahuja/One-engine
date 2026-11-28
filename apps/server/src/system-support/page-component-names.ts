@@ -10,7 +10,27 @@ export function componentNameStem(type:string):string{
  const stem=api.replace(/[^A-Za-z0-9]/g,'').toLowerCase().replace(/^[0-9]+/,'');
  return (stem||'component').slice(0,64);
 }
+// Page Builder and runtime ask for names once per component per render. The answer
+// depends only on each item's id, type and navigatorName, so it is cached per array
+// (re-checked item by item, O(n)) and a copy is returned so callers may change it.
+type NamesCache={items:readonly NamedComponent[];keys:string[];names:Map<string,string>};
+const namesCache=new WeakMap<readonly NamedComponent[],NamesCache>();
+const nameKey=(item:NamedComponent)=>item.id+'\u0000'+item.type+'\u0000'+String(item.properties?.navigatorName??'');
+const stemPatterns=new Map<string,RegExp>();
+const stemPattern=(stem:string)=>{
+ let regex=stemPatterns.get(stem);
+ if(!regex){regex=new RegExp('^'+stem+'([0-9]+)$','i');stemPatterns.set(stem,regex);}
+ return regex;
+};
 export function componentInstanceNames(components:readonly NamedComponent[]):Map<string,string>{
+ const cached=namesCache.get(components);
+ if(cached&&cached.items.length===components.length&&components.every((item,index)=>
+  cached.items[index]===item&&cached.keys[index]===nameKey(item)))return new Map(cached.names);
+ const names=computeInstanceNames(components);
+ namesCache.set(components,{items:components.slice(),keys:components.map(nameKey),names});
+ return new Map(names);
+}
+function computeInstanceNames(components:readonly NamedComponent[]):Map<string,string>{
  const explicit=new Set<string>(),result=new Map<string,string>();
  for(const item of components){
   const raw=item.properties?.navigatorName;
@@ -24,7 +44,7 @@ export function componentInstanceNames(components:readonly NamedComponent[]):Map
  for(const item of components){
   const stem=componentNameStem(item.type),name=result.get(item.id);
   if(!name)continue;
-  const match=new RegExp('^'+stem+'([0-9]+)$','i').exec(name);
+  const match=stemPattern(stem).exec(name);
   if(match)lastByStem.set(stem,Math.max(lastByStem.get(stem)??0,Number(match[1])));
  }
  for(const item of components){

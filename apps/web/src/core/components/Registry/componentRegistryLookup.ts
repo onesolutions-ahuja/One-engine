@@ -10,9 +10,29 @@ export function findRegisteredComponent(
   surface: ComponentSurface
 ): LibraryComponentMetadata | undefined {
   if (typeof apiName !== 'string' || !apiName) return undefined;
-  const registered = registeredComponentDefinitions(components, surface);
-  return registered.find(definition=>definition.apiName===apiName &&
-    definition.status!=='Draft' && definition.surfaces.includes(surface));
+  return publishedLookup(components, surface).get(apiName);
+}
+
+// Called once per component on every canvas/runtime render; the library list is
+// immutable state, so the published lookup is built once per list and surface.
+type PublishedLookup = { length: number; bySurface: Map<ComponentSurface, Map<string, LibraryComponentMetadata>> };
+const publishedCache = new WeakMap<readonly LibraryComponentMetadata[], PublishedLookup>();
+function publishedLookup(components: readonly LibraryComponentMetadata[], surface: ComponentSurface): Map<string, LibraryComponentMetadata> {
+  let entry = publishedCache.get(components);
+  if (!entry || entry.length !== components.length) {
+    entry = { length: components.length, bySurface: new Map() };
+    publishedCache.set(components, entry);
+  }
+  let lookup = entry.bySurface.get(surface);
+  if (!lookup) {
+    lookup = new Map();
+    for (const definition of registeredComponentDefinitions(components, surface)) {
+      if (definition.status !== 'Draft' && definition.surfaces.includes(surface) && !lookup.has(definition.apiName))
+        lookup.set(definition.apiName, definition);
+    }
+    entry.bySurface.set(surface, lookup);
+  }
+  return lookup;
 }
 
 /** Interpret saved metadata for all existing registered-component surfaces.

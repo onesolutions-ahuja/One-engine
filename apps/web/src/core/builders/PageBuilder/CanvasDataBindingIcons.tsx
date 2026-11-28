@@ -15,14 +15,23 @@ const SPACING=4;
 const validRect=(r:Rect)=>Number.isFinite(r.left)&&Number.isFinite(r.top)&&r.width>0&&r.height>0;
 const overlaps=(a:{x:number;y:number},b:{x:number;y:number})=>
  Math.abs(a.x-b.x)<ICON_SIZE+SPACING&&Math.abs(a.y-b.y)<ICON_SIZE+SPACING;
-function clipRect(element:HTMLElement,host:HTMLElement):Rect|null{
+// Bound elements share ancestors (rows, cards, scroll areas): measure each ancestor
+// once per positioning pass instead of once per bound element.
+type ClipCache=Map<Element,DOMRect|null>;
+function ancestorClip(node:HTMLElement,cache:ClipCache):DOMRect|null{
+ if(cache.has(node))return cache.get(node)!;
+ const style=getComputedStyle(node);
+ const clip=/(auto|scroll|hidden|clip)/.test(style.overflowX+' '+style.overflowY)?node.getBoundingClientRect():null;
+ cache.set(node,clip);
+ return clip;
+}
+function clipRect(element:HTMLElement,host:HTMLElement,cache:ClipCache=new Map()):Rect|null{
  const actual=element.getBoundingClientRect();
  if(!validRect(actual))return null;
  let left=actual.left,top=actual.top,right=actual.right,bottom=actual.bottom;
  for(let node=element.parentElement;node&&node!==host;node=node.parentElement){
-  const style=getComputedStyle(node);
-  if(!/(auto|scroll|hidden|clip)/.test(style.overflowX+' '+style.overflowY))continue;
-  const clip=node.getBoundingClientRect();
+  const clip=ancestorClip(node,cache);
+  if(!clip)continue;
   left=Math.max(left,clip.left);top=Math.max(top,clip.top);
   right=Math.min(right,clip.right);bottom=Math.min(bottom,clip.bottom);
  }
@@ -169,6 +178,7 @@ export default function CanvasDataBindingIcons({componentId,api,definitions,prop
    const sy=host.offsetHeight>0?hostRect.height/host.offsetHeight:1;
    const box={w:host.offsetWidth||hostRect.width,h:host.offsetHeight||hostRect.height};
    const watched=new Set<Element>();
+   const clips:ClipCache=new Map();
    const next:IconPosition[]=[];
    const selected=new Set<string>();
    // A compact component must not lose editable data properties just because
@@ -183,7 +193,7 @@ export default function CanvasDataBindingIcons({componentId,api,definitions,prop
     // Nested components manage their own bindings when selected.
     if(element.closest('[data-component-id]')!==host)continue;
     watched.add(element);
-    const clipped=clipRect(element,host);
+    const clipped=clipRect(element,host,clips);
     const caption=clipped?textRect(element):null;
     const isCaption=element.dataset.mdBind!=='tabCaptionFormula'&&Boolean(caption&&validRect(caption));
     const anchor=clipped?local(isCaption?caption!:clipped,hostRect,sx,sy):null;

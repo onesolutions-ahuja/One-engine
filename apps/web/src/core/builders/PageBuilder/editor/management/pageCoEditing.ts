@@ -36,7 +36,20 @@ export const PRESENCE_MS=25_000;
 export function updateEditors(editors:readonly CoEditor[],heard:CoEditor|null,now=Date.now()):CoEditor[]{
  const out=editors.filter(editor=>now-editor.seenAt<PRESENCE_MS&&editor.clientId!==heard?.clientId);
  if(heard)out.push(heard);
+ // Nothing expired and no one new: keep the same list, so nothing redraws.
+ if(!heard&&out.length===editors.length)return editors as CoEditor[];
  return out;
+}
+/** Same people with the same names and selections (only "last heard" times differ). */
+export function sameEditorsShown(a:readonly CoEditor[],b:readonly CoEditor[]):boolean{
+ if(a===b)return true;
+ if(a.length!==b.length)return false;
+ const byId=new Map(a.map(editor=>[editor.clientId,editor]));
+ return b.every(editor=>{
+  const old=byId.get(editor.clientId);
+  return Boolean(old)&&old!.name===editor.name&&old!.selection.length===editor.selection.length
+   &&old!.selection.every((id,index)=>id===editor.selection[index]);
+ });
 }
 
 /** The other designers here now (shown on the MultiPage bar). */
@@ -45,5 +58,14 @@ const editorListeners=new Set<()=>void>();
 export const coEditorsStore={
  get:()=>shownEditors,
  set(next:CoEditor[]){shownEditors=next;editorListeners.forEach(listener=>listener());},
+ /** Presence lives here, not in Page Builder state: a heartbeat or another designer's
+  * ping redraws only what shows presence, and only when what it shows changed. */
+ update(change:(current:CoEditor[])=>CoEditor[]){
+  const next=change(shownEditors);
+  if(next===shownEditors)return;
+  const shownChanged=!sameEditorsShown(shownEditors,next);
+  shownEditors=next;
+  if(shownChanged)editorListeners.forEach(listener=>listener());
+ },
  subscribe(listener:()=>void){editorListeners.add(listener);return ()=>{editorListeners.delete(listener);};}
 };

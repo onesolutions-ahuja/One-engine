@@ -290,7 +290,7 @@ export function directChildren(components: PageComponentMetadata[], parentId?: s
 
 export function isDescendantOf(components: PageComponentMetadata[], childId: string, ancestorId: string): boolean {
   const visited = new Set<string>();
-  const byId = new Map(components.map(item=>[item.id,item]));
+  const byId = componentsById(components);
   let cursor = byId.get(childId);
   while (cursor && !visited.has(cursor.id)) {
     visited.add(cursor.id);
@@ -325,10 +325,49 @@ export function rawLayoutParentId(component: PageComponentMetadata): string | nu
     ? component.properties.layoutParentId : (component.parentId || null);
 }
 
-function validParentId(components: PageComponentMetadata[], component: PageComponentMetadata): string | null {
+// Component arrays are immutable editor/runtime state, so lookups built from one
+// array are cached against it. Before this, every childrenOf() call rebuilt an
+// id map once per component (O(n²) per call, O(n³) per canvas render).
+type LayoutIndex = { items: PageComponentMetadata[]; ids: string[]; parents: (string | null)[]; types: string[]; flags: unknown[]; byId: Map<string, PageComponentMetadata>; children: Map<string | null, PageComponentMetadata[]> };
+const layoutIndexCache = new WeakMap<readonly PageComponentMetadata[], LayoutIndex>();
+const emptyChildren: PageComponentMetadata[] = [];
+
+function componentsById(components: readonly PageComponentMetadata[]): Map<string, PageComponentMetadata> {
+  return layoutIndex(components).byId;
+}
+
+function layoutIndex(components: readonly PageComponentMetadata[]): LayoutIndex {
+  const cached = layoutIndexCache.get(components);
+  if (cached && sameItems(cached, components)) return cached;
+  const byId = new Map<string, PageComponentMetadata>();
+  for (const item of components) byId.set(item.id, item);
+  const children = new Map<string | null, PageComponentMetadata[]>();
+  for (const item of components) {
+    const parentId = validParentIdFrom(byId, item);
+    const list = children.get(parentId);
+    if (list) list.push(item); else children.set(parentId, [item]);
+  }
+  const index = { items: components.slice(), ids: components.map(item => item.id), parents: components.map(rawLayoutParentId),
+    types: components.map(item => item.type), flags: components.map(item => item.properties?.layoutContainer), byId, children };
+  layoutIndexCache.set(components, index);
+  return index;
+}
+
+// A few editor paths patch a copied array in place before saving it, so the
+// cache is only reused when every item (id, parent, container flag) is unchanged: O(n).
+function sameItems(index: LayoutIndex, components: readonly PageComponentMetadata[]): boolean {
+  if (index.items.length !== components.length) return false;
+  for (let i = 0; i < components.length; i++) {
+    const item = components[i];
+    if (index.items[i] !== item || index.ids[i] !== item.id || index.types[i] !== item.type
+      || index.flags[i] !== item.properties?.layoutContainer || index.parents[i] !== rawLayoutParentId(item)) return false;
+  }
+  return true;
+}
+
+function validParentIdFrom(byId: Map<string, PageComponentMetadata>, component: PageComponentMetadata): string | null {
   const parentId = rawLayoutParentId(component);
   if (!parentId) return null;
-  const byId = new Map(components.map((item) => [item.id, item]));
   const visited = new Set([component.id]);
   let currentId: string | null = parentId;
   while (currentId) {
@@ -345,7 +384,8 @@ export function childrenOf(
   components: PageComponentMetadata[],
   parentId: string | null
 ): PageComponentMetadata[] {
-  return components.filter((item) => validParentId(components, item) === parentId);
+  // Returns a fresh array so callers may sort/splice it without touching the cache.
+  return (layoutIndex(components).children.get(parentId ?? null) ?? emptyChildren).slice();
 }
 
 export function canNest(
@@ -516,7 +556,7 @@ export function multiPageName(component: PageComponentMetadata): string {
 /** True when `id` is `ancestorId` or sits anywhere inside it. */
 export function isSelfOrDescendant(components: PageComponentMetadata[], ancestorId: string, id: string | null | undefined): boolean {
   if (!id) return false;
-  const byId = new Map(components.map((item) => [item.id, item]));
+  const byId = componentsById(components);
   const seen = new Set<string>();
   let current: string | null = id;
   while (current && !seen.has(current)) {

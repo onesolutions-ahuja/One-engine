@@ -34,7 +34,18 @@ const DISPLAY_ONLY=/^(?:visibleFormula|disabledFormula|visibleSource|multiPageVi
  * A component that reads an upstream state is responsible only for its own
  * selection outputs; independent siblings, cart data and other state survive.
  */
+// Every data-bound component asks for the whole page's graph; build it once per
+// components array (items re-checked by identity, O(n)) instead of once per component.
+const dependencyGraphCache=new WeakMap<readonly Component[],{items:readonly Component[];props:unknown[];graph:PageStateDependencies}>();
 export function pageStateDependencies(components:readonly Component[]):PageStateDependencies {
+ const cached=dependencyGraphCache.get(components);
+ if(cached&&cached.items.length===components.length&&components.every((item,index)=>
+  cached.items[index]===item&&cached.props[index]===item.properties))return cached.graph;
+ const graph=buildPageStateDependencies(components);
+ dependencyGraphCache.set(components,{items:components.slice(),props:components.map(item=>item.properties),graph});
+ return graph;
+}
+function buildPageStateDependencies(components:readonly Component[]):PageStateDependencies {
  const graph=new Map<Channel,Set<Channel>>();
  const emitted=(props:Readonly<Record<string,unknown>>):string[]=>{
   const authored=Object.entries(props).filter(([key])=>key!=='collectionFormula')

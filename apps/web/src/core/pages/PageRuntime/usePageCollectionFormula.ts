@@ -21,7 +21,16 @@ type SourceResult={key:string;records:Record<string,Row[]>;error?:string};
 /** TABLE's first argument is an Object reference, not a scalar field.
  * Parse using the global Formula parser; never infer a source from text fragments.
  */
+const tableObjectByFormula=new Map<string,string|null>();
 export function tableFormulaObject(formula:string):string|null{
+ const cached=tableObjectByFormula.get(formula);
+ if(cached!==undefined)return cached;
+ const result=parseTableFormulaObject(formula);
+ if(tableObjectByFormula.size>2000)tableObjectByFormula.clear();
+ tableObjectByFormula.set(formula,result);
+ return result;
+}
+function parseTableFormulaObject(formula:string):string|null{
  try{
   const node=new Parser(tokenize(formula.trim().replace(/^=\s*/,''))).parse();
   const source=node.kind==='call'&&node.name==='TABLE'?node.args[0]:null;
@@ -30,9 +39,19 @@ export function tableFormulaObject(formula:string):string|null{
  }catch{return null;}
 }
 
+// Parsed once per formula text (the arguments after the first are unused).
+const referencesByFormula=new Map<string,ReadonlyArray<{object:string;field:string}>>();
 export function collectionFormulaReferences(formula:string,primaryObject='',knownCollections:readonly string[]=[],primaryFields?:readonly string[]):Array<{object:string;field:string}>{
  void primaryObject;void knownCollections;void primaryFields;
  if(!/\bCOLLECTION\s*\(/i.test(formula))return [];
+ const cached=referencesByFormula.get(formula);
+ if(cached)return cached.map(item=>({...item}));
+ const result=parseCollectionFormulaReferences(formula);
+ if(referencesByFormula.size>2000)referencesByFormula.clear();
+ referencesByFormula.set(formula,result);
+ return result.map(item=>({...item}));
+}
+function parseCollectionFormulaReferences(formula:string):Array<{object:string;field:string}>{
  const found=new Map<string,{object:string;field:string}>();
  const visit=(node:Expression):void=>{
   if(node.kind==='reference'){

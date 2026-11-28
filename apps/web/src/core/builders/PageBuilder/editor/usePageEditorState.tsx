@@ -13,7 +13,7 @@ import { isBuilderApi, type SharedRibbonCatalog, type BuilderApi } from '../buil
 import { isCanvasLocked } from '../canvasInteractions';
 import { constrainCanvasRect } from '../canvasPointerInteractions';
 import { pageBuilderPreviewDevice } from '../pageBuilderPreviewDevice';
-import { type ComponentClipboard } from '../pageComponentTree';
+import { type PageClipboard, readSharedClipboard, writeSharedClipboard } from '../pageComponentTree';
 import { standardPageComponents } from '../../../components/Catalog/index';
 import { findRegisteredComponent } from '../../../components/Registry/componentRegistryLookup';
 import { canvasOrientation } from '../../../pages/PageRuntime/pageCanvas';
@@ -378,7 +378,8 @@ export function usePageEditorState(
     const select=document.querySelector<HTMLSelectElement>(`select[data-card-mapping-field="${focusedCardMapping}"]`);
     if(select)select.focus();
   },[focusedCardMapping,ribbonTab,selectedId]);
-  const [componentClipboard, setComponentClipboard] = useState<ComponentClipboard | null>(null);
+  const [componentClipboard, setClipboardState] = useState<PageClipboard | null>(readSharedClipboard);
+  const setComponentClipboard = (value: PageClipboard | null) => { writeSharedClipboard(value); setClipboardState(value); };
   const [recordScope, setRecordScope] = useState<PageActivationAssignmentMetadata['scope']>('Org Default');
   const [recordAppId, setRecordAppId] = useState(builderAppApiName || apps[0]?.apiName || '');
   const [recordProfileId, setRecordProfileId] = useState('');

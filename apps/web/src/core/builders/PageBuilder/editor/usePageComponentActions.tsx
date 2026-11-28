@@ -7,7 +7,7 @@ import { isBuilderApi, builderDefaults } from '../builderPropertyInventory';
 import { isLayoutType } from '../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { isCanvasLocked, alignCanvasComponents, distributeCanvasComponents } from '../canvasInteractions';
 import { reachableMoveArea, translateCanvasSelection } from '../canvasSelectionInteractions';
-import { copyComponentTree, cloneComponentTree, assignTabOnReparent, removePageComponentSelection } from '../pageComponentTree';
+import { copyComponentTree, copyComponentSelection, cloneComponentTree, assignTabOnReparent, removePageComponentSelection } from '../pageComponentTree';
 import { containerCanvasSize, isLayoutContainer, rawLayoutParentId } from '../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { MULTIPAGE_TYPE, multiPageInsertParent, nextTabId, nextTabName, keepTabIds, renameMultiPageTab, stampAllTabIds, stampTabIds } from '../multiPageBuilder';
 import { findRegisteredComponent } from '../../../components/Registry/componentRegistryLookup';
@@ -395,37 +395,51 @@ export function usePageComponentActions(
       status: page.status === 'Active' && !activationAssignments.length ? 'Draft' : page.status
     });
   };
+  /** Ids Cut / Copy act on: the whole selection (Ctrl+A = everything), else the selected one. */
+  const clipboardIds = () => selectionIds.length > 1 ? selectionIds : selected ? [selected.id] : [];
   const copySelected = () => {
-    if (selected) setComponentClipboard(copyComponentTree(page.components, selected.id));
+    const copied = copyComponentSelection(page.components, clipboardIds());
+    if (!copied.length) return;
+    setComponentClipboard(copied);
+    if (copied.length > 1) onNotify(copied.length + ' components copied. Open any page and press Ctrl+V.');
   };
   const cutSelected = () => {
-    if (!selected || isCanvasLocked(selected)) return;
-    const snapshot=copyComponentTree(page.components,selected.id);
-    setComponentClipboard(snapshot);
-    const removedIds=new Set(snapshot.components.map(item=>item.id));
+    const copied = copyComponentSelection(page.components, clipboardIds());
+    if (!copied.length) return;
+    const locked = copied.map(tree => page.components.find(item => item.id === tree.rootId)!).filter(isCanvasLocked);
+    if (locked.length) {
+      onNotify('Unlock all ' + locked.length + ' locked selected component(s) before cutting. Nothing was cut.');
+      return;
+    }
+    setComponentClipboard(copied);
+    const removedIds = new Set(copied.flatMap(tree => tree.components.map(item => item.id)));
     applyPage({...page,components:stampAllTabIds(page.components).filter(item=>!removedIds.has(item.id))});
-    // Its container stays selected, so Paste puts it back in the same place.
-    const parentId=rawLayoutParentId(selected)??'';
+    // The first one's container stays selected, so Paste puts them back in the same place.
+    const first = page.components.find(item => item.id === copied[0].rootId);
+    const parentId = (copied.length === 1 && first ? rawLayoutParentId(first) : null) ?? '';
     setSelectedId(parentId);setSelectionIds(parentId?[parentId]:[]);
+    if (copied.length > 1) onNotify(copied.length + ' components cut. Open any page and press Ctrl+V.');
   };
   /** Paste keeps the copied place when it is free in the destination (Cut → Paste puts it
-   * back where it was); when that place is taken it steps 24 px down-right. Always inside
-   * the destination (the container's own area, or the page). */
-  const pastePlace = (position: NonNullable<PageComponentMetadata['position']>, parentId: string | null) => {
-    const area = parentId ? containerCanvasSize(page.components, parentId) : {width: page.canvasWidth, height: page.canvasHeight};
-    const sourceParent = componentClipboard
-      ? rawLayoutParentId(componentClipboard.components.find(item => item.id === componentClipboard.rootId)!) : null;
+   * back where it was, and a page-to-page paste lands in the same spot); when that place is
+   * taken everything steps 24 px down-right together. Pasting into another container starts
+   * at 16,16 there. Several pasted components keep their layout relative to each other. */
+  const pasteOffset = (trees: readonly {root: PageComponentMetadata; sourceParent: string | null}[], parentId: string | null) => {
+    const placed = trees.filter(tree => tree.root.position);
+    if (!placed.length) return {dx: 0, dy: 0};
+    const minX = Math.min(...placed.map(tree => tree.root.position!.x));
+    const minY = Math.min(...placed.map(tree => tree.root.position!.y));
+    const sameParent = placed.every(tree => tree.sourceParent === parentId);
+    let x = sameParent || !parentId ? 0 : 16 - minX;
+    let y = sameParent || !parentId ? 0 : 16 - minY;
     const siblings = page.components.filter(item => item.position && rawLayoutParentId(item) === parentId).map(item => item.position!);
-    let x = sourceParent === parentId ? position.x : parentId ? 16 : position.x;
-    let y = sourceParent === parentId ? position.y : parentId ? 16 : position.y;
-    for (let step = 0; step < 20 && siblings.some(other => other.x === x && other.y === y); step++) { x += 24; y += 24; }
-    return {
-      x: Math.max(0, Math.min(area.width - position.width, x)),
-      y: Math.max(0, Math.min(area.height - position.height, y))
-    };
+    const taken = () => placed.some(tree => siblings.some(other =>
+      other.x === tree.root.position!.x + x && other.y === tree.root.position!.y + y));
+    for (let step = 0; step < 20 && taken(); step++) { x += 24; y += 24; }
+    return {dx: x, dy: y};
   };
   const pasteComponent = () => {
-    if (!componentClipboard) return;
+    if (!componentClipboard?.length) return;
     // Match Insert and the runtime: a selected layout container is the paste
     // destination; selecting its child pastes a sibling inside that container.
     const parentId=selected
@@ -435,28 +449,37 @@ export function usePageComponentActions(
       onNotify('Select a valid container before pasting inside it.');
       return;
     }
-    const cloned=cloneComponentTree(componentClipboard,parentId);
-    const root=cloned.components.find(item=>item.id===cloned.rootId)!;
-    const position=root.position ? {
-      ...root.position,
-      // Nested content flows inside the container, not at its former page
-      // coordinates. Retain dimensions and a useful local position for unnest.
-      ...pastePlace(root.position, parentId)
-    }:undefined;
+    // Clones get no extra offset: pasteOffset decides where they go.
+    const clones=componentClipboard.map(tree=>({
+      sourceParent: rawLayoutParentId(tree.components.find(item=>item.id===tree.rootId)!),
+      cloned: cloneComponentTree(tree,parentId,undefined,0)
+    })).map(entry=>({...entry,root:entry.cloned.components.find(item=>item.id===entry.cloned.rootId)!}));
+    const {dx,dy}=pasteOffset(clones,parentId);
+    const area = parentId ? containerCanvasSize(page.components, parentId) : {width: page.canvasWidth, height: page.canvasHeight};
     // Old page-layer numbers are dropped on paste (layers were replaced by MultiPage tabs).
     const layerProps=(item:PageComponentMetadata)=>parentId?item.properties
       :Object.fromEntries(Object.entries(item.properties).filter(([key])=>key!=='pageLayer'));
-    const inserted=cloned.components.map(item=>item.id===root.id?{...item,position,region:selected?.region??item.region,properties:layerProps(item)}:item);
+    const inserted=clones.flatMap(({cloned,root})=>{
+      // Nested content flows inside the container, not at its former page
+      // coordinates. Retain dimensions and a useful local position for unnest.
+      const position=root.position?{...root.position,
+        x:Math.max(0,Math.min(area.width-root.position.width,root.position.x+dx)),
+        y:Math.max(0,Math.min(area.height-root.position.height,root.position.y+dy))}:undefined;
+      return cloned.components.map(item=>item.id===root.id
+        ?{...item,position,region:selected?.region??item.region,properties:layerProps(item)}:item);
+    });
     const originalIndex=selected?page.components.findIndex(item=>item.id===selected.id):-1;
-    const components=[...page.components];
+    let components=[...page.components];
     components.splice(originalIndex<0?components.length:originalIndex+1,0,...inserted);
     // The same shared nesting contract is used for paste, palette insertion,
     // drag-and-drop and published runtime. Preserve active Tabs membership.
-    applyPage({...page,components:assignTabOnReparent(components,cloned.rootId,parentId,
-      parentId?openBuilderTabs[parentId]:undefined)});
-    setSelectedId(cloned.rootId);
-    setSelectionIds([cloned.rootId]);
-    pendingInsertedComponentRef.current=cloned.rootId;
+    for(const {cloned} of clones)components=assignTabOnReparent(components,cloned.rootId,parentId,
+      parentId?openBuilderTabs[parentId]:undefined);
+    applyPage({...page,components});
+    const rootIds=clones.map(entry=>entry.cloned.rootId);
+    setSelectedId(rootIds[0]);
+    setSelectionIds(rootIds);
+    pendingInsertedComponentRef.current=rootIds[0];
   };
   const duplicateSelected = () => {
     if (!selected || isCanvasLocked(selected)) return;
@@ -553,7 +576,7 @@ export function usePageComponentActions(
         event.preventDefault(); redo();
       } else if (command && key === 'c' && selected && !previewMode) {
         event.preventDefault(); copySelected();
-      } else if (command && key === 'x' && selected && !previewMode && !isCanvasLocked(selected)) {
+      } else if (command && key === 'x' && selected && !previewMode) {
         event.preventDefault(); cutSelected();
       } else if (command && key === 'v' && componentClipboard && !previewMode) {
         event.preventDefault(); pasteComponent();

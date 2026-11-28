@@ -31,7 +31,7 @@ export default function AppVersions({appApiName,request}:{
   {error&&<p className="form-error" role="alert">{error}</p>}
   {!versions.length?<p className="permission-help">No versions yet. Save the app in Page Builder to create one.</p>:
   <table className="app-versions-table">
-   <thead><tr><th>Version</th><th>Status</th><th>Created</th><th>Created by</th><th>Last modified</th><th>Modified by</th><th/></tr></thead>
+   <thead><tr><th>Version</th><th>Status</th><th>Created</th><th>Last modified</th><th/></tr></thead>
    <tbody>{versions.map(item=><Fragment key={item.version}>
     <tr className={item.published?'is-published':item.errorCount?'has-errors':undefined}>
      <td>v{item.version} <small>{item.pages} page{item.pages===1?'':'s'}</small></td>
@@ -40,14 +40,14 @@ export default function AppVersions({appApiName,request}:{
         onClick={()=>setOpen(current=>current===item.version?0:item.version)}>
         {item.errorCount} broken link{item.errorCount===1?'':'s'}</button>
       :<span className="app-version-badge saved">Saved</span>}</td>
-     <td>{when(item.createdAt)}</td><td>{item.createdBy||'—'}</td>
-     <td>{when(item.modifiedAt)}</td><td>{item.modifiedBy||'—'}</td>
+     <td>{when(item.createdAt)}<small className="app-version-user">{item.createdBy||'—'}</small></td>
+     <td>{when(item.modifiedAt)}<small className="app-version-user">{item.modifiedBy||'—'}</small></td>
      <td><button type="button" className="btn btn-small" disabled={item.published||item.errorCount>0||busy>0}
       title={item.errorCount?'Fix the broken links, save, then publish the new version':item.published?'Already published':'Make this version live'}
       onClick={()=>void publish(item.version)}>{busy===item.version?'Publishing…':'Publish'}</button></td>
     </tr>
     {open===item.version&&item.errors.length>0&&<tr className="app-version-errors">
-     <td colSpan={7}><ul>{item.errors.map((line,index)=><li key={index}>{line}</li>)}</ul></td></tr>}
+     <td colSpan={5}><ul>{item.errors.map((line,index)=><li key={index}>{line}</li>)}</ul></td></tr>}
    </Fragment>)}</tbody>
   </table>}
  </div>;

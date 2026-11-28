@@ -1,6 +1,9 @@
 /* A component that opens a page which no longer exists (pageLinkCheck.ts). Saving is allowed;
-   Publish is blocked until the link is fixed. Outline only: never changes size or place. */
-.record-component.canvas-broken-link{
-  outline:2px solid #dc2626;outline-offset:1px;
-  box-shadow:0 0 0 4px rgba(220,38,38,.18),0 0 14px rgba(220,38,38,.55);
+   Publish is blocked until the link is fixed. Drawn as an inner overlay: the builder forces
+   outline/box-shadow off on canvas components and containers clip anything drawn outside. */
+.record-component.canvas-broken-link::after{
+  content:"";position:absolute;inset:0;z-index:50;pointer-events:none;border-radius:inherit;
+  box-shadow:inset 0 0 0 2px #dc2626,inset 0 0 14px rgba(220,38,38,.55);
+  background:rgba(220,38,38,.06);
 }
+.record-component.canvas-broken-link:not(.free-canvas-component){position:relative}

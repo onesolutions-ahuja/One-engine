@@ -9,3 +9,11 @@
 .app-version-badge.errors{background:#dc2626;color:#fff;cursor:pointer}
 .app-version-badge.saved{background:#e2e8f0;color:#334155}
 .app-version-errors ul{margin:0;padding-left:18px;color:#991b1b}
+.app-versions-table small.app-version-user{display:block;margin:2px 0 0;color:#64748b;overflow-wrap:anywhere}
+.app-versions-table{table-layout:auto}
+.app-versions-table th:last-child,.app-versions-table td:last-child{width:1%;white-space:nowrap;text-align:right}
+.app-version-badge{white-space:nowrap}
+/* The Versions step uses the whole width of the screen (no sideways scrolling). */
+.app-manager-workspace:has(#app-versions) .app-manager-form-card,
+.app-manager-workspace:has(#app-versions) .app-manager-stepper{max-width:none}
+.app-versions.md-table-scroll-host{overflow-x:visible}

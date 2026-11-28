@@ -1,5 +1,6 @@
 // @ts-nocheck
 import WorkspaceFormulaScreen from '../../pages/PageRuntime/WorkspaceFormulaScreen';
+import { isProblemNotice } from './toastTone';
 import SetupLoadingState from './SetupLoadingState';
 import { UneBrandLogo } from '../../branding/UneBrandLogo';
 import CompanySettingsWorkspace from '../../settings/CompanySettingsWorkspace/CompanySettingsWorkspace';
@@ -723,7 +724,7 @@ onNavigateDeveloper={(target: string) => navigateRoute({kind:'setup',workspace:t
         flows,pages,apps,objects,reports,LightningAppRuntime,formFactor:runtimeFormFactor,
         pageDefinitionCache:pageDefinitionCache.current,activeAppId:(route.kind==='app-page'||route.kind==='app-home')?route.appId:'',
         onNavigate:navigateRoute,onLaunchFlow:(apiName:string,inputs?:Record<string,unknown>)=>void runFlow(apiName,inputs) }} /></React.Suspense>}
-      {toast && <div className="toast" role="status"><Check size={16} aria-hidden="true" /><span className="toast-message">{toast}</span><button type="button" className="toast-dismiss" aria-label="Dismiss notification" title="Dismiss notification" onClick={() => setToast('')}><X size={16} aria-hidden="true" /></button></div>}
+      {toast && <div className={isProblemNotice(toast) ? 'toast toast-problem' : 'toast'} role={isProblemNotice(toast) ? 'alert' : 'status'}>{isProblemNotice(toast) ? <span className="toast-problem-icon" aria-hidden="true">!</span> : <Check size={16} aria-hidden="true" />}<span className="toast-message">{toast}</span><button type="button" className="toast-dismiss" aria-label="Dismiss notification" title="Dismiss notification" onClick={() => setToast('')}><X size={16} aria-hidden="true" /></button></div>}
     </div>
   );
 }

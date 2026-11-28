@@ -46,3 +46,10 @@ test('extra height moves bottom bars down and grows tall surfaces only',()=>{
  assert.deepEqual(runtimeVerticalComponentStyle(page,at('tabs',20,85,1190,50)),{});
  assert.deepEqual(runtimeVerticalComponentStyle(page,{...at('nested',0,975,10,10),parentId:'x'}),{});
 });
+
+test('notices about something to fix are red and stay; ordinary ones fade',async()=>{
+ const {isProblemNotice}=await import('../src/core/workspace/SetupShell/toastTone');
+ for(const text of ['Not published (saved as version 3). 13 broken links …','Saved app version 2. 1 broken link (red on the canvas)',
+  'Unable to publish the app','Saved. 2 formula errors to fix: x'])assert.equal(isProblemNotice(text),true,text);
+ for(const text of ['Saved app version 4','Page layout published','Published app version 5'])assert.equal(isProblemNotice(text),false,text);
+});

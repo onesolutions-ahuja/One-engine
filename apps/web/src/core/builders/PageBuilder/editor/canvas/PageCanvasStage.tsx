@@ -49,7 +49,7 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
     previewPageDefinitionCache, device, fitCanvas, fitScale, canvasZoom, canvasSnap,
     marqueeOverlayRef, selected, openAddBlocks, canvasGuideXRef, canvasGuideYRef, targetObject,
     previewRecordId, previewRecord, setPreviewRecordId, previewRecords, fields, previewFieldValue,
-    stringList, template, applyPage, openBuilderTabs, setOpenBuilderTabs, selectedId,
+    stringList, template, openBuilderTabs, setOpenBuilderTabs, selectedId,
   } = editorState;
   const { handleDrop } = placement;
   const { page, apps, objects, pages, reports, libraryComponents, flows, onLaunchFlow } = props;
@@ -260,7 +260,12 @@ export default function PageCanvasStage({ ribbon, editorState, placement, props,
               const app = apps.find(item => item.apiName === builderAppApiName)
                 ?? apps.find(item => item.navigationPageApiNames?.includes(page.apiName));
               return app ? <AppPageBar app={app} pages={pages} current={page.apiName} onPick={onSwitchPage} onAdd={onAddPage}
-                onRename={label => applyPage({ ...page, label })} onDelete={onDeletePage} /> : null;
+                onRename={label => {
+                  // The page name lives on the page itself (like Page Properties), not in the layout draft:
+                  // save it now so the bar and the app show the new name. Unsaved layout edits stay.
+                  const saved = pages.find(item => item.apiName === page.apiName)?.label ?? page.label;
+                  void props.onUpdatePageDetails(page.apiName, label, undefined, saved);
+                }} onDelete={onDeletePage} /> : null;
             })()}
           </div>
         </div>

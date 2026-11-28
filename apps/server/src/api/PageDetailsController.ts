@@ -45,7 +45,10 @@ export function registerPageDetailsController(app:Express,db:SqlPersistence,rbac
   if(!api.test(pageApi))throw new Error('Invalid Page API name');
   const body=req.body;
   if(!body||typeof body!=='object'||Array.isArray(body))throw new Error('Invalid Page details');
-  const label=body.label,appApiName=body.appApiName,expectedLabel=body.expectedLabel;
+  const label=body.label,expectedLabel=body.expectedLabel;
+  // No appApiName at all = leave the page's app as it is (a rename from the Page Builder bar).
+  const keepApp=body.appApiName===undefined;
+  const appApiName=keepApp?null:body.appApiName;
   // Page device support is relational metadata, not a component setting.
   const deviceChoices=['Desktop','Tablet','Phone','Custom'] as const;
   const devices=body.devices as unknown;
@@ -93,7 +96,7 @@ export function registerPageDetailsController(app:Express,db:SqlPersistence,rbac
    WHERE tenant_id=$1 AND page_id=$2 AND scope='App Default'`,[actor.tenant_id,page.id]);
   const assignedAppNames=direct.rows.map(row=>row.app_api).filter(Boolean);
   const renaming=nextApiName!==pageApi;
-  const appChanged=page.page_type==='App Page'&&
+  const appChanged=!keepApp&&page.page_type==='App Page'&&
     (existingAppNames.length!==1||existingAppNames[0]!==appApiName
       ||assignedAppNames.length!==1||assignedAppNames[0]!==appApiName);
   const deviceChangeRequested=validDeviceList(devices)&&
@@ -123,6 +126,7 @@ export function registerPageDetailsController(app:Express,db:SqlPersistence,rbac
     throw new Error('Page device settings changed. Reload before saving.');
    const nextDevices=deviceChanged?devices as string[]:row.devices;
    if(page.page_type==='App Page'){
+    if(!keepApp){
     if(!appApiName)throw new Error('Choose an installed application');
     const appRecord=await client.query<{id:string}>(`
      SELECT a.id FROM md_apps a
@@ -158,6 +162,7 @@ export function registerPageDetailsController(app:Express,db:SqlPersistence,rbac
         WHERE tenant_id=$1 AND app_id=$2 AND entry_type='App Page' AND api_name=$3)`,
        [actor.tenant_id,appRecord.rows[0].id,pageApi]);
      }
+    }
     }
     // App Page default assignment follows device eligibility without touching
     // tenant-specific Record/Home profile assignments or customer layouts.

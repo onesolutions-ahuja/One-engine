@@ -112,12 +112,13 @@ export function createPageRibbon(
         // make the canvas taller to keep adding components below the fold.
         value={page.canvasHeight}
         onValueChange={n=>applyPage({...page,canvasHeight:n})}/>;
-      case 'restoreVersion':return <button type="button" aria-label="Restore version" title="Restore selected version"
+      // Editing an app: versions are the app's (App Manager > Versions), not one page's.
+      case 'restoreVersion':return props.appModeId?null:<button type="button" aria-label="Restore version" title="Restore selected version"
         disabled={saving||selectedHistoryVersion===null||
          layoutVersions.find(v=>v.version===selectedHistoryVersion)?.draft===true}
         onClick={()=>{if(selectedHistoryVersion!==null)void restoreLayoutVersion(selectedHistoryVersion);}}>
         Restore</button>;
-      case 'selectVersion':return <div className="office-ribbon-stack office-ribbon-version-controls">
+      case 'selectVersion':return props.appModeId?null:<div className="office-ribbon-stack office-ribbon-version-controls">
         <button type="button" aria-label={showLayoutHistory?'Refresh versions':'Load versions'}
           title={showLayoutHistory?'Refresh versions':'Load versions'}
           onClick={()=>void loadLayoutHistory()}>

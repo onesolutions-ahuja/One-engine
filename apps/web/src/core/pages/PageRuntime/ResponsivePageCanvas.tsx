@@ -1,7 +1,7 @@
 import {useLayoutEffect,useRef,useState,type CSSProperties,type ReactNode} from 'react';
 import type {LightningPageMetadata} from '../../metadata/Definitions/metadata';
 import {isStandalonePagePresentation,pageCanvasPresentationStyle} from './pageRuntimePresentation';
-import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth} from './runtimeCanvasSizing';
+import {runtimeCanvasWidthScale,runtimeCanvasExtraWidth,settleCanvasWidth,runtimeAppScreenScale,runtimeCanvasExtra} from './runtimeCanvasSizing';
 import {flowPrintCanvas} from './printTemplateFlow';
 import {openerMirrorKey} from '../../authentication/TillDevice/deviceTill';
 import {onPairedScreenPage} from '../../authentication/PairedScreen/pairedScreen';
@@ -31,6 +31,9 @@ export default function ResponsivePageCanvas({
   const [availableWidth,setAvailableWidth]=useState(page.canvasWidth);
   const [screen]=useState(shownAsScreen);
   const [availableHeight,setAvailableHeight]=useState(0);
+  // A published app (not Builder Preview, print or a paired display) fills the whole screen:
+  // no grey band to the right or below the page, whatever the screen size.
+  const [appScreen,setAppScreen]=useState(false);
   // Last small width step (a scrollbar appearing/disappearing), to stop a loop:
   // new width -> new scale -> new height -> scrollbar toggles -> width flips back.
   const lastStep=useRef<{from:number;at:number}|null>(null);
@@ -45,15 +48,25 @@ export default function ResponsivePageCanvas({
       setAvailableWidth(previous=>settleCanvasWidth(previous,next,lastStep.current,
         typeof performance!=='undefined'?performance.now():Date.now(),step=>{lastStep.current=step;}));
     };
+    const app=!screen&&Boolean(target.closest('.md-app-runtime'));
+    setAppScreen(app);
+    // The scrolling area the page sits in (the app workspace), else the window.
+    const scroller=app?target.closest<HTMLElement>('.workspace-records'):null;
     const updateHeight=()=>{
-      if(!screen)return;
+      if(!screen&&!app)return;
+      if(scroller){
+        const top=target.getBoundingClientRect().top-scroller.getBoundingClientRect().top+scroller.scrollTop;
+        setAvailableHeight(Math.max(1,scroller.clientHeight-Math.max(0,top)));
+        return;
+      }
       const top=Math.max(0,target.getBoundingClientRect().top+window.scrollY);
       setAvailableHeight(Math.max(1,window.innerHeight-top));
     };
     update();updateHeight();
     const observer=new ResizeObserver(()=>{update();updateHeight();});
     observer.observe(target);
-    if(screen)window.addEventListener('resize',updateHeight);
+    if(scroller)observer.observe(scroller);
+    if(screen||app)window.addEventListener('resize',updateHeight);
     return()=>{observer.disconnect();window.removeEventListener('resize',updateHeight);};
   },[page.canvasWidth,screen]);
 
@@ -77,16 +90,24 @@ export default function ResponsivePageCanvas({
   },[printTemplate]);
   const canvasHeight=printTemplate&&fittedHeight?fittedHeight:page.canvasHeight;
   const standalone=isStandalonePagePresentation(page);
+  const fillsScreen=appScreen&&!standalone&&!printTemplate&&availableHeight>0;
   const widthScale=standalone?1:runtimeCanvasWidthScale(page.canvasWidth,availableWidth);
-  const scale=screen&&!standalone&&!printTemplate&&availableHeight>0
+  const scale=fillsScreen?runtimeAppScreenScale(page.canvasWidth,canvasHeight,availableWidth,availableHeight)
+    :screen&&!standalone&&!printTemplate&&availableHeight>0
     ?Math.min(widthScale,runtimeCanvasWidthScale(canvasHeight,availableHeight)):widthScale;
-  const heightFitted=scale<widthScale;
-  const extra=standalone||heightFitted?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
-  const canvasStyle: CSSProperties & { '--md-runtime-canvas-extra': string }={
+  const heightFitted=!fillsScreen&&scale<widthScale;
+  // App screen: whatever is left over on either side becomes part of the page (see
+  // runtimeResponsiveComponentStyle / runtimeVerticalComponentStyle), never a grey band.
+  const fill=fillsScreen?runtimeCanvasExtra(page.canvasWidth,canvasHeight,scale,availableWidth,availableHeight):{x:0,y:0};
+  const extra=fillsScreen?fill.x:standalone||heightFitted?0:runtimeCanvasExtraWidth(page.canvasWidth,availableWidth);
+  const shownHeight=canvasHeight+fill.y;
+  const canvasStyle: CSSProperties & { '--md-runtime-canvas-extra': string; '--md-runtime-canvas-extra-y': string }={
     ...pageCanvasPresentationStyle(page),
     ...(printTemplate&&fittedHeight?{height:fittedHeight}:{}),
-    ...(!standalone && extra > 0 ? {width:'100%'} : {}),
+    ...(fillsScreen?{width:page.canvasWidth+fill.x,height:shownHeight}
+      :!standalone && extra > 0 ? {width:'100%'} : {}),
     '--md-runtime-canvas-extra':extra+'px',
+    '--md-runtime-canvas-extra-y':fill.y+'px',
     transform:scale<1?`scale(${scale})`:undefined,
     transformOrigin:'top left',
     // Fitted to a screen's height: centre the page across the spare width.
@@ -95,7 +116,7 @@ export default function ResponsivePageCanvas({
 
   return <div ref={frame} className="page-responsive-canvas-frame" style={{
     position:'relative',width:'100%',minWidth:0,
-    height:standalone?'100dvh':Math.ceil(canvasHeight*scale),
+    height:standalone?'100dvh':fillsScreen?Math.floor(shownHeight*scale):Math.ceil(canvasHeight*scale),
     overflow:'hidden'
   }}>
     <div ref={canvasRef} className="free-canvas-runtime" data-layout-mode="free-canvas"

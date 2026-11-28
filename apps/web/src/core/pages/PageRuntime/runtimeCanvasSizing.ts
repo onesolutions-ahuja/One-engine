@@ -89,3 +89,47 @@ export function runtimeResponsiveComponentStyle(
   if (coversPage || fillsLeft) return { width: `calc(${p.width}px + ${extra})` };
   return {};
 }
+
+/**
+ * Taller screen than the (width-fitted) page: the page fills the extra height too, so no grey
+ * band is left under it. Same idea as the extra width: bottom bars (dock, totals) keep to the
+ * bottom edge and tall surfaces (product grid, cart panel, background) grow; small controls keep
+ * their saved size and place. --md-runtime-canvas-extra-y is 0 when the page already fills the
+ * screen, so saved geometry is reproduced exactly.
+ */
+export function runtimeVerticalComponentStyle(
+  page: CanvasPage, component: PageComponentMetadata,
+): CSSProperties {
+  const p = component.position, h = page.canvasHeight;
+  if (!p || component.parentId || !Number.isFinite(h) || h <= 0) return {};
+  const bottomGap = h - (p.y + p.height);
+  const extra = 'var(--md-runtime-canvas-extra-y, 0px)';
+  const tall = p.y <= h * .2 && p.height >= h * .5 && bottomGap <= h * .15;
+  if (tall) return { height: `calc(${p.height}px + ${extra})` };
+  const bottomBar = p.y >= h * .55 && p.height <= h * .45 && bottomGap <= h * .12;
+  if (bottomBar) return { top: `calc(${p.y}px + ${extra})` };
+  return {};
+}
+
+/**
+ * Scale for an app screen. Width-first as before; a screen only a little shorter than the page
+ * (browser bars, a 16:10 vs 16:9 panel) fits the height too instead of scrolling by a few
+ * pixels. A page much taller than the screen (long forms) still scrolls.
+ */
+export const HEIGHT_FIT_LIMIT = .8;
+export function runtimeAppScreenScale(canvasWidth: number, canvasHeight: number,
+  availableWidth: number, availableHeight: number): number {
+  const byWidth = runtimeCanvasWidthScale(canvasWidth, availableWidth);
+  if (!Number.isFinite(availableHeight) || availableHeight <= 0 || !Number.isFinite(canvasHeight) || canvasHeight <= 0) return byWidth;
+  const byHeight = availableHeight / canvasHeight;
+  return byHeight < byWidth && byHeight >= byWidth * HEIGHT_FIT_LIMIT ? byHeight : byWidth;
+}
+
+/** Canvas pixels left over on each side once the page is scaled to the screen (never negative). */
+export function runtimeCanvasExtra(canvasWidth: number, canvasHeight: number, scale: number,
+  availableWidth: number, availableHeight: number): { x: number; y: number } {
+  if (!(scale > 0)) return { x: 0, y: 0 };
+  const x = Number.isFinite(availableWidth) ? Math.floor(availableWidth / scale - canvasWidth) : 0;
+  const y = Number.isFinite(availableHeight) && availableHeight > 0 ? Math.floor(availableHeight / scale - canvasHeight) : 0;
+  return { x: Math.max(0, x), y: Math.max(0, y) };
+}

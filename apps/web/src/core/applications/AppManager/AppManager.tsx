@@ -1,4 +1,5 @@
 import {generateMetadataApiName} from '../../metadata/Definitions/metadataApiNames';
+import AppVersions from './AppVersions';
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
 import AppManagerList from '../AppManagerList/AppManagerList';
@@ -317,6 +318,8 @@ export default function AppManager({
     {id:'app-basics',name:'Basics'},
     {id:'app-navigation',name:'Navigation'},
     {id:'app-home',name:'Home Page'},
+    // Saved versions of an existing app (Page Builder Save); publish one from here.
+    ...(!creating&&request&&draft.apiName?[{id:'app-versions',name:'Versions'}]:[]),
     {id:'app-review',name:'Review & Save'}
   ];
   const stepIndex=Math.max(0,steps.findIndex(step=>step.id===activeStep));
@@ -516,6 +519,9 @@ export default function AppManager({
           </fieldset>
         </div>}
 
+        {activeStep==='app-versions' && request && draft.apiName && <div id="app-versions" className="app-manager-form-section">
+          <AppVersions appApiName={draft.apiName} request={request}/>
+        </div>}
         {activeStep==='app-review' && <div id="app-review" className="app-manager-form-section">
           <dl className="app-manager-review">
             <div><dt>App</dt><dd>{draft.label||'—'} <small>{draft.apiName}</small></dd></div>

@@ -1,0 +1,11 @@
+.app-versions-table{width:100%;border-collapse:collapse;font-size:13px}
+.app-versions-table th,.app-versions-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:middle}
+.app-versions-table th{font-weight:600;color:#475569;background:#f8fafc}
+.app-versions-table small{color:#64748b;margin-left:4px}
+.app-versions-table tr.is-published td{background:#f0fdf4}
+.app-versions-table tr.has-errors td{background:#fef2f2}
+.app-version-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;border:0}
+.app-version-badge.published{background:#16a34a;color:#fff}
+.app-version-badge.errors{background:#dc2626;color:#fff;cursor:pointer}
+.app-version-badge.saved{background:#e2e8f0;color:#334155}
+.app-version-errors ul{margin:0;padding-left:18px;color:#991b1b}

@@ -1,4 +1,5 @@
 import {loadFieldAccess,registerRequiredBox,missingRequired,writesRecord} from '../PageRuntime/fieldRules';
+import RuntimeComponentNotices from '../PageRuntime/RuntimeComponentNotices';
 import {startDevicePresence} from '../../authentication/TillDevice/devicePresence';
 import {showMessageScreen} from '../PageRuntime/messageScreen';
 import * as React from 'react';
@@ -934,9 +935,8 @@ export function CompiledComponentNode({definition,component,objectApiName,formFa
    ?{width:'100%',height:'100%',minHeight:0,minWidth:0}
    :properties.fillRegion===true?{height:'100%',minHeight:0,minWidth:0,display:'flex',flexDirection:'column'}:undefined}
    data-compiled-component={component.id} onScrollCapture={onScrollCapture}>
-  {source.error&&<div className="records-message" role="alert">{source.error}</div>}
-  {actionError&&<div className="records-message" role="alert">{actionError}</div>}
-  {namedSource.error&&<div className="records-message" role="alert">{namedSource.error}</div>}
+  <RuntimeComponentNotices actionError={actionError} clearActionError={()=>setActionError('')}
+   placed={Boolean(component.position)} dataErrors={[source.error,namedSource.error]}/>
   <RegisteredComponent definition={definition} layoutTransparent props={{
    ...resolved,...componentLayoutProps(properties,formFactor),
    ...(definition.apiName.startsWith('smart_')&&component.position?{canvasFrameSized:true}:{}),

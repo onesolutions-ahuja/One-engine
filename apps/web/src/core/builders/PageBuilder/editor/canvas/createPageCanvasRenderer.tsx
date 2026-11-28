@@ -4,6 +4,8 @@ import { loadCanvasAsset } from './canvasAssetCache';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
 import MultiPageTabRename from '../../MultiPageTabRename';
 import { builderBindingMemo } from '../../builderBindingMemo';
+import { brokenLinkIds } from '../../pageLinkCheck';
+import './canvasBrokenLink.css';
 import { MULTIPAGE_TYPE, isMultiPageTab, moveMultiPageTab, multiPageTabs, openMultiPageTab } from '../../multiPageBuilder';
 import { multiPageKey } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { compactLayoutForRecord } from '../../../../records/RecordWorkspace/recordMetadataUtils';
@@ -81,6 +83,8 @@ export function createPageCanvasRenderer(
   const { placeSelectedLayer } = layoutActions;
   // Designer previews of data-bound components redraw only when what they show changed.
   const MetadataBoundPageComponent = builderBindingMemo(components.MetadataBoundPageComponent);
+  // Components that open a page which no longer exists: marked red; Publish is blocked until fixed.
+  const brokenLinks = brokenLinkIds(page.components, pages);
 
   const renderPageComponent = (component: LightningPageMetadata['components'][number], index: number, libraryPreview = false, interactivePreview = false) => {
     const showHiddenSelection = ribbonTab === 'Preview' && !previewMode && !libraryPreview && Boolean(selectedId) && (selectedId === component.id || isDescendantOf(page.components,selectedId,component.id));
@@ -248,7 +252,8 @@ export function createPageCanvasRenderer(
       data-page-appearance={isLayoutType(component.type) ? 'layout' : pageAppearanceTarget(component.type)}
       data-page-style={pageAppearanceStyleKeys(visualStyle)}
       ref={libraryPreview && !interactivePreview ? (element) => { if (element) element.inert = true; } : undefined}
-      className={`record-component ${(!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas' ? 'free-canvas-component' : ''} ${isCanvasLocked(component) ? 'canvas-component-locked' : ''} ${nested ? 'nested-page-component' : ''} ${isLayoutContainer(component) ? 'layout-container-component' : ''} ${tabOf ? 'multipage-tab-component' : ''} ${libraryPreview ? 'component-rendered-preview' : ''} ${selectedId === component.id && !previewMode && !libraryPreview ? 'selected' : ''} ${selectionIds.includes(component.id) && !previewMode && !libraryPreview ? 'multi-selected' : ''} ${showHiddenSelection ? 'canvas-hidden-selection' : ''} ${dragOverId === component.id && !libraryPreview ? 'drop-target' : ''} ${partEditId === component.id && !previewMode && !libraryPreview ? 'canvas-part-editing' : ''}`}
+      className={`record-component ${(!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas' ? 'free-canvas-component' : ''} ${isCanvasLocked(component) ? 'canvas-component-locked' : ''} ${nested ? 'nested-page-component' : ''} ${isLayoutContainer(component) ? 'layout-container-component' : ''} ${tabOf ? 'multipage-tab-component' : ''} ${libraryPreview ? 'component-rendered-preview' : ''} ${selectedId === component.id && !previewMode && !libraryPreview ? 'selected' : ''} ${selectionIds.includes(component.id) && !previewMode && !libraryPreview ? 'multi-selected' : ''} ${showHiddenSelection ? 'canvas-hidden-selection' : ''} ${dragOverId === component.id && !libraryPreview ? 'drop-target' : ''} ${partEditId === component.id && !previewMode && !libraryPreview ? 'canvas-part-editing' : ''} ${brokenLinks.has(component.id) && !previewMode && !libraryPreview ? 'canvas-broken-link' : ''}`}
+      title={brokenLinks.has(component.id) && !previewMode && !libraryPreview ? brokenLinks.get(component.id) : undefined}
       style={{
         ...((!libraryPreview || interactivePreview) && page.layoutMode === 'free-canvas'
           ? nested

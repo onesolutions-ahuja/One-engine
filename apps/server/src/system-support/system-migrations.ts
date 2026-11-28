@@ -17,6 +17,7 @@ import {GUEST_ACCESS_DDL} from './guest-access-service.js';
 import {LIVE_CHANGES_DDL} from './live-changes.js';
 import {PAGE_CODE_VERSION_DDL} from '../page-compiler/source/pageCodeVersionDdl.js';
 import {APP_PACKAGE_DDL} from '../page-compiler/source/appPackageDdl.js';
+import {APP_VERSION_DDL} from './app-version-ddl.js';
 import {OBJECT_KIND_DDL} from '../system-files/object-schema-lifecycle.js';
 import {OBJECT_WRITE_LOCK_DDL} from '../system-files/object-save-setup.js';
 import {AUTO_NUMBER_SCOPE_DDL} from '../field-engine/types/AutoNumberScope.js';
@@ -161,6 +162,8 @@ export async function applySystemMigrations(db:SqlPersistence) {
   await client.query(PAGE_CODE_VERSION_DDL);
   // Run app from published code: per-tenant switch + the one-file app package (idempotent).
   await client.query(APP_PACKAGE_DDL);
+  // App versions: the last 10 saves of each app and which one is published (idempotent).
+  await client.query(APP_VERSION_DDL);
   // Standard Object flag and the trigger that keeps System Objects from ever being deleted.
   await client.query(OBJECT_KIND_DDL);
   // Object write lock in one round trip (idempotent).

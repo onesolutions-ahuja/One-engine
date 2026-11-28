@@ -121,7 +121,8 @@ import { standardPageComponents } from '../../components/Catalog/index';
 import {StandardRecordList,StandardRichText,StandardFlowLauncher} from './StandardPageBlocks';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import ResponsivePageCanvas from './ResponsivePageCanvas';
-import { runtimeRightColumnStart, runtimeResponsiveComponentStyle } from './runtimeCanvasSizing';
+import RuntimeComponentNotices from './RuntimeComponentNotices';
+import { runtimeRightColumnStart, runtimeResponsiveComponentStyle, runtimeVerticalComponentStyle } from './runtimeCanvasSizing';
 const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));
 const StandardApprovals=React.lazy(()=>import('./StandardApprovals'));
@@ -930,9 +931,9 @@ function MetadataBoundPageComponent({
   return <div style={definition.apiName==='smart_toggle'||(definition.apiName==='ui_image'&&Boolean(component.position))||(definition.apiName.startsWith('smart_')&&Boolean(component.position))
     ?{width:'100%',height:'100%',minHeight:0,minWidth:0}
     :properties.fillRegion===true?{height:'100%',minHeight:0,minWidth:0,display:'flex',flexDirection:'column'}:undefined}>
-    {dataError && dataErrorForQueryKey === recordQueryKey && <div className="records-message" role="alert">{dataError}</div>}
-    {actionError && <div className="records-message" role="alert">{actionError}</div>}
-    {namedSource.error && <div className="records-message" role="alert">{namedSource.error}</div>}
+    <RuntimeComponentNotices actionError={actionError} clearActionError={()=>setActionError('')}
+      placed={Boolean(component.position)}
+      dataErrors={[dataError && dataErrorForQueryKey === recordQueryKey && dataError, namedSource.error]}/>
     <RegisteredComponent definition={definition} layoutTransparent
       // RegisteredComponent only trusts this host flag for builder mode; without it
       // builderPreview is reset to false and builder aids (area tags) never render.
@@ -1604,7 +1605,8 @@ function LightningAppRuntime({
         // Grow large left-hand surfaces and anchor right-side panels on wider
         // monitors; do not enlarge text, icons, buttons or saved component sizes.
         ...(!nested && !isStandaloneRuntime
-          ? runtimeResponsiveComponentStyle(page, component, runtimeRightColumn) : {}),
+          ? {...runtimeResponsiveComponentStyle(page, component, runtimeRightColumn),
+             ...runtimeVerticalComponentStyle(page, component)} : {}),
         ...(isLayoutType(component.type) ? {} : resolvePageComponentStyle(component.properties, component.type, layoutDevice)),
         ...behaviorAppearance(component.properties,appVisibilityContext),
         ...(isStandaloneRuntime && component.properties?.standalonePresentation === true && !nested

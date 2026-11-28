@@ -7,7 +7,7 @@ const clickComponents=new Set(['smart_button','smart_toggle','smart_calendar','s
 const selectComponents=new Set(['smart_lookup']);
 const changeComponents=new Set(['smart_ticket_board','smart_multipage','smart_calendar','smart_lookup','smart_search','smart_selector','smart_tabs','smart_toggle','smart_text','smart_card_grid','smart_id_card','smart_spacemap','smart_numpad',
  'smart_keyboard']);
-/** Smart Dock: one independent event per item, shown under Other events. */
+/** Smart Dock: one independent event per item, picked in the Event box ("Dock item", then On Click). */
 export const dockItemEvents=['dockItem1','dockItem2','dockItem3','dockItem4','dockItem5','dockItem6',
  'dockItem7','dockItem8','dockItem9','dockItem10','dockItem11','dockItem12'] as const;
 /** Component event applicability is shared by the old property contract and unified catalog. */

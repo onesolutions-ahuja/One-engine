@@ -24,6 +24,13 @@
  box-sizing:border-box;display:grid;grid-template-rows:repeat(3,26px);
  grid-auto-flow:row;row-gap:4px;align-items:start;
 }
+/* Smart Dock: "Dock item" picker sits above On Click, so the Event box holds 4 shorter rows. */
+.office-builder-ribbon .page-action-compact-event-rows:has(.page-action-dock-item){
+ grid-template-rows:repeat(4,21px);row-gap:1px;
+}
+.office-builder-ribbon .page-action-compact-event-rows:has(.page-action-dock-item) .page-action-slot{
+ height:21px;min-height:21px;max-height:21px;
+}
 .office-builder-ribbon .page-action-slot,
 .office-builder-ribbon .page-action-compact-mapping{
  display:flex;box-sizing:border-box;align-items:center;gap:2px;

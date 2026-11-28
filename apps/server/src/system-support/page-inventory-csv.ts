@@ -172,10 +172,43 @@ export async function inventoryDefinitions(db:SqlPersistence,tenant:string,
 }
 /** A stable, metadata-complete list per component type, independent of how many
  * instance keys happen to have been saved. Never writes defaults back to SQL. */
+/** Smart Dock: one CSV row per item, e.g. TestDock,dockItem3.onClick,=FLOW(OpenKitchen).
+ * The value is that item's On Click formula; a blank value means the item does nothing. */
+const DOCK_MAX_ITEMS=12;
+const dockItemRow=/^dockItem([1-9]|1[0-2])\.onClick$/;
+const isDockType=(type:string)=>componentApi(type)==='smart_dock';
+const dockCount=(properties:Record<string,unknown>)=>{
+ const raw=Math.trunc(Number(properties.dockItemCount));
+ return Number.isFinite(raw)&&raw>=1?Math.min(DOCK_MAX_ITEMS,raw):4;
+};
+/** An item's saved action as formula text: Formula as written, Flow as =FLOW(Name),
+ * an old "Open another page" as its @navigate formula. */
+export function dockActionFormula(binding:unknown,flowNames?:ReadonlyMap<string,string>):string{
+ if(!isPlain(binding))return '';
+ const type=String(binding.actionType??(binding.flowApiName?'Flow':''));
+ if(type==='Formula')return String(binding.formula??'');
+ if(type==='Flow'){
+  const raw=String(binding.flowApiName??'');
+  const name=raw.startsWith('metadata:')?flowNames?.get(raw.slice(9))??'':raw;
+  return /^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name)?'=FLOW('+name+')':'';
+ }
+ if(type==='Navigate'){
+  const q=(v:string)=>JSON.stringify(v);
+  const mode=String(binding.navigationTargetType??'Record List');
+  const app=String(binding.navigationAppId??''),page=String(binding.navigationPageApiName??'');
+  const object=String(binding.navigationObjectApiName??'');
+  if(mode==='App Page'&&app&&page)return '@navigate.page := '+q(app+'/'+page);
+  if(mode==='App Home'&&app)return '@navigate.home := '+q(app);
+  if(mode==='Record List'&&object)return '@navigate.list := '+q(object);
+ }
+ return '';
+}
+const withoutDockItems=(actions:unknown)=>isPlain(actions)?Object.fromEntries(
+ Object.entries(actions).filter(([key])=>!/^dockItem\d+$/.test(key))):actions;
 /** A value that is a formula or reads a record/page value: what "Download all formulas" keeps. */
 export const isFormulaInventoryValue=(text:string)=>/^\s*=/.test(text)||/(?:^|[^A-Za-z0-9_.])@[A-Za-z]/.test(text);
 export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=new Map(),
- variant:PageLayoutVariant='Desktop',options:{formulasOnly?:boolean}={}):string{
+ variant:PageLayoutVariant='Desktop',options:{formulasOnly?:boolean;flowNames?:ReadonlyMap<string,string>}={}):string{
  const rows:unknown[][]=[[...INVENTORY_EXPORT_COLUMNS]];
  const names=componentInstanceNames(page.components);
  for(const component of page.components){
@@ -208,6 +241,18 @@ export function exportInventoryCsv(page:InventoryPage,definitions:Definitions=ne
    const ribbon=definitions.ribbonProperties?.get(component.type)?.find(row=>row.id===id);
    values.set(id,{value:effective(pathValue(properties,ribbon?.valueKey??id),descriptor.defaultValue),
     tab:descriptor.tab});
+  }
+  if(isDockType(component.type)){
+   // Each dock item gets its own row; the shared actions cell keeps only the other events.
+   const actions=isPlain(properties.actionFlows)?properties.actionFlows:{};
+   if(values.has('actionFlows')){
+    const rest=withoutDockItems(actions);
+    values.set('actionFlows',{value:isPlain(rest)&&Object.keys(rest).length?rest:'',tab:'Actions'});
+   }
+   const count=Math.max(dockCount(properties),...Object.keys(actions)
+    .map(key=>Number(/^dockItem(\d+)$/.exec(key)?.[1]??0)).filter(n=>n<=DOCK_MAX_ITEMS));
+   for(let index=1;index<=count;index++)
+    values.set('dockItem'+index+'.onClick',{value:dockActionFormula(actions['dockItem'+index],options.flowNames),tab:'Actions'});
   }
   for(const [key,{value,tab}] of values){
    const text=valueText(value);
@@ -404,6 +449,7 @@ export function applyInventoryCsv(page:InventoryPage,csv:string,definitions:Defi
  const byName=new Map([...copy.components].map(c=>[canonicalComponentName(names.get(c.id)!),c]));
  const byId=new Map(copy.components.map(c=>[c.id,c]));
  const seen=new Set<string>(),rejectedNames=new Set<string>();
+ const dockRows:{component:Block;key:string;formula:string}[]=[];
  let changes=0,skipped=0;
  const report=(entry:ImportedRow,remark:string)=>issues.push({
   row:entry.row.line,pageapi:entry.api,component_type:entry.type,
@@ -475,6 +521,11 @@ export function applyInventoryCsv(page:InventoryPage,csv:string,definitions:Defi
   const pair=component.id+'\u0000'+property;
   if(seen.has(pair)){report(entry,'Duplicate component property in CSV');continue;}
   seen.add(pair);
+  if(dockItemRow.test(property)){
+   if(!isDockType(component.type)){report(entry,property+' is only for a Smart Dock');continue;}
+   dockRows.push({component,key:property.slice(0,property.indexOf('.')),formula:entry.value.trim()});
+   continue;
+  }
   if(entry.value.trim()===''){skipped++;continue;}
   const value=entry.value;
   if(property.startsWith('component.')){
@@ -528,6 +579,18 @@ export function applyInventoryCsv(page:InventoryPage,csv:string,definitions:Defi
   if(!inventoryPropertyAllowed(parts[0])){
    report(entry,'This property is internal or retired and cannot be changed by CSV');continue;
   }
+  // A dock's actions cell never wipes the per-item rows: keep item actions it does not name.
+  if(isDockType(component.type)&&parts.length===1&&parts[0]==='actionFlows'){
+   let incoming:unknown;
+   try{incoming=JSON.parse(value);}catch{report(entry,'Enter a valid JSON object');continue;}
+   if(!isPlain(incoming)){report(entry,'Enter a valid JSON object');continue;}
+   const saved=isPlain(component.properties?.actionFlows)?component.properties!.actionFlows as Record<string,unknown>:{};
+   const items=Object.fromEntries(Object.entries(saved).filter(([key])=>/^dockItem\d+$/.test(key)));
+   const next={...items,...incoming};
+   if(JSON.stringify(next)!==JSON.stringify(saved)){
+    component.properties={...(component.properties??{}),actionFlows:next};changes++;}
+   continue;
+  }
   const schema=lookupSchema([
    ...(definitions.get(component.type)??[]),...pageSettingsFor(component.type)],parts);
   const ribbon=parts.length===1?definitions.ribbonProperties?.get(component.type)?.find(item=>item.id===parts[0]):undefined;
@@ -576,6 +639,20 @@ export function applyInventoryCsv(page:InventoryPage,csv:string,definitions:Defi
    if(missingParent){report(entry,'Nested component property does not exist');continue;}
    target[storageParts[storageParts.length-1]]=next;changes++;
   }catch(error){report(entry,error instanceof Error?error.message:'Invalid component property value');}
+ }
+ // Dock item rows last, so a dock's actions cell in the same file cannot undo them.
+ for(const {component,key,formula} of dockRows){
+  const actions=isPlain(component.properties?.actionFlows)?{...component.properties!.actionFlows as Record<string,unknown>}:{};
+  const saved=actions[key];
+  if(!formula){
+   if(saved===undefined)continue;
+   delete actions[key];
+  }else{
+   // Unchanged (including a Flow written back as =FLOW(Name)): keep the saved action.
+   if(dockActionFormula(saved)===formula)continue;
+   actions[key]={...(isPlain(saved)&&saved.actionType==='Formula'?saved:{}),actionType:'Formula',formula};
+  }
+  component.properties={...(component.properties??{}),actionFlows:actions};changes++;
  }
  if(issues.length===0&&changes>0)copy.components=ensureComponentInstanceNames(copy.components);
  issues.sort((a,b)=>a.row-b.row);

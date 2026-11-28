@@ -159,7 +159,12 @@ export function registerPageApiController(app:Express,db:SqlPersistence,rbac:Rba
     const definitions=await inventoryDefinitions(db,actor.tenant_id,page.components,variant);
     res.setHeader('Cache-Control','private, no-store');
     // ?only=formulas: the rows "Download all formulas" needs (upload upserts them back).
-    res.json({csv:exportInventoryCsv(page,definitions,variant,{formulasOnly:req.query.only==='formulas'}),
+    // Dock item rows show a chosen Flow by name: =FLOW(Name).
+    const flowNames=page.components.some(c=>c.type.endsWith('smart_dock'))
+      ?new Map((await db.query<{id:string;api_name:string}>(
+        'SELECT DISTINCT id::text AS id,api_name FROM md_flow_definitions WHERE tenant_id=$1',[actor.tenant_id])).rows
+        .map(row=>[row.id,row.api_name] as [string,string])):undefined;
+    res.json({csv:exportInventoryCsv(page,definitions,variant,{formulasOnly:req.query.only==='formulas',flowNames}),
      variant,draftRevision:page.draftRevision??0});
   }));
   /**

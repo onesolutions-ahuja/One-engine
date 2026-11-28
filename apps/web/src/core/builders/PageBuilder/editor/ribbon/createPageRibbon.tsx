@@ -32,6 +32,15 @@ import type { PageBuilderProps } from '../PageBuilderTypes';
 import type { usePageComponentProperties } from '../inspector/usePageComponentProperties';
 import type { usePageComponentActions } from '../usePageComponentActions';
 import type { usePageManagement } from '../management/usePageManagement';
+/** Smart Dock items 1..count with their plain labels (formula labels are not shown). */
+const dockItemChoices=(properties:Record<string,unknown>)=>{
+ const raw=Math.trunc(Number(properties.dockItemCount));
+ const count=Number.isFinite(raw)&&raw>=1?Math.min(12,raw):4;
+ return Array.from({length:count},(_,i)=>{
+  const label=String(properties['dockItem'+(i+1)+'Label']??'').trim();
+  return {index:i+1,label:label.startsWith('=')||label.includes('@')?'':label};
+ });
+};
 import type { usePagePalette } from './usePagePalette';
 
 export function createPageRibbon(
@@ -419,6 +428,7 @@ export function createPageRibbon(
               mixedButtonVisibilityKeys={mixedActionButtonVisibilityKeys} eventDefinitions={actionOptions} flows={flows}
               stateOptions={pageStateChoices(page.components)}
               ownerName={selected?componentStateName(componentInstanceNames(page.components).get(selected.id))??'':''}
+              dockItems={/smart_dock$/.test(selected?.type??'')?dockItemChoices(selected!.properties):[]}
               dataFields={objects.find(item=>item.apiName===
                 String(selected?.properties.objectApiName||page.targetObject||''))?.fields??[]}
               selectedEvent={activeActionEvent} disabled={!selected||actionSelectionDisabled}

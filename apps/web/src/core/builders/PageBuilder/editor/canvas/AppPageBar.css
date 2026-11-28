@@ -11,7 +11,8 @@
   border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#344054;font:inherit;cursor:pointer;
 }
 .app-page-tab span{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.app-page-tab small{font-size:10px;opacity:.7}
+/* Popups are light grey; normal pages stay white. */
+.app-page-tab.is-popup{background:#eef0f3;border-color:#d8dce2;color:#475467}
 .app-page-tab:hover{border-color:#98a2b3}
 .app-page-tab.is-current{background:#2453d6;border-color:#2453d6;color:#fff;font-weight:600}
 

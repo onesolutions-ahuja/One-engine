@@ -15,7 +15,7 @@ export function appPagesOf(app: LightningAppMetadata | undefined, pages: readonl
 }
 
 /** Bottom bar of Page Builder: switch between the pages of the app being edited.
- * + adds an App page or a Popup; double-click a name to rename it (kept as a draft until Save). */
+ * + adds an App page or a Popup; double-click a name to rename it (saved at once, like Page Properties). */
 export default function AppPageBar({ app, pages, current, onPick, onAdd, onRename, onDelete }: {
   app: LightningAppMetadata;
   pages: readonly LightningPageMetadata[];
@@ -56,11 +56,11 @@ export default function AppPageBar({ app, pages, current, onPick, onAdd, onRenam
             }}
             onBlur={event => finishRename(event.currentTarget.value)} />
         : <button key={item.apiName} type="button" role="tab" aria-selected={item.apiName === current}
-            className={'app-page-tab' + (item.apiName === current ? ' is-current' : '')}
-            title={item.label + ' (' + item.pageType + ') · double-click to rename'}
+            className={'app-page-tab' + (item.pageType === 'In-Screen Page' ? ' is-popup' : '') + (item.apiName === current ? ' is-current' : '')}
+            title={item.label + ' (' + (item.pageType === 'In-Screen Page' ? 'Popup' : item.pageType) + ') · double-click to rename'}
             onClick={() => { if (item.apiName !== current) { setRenaming(''); onPick(item.apiName); } }}
             onDoubleClick={() => { if (!onRename) return; if (item.apiName !== current) onPick(item.apiName); setRenaming(item.apiName); }}>
-            <span>{item.label}</span>{item.pageType === 'In-Screen Page' && <small>Popup</small>}
+            <span>{item.label}</span>
             {onDelete && item.apiName === current && <span role="button" tabIndex={0} className="app-page-delete"
               aria-label={'Delete ' + item.label + ' permanently'} title="Delete this page permanently"
               onClick={event => { event.stopPropagation(); onDelete(item.apiName); }}

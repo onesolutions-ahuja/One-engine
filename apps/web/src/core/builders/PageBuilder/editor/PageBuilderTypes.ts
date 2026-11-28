@@ -22,7 +22,8 @@ export type PageBuilderProps = {
   onPublish: (apiName:string,variant:'Mobile'|'Desktop'|'Tablet'|'Custom',draftRevision?:number)=>Promise<boolean>;
   onDeactivate: (apiName:string)=>Promise<boolean>;
   onSaveApp: (app: LightningAppMetadata, updating: boolean) => Promise<void>;
-  onUpdatePageDetails: (apiName:string,label:string,appApiName:string|null,expectedLabel:string,nextApiName?:string,
+  /** appApiName undefined = keep the page's app (rename only). */
+  onUpdatePageDetails: (apiName:string,label:string,appApiName:string|null|undefined,expectedLabel:string,nextApiName?:string,
     devices?:LightningPageMetadata['devices'],expectedDevices?:LightningPageMetadata['devices'])=>Promise<boolean>;
   onDeleteApp: (apiName: string) => Promise<void>;
   onDeletePage: (apiName: string) => Promise<void>;

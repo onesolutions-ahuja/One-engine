@@ -942,7 +942,7 @@ function SetupApp({ onLogout, entryTiming }: { onLogout: () => void; entryTiming
     }
   };
   const updatePageDetailsFromBuilder = async (apiName:string,label:string,
-    appApiName:string|null,expectedLabel:string,nextApiName=apiName,
+    appApiName:string|null|undefined,expectedLabel:string,nextApiName=apiName,
     devices?:LightningPageMetadata['devices'],expectedDevices?:LightningPageMetadata['devices']):Promise<boolean>=>{
     try{
       const {page:updated}=await apiRequest<{page:LightningPageMetadata}>(

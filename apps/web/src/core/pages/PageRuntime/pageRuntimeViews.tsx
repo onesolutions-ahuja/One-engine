@@ -1,3 +1,5 @@
+import ComponentPartFonts from '../../components/Properties/ComponentPartFonts';
+import { componentFontStyle } from '../../components/Properties/fontChoices';
 import {multiPageChildren} from './multiPageChildren';
 import {nestedCanvasStyle} from '../TemplatePageRuntime/pageComponentLayout';
 import {declarativeSource} from '../../../../../server/src/expression-engine/PageReferences.js';
@@ -121,8 +123,6 @@ import { standardPageComponents } from '../../components/Catalog/index';
 import {StandardRecordList,StandardRichText,StandardFlowLauncher} from './StandardPageBlocks';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import ResponsivePageCanvas from './ResponsivePageCanvas';
-import ComponentPartFonts from '../../components/Properties/ComponentPartFonts';
-import { componentFontStyle } from '../../components/Properties/fontChoices';
 import { runtimeRightColumnStart, runtimeResponsiveComponentStyle } from './runtimeCanvasSizing';
 const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));

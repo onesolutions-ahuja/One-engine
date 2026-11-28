@@ -1,11 +1,11 @@
+import ComponentPartFonts from '../../../../components/Properties/ComponentPartFonts';
+import { componentFontStyle } from '../../../../components/Properties/fontChoices';
 import {multiPageChildren} from '../../../../pages/PageRuntime/multiPageChildren';
 import {nestedCanvasStyle} from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { loadCanvasAsset } from './canvasAssetCache';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
 import MultiPageTabRename from '../../MultiPageTabRename';
 import { builderBindingMemo } from '../../builderBindingMemo';
-import ComponentPartFonts from '../../../../components/Properties/ComponentPartFonts';
-import { componentFontStyle } from '../../../../components/Properties/fontChoices';
 import { MULTIPAGE_TYPE, isMultiPageTab, moveMultiPageTab, multiPageTabs, openMultiPageTab } from '../../multiPageBuilder';
 import { multiPageKey } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { compactLayoutForRecord } from '../../../../records/RecordWorkspace/recordMetadataUtils';

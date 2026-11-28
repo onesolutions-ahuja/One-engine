@@ -4,6 +4,8 @@ import { loadCanvasAsset } from './canvasAssetCache';
 import CanvasFloatingResizeHandles from '../../CanvasFloatingResizeHandles';
 import MultiPageTabRename from '../../MultiPageTabRename';
 import { builderBindingMemo } from '../../builderBindingMemo';
+import ComponentPartFonts from '../../../../components/Properties/ComponentPartFonts';
+import { componentFontStyle } from '../../../../components/Properties/fontChoices';
 import { MULTIPAGE_TYPE, isMultiPageTab, moveMultiPageTab, multiPageTabs, openMultiPageTab } from '../../multiPageBuilder';
 import { multiPageKey } from '../../../../pages/TemplatePageRuntime/pageComponentLayout';
 import { compactLayoutForRecord } from '../../../../records/RecordWorkspace/recordMetadataUtils';
@@ -245,6 +247,7 @@ export function createPageCanvasRenderer(
     return <div
       key={component.id}
       data-builder-editor={!previewMode&&!libraryPreview?'true':undefined}
+      data-font-scope={component.id}
       data-page-appearance={isLayoutType(component.type) ? 'layout' : pageAppearanceTarget(component.type)}
       data-page-style={pageAppearanceStyleKeys(visualStyle)}
       ref={libraryPreview && !interactivePreview ? (element) => { if (element) element.inert = true; } : undefined}
@@ -261,6 +264,8 @@ export function createPageCanvasRenderer(
               }
           : {}),
         ...(isLayoutType(component.type) ? {} : visualStyle),
+        // Design > Font: inherited by every text part of the component.
+        ...componentFontStyle(component.properties),
         // The rendered and hit-tested stack follows the saved sibling order,
         // never the temporary .selected state or an authored visual override.
         ...(page.layoutMode==='free-canvas' ? {
@@ -345,6 +350,7 @@ export function createPageCanvasRenderer(
       aria-hidden={libraryPreview && !interactivePreview || undefined}
     >
       {/* No floating toolbar on the canvas: editing is from the left panel and the top bar. */}
+      <ComponentPartFonts scope={component.id} properties={component.properties}/>
       <ContentHost {...contentHostProps}>
       {editorGenericHint&&<span className="page-editor-generic-hint" aria-hidden="true">{editorGenericHint}</span>}
       {showHiddenSelection && !component.visible

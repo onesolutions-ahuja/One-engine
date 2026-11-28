@@ -1,4 +1,5 @@
 import {disabledWhen} from "../shared/showWhen.js";
+import SmartEmptyState from "../smart/shared/SmartEmptyState.jsx";
 import icons from "../smart_icon/iconCatalog.json";
 import {smartIconPaint} from "../smart_icon/iconPaint.js";
 import {smartCustomButtonAppearance} from "../smart/shared/SmartCustomButtonAppearance.js";
@@ -219,7 +220,9 @@ export default function SmartTable({p,records,expression,fieldAllowed,fire}){
       </tr>;
     })}</tbody>
    </table>:<p className="smart-table-empty">Select a table source to display fields.</p>}
-   {!sortedRows.length&&!p.loading&&<p className="smart-table-empty">{plain(p.emptyText)||"No records"}</p>}
+   {!sortedRows.length&&!p.loading&&<SmartEmptyState className="smart-table-empty" icon="table"
+    title={plain(p.emptyText)||"No records found"}
+    subtitle={p.emptySubtitle===undefined||p.emptySubtitle===null?"Try changing the filters or add a new record.":plain(p.emptySubtitle)}/>}
   </div>
   {/* Show record count: off for receipts and lists where "3 records" is noise. */}
   {p.footerVisible===false?null:<footer data-design-area={p.builderPreview?"Footer":undefined} className="smart-table-footer" style={footerStyle}>{footerText}</footer>}

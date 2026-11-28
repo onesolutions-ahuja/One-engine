@@ -121,6 +121,8 @@ import { standardPageComponents } from '../../components/Catalog/index';
 import {StandardRecordList,StandardRichText,StandardFlowLauncher} from './StandardPageBlocks';
 import {useViewportWidth} from '../../workspace/Responsive/useViewportWidth';
 import ResponsivePageCanvas from './ResponsivePageCanvas';
+import ComponentPartFonts from '../../components/Properties/ComponentPartFonts';
+import { componentFontStyle } from '../../components/Properties/fontChoices';
 import { runtimeRightColumnStart, runtimeResponsiveComponentStyle } from './runtimeCanvasSizing';
 const EmbeddedScreenFlow=React.lazy(()=>import('./EmbeddedScreenFlow'));
 const InScreenFlowHost=React.lazy(()=>import('../../automation/InScreenFlowHost'));
@@ -1588,7 +1590,7 @@ function LightningAppRuntime({
   const renderCanvasComponent = (component: PageComponentMetadata, nested = false) => {
     if (!isAppComponentVisible(component)) return null;
     return <div key={component.id} className={nested ? 'free-canvas-runtime-component nested-page-runtime' : 'free-canvas-runtime-component'}
-      data-layout-component-id={component.id}
+      data-layout-component-id={component.id} data-font-scope={component.id}
       data-smart-frame={component.type.startsWith('Custom:smart_') ? 'true' : undefined}
       data-page-appearance={isLayoutType(component.type) ? 'layout' : pageAppearanceTarget(component.type)}
       data-page-style={pageAppearanceStyleKeys(resolvePageComponentStyle(component.properties, component.type, layoutDevice))}
@@ -1607,9 +1609,12 @@ function LightningAppRuntime({
           ? runtimeResponsiveComponentStyle(page, component, runtimeRightColumn) : {}),
         ...(isLayoutType(component.type) ? {} : resolvePageComponentStyle(component.properties, component.type, layoutDevice)),
         ...behaviorAppearance(component.properties,appVisibilityContext),
+        // Design > Font: the component's text parts inherit it (parts may have their own).
+        ...componentFontStyle(component.properties),
         ...(isStandaloneRuntime && component.properties?.standalonePresentation === true && !nested
           ? { left: 0, top: 0, width: '100%', height: '100%' } : {})
       } as React.CSSProperties}>
+      <ComponentPartFonts scope={component.id} properties={component.properties}/>
       {renderComponent(component)}
     </div>;
   };

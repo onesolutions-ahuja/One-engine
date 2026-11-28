@@ -43,6 +43,27 @@ import type { usePageComponentActions } from '../usePageComponentActions';
 import type { usePageLayoutActions } from '../management/usePageLayoutActions';
 import type { PageBuilderComponents } from '../PageBuilderTypes';
 
+type CanvasContentMemo = {
+  entries: Map<string, { deps: readonly unknown[]; element: React.ReactNode }>;
+  latest: { request: PageBuilderProps['request']; onLaunchFlow: PageBuilderProps['onLaunchFlow'] };
+  liveRequest: PageBuilderProps['request'];
+  liveLaunchFlow: PageBuilderProps['onLaunchFlow'];
+};
+/** One store per open Page Builder (keyed by one of its stable refs). Reused previews call the
+ * latest request / Flow launcher through these stable wrappers, never an old one. */
+const canvasContentMemos = new WeakMap<object, CanvasContentMemo>();
+function canvasContentMemoFor(owner: object): CanvasContentMemo {
+  let memo = canvasContentMemos.get(owner);
+  if (!memo) {
+    const created = { entries: new Map(), latest: {} } as unknown as CanvasContentMemo;
+    created.liveRequest = ((path: string, init?: RequestInit) => created.latest.request(path, init)) as PageBuilderProps['request'];
+    created.liveLaunchFlow = ((...args: Parameters<PageBuilderProps['onLaunchFlow']>) => created.latest.onLaunchFlow(...args)) as PageBuilderProps['onLaunchFlow'];
+    canvasContentMemos.set(owner, created);
+    memo = created;
+  }
+  return memo;
+}
+
 export function createPageCanvasRenderer(
   editorState: ReturnType<typeof usePageEditorState>,
   props: PageBuilderProps,
@@ -85,6 +106,24 @@ export function createPageCanvasRenderer(
   const { placeSelectedLayer } = layoutActions;
   // Designer previews of data-bound components redraw only when what they show changed.
   const MetadataBoundPageComponent = builderBindingMemo(components.MetadataBoundPageComponent);
+  // Speed (selecting, switching ribbon tabs): a component's preview — the expensive part of the
+  // canvas (cards, carts, tables) — is reused while nothing it shows has changed. Its frame,
+  // selection marks and every click/drag handler are still drawn fresh on each render.
+  const contentMemo = canvasContentMemoFor(suppressCanvasClickRef);
+  contentMemo.latest = { request, onLaunchFlow };
+  const { liveRequest, liveLaunchFlow } = contentMemo;
+  const canvasContent = (component: LightningPageMetadata['components'][number], libraryPreview: boolean,
+    interactivePreview: boolean, cacheable: boolean, deps: readonly unknown[], draw: () => React.ReactNode) => {
+    if (!cacheable) return draw();
+    const key = component.id + '|' + (libraryPreview ? 1 : 0) + (interactivePreview ? 1 : 0);
+    const cached = contentMemo.entries.get(key);
+    if (cached && cached.deps.length === deps.length && cached.deps.every((value, index) => Object.is(value, deps[index])))
+      return cached.element;
+    const element = draw();
+    if (contentMemo.entries.size > 4000) contentMemo.entries.clear();
+    contentMemo.entries.set(key, { deps, element });
+    return element;
+  };
   // Components that open a page which no longer exists: marked red; Publish is blocked until fixed.
   const brokenLinks = brokenLinkIds(page.components, pages);
 
@@ -358,7 +397,12 @@ export function createPageCanvasRenderer(
       <ComponentPartFonts scope={component.id} properties={component.properties}/>
       <ContentHost {...contentHostProps}>
       {editorGenericHint&&<span className="page-editor-generic-hint" aria-hidden="true">{editorGenericHint}</span>}
-      {showHiddenSelection && !component.visible
+      {canvasContent(component, libraryPreview, interactivePreview,
+        Boolean(customDefinition) && !showHiddenSelection && !isLayoutType(component.type) && !isLayoutContainer(component) && !nestedChildren?.length,
+        [component, previewMode, device, customDefinition, page.layoutMode, page.pageType, page.apiName,
+          needsMetadataComponentRuntime(component.properties) ? page.components : null, targetObject, builderAppApiName,
+          apps, pages, objects, flows, reports, libraryPreview ? selectedComponentDescription : null],
+        () => showHiddenSelection && !component.visible
         ? <span className="canvas-hidden-marker">Hidden: {component.label}</span>
         : isLayoutType(component.type)
         ? <div className="page-nested-layout" style={visualStyle}>
@@ -478,14 +522,14 @@ export function createPageCanvasRenderer(
                           availableFlows={flows.filter((flow) => ['Screen Flow', 'Autolaunched Flow'].includes(flow.flowType))}
                           reports={reports} children={nestedChildren}
                           onNavigate={((route:AppRoute)=>{window.open(appRoutePath(route),'_blank','noopener,noreferrer');}) as never}
-                          onLaunchFlow={(flowApiName: string, inputs?: Record<string, unknown>) => { onLaunchFlow(flowApiName, inputs); }}/>}
-                        fallback={<MetadataBoundPageComponent apiRequest={request} definition={customDefinition} component={component}
+                          onLaunchFlow={(flowApiName: string, inputs?: Record<string, unknown>) => { liveLaunchFlow(flowApiName, inputs); }}/>}
+                        fallback={<MetadataBoundPageComponent apiRequest={liveRequest} definition={customDefinition} component={component}
                         objects={objects} apps={apps} pages={pages} currentAppId={builderAppApiName || apps[0]?.apiName || 'Records'}
                         pageSessionKey={(builderAppApiName || apps[0]?.apiName || 'Records') + ':' + page.apiName}
                         pageComponents={page.components} reports={reports} formFactor={device === 'Phone' ? 'Phone' : 'Desktop'}
                         availableFlows={flows.filter((flow) => ['Screen Flow', 'Autolaunched Flow'].includes(flow.flowType))}
                         onNavigate={(route:AppRoute)=>{if(previewMode)window.open(appRoutePath(route),'_blank','noopener,noreferrer');}}
-                         onLaunchFlow={(flowApiName: string, inputs: Record<string, unknown>) => { onLaunchFlow(flowApiName, inputs); externalPreviewWindowRef.current?.opener?.focus?.(); }} disableActions={!previewMode} builderPreview={!previewMode} />}/>
+                         onLaunchFlow={(flowApiName: string, inputs: Record<string, unknown>) => { liveLaunchFlow(flowApiName, inputs); externalPreviewWindowRef.current?.opener?.focus?.(); }} disableActions={!previewMode} builderPreview={!previewMode} />}/>
                   : customDefinition
                     ? <RegisteredComponent formulaInstanceId={component.id} definition={customDefinition} layoutTransparent props={libraryPreview ? customPreviewProps : {
                       ...component.properties,
@@ -497,12 +541,12 @@ export function createPageCanvasRenderer(
                       properties: component.properties,
                       object: page.pageType === 'Record Page' ? targetObject : undefined,
                       device, previewOnly: true, builderPreview: !previewMode, pageSessionKey: (builderAppApiName || apps[0]?.apiName || 'Records') + ':' + page.apiName,
-                       loadAsset:(id:string)=>loadCanvasAsset<{contentType:string;contentBase64:string}>(request,id),
+                       loadAsset:(id:string)=>loadCanvasAsset<{contentType:string;contentBase64:string}>(liveRequest,id),
                       children: nestedChildren
                     }} editorPreview={!previewMode} />
                     : libraryPreview
                       ? <div className="component-demo-fallback"><strong>{component.label}</strong><span>{selectedComponentDescription || 'Preview of a reusable page component.'}</span><div><i /><i /><i /></div></div>
-                      : <div className="component-demo-fallback"><strong>{component.label}</strong><span>This component is no longer registered. Re-register it to restore its live preview.</span><div><i /><i /><i /></div></div>}
+                      : <div className="component-demo-fallback"><strong>{component.label}</strong><span>This component is no longer registered. Re-register it to restore its live preview.</span><div><i /><i /><i /></div></div>)}
       {!libraryPreview && customDefinition && customDefinition.trustedBundled !== true && isLayoutContainer(component)
         && <div className="metadata-nested-host">{nestedChildren}</div>}
       {/* Editing is selection-only. A transparent hit target sits above the actual

@@ -5,7 +5,7 @@ import {useState,useEffect} from 'react';
 import {Trash2, SlidersHorizontal, Eye, EyeOff} from 'lucide-react';
 import type {FlowDefinitionMetadata,ObjectMetadata} from '../../metadata/Definitions/metadata';
 import {metadataReference,metadataSelection} from '../../metadata/Definitions/metadataReferences';
-import {supportsSmartActionEvent} from './SmartEventActionsRibbon';
+import {supportsSmartActionEvent,dockItemEvents} from './SmartEventActionsRibbon';
 import SmartFormulaField from './SmartFormulaField';
 import type {PageStateChoice} from './pageStateChoices';
 import {isFlowActionFormula,validateFlowActionFormula} from '../../pages/PageRuntime/actionFlowFormula';
@@ -99,7 +99,7 @@ const sameJson=(a:unknown,b:unknown)=>a===b||JSON.stringify(a)===JSON.stringify(
 export default function PageBuilderActionRibbon({
  actions,eventDefinitions,flows,selectedEvent,onSelectEvent,onChange,
  api='',selectedApis,mixedEventIds=[],mixedButtonVisibilityKeys=[],objects=[],pages=[],request,dataFields=[],disabled=false,
- buttonVisibility,onButtonVisibilityChange,stateOptions=[],ownerName=''
+ buttonVisibility,onButtonVisibilityChange,stateOptions=[],ownerName='',dockItems=[]
 }:{
  actions:Binding;eventDefinitions:EventOption[];flows:FlowDefinitionMetadata[];
  selectedEvent:string;onSelectEvent:(name:string)=>void;
@@ -112,6 +112,8 @@ export default function PageBuilderActionRibbon({
  stateOptions?:readonly PageStateChoice[];
  /** This component's page name: the owner of values its actions save. */
  ownerName?:string;
+ /** Smart Dock: its visible items (1..count) so On Click can be set per item. */
+ dockItems?:readonly {index:number;label:string}[];
  buttonVisibility?:Partial<Record<CartButtonKey,boolean>>;
  onButtonVisibilityChange?:(key:CartButtonKey,visible:boolean)=>void;
  // Deprecated parameters remain optional for existing Page Builder integrations.
@@ -155,11 +157,16 @@ export default function PageBuilderActionRibbon({
  const supports=(key:string)=>members.every(member=>member.startsWith('smart_')
    ?supportsSmartActionEvent(member,key)
    :eventDefinitions.some(item=>item.apiName===key));
+ // Smart Dock: pick the item first, then its On Click (Formula or Flow) loads in the formula bar.
+ const isDock=members.length>0&&members.every(member=>member==='smart_dock');
+ const dockKeys=dockItemEvents as readonly string[];
+ const [dockChoice,setDockChoice]=useState('dockItem1');
+ const dockEvent=isDock?(dockKeys.includes(selectedEvent)||selectedEvent==='click'?selectedEvent:dockChoice):'';
  const otherEvents=[...new Set([
    ...eventDefinitions.map(item=>item.apiName),
    ...Object.keys(actions)
  ])].filter(key=>!eventSlots.some(slot=>slot.key===key)&&
-   !componentSlots.some(slot=>slot.key===key));
+   !componentSlots.some(slot=>slot.key===key)&&!(isDock&&dockKeys.includes(key)));
  const [otherEvent,setOtherEvent]=useState('');
  const selectedOther=otherEvents.includes(selectedEvent)?selectedEvent:
    otherEvents.includes(otherEvent)?otherEvent:otherEvents[0]??'';
@@ -254,7 +261,20 @@ export default function PageBuilderActionRibbon({
    aria-label="Actions ribbon workspace">
    <section className="page-action-compact-event" aria-label="Event">
      <div className="page-action-compact-event-rows">
-       {eventSlots.map(slot=>slotPicker(slot))}
+       {isDock&&<div className="page-action-slot page-action-dock-item" data-action-event="dockItem">
+         <label htmlFor="page-action-dock-item">Dock item</label>
+         <select id="page-action-dock-item" aria-label="Dock item" disabled={disabled} value={dockEvent}
+           onChange={event=>{setDockChoice(event.target.value);onSelectEvent(event.target.value);}}>
+           <option value="click">Any item{actions.click?' ✓':''}</option>
+           {(dockItems.length?dockItems:[1,2,3,4].map(index=>({index,label:''}))).map(item=>{
+             const key='dockItem'+item.index;
+             return <option key={key} value={key}>
+               {'Item '+item.index+(item.label?' – '+item.label:'')+(actions[key]?' ✓':'')}</option>;
+           })}
+         </select>
+       </div>}
+       {eventSlots.map(slot=>isDock&&slot.key==='click'
+         ?slotPicker({key:dockEvent,label:'On Click'}):slotPicker(slot))}
      </div>
      <span className="page-action-section-caption">Event</span>
    </section>

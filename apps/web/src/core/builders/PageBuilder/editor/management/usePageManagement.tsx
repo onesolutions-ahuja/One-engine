@@ -13,6 +13,8 @@ import { pageActivationAppCandidates, resolvePageActivationApp, pageAppsWithPopu
 import { compilePage } from '../../../../pages/PageCompiler/compilePage';
 import { downloadPageCode } from '../../../../pages/AppPackage/pageCodeDownload';
 import { dropAppDraft, keepAppDraft, otherAppDrafts } from './appDraftStore';
+import { appBrokenLinks, appPageNames, describeLinkErrors, publishAppVersion, recordAppVersion, type AppLinkError } from './appVersions';
+import { brokenPageLinks } from '../../pageLinkCheck';
 import { PAGE_LIST_TYPES } from '../../pageBuilderUx';
 
 import type { PageBuilderProps } from '../PageBuilderTypes';
@@ -194,22 +196,63 @@ export function usePageManagement(
       onNotify(error instanceof Error?error.message:'Unable to load the page layout for activation');
     }finally{setSaving(false);}
   };
+  /** The whole app as it is now: its pages and the broken links on any of them. */
+  const checkApp=async(appId:string,current:LightningPageMetadata)=>{
+    const kept=otherAppDrafts(appId,{apiName:current.apiName,variant:current.layoutVariant??'Desktop'});
+    const edited=new Map<string,LightningPageMetadata['components']>([[current.apiName,current.components]]);
+    for(const {page:draft} of kept)if((draft.layoutVariant??'Desktop')==='Desktop'||!edited.has(draft.apiName))
+      edited.set(draft.apiName,draft.components);
+    const names=appPageNames(appId,apps,pages,[current.apiName,...kept.map(item=>item.page.apiName)]);
+    return {names,errors:await appBrokenLinks(request,names,pages,edited)};
+  };
+  /** Save = a new version of the app (the last 10 are kept, see App Manager > Versions). */
+  const recordVersion=async(appId:string,current:LightningPageMetadata)=>{
+    const {names,errors}=await checkApp(appId,current);
+    const recorded=await recordAppVersion(request,appId,names,errors);
+    return {...recorded,errors};
+  };
+  const linkWarning=(errors:readonly AppLinkError[])=>errors.length
+    ?errors.length+' broken link'+(errors.length===1?'':'s')+' (red on the canvas) — fix before publishing: '+describeLinkErrors(errors):'';
   /** Save button. Editing the whole app saves every changed page of the app together. */
   const saveCurrent=async()=>{
     const saved=await savePage();
-    if(saved&&appModeId)await saveOtherAppPages(false);
+    if(saved&&appModeId){
+      await saveOtherAppPages(false);
+      try{
+        const {version,errors}=await recordVersion(appModeId,saved);
+        onNotify('Saved app version '+version+(errors.length?'. '+linkWarning(errors):''));
+      }catch(error){onNotify('Saved. Version not recorded: '+(error instanceof Error?error.message:'unknown error'));}
+    }
     return saved;
   };
   const publishCurrentLayout=async()=>{
     if(saving)return;
     if(appModeId){
-      // Publish the app: this page, then every other changed page of the app.
+      // Publish the app: save every changed page, record the app version, and make it live.
+      // Nothing is published while any page of the app has a broken link.
       const saved=undoStack.length||!page.draftRevision?await savePage():page;
       if(!saved)return;
-      if(saved.draftRevision!==saved.publishedRevision
-        &&!await onPublish(saved.apiName,saved.layoutVariant??'Desktop',saved.draftRevision||undefined))return;
-      await saveOtherAppPages(true);
-      setSavedFeedback(true);setShowLayoutHistory(false);
+      await saveOtherAppPages(false);
+      setSaving(true);
+      try{
+        const {version,errors}=await recordVersion(appModeId,saved);
+        if(errors.length){onNotify('Not published (saved as version '+version+'). '+linkWarning(errors));return;}
+        await publishAppVersion(request,appModeId,version);
+        // The open page is now live: show it as the server has it.
+        const variant=saved.layoutVariant??'Desktop';
+        const fresh=await request<{page:LightningPageMetadata}>(
+          `/metadata/pages/${encodeURIComponent(saved.apiName)}/layouts/${variant}/editor`).catch(()=>null);
+        if(fresh?.page&&fresh.page.apiName===page.apiName)props.onChange(fresh.page);
+        onNotify('Published app version '+version);
+        setSavedFeedback(true);setShowLayoutHistory(false);
+      }catch(error){
+        onNotify(error instanceof Error?error.message:'Unable to publish the app');
+      }finally{setSaving(false);}
+      return;
+    }
+    const pageErrors=brokenPageLinks(page.components,pages);
+    if(pageErrors.length){
+      onNotify('Not published. '+linkWarning(pageErrors.map(item=>({page:page.label,component:item.component,message:item.message}))));
       return;
     }
     if(undoStack.length||!page.draftRevision){

@@ -122,6 +122,7 @@ import {PlatformTenantUserService} from './platform-tenant-user-service.js';
 import {AppPublishingService} from './app-publishing-service.js';
 import {NativeTenantRecordReader} from './native-tenant-records.js';
 import {rotateFirstLoginPassword} from './first-login-rotation.js';
+import {registerAppVersionRoutes} from './app-version-service.js';
 import {reconcileBootstrapPassword} from './bootstrap-password-sync.js';
 
 type Actor={tenant_id:string;user_id:string};
@@ -2081,6 +2082,8 @@ export function createSystemServer(db:SqlPersistence) {
     res.setHeader('Cache-Control','private, no-store');
     res.json({page:await pages.publishLayout(actor.tenant_id,req.params.apiName,variant,expected,actor.user_id)});
   }));
+  // App versions (Save = a new version of the whole app, Publish = make one version live).
+  registerAppVersionRoutes(app,db,rbac,pages);
   // The layout a page opens in (Page settings > Default layout). Stored as the page's creation layout.
   app.put('/api/metadata/pages/:apiName/default-layout/:variant',route(async(req,res)=>{
     const actor=req.actor!;
